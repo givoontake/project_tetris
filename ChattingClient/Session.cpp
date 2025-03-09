@@ -1,5 +1,6 @@
 #include <iostream>
 #include "Session.h"
+#include "protocol.h"
 
 Session::Session()
 {
@@ -55,6 +56,49 @@ void Session::Disconnect()
 void Session::ProcessRecvPacket(char* packet)
 {
     
+}
+
+void Session::MergePacket(int recv_bytes, char* recv_data)
+{
+    static int r_size = 0;
+    static char r_buffer[BUFFER_SIZE];
+
+    // 일단 새로 들어온 데이터를 뒤에 붙임
+
+    if (r_size + recv_bytes > BUFFER_SIZE)
+    {
+        // 버퍼 오버플로우 방지
+       /* std::cout << "Buffer overflow.." << std::endl;
+        r_size = 0;
+        ZeroMemory(r_buffer, sizeof(r_buffer));
+        std::cout << "Buffer clear complete." << std::endl;*/
+        Disconnect();
+        std::cout << "버퍼 오버플로우로 인해 종료합니다." << std::endl;
+    }
+
+    if (recv_bytes > 0)
+    {
+        memcpy(r_buffer + r_size, recv_data, recv_bytes);
+        r_size += recv_bytes;
+    } 
+
+    else {
+        std::cout << "recv_data: 0, 프로그램 종료.." << std::endl;
+        Disconnect();
+    }
+
+    // 남은 데이터에 패킷이 충분히 쌓였는지 확인하며 처리
+    while (r_size >= r_buffer[0]) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
+    {
+        char p_buffer[BUFFER_SIZE];
+        // 패킷 분리: packet_buffer에 복사 후 처리
+        memcpy(p_buffer, r_buffer, r_buffer[0]);
+        ProcessRecvPacket(p_buffer);
+
+        // 처리한 패킷은 남은 데이터에서 제거
+        r_size -= r_buffer[0];
+        memmove(r_buffer, r_buffer + r_buffer[0], r_size);
+    }
 }
 
 void Session::ProcessSendPacket(std::string message)

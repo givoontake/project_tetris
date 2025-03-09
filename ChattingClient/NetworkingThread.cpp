@@ -35,8 +35,8 @@ void NetworkingThread::RecvWorker(Session session)
 {
 	char buffer[BUFFER_SIZE];
 	while (true) {
-		int received_bytes = recv(session.GetSocket(), buffer, BUFFER_SIZE, 0);
-		// 패킷 병합 코드 필요
+		int recv_bytes = recv(session.GetSocket(), buffer, BUFFER_SIZE, 0);
+		session.MergePacket(recv_bytes, buffer);
 	}
 }
 

@@ -19,6 +19,7 @@ public:
 	bool ConnectToServer();
 	void Disconnect();
 	void ProcessRecvPacket(char* packet);
+	void MergePacket(int recv_bytes, char* recv_data);
 	void ProcessSendPacket(std::string message);
 	void MergePacket(char* packet);
 

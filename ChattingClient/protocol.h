@@ -1,5 +1,5 @@
 #pragma once
-constexpr int BUFFER_SIZE = 1024;
+constexpr int BUFFER_SIZE = 4096;
 constexpr int ID_SIZE = 16;
 
 constexpr char S2C_LOGIN = 1;
