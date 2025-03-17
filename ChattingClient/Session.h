@@ -26,6 +26,8 @@ public:
 	void MergePacket(int recv_bytes, char* recv_data);
 	void ProcessSendPacket(std::string message, int send_type);
 
+	std::string ConvertStringToUTF8(const std::string& str);
+
 	SOCKET GetSocket() const { return clientSocket; }
 };
 

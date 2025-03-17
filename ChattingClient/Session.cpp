@@ -154,13 +154,14 @@ void Session::ProcessSendPacket(std::string message, int send_type)
 
     case SEND_FLASK: {
             // HTTP POST 요청 메시지 구성
-            std::string httpPostRequest =
-                u8"POST /receive HTTP/1.1\r\n"
-                "Host: " + std::string(flaskIP) + ":" + std::to_string(flaskPort) + "\r\n"
-                "Content-Type: text/plain\r\n"
-                "Content-Length: " + std::to_string(message.size()) + "\r\n\r\n" + message;
+        std::string utf8Message = ConvertStringToUTF8(message);
+        std::string httpPostRequest =
+            u8"POST /receive HTTP/1.1\r\n"
+            "Host: " + std::string(flaskIP) + ":" + std::to_string(flaskPort) + "\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: " + std::to_string(utf8Message.size()) + "\r\n\r\n" + utf8Message;
 
-            std::cout << httpPostRequest << std::endl;
+            //std::cout << httpPostRequest << std::endl;
 
             // Flask로 데이터 전송
             int flaskResult = send(flaskSocket, httpPostRequest.c_str(), httpPostRequest.size(), 0);
@@ -171,4 +172,34 @@ void Session::ProcessSendPacket(std::string message, int send_type)
         }
 
     }
+}
+
+std::string Session::ConvertStringToUTF8(const std::string& str) {
+    // Step 1: Convert multi-byte string to wide string
+    int wideCharLength = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, NULL, 0);
+    if (wideCharLength == 0) {
+        throw std::runtime_error("MultiByteToWideChar conversion failed.");
+    }
+
+    std::wstring wideStr(wideCharLength, 0);
+    int result = MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, &wideStr[0], wideCharLength);
+    if (result == 0) {
+        throw std::runtime_error("MultiByteToWideChar conversion failed.");
+    }
+    wideStr.resize(wideCharLength - 1); // Remove null terminator
+
+    // Step 2: Convert wide string to UTF-8 string
+    int utf8Length = WideCharToMultiByte(CP_UTF8, 0, wideStr.c_str(), -1, NULL, 0, NULL, NULL);
+    if (utf8Length == 0) {
+        throw std::runtime_error("WideCharToMultiByte conversion failed.");
+    }
+
+    std::string utf8Str(utf8Length, 0);
+    result = WideCharToMultiByte(CP_UTF8, 0, wideStr.c_str(), -1, &utf8Str[0], utf8Length, NULL, NULL);
+    if (result == 0) {
+        throw std::runtime_error("WideCharToMultiByte conversion failed.");
+    }
+    utf8Str.resize(utf8Length - 1); // Remove null terminator
+
+    return utf8Str;
 }
