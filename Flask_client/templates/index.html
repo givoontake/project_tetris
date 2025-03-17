@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flask Real-time Message</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Real-time Flask Message</h1>
+    <div id="messageBox">Waiting for message...</div>
+
+    <script>
+        const socket = io();
+
+        socket.on('new_message', function(data) {
+            document.getElementById('messageBox').innerText = data.message;
+        });
+    </script>
+</body>
+</html>
