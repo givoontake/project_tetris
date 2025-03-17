@@ -7,9 +7,12 @@
 class Session
 {
 private:
-	SOCKET ClientSocket;
-	const char* ServerIP = "127.0.0.1";
-	int ServerPort = 1234;
+	SOCKET clientSocket;
+	SOCKET flaskSocket;
+	const char* serverIP = "127.0.0.1";
+	const char* flaskIP = "127.0.0.1";
+	int flaskPort = 5000;
+	int serverPort = 1234;
 	int id = -1;
 
 public:
@@ -17,12 +20,12 @@ public:
 	~Session();
 
 	bool ConnectToServer();
+	bool ConnectToLocalFlask();
 	void Disconnect();
 	void ProcessRecvPacket(char* packet);
 	void MergePacket(int recv_bytes, char* recv_data);
-	void ProcessSendPacket(std::string message);
-	void MergePacket(char* packet);
+	void ProcessSendPacket(std::string message, int send_type);
 
-	SOCKET GetSocket() const { return ClientSocket; }
+	SOCKET GetSocket() const { return clientSocket; }
 };
 

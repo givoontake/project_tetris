@@ -5,13 +5,18 @@ int main()
 {
 	Session session;
 
-	bool result = session.ConnectToServer();
+	bool result = session.ConnectToLocalFlask();
 	if (result == false) {
-		std::cout << "연결에 실패하였습니다. 프로그램을 종료합니다." << std::endl;
+	std::cout << "연결에 실패하였습니다. 프로그램을 종료합니다." << std::endl;
 		return 0;
 	}
+	//bool result = session.ConnectToServer();
+	//if (result == false) {
+	//	std::cout << "연결에 실패하였습니다. 프로그램을 종료합니다." << std::endl;
+	//	return 0;
+	//}
 
-	NetworkingThread nt(session);
-	nt.StartWorkerThread();
-	nt.WaitingThreadStop();
+	//NetworkingThread nt(session);
+	//nt.StartWorkerThread();
+	//nt.WaitingThreadStop();
 }

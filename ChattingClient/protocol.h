@@ -2,6 +2,9 @@
 constexpr int BUFFER_SIZE = 4096;
 constexpr int ID_SIZE = 16;
 
+constexpr int SEND_SERVER = 2000;
+constexpr int SEND_FLASK = 2001;
+
 constexpr char S2C_LOGIN = 1;
 constexpr char S2C_MESSAGE = 2;
 

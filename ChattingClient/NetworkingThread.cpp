@@ -45,6 +45,6 @@ void NetworkingThread::SendWorker(Session session)
 	std::string message;
 	while (true) {
 		std::cin >> message;
-		session.ProcessSendPacket(message);
+		session.ProcessSendPacket(message, SEND_SERVER); // 나중에 웹에서 메세지 받아와서 보내야함. 콘솔 메세지 전송 사용 안할 것.
 	}
 }
