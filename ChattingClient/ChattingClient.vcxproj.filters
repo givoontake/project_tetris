@@ -24,6 +24,9 @@
     <ClCompile Include="NetworkingThread.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="PacketType.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Session.h">
@@ -33,6 +36,12 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="protocol.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DataTransfer.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="PacketType.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
