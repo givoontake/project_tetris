@@ -156,7 +156,7 @@ void Session::ProcessSendPacket(std::string message, int send_type)
             // HTTP POST 요청 메시지 구성
         std::string utf8Message = ConvertStringToUTF8(message);
         std::string httpPostRequest =
-            u8"POST /receive HTTP/1.1\r\n"
+            "POST /receive HTTP/1.1\r\n"
             "Host: " + std::string(flaskIP) + ":" + std::to_string(flaskPort) + "\r\n"
             "Content-Type: text/plain\r\n"
             "Content-Length: " + std::to_string(utf8Message.size()) + "\r\n\r\n" + utf8Message;

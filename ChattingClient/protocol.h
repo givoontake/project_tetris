@@ -1,15 +1,10 @@
 #pragma once
+#include <array>
 constexpr int BUFFER_SIZE = 4096;
 constexpr int ID_SIZE = 16;
 
 constexpr int SEND_SERVER = 2000;
 constexpr int SEND_FLASK = 2001;
-
-constexpr char S2C_LOGIN = 1;
-constexpr char S2C_MESSAGE = 2;
-
-constexpr char C2S_LOGIN = 11;
-constexpr char C2S_MESSAGE = 12;
 
 struct S2C_LOGIN_PACKET {
 	char size;
@@ -17,7 +12,7 @@ struct S2C_LOGIN_PACKET {
 	char id[ID_SIZE];
 };
 
-struct C2S_LOGIN_SIZE {
+struct C2S_LOGIN_PACKET {
 	char size;
 	char type;
 	char id[ID_SIZE];
