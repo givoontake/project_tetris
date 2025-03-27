@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>반갑습니다!</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- 실시간 소켓 메시지 영역 -->
+        
+        <script>
+            // Socket.IO 연결 (동일 서버 5000번 포트 사용 시)
+            const socket = io('http://127.0.0.1:5000');
+
+            // 서버로부터 new_message 이벤트를 받으면 화면에 표시
+            socket.on('new_message', function(data) {
+                document.getElementById('messageBox').innerText = data.message;
+            });
+            
+            // 소켓 연결 실패 시 에러 핸들링
+            socket.on('connect_error', function(error) {
+                document.getElementById('messageBox').innerText = 'Connection failed';
+            });
+
+            // 닉네임 입력 후 채팅 시작하기 버튼을 눌렀을 때 실행될 함수
+            function startChat() {
+                const nickname = document.getElementById('nickname').value;
+
+                // Flask의 /main 엔드포인트로 POST 요청
+                fetch('/main', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: nickname })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('서버 응답:', data);
+                    // 필요 시, 여기서 추가 로직을 처리하면 됨
+                })
+                .catch(error => {
+                    console.error('에러 발생:', error);
+                });
+            }
+        </script>
+        
+        <!-- 채팅 설명 및 주의 사항 -->
+        <div class="margin">
+            <h1>이 프로그램은 채팅 프로그램 제작을 위한 연습 프로그램입니다.</h1>
+            <h4>
+                1인당 1개의 채팅방에만 참여할 수 있습니다.<br>
+                모든 채팅은 텍스트로만 전달 가능합니다.<br>
+                모든 대화 내용은 서버에 저장되지 않습니다.<br>
+                따라서 대화는 현재 세션에서만 유지되며<br>
+                웹 브라우저가 종료될 경우 모든 대화 내용은 사라집니다.
+            </h4>
+        </div>
+        
+        <!-- 닉네임 입력 및 채팅 시작 UI -->
+        <div class="chat-controls">
+            <p>사용할 닉네임을 입력하세요</p>
+            <input type="text" class="nickname-input" id="nickname" placeholder="닉네임 입력">
+            <br>
+            <a href="#" class="chat-start-button">채팅 시작하기</a>
+        </div>
+    </div>
+</body>
+</html>

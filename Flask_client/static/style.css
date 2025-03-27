@@ -3,6 +3,7 @@ body {
     background-color: #f0f0f0;
     margin: 0;
     padding: 20px;
+    text-align: center; /* 모든 내용 가운데 정렬 */
 }
 
 .container {
@@ -13,10 +14,6 @@ body {
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     text-align: center;
-}
-
-h1 {
-    color: #333;
 }
 
 .message-box {
@@ -30,4 +27,35 @@ h1 {
 .message-box p {
     font-size: 18px;
     color: #555;
+    margin: 0;
+}
+
+.margin {
+    margin-top: 50px;
+}
+
+/* 추가 스타일 */
+.chat-controls {
+    margin-top: 30px;
+}
+
+.nickname-input {
+    width: 80%;
+    padding: 10px;
+    font-size: 16px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.chat-start-button {
+    display: inline-block;
+    padding: 15px 30px;
+    background-color: purple;
+    color: white;
+    font-size: 18px;
+    text-align: center;
+    border-radius: 12px;
+    cursor: pointer;
+    text-decoration: none;
 }

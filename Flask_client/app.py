@@ -7,7 +7,30 @@ received_message = ""
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('main.html')
+
+@app.route('/main', methods=['POST'])
+def connect():
+    # html에서 json 데이터를 수신
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "No data received"}), 400
+
+        text = data.get('message', '')
+        if not text:
+            return jsonify({"status": "error", "message": "No 'message' field"}), 400
+
+        # 받은 데이터를 바로 Socket.IO(로 전송
+        socketio.emit('new_message', {'message': text})
+        # print("전송된 메시지:", text)
+
+        return jsonify({"status": "success", "message": f"Sent: {text}"})
+
+    except Exception as e:
+        print("에러 발생:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
 
 @app.route('/receive', methods=['POST'])
 def receive():
