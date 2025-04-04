@@ -3,22 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>방 찾기</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .form-group {
-            margin: 20px 0;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
+    <div class="box">
         <h2>참여할 방 이름을 입력하세요</h2>
         
-        <div class="form-group">
+        <div class="form-input">
             <input type="text" class="nickname-input" placeholder="방 이름 입력">
         </div>
 
-        <a href="#" class="chat-start-button">찾기</a>
+        <a href="#" class="form-button">찾기</a>
     </div>
 </body>
 </html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlueTalk</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- {% if error %}
+    <script>
+        alert("{{ error }}");
+    </script>
+    {% endif %} -->
+
+    <!-- 로그인 박스 -->
+    <div class="box">
+        <h2>Login</h2>
+        <form method="POST" action="{{ url_for('send_to_main_server') }}">
+
+            <input type="hidden" name="type" value="c2s_login">
+
+            <label for="username"></label>
+            <input type="text" name="username" class="form-input" placeholder="아이디"><br>
+            
+            <label for="password"></label>
+            <input type="password" name="password" class="form-input" placeholder="비밀번호"><br>
+        
+            <button type="submit" class="form-button">로그인</button>
+        </form>
+
+    </div>
+</body>
+</html>

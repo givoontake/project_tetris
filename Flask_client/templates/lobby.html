@@ -2,21 +2,18 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>{{ session.user_id }}님! 환영합니다!</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>환영합니다!</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         /* 필요한 추가 스타일만 정의 */
 
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>{{ session.user_id }}님! 환영합니다!</h1>
-
-        <div class="action-buttons">
-            <a href="{{ url_for('lobby_make') }}" class="action-box">방 만들기</a>
-            <a href="{{ url_for('lobby_find') }}" class="action-box">방 참가하기</a>
-        </div>
+    <div class="box">
+        <h1>환영합니다!</h1>
+        <a href="{{ url_for('lobby_make') }}" class="form-button">방 만들기</a>
+        <a href="{{ url_for('lobby_find') }}" class="form-button">방 참가하기</a>
     </div>
 </body>
 </html>

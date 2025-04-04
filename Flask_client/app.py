@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, url_for, redirect, session
 from flask_socketio import SocketIO, emit
+import json
 
 app = Flask(__name__)
 app.secret_key = 'my_secret_key'  # session 사용을 위한 필수 설정
@@ -11,7 +12,24 @@ def set_default_session():
     if 'user_id' not in session:
         session['user_id'] = 'guest'
 
+@app.route('/send_to_main_server', methods = ['POST'])
+def send_to_main_server():
+    data = request.form.to_dict()
+    json_data = json.dumps(data)
+    if(data['type'] == "c2s_login"):
+        # socketio.emit('send', json_data) # 첫 인자는 c++로 들어갈 때 어차피 제외되고 데이터만 들어간다고 한다.
+        return render_template('lobby.html')
+
+
 @app.route('/')
+def login():
+    return render_template('login.html')
+
+@app.route('/new_main')
+def new_main():
+    return render_template('new_main.html')
+
+@app.route('/lobby')
 def index():
     return render_template('lobby.html')
 
@@ -42,12 +60,7 @@ def chatting():
     except Exception as e:
         print("에러 발생:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/lobby')
-def lobby():
-    # 세션에서 user_id 사용 → 템플릿에서 {{ session.user_id }}로 접근 가능
-    return render_template("lobby.html")
-
+    
 @app.route('/receive', methods=['POST'])
 def receive():
     try:

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>방 만들기</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         .form-group {
             margin: 20px 0;
@@ -19,12 +19,9 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="box">
         <h2>새로운 방을 만들어보세요</h2>
-
-        <div class="form-group">
-            <input type="text" class="nickname-input" placeholder="방 제목 입력">
-        </div>
+        <input type="text" class="nickname-input" placeholder="방 제목 입력">
 
         <div class="form-group">
             <select class="select-box">
@@ -34,7 +31,7 @@
             </select>
         </div>
 
-        <a href="#" class="chat-start-button">만들기</a>
+        <a href="#" class="form-button">만들기</a>
     </div>
 </body>
 </html>
