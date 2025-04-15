@@ -32,3 +32,23 @@ void Session::RecvPacket()
 		std::cout << "client[" << id << "]" << "WSARecv() IOCP Sign Up Fail\n";
 	}
 }
+
+void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는 것 같다. 나중에 방이 추가되면, 방에서도 세션에 접근만 해서 보내기만 하면 된다.
+{
+    // 일단 새로 들어온 데이터를 뒤에 붙임
+	memcpy(recv_over.packet_buf + remain_data_size, recv_data, recv_bytes);
+	remain_data_size += recv_bytes;
+
+    // 남은 데이터에 패킷이 충분히 쌓였는지 확인하며 처리
+    while (remain_data_size >= recv_over.packet_buf[0]) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
+    {
+        char p_buffer[BUF_SIZE];
+        // 패킷 분리: packet_buffer에 복사 후 처리
+        memcpy(p_buffer, recv_over.packet_buf, recv_over.packet_buf[0]);
+       // ProcessRecvPacket(p_buffer);
+
+        // 처리한 패킷은 남은 데이터에서 제거
+        remain_data_size -= recv_over.packet_buf[0];
+        memmove(recv_over.packet_buf, recv_over.packet_buf + recv_over.packet_buf[0], remain_data_size);
+    }
+}
