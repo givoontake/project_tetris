@@ -1,0 +1,31 @@
+#pragma once
+#include <WinSock2.h>
+#include <MSWSock.h>
+#include <mutex>
+#include "ExOverlapped.h"
+
+class Session
+{
+	SOCKET socket;
+	ExOvelapped recv_over;
+	std::mutex session_mutex;
+	int id = -1;
+
+	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
+	int remain_data_size = 0;
+	
+public:
+	Session();
+
+	void SendPacket(char* packet);
+	void RecvPacket();
+
+	//getters
+	SOCKET GetSocket() const { return socket; }
+	int GetId() const { return id; }
+
+	//setters
+	void SetSocket(SOCKET new_socket) { socket = new_socket; }
+	void SetId(int new_id) { id = new_id; }
+};
+
