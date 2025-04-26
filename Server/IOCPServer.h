@@ -18,7 +18,6 @@ class IOCPServer : IServer
 	SOCKADDR_IN server_addr;
 	ExOvelapped accept_over;
 
-	std::array<std::atomic<bool>, MAX_USER> id_container;
 	std::array<Session, MAX_USER> users;
 
 	PacketHandler packet_handler;

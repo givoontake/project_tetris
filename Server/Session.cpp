@@ -52,3 +52,18 @@ void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는
 		handler_interface->ProcessPacket(p_buffer);
     }
 }
+
+bool Session::SetUse(bool expected, bool desired)
+{
+	// false -> true
+	if (desired == true) {
+		if (in_use.compare_exchange_strong(expected, desired)) return true;
+		else return false;
+	}
+
+	// true -> false
+	else {
+		if (in_use.compare_exchange_strong(expected, desired)) return true;
+		else return false;
+	}
+}
