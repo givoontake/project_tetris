@@ -5,7 +5,7 @@ int main()
 {
 	Session session;
 
-	bool result = session.ConnectToLocalFlask();
+	bool result = session.ConnectToServer();
 	if (result == false) {
 	std::cout << "연결에 실패하였습니다. 프로그램을 종료합니다." << std::endl;
 		return 0;

@@ -12,7 +12,7 @@ private:
 	const char* serverIP = "127.0.0.1";
 	const char* flaskIP = "127.0.0.1";
 	int flaskPort = 5000;
-	int serverPort = 1234;
+	int serverPort = 12345;
 	int id = -1;
 
 public:
