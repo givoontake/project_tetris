@@ -3,12 +3,14 @@
 #include <MSWSock.h>
 #include <mutex>
 #include "ExOverlapped.h"
+#include "Interface.h"
 
 class Session
 {
 	SOCKET socket;
 	ExOvelapped recv_over;
 	std::mutex session_mutex;
+	IPacketHandler* handler_interface;
 	int id = -1;
 
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.

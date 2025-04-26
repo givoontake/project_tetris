@@ -16,6 +16,11 @@ IOCPServer::IOCPServer()
 
 }
 
+std::array<Session, MAX_USER>& IOCPServer::GetSessionList()
+{
+	return users;
+}
+
 void IOCPServer::StartServer()
 {
 	bind(listen_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));

@@ -21,12 +21,15 @@
   <ItemGroup>
     <ClCompile Include="IOCPServer.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="Session.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="define.h" />
     <ClInclude Include="ExOverlapped.h" />
     <ClInclude Include="IOCPServer.h" />
+    <ClInclude Include="Interface.h" />
+    <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="Session.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

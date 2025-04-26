@@ -13,7 +13,7 @@ void Session::SendPacket(char* packet)
 	memcpy(send_over->packet_buf, packet, packet[0]);
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		// 이건 GQCS로 가지 않음 → 직접 처리해야 함
+		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
 		std::cout << "client[" << id << "]" << "WSASend() IOCP Sign Up Fail\n";
 		delete send_over;
 	}
@@ -28,7 +28,6 @@ void Session::RecvPacket()
 	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		// 이건 GQCS로 가지 않음 → 직접 처리해야 함
 		std::cout << "client[" << id << "]" << "WSARecv() IOCP Sign Up Fail\n";
 	}
 }
@@ -50,5 +49,6 @@ void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는
         // 처리한 패킷은 남은 데이터에서 제거
         remain_data_size -= recv_over.packet_buf[0];
         memmove(recv_over.packet_buf, recv_over.packet_buf + recv_over.packet_buf[0], remain_data_size);
+		handler_interface->ProcessPacket(p_buffer);
     }
 }
