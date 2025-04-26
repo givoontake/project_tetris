@@ -29,6 +29,7 @@ public:
 	//getters
 	SOCKET GetSocket() const { return socket; }
 	int GetId() const { return id; }
+	bool GetUse() const { return in_use; }
 
 	//setters
 	void SetSocket(SOCKET new_socket) { socket = new_socket; }
