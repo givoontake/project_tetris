@@ -25,6 +25,7 @@ class IOCPServer : IServer
 	
 public:
 	IOCPServer();
+	~IOCPServer();
 
 	virtual std::array<Session, MAX_USER>& GetSessionList() override;
 

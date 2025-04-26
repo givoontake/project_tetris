@@ -16,6 +16,13 @@ IOCPServer::IOCPServer()
 
 }
 
+IOCPServer::~IOCPServer()
+{
+	closesocket(listen_socket);
+	closesocket(client_socket);
+	WSACleanup();
+}
+
 std::array<Session, MAX_USER>& IOCPServer::GetSessionList()
 {
 	return users;
@@ -78,6 +85,8 @@ void IOCPServer::ProcessGQCS()
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 
+			std::cout << "client[" << new_id << "]" << " Connect\n";
+
 			ZeroMemory(&accept_over.over, sizeof(accept_over.over));
 			int addr_size = sizeof(SOCKADDR_IN);
 			AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.over);
@@ -85,11 +94,13 @@ void IOCPServer::ProcessGQCS()
 		}
 
 		case RECV: {
-				
+			users[key].MergePacket(transferred_bytes, ex_over->packet_buf);
+			users[key].RecvPacket();
 			break;
 		}
 
 		case SEND:
+			delete ex_over;
 			// 송신 완료 후 추가 처리
 			break;
 		}
