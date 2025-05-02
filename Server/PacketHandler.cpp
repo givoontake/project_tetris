@@ -30,5 +30,16 @@ void PacketHandler::ProcessPacket(char* packet)
 			user.SendPacket(reinterpret_cast<char*>(p));
 		}
 		break;
+
+	case C2S_TEST:
+		// 받아서 따로 서버에서 변경되는 패킷 내용이 없다.
+		for (auto& user : users) {
+			if (!user.GetUse()) continue;
+			S2C_TEST_PACKET* p = reinterpret_cast<S2C_TEST_PACKET*>(packet);
+			p->type = S2C_TEST;
+			user.SendPacket(reinterpret_cast<char*>(p));
+		}
+		break;
 	}
+
 }
