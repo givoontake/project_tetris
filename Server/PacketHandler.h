@@ -1,10 +1,10 @@
 #pragma once
 #include "Interface.h"
 
-class PacketHandler : IPacketHandler
+class PacketHandler : public IPacketHandler
 {
 public:
-	PacketHandler();
+	PacketHandler(IServer* i_server);
 	IServer* server_interface;
 	virtual void ProcessPacket(char* pakcet);
 };

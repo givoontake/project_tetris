@@ -6,6 +6,11 @@
 
 TestManager::TestManager()
 {
+	packet_handler = std::make_unique<PacketHandler>(this);
+	for (auto& client : clients) {
+		client = std::make_unique<Session>(packet_handler.get()); // packet_handler는 unique_ptr이므로 get()을 이용해 raw ptr을 넘긴다.
+	}
+
 	WSAStartup(MAKEWORD(2, 2), &wsadata);
 
 	//client_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -23,7 +28,7 @@ TestManager::~TestManager()
 	WSACleanup();
 }
 
-std::array<Session, MAX_USER>& TestManager::GetSessionList()
+std::array<std::unique_ptr<Session>, MAX_USER>& TestManager::GetSessionList()
 {
 	return clients;
 }
@@ -62,9 +67,9 @@ bool TestManager::ConnectToServer()
 	}
 
 	int new_id = GetClientId();
-	clients[new_id].SetId(new_id); // 이미 배열 인덱스를 id처럼 쓰고 있어서..나중에라도 의미가 있을까?
-	clients[new_id].SetSocket(client_socket);
-	clients[new_id].last_send_time = GetCurrentTimeMS();
+	clients[new_id]->SetId(new_id); // 이미 배열 인덱스를 id처럼 쓰고 있어서..나중에라도 의미가 있을까?
+	clients[new_id]->SetSocket(client_socket);
+	clients[new_id]->last_send_time = GetCurrentTimeMS();
 	
 	while (true) {
 		int expected = connected_client;
@@ -97,13 +102,13 @@ void TestManager::ProcessGQCS()
 	switch (ex_over->op_type) {
 
 	case RECV: {
-		clients[key].MergePacket(transferred_bytes, ex_over->packet_buf);
-		clients[key].RecvPacket();
+		clients[key]->MergePacket(transferred_bytes, ex_over->packet_buf);
+		clients[key]->RecvPacket();
 		break;
 	}
 
 	case SEND:
-		clients[key].last_time = GetCurrentTimeMS();
+		clients[key]->last_time = GetCurrentTimeMS();
 		delete ex_over;
 		// 송신 완료 후 추가 처리
 		break;
@@ -113,18 +118,18 @@ void TestManager::ProcessGQCS()
 void TestManager::ProcessSend()
 {
 	for (auto& client : clients) {
-		if (!client.GetUse()) continue;
-		int expected = client.last_send_time;
+		if (!client->GetUse()) continue;
+		int expected = client->last_send_time;
 		int desired = GetCurrentTimeMS();
 		int ms = desired - expected;
 		if (ms > 1000) {
-			if (client.last_send_time.compare_exchange_strong(expected, desired)) {
+			if (client->last_send_time.compare_exchange_strong(expected, desired)) {
 				C2S_TEST_PACKET p;
 				p.size = sizeof(C2S_TEST_PACKET);
 				p.type = C2S_TEST;
 				memcpy(p.message, test_message, BUF_SIZE);
 				p.last_time = GetCurrentTimeMS();
-				client.SendPacket(reinterpret_cast<char*>(&p));
+				client->SendPacket(reinterpret_cast<char*>(&p));
 			}
 		}
 		else continue;
@@ -135,7 +140,7 @@ int TestManager::GetClientId()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		bool expected = false;
-		if (clients[i].SetUse(false, true)) {
+		if (clients[i]->SetUse(false, true)) {
 			return i;
 		}
 	}
@@ -158,8 +163,8 @@ void TestManager::SetTestMessege(int message_size)
 void TestManager::Disconnect(int user_id)
 {
 	// 채팅에 연결된 모든 클라에게 disconnect 패킷 전송-> 실시간 채팅도 아니고 필요 없을 듯 한데..
-	clients[user_id].SetUse(false, true); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
-	closesocket(clients[user_id].GetSocket());
+	clients[user_id]->SetUse(false, true); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
+	closesocket(clients[user_id]->GetSocket());
 	while (true) {
 		int expected = connected_client;
 		int desired = expected - 1;

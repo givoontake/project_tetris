@@ -23,7 +23,7 @@ public:
 	std::atomic<int> last_send_time; // 타이머 스레드의 자동 send에 사용
 	
 public:
-	Session();
+	Session(IPacketHandler* p_handler);
 
 	void SendPacket(char* packet);
 	void RecvPacket();

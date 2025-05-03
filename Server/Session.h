@@ -20,7 +20,7 @@ class Session
 	std::atomic<bool> in_use = false;
 	
 public:
-	Session();
+	Session(IPacketHandler* p_handler); // 인자로 IPacketHandler를 받을 때 자식 클래스 Packethandler를 받는다->업캐스팅, 자식에서 재정의한 가상함수만 사용 가능하다.
 
 	void SendPacket(char* packet);
 	void RecvPacket();

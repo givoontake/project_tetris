@@ -3,6 +3,11 @@
 
 IOCPServer::IOCPServer()
 {
+	packet_handler = std::make_unique<PacketHandler>(this);
+	for (auto& user : users) {
+		user = std::make_unique<Session>(packet_handler.get()); // packet_handler는 unique_ptr이므로 get()을 이용해 raw ptr을 넘긴다.
+	}
+
 	WSAStartup(MAKEWORD(2, 2), &wsadata);
 
 	listen_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
@@ -23,7 +28,7 @@ IOCPServer::~IOCPServer()
 	WSACleanup();
 }
 
-std::array<Session, MAX_USER>& IOCPServer::GetSessionList()
+std::array<std::unique_ptr<Session>, MAX_USER>& IOCPServer::GetSessionList()
 {
 	return users;
 }
@@ -77,10 +82,10 @@ void IOCPServer::ProcessGQCS()
 		case ACCEPT: {
 			int new_id = GetUserId();
 			if (new_id != -1) {
-				users[new_id].SetId(new_id);
-				users[new_id].SetSocket(client_socket);
+				users[new_id]->SetId(new_id);
+				users[new_id]->SetSocket(client_socket);
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_id, 0);
-				users[new_id].RecvPacket();
+				users[new_id]->RecvPacket();
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
@@ -94,8 +99,8 @@ void IOCPServer::ProcessGQCS()
 		}
 
 		case RECV: {
-			users[key].MergePacket(transferred_bytes, ex_over->packet_buf);
-			users[key].RecvPacket();
+			users[key]->MergePacket(transferred_bytes, ex_over->packet_buf);
+			users[key]->RecvPacket();
 			break;
 		}
 
@@ -111,7 +116,7 @@ int IOCPServer::GetUserId()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		bool expected = false;
-		if (users[i].SetUse(false, true)) {
+		if (users[i]->SetUse(false, true)) {
 			return i;
 		}
 	}
@@ -122,6 +127,6 @@ int IOCPServer::GetUserId()
 void IOCPServer::Disconnect(int user_id)
 {
 	// 채팅에 연결된 모든 클라에게 disconnect 패킷 전송-> 실시간 채팅도 아니고 필요 없을 듯 한데..
-	users[user_id].SetUse(false, true); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
-	closesocket(users[user_id].GetSocket());
+	users[user_id]->SetUse(false, true); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
+	closesocket(users[user_id]->GetSocket());
 }

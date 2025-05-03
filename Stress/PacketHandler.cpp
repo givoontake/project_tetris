@@ -3,13 +3,14 @@
 //#include "define.h"
 #include "Session.h"
 
-PacketHandler::PacketHandler()
+PacketHandler::PacketHandler(ITestManager* i_manager) : manager_interface(i_manager)
 {
+
 }
 
 void PacketHandler::ProcessPacket(char* packet)
 {
-	std::array<Session, MAX_USER>& users = manager_interface->GetSessionList();
+	std::array<std::unique_ptr<Session>, MAX_USER>& users = manager_interface->GetSessionList();
 
 	switch (packet[1]) {
 	case S2C_TEST: {

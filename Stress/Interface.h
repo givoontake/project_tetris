@@ -13,7 +13,7 @@ public:
 
 class ITestManager { // 서버의 세션 리스트 접근을 위한 추상 클래스
 public:
-	virtual std::array<Session, MAX_USER>& GetSessionList() = 0;
+	virtual std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() = 0;
 	virtual int GetCurrentTimeMS() = 0;
 	virtual void AdjustClientNumber(int now_time, S2C_TEST_PACKET* p) = 0;
 };

@@ -1,7 +1,7 @@
 #include <iostream>
 #include "Session.h"
 
-Session::Session()
+Session::Session(IPacketHandler* p_handler) :  handler_interface(p_handler)
 {
 	recv_over.SetExOverlapped(RECV);
 }
