@@ -38,22 +38,29 @@ void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는
 	memcpy(recv_over.packet_buf + remain_data_size, recv_data, recv_bytes);
 	remain_data_size += recv_bytes;
 
-	short packet_size;
-	memcpy(&packet_size, recv_over.packet_buf, sizeof(packet_size));
+	short packet_size = GetPacketSize(recv_over.packet_buf);
 
-    // 남은 데이터에 패킷이 충분히 쌓였는지 확인하며 처리
-    while (remain_data_size >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
-    {
-        char p_buffer[BUF_SIZE];
-        // 패킷 분리: packet_buffer에 복사 후 처리
-        memcpy(p_buffer, recv_over.packet_buf, packet_size);
-       // ProcessRecvPacket(p_buffer);
+	// 남은 데이터에 패킷이 충분히 쌓였는지 확인하며 처리
+	while (remain_data_size >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
+	{
+		char p_buffer[BUF_SIZE];
+		// 패킷 분리: packet_buffer에 복사 후 처리
+		memcpy(p_buffer, recv_over.packet_buf, packet_size);
+		// ProcessRecvPacket(p_buffer);
 
-        // 처리한 패킷은 남은 데이터에서 제거
-        remain_data_size -= packet_size;
-        memmove(recv_over.packet_buf, recv_over.packet_buf + packet_size, remain_data_size);
+		 // 처리한 패킷은 남은 데이터에서 제거
+		remain_data_size -= packet_size;
+		memmove(recv_over.packet_buf, recv_over.packet_buf + packet_size, remain_data_size);
 		handler_interface->ProcessPacket(p_buffer);
-    }
+	}
+}
+
+short Session::GetPacketSize(char* packet)
+{
+	short packet_size;
+	memcpy(&packet_size, packet, sizeof(packet_size));
+	std::cout << packet_size << std::endl;
+	return packet_size;
 }
 
 bool Session::SetUse(bool expected, bool desired)

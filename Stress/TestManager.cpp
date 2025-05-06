@@ -109,7 +109,7 @@ void TestManager::ProcessGQCS()
 	case SEND:
 		clients[key]->last_time = GetCurrentTimeMS();
 		C2S_TEST_PACKET* p = reinterpret_cast<C2S_TEST_PACKET*>(ex_over->packet_buf);
-		std::cout << "=== C2S_TEST_PACKET ===" << std::endl;
+		std::cout << "=== C2S_TEST_PACKET(ProcessGQCS) ===" << std::endl;
 		std::cout << "Size: " << p->size << std::endl;
 		std::cout << "Type: " << p->type << std::endl;
 		std::cout << "ID: " << p->id << std::endl;

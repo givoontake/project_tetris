@@ -11,6 +11,15 @@ void Session::SendPacket(char* packet)
 	ExOvelapped* send_over = new ExOvelapped;
 	send_over->SetExOverlapped(SEND);
 	memcpy(send_over->packet_buf, packet, GetPacketSize(packet));
+	C2S_TEST_PACKET* p = reinterpret_cast<C2S_TEST_PACKET*>(send_over->packet_buf);
+	std::cout << "=== C2S_TEST_PACKET(SendPacket) ===" << std::endl;
+	std::cout << "Size: " << p->size << std::endl;
+	std::cout << "Type: " << p->type << std::endl;
+	std::cout << "ID: " << p->id << std::endl;	
+	std::cout << "Message: " << p->message << std::endl;
+	std::cout << "Last Time: " << p->last_time << std::endl;
+	std::cout << "=======================" << std::endl;
+	std::cout << std::endl;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
@@ -58,7 +67,8 @@ void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는
 short Session::GetPacketSize(char* packet)
 {
 	short packet_size;
-	memcpy(&packet_size, recv_over.packet_buf, sizeof(packet_size));
+	memcpy(&packet_size, packet, sizeof(packet_size));
+	std::cout << packet_size << std::endl;
 	return packet_size;
 }
 

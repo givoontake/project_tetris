@@ -25,6 +25,7 @@ public:
 	void SendPacket(char* packet);
 	void RecvPacket();
 	void MergePacket(int recv_bytes, char* recv_data);
+	short GetPacketSize(char* packet);
 
 	//getters
 	SOCKET GetSocket() const { return socket; }
