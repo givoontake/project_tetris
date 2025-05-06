@@ -33,17 +33,16 @@ std::array<std::unique_ptr<Session>, MAX_USER>& TestManager::GetSessionList()
 	return clients;
 }
 
-int TestManager::GetCurrentTimeMS()
+long long TestManager::GetCurrentTimeMS()
 {
-	using namespace std::chrono;
-	auto now = system_clock::now();
-	auto duration = duration_cast<milliseconds>(now.time_since_epoch());
-	return static_cast<int>(duration.count());  // 밀리초 단위 정수값
+	return std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::system_clock::now().time_since_epoch()
+	).count();
 }
 
-void TestManager::AdjustClientNumber(int now_time, S2C_TEST_PACKET* p)
+void TestManager::AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p)
 {
-	int ms = now_time - p->last_time;
+	long long ms = now_time - p->last_time;
 	if (ms > 100) { // 딜레이가 100ms 이상이면
 		Disconnect(p->id);
 	}
@@ -109,6 +108,15 @@ void TestManager::ProcessGQCS()
 
 	case SEND:
 		clients[key]->last_time = GetCurrentTimeMS();
+		C2S_TEST_PACKET* p = reinterpret_cast<C2S_TEST_PACKET*>(ex_over->packet_buf);
+		std::cout << "=== C2S_TEST_PACKET ===" << std::endl;
+		std::cout << "Size: " << p->size << std::endl;
+		std::cout << "Type: " << p->type << std::endl;
+		std::cout << "ID: " << p->id << std::endl;
+		std::cout << "Message: " << p->message << std::endl;
+		std::cout << "Last Time: " << p->last_time << std::endl;
+		std::cout << "=======================" << std::endl;
+		std::cout << std::endl;
 		delete ex_over;
 		// 송신 완료 후 추가 처리
 		break;
@@ -119,15 +127,16 @@ void TestManager::ProcessSend()
 {
 	for (auto& client : clients) {
 		if (!client->GetUse()) continue;
-		int expected = client->last_send_time;
-		int desired = GetCurrentTimeMS();
-		int ms = desired - expected;
+		long long expected = client->last_send_time;
+		long long desired = GetCurrentTimeMS();
+		long long ms = desired - expected;
 		if (ms > 1000) {
 			if (client->last_send_time.compare_exchange_strong(expected, desired)) {
 				C2S_TEST_PACKET p;
 				p.size = sizeof(C2S_TEST_PACKET);
 				p.type = C2S_TEST;
-				memcpy(p.message, test_message, BUF_SIZE);
+				p.id = client->GetId();
+				memcpy(p.message, test_message, sizeof(test_message));
 				p.last_time = GetCurrentTimeMS();
 				client->SendPacket(reinterpret_cast<char*>(&p));
 			}
@@ -157,13 +166,14 @@ void TestManager::SetTestMessege(int message_size)
 		exit(0);
 	}
 
+	std::cout << test_message << std::endl;
 	in.close();
 }
 
 void TestManager::Disconnect(int user_id)
 {
 	// 채팅에 연결된 모든 클라에게 disconnect 패킷 전송-> 실시간 채팅도 아니고 필요 없을 듯 한데..
-	clients[user_id]->SetUse(false, true); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
+	clients[user_id]->SetUse(true, false); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(clients[user_id]->GetSocket());
 	while (true) {
 		int expected = connected_client;

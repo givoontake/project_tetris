@@ -1,5 +1,6 @@
 #pragma once
-constexpr int BUF_SIZE = 1024;
+constexpr int BUF_SIZE = 10240;
+constexpr int MAX_MESSAGE_SIZE = 512;
 constexpr int PORT_NUM = 12345;
 
 constexpr int MAX_USER = 10000;
@@ -13,44 +14,48 @@ constexpr char C2S_MESSAGE = 4;
 constexpr char S2C_TEST = 5;
 constexpr char C2S_TEST = 6;
 
+#pragma pack(push, 1)
+
 struct S2C_LOGIN_PACKET {
-	char size;
+	short size;
 	char type;
 	char id[ID_SIZE];
 };
 
 struct C2S_LOGIN_PACKET {
-	char size;
+	short size;
 	char type;
 	char id[ID_SIZE];
 };
 
 struct S2C_MESSAGE_PACKET {
-	char size;
+	short size;
 	char type;
 	char id[ID_SIZE];
-	char message[BUF_SIZE];
+	char message[MAX_MESSAGE_SIZE];
 };
 
 struct C2S_MESSAGE_PACKET {
-	char size;
+	short size;
 	char type;
 	char id[ID_SIZE];
-	char message[BUF_SIZE];
+	char message[MAX_MESSAGE_SIZE];
 };
 
 struct S2C_TEST_PACKET {
-	char size;
+	short size;
 	char type;
 	int id;
-	char message[BUF_SIZE];
-	int last_time;
+	char message[MAX_MESSAGE_SIZE];
+	long long last_time;
 };
 
 struct C2S_TEST_PACKET {
-	char size;
+	short size;
 	char type;
 	int id; // 테스트 프로그램도 다중 클라이언트를 관리중이므로 필요
-	char message[BUF_SIZE];
-	int last_time;
+	char message[MAX_MESSAGE_SIZE];
+	long long last_time;
 };
+
+#pragma pack(pop)

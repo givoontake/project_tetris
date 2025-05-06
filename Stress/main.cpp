@@ -20,6 +20,7 @@ void SendWorkerThread()
 
 int main()
 {
+	test_manager.SetTestMessege(MAX_MESSAGE_SIZE);
 	bool res = test_manager.ConnectToServer();
 	if (!res) {
 		return 0;

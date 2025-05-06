@@ -22,15 +22,15 @@ class TestManager : public ITestManager
 
 public: // 테스트하는데 굳이 private 할 이유는 없다
 	std::atomic<int> connected_client = 0;
-	char test_message[BUF_SIZE];
+	char test_message[MAX_MESSAGE_SIZE];
 
 public:
 	TestManager();
 	~TestManager();
 
 	virtual std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() override;
-	virtual int GetCurrentTimeMS() override;
-	virtual void AdjustClientNumber(int now_time, S2C_TEST_PACKET* p) override;
+	virtual long long GetCurrentTimeMS() override;
+	virtual void AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p) override;
 
 	bool ConnectToServer();
 	void ProcessGQCS();

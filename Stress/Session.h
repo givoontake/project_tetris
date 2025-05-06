@@ -19,8 +19,8 @@ class Session
 
 	std::atomic<bool> in_use = false;
 public:
-	int last_time; // 지연시간 파악에 사용
-	std::atomic<int> last_send_time; // 타이머 스레드의 자동 send에 사용
+	long long last_time; // 지연시간 파악에 사용
+	std::atomic<long long> last_send_time; // 타이머 스레드의 자동 send에 사용
 	
 public:
 	Session(IPacketHandler* p_handler);
@@ -28,6 +28,7 @@ public:
 	void SendPacket(char* packet);
 	void RecvPacket();
 	void MergePacket(int recv_bytes, char* recv_data);
+	short GetPacketSize(char* packet);
 
 	//getters
 	SOCKET GetSocket() const { return socket; }

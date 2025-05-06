@@ -127,6 +127,6 @@ int IOCPServer::GetUserId()
 void IOCPServer::Disconnect(int user_id)
 {
 	// 채팅에 연결된 모든 클라에게 disconnect 패킷 전송-> 실시간 채팅도 아니고 필요 없을 듯 한데..
-	users[user_id]->SetUse(false, true); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
+	users[user_id]->SetUse(true, false); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(users[user_id]->GetSocket());
 }
