@@ -115,9 +115,10 @@ void IOCPServer::ProcessGQCS()
 int IOCPServer::GetUserId()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
-		bool expected = false;
-		if (users[i]->SetUse(false, true)) {
-			return i;
+		if (!users[i]->GetUse()) {
+			if (users[i]->SetUse(false, true)) {
+				return i;
+			}
 		}
 	}
 

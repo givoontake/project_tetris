@@ -145,9 +145,10 @@ void TestManager::ProcessSend()
 int TestManager::GetClientId()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
-		bool expected = false;
-		if (clients[i]->SetUse(false, true)) {
-			return i;
+		if (!clients[i]->GetUse()) {
+			if (clients[i]->SetUse(false, true)) {
+				return i;
+			}
 		}
 	}
 
