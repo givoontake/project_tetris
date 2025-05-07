@@ -108,15 +108,7 @@ void TestManager::ProcessGQCS()
 
 	case SEND:
 		clients[key]->last_time = GetCurrentTimeMS();
-		C2S_TEST_PACKET* p = reinterpret_cast<C2S_TEST_PACKET*>(ex_over->packet_buf);
-		std::cout << "=== C2S_TEST_PACKET(ProcessGQCS) ===" << std::endl;
-		std::cout << "Size: " << p->size << std::endl;
-		std::cout << "Type: " << p->type << std::endl;
-		std::cout << "ID: " << p->id << std::endl;
-		std::cout << "Message: " << p->message << std::endl;
-		std::cout << "Last Time: " << p->last_time << std::endl;
-		std::cout << "=======================" << std::endl;
-		std::cout << std::endl;
+		std::cout << "IOCP로 전송된 데이터 수: " << transferred_bytes << std::endl;
 		delete ex_over;
 		// 송신 완료 후 추가 처리
 		break;
@@ -136,9 +128,14 @@ void TestManager::ProcessSend()
 				p.size = sizeof(C2S_TEST_PACKET);
 				p.type = C2S_TEST;
 				p.id = client->GetId();
-				memcpy(p.message, test_message, sizeof(test_message));
 				p.last_time = GetCurrentTimeMS();
-				client->SendPacket(reinterpret_cast<char*>(&p));
+				p.message_size = sizeof(test_message);
+				int real_size = sizeof(C2S_TEST_PACKET) + sizeof(test_message);
+				char* pp = new char[real_size];
+				memcpy(pp, &p, sizeof(C2S_TEST_PACKET));
+				memcpy(pp + sizeof(C2S_TEST_PACKET), test_message, sizeof(test_message));
+				client->SendPacket(pp);
+				delete[] pp;
 			}
 		}
 		else continue;
@@ -166,7 +163,6 @@ void TestManager::SetTestMessege(int message_size)
 		exit(0);
 	}
 
-	std::cout << test_message << std::endl;
 	in.close();
 }
 

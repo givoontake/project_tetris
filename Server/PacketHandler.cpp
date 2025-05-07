@@ -38,7 +38,12 @@ void PacketHandler::ProcessPacket(char* packet)
 			if (!user->GetUse()) continue;
 			S2C_TEST_PACKET* p = reinterpret_cast<S2C_TEST_PACKET*>(packet);
 			p->type = S2C_TEST;
-			user->SendPacket(reinterpret_cast<char*>(p));
+			int real_size = p->size + p->message_size; // 신뢰 가능한 패킷이면 p->size는 sizeof(S2C_TEST_PACKET)이다. 
+			char* pp = new char[real_size];
+			memcpy(pp, p, sizeof(S2C_TEST_PACKET));
+			memcpy(pp + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(p)+ sizeof(S2C_TEST_PACKET), (p->message_size));
+			user->SendPacket(pp);
+			delete[] pp;
 		}
 		break;
 	}
