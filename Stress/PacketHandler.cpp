@@ -12,7 +12,7 @@ void PacketHandler::ProcessPacket(char* packet)
 {
 	//std::array<std::unique_ptr<Session>, MAX_USER>& users = manager_interface->GetSessionList();
 
-	switch (packet[1]) {
+	switch (packet[2]) {
 	case S2C_TEST: {
 		long long now_time = manager_interface->GetCurrentTimeMS();
 		// 받아서 따로 서버에서 변경되는 패킷 내용이 없다.

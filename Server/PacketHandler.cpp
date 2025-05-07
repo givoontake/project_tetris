@@ -11,7 +11,7 @@ void PacketHandler::ProcessPacket(char* packet)
 {
 	std::array<std::unique_ptr<Session>, MAX_USER>& users = server_interface->GetSessionList();
 
-	switch (packet[1]) {
+	switch (packet[2]) {
 	case C2S_LOGIN:
 		// 받아서 따로 서버에서 변경되는 패킷 내용이 없다.
 		for (auto& user : users) {
