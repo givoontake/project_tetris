@@ -69,6 +69,7 @@ bool TestManager::ConnectToServer()
 	clients[new_id]->SetId(new_id); // 이미 배열 인덱스를 id처럼 쓰고 있어서..나중에라도 의미가 있을까?
 	clients[new_id]->SetSocket(client_socket);
 	clients[new_id]->last_send_time = GetCurrentTimeMS();
+	clients[new_id]->RecvPacket();
 	
 	while (true) {
 		int expected = connected_client;
@@ -108,7 +109,6 @@ void TestManager::ProcessGQCS()
 
 	case SEND:
 		clients[key]->last_time = GetCurrentTimeMS();
-		std::cout << "IOCP로 전송된 데이터 수: " << transferred_bytes << std::endl;
 		delete ex_over;
 		// 송신 완료 후 추가 처리
 		break;

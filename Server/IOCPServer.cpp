@@ -105,7 +105,6 @@ void IOCPServer::ProcessGQCS()
 		}
 
 		case SEND:
-			std::cout << "클라이언트로 전송된 데이터 수 : " << transferred_bytes << std::endl;
 			delete ex_over;
 			// 송신 완료 후 추가 처리
 			break;

@@ -10,8 +10,9 @@ PacketHandler::PacketHandler(ITestManager* i_manager) : manager_interface(i_mana
 
 void PacketHandler::ProcessPacket(char* packet)
 {
-	//std::array<std::unique_ptr<Session>, MAX_USER>& users = manager_interface->GetSessionList();
-
+	std::array<std::unique_ptr<Session>, MAX_USER>& users = manager_interface->GetSessionList();
+	S2C_TEST_PACKET* p = reinterpret_cast<S2C_TEST_PACKET*>(packet);
+	if (!users[p->id]->GetUse() && p->id >= 0 && p->id < MAX_ARRAY_SIZE) return;
 	switch (packet[2]) {
 	case S2C_TEST: {
 		long long now_time = manager_interface->GetCurrentTimeMS();
