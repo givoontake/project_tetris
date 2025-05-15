@@ -16,13 +16,15 @@ void Session::SendPacket(char* packet)
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
-		std::cout << "client[" << id << "]" << "WSASend() IOCP Sign Up Fail\n";
+		std::cout << "/r client[" << id << "]" << "WSASend() IOCP Sign Up Fail\n";
+		handler_interface->GetManagerInterface()->Disconnect(id);
 		delete send_over;
 	}
 }
 
 void Session::RecvPacket()
 {
+	int sign_count = 0;
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over.over, sizeof(recv_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
 	recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
@@ -31,6 +33,7 @@ void Session::RecvPacket()
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		std::cout << "client[" << id << "]" << "WSARecv() IOCP Sign Up Fail\n";
+		handler_interface->GetManagerInterface()->Disconnect(id);
 	}
 }
 
@@ -77,7 +80,6 @@ short Session::GetPacketSize(char* packet)
 	default: {
 		short packet_size;
 		memcpy(&packet_size, packet, sizeof(packet_size));
-		std::cout << packet_size << std::endl;
 		return packet_size;
 	}
 	}

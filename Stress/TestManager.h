@@ -31,12 +31,12 @@ public:
 	virtual std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() override;
 	virtual long long GetCurrentTimeMS() override;
 	virtual void AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p) override;
+	virtual void Disconnect(int client_id) override;
 
 	bool ConnectToServer();
 	void ProcessGQCS();
 	void ProcessSend();
 	int GetClientId();
 	void SetTestMessege(int message_size);
-	void Disconnect(int user_id);
 };
 

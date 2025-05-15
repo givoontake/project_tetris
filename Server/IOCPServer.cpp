@@ -33,6 +33,12 @@ std::array<std::unique_ptr<Session>, MAX_USER>& IOCPServer::GetSessionList()
 	return users;
 }
 
+MQueue& IOCPServer::GetQueue()
+{
+	return disconnect_queue;
+	// TODO: 여기에 return 문을 삽입합니다.
+}
+
 void IOCPServer::StartServer()
 {
 	bind(listen_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
@@ -62,8 +68,7 @@ void IOCPServer::ProcessGQCS()
 		if (!result){
 			if (ex_over->op_type == ACCEPT) std::cout << "Accept Error";
 			else { // 클라이언트 강제 종료일 경우
-				std::cout << "client[" << key << "]" << " Disconnect\n";
-				//disconnect(static_cast<int>(key));
+				Disconnect(static_cast<int>(key));
 				if (ex_over->op_type == SEND) delete ex_over;
 				continue;
 			}
@@ -71,8 +76,7 @@ void IOCPServer::ProcessGQCS()
 
 		// 클라이언트 정상 종료일 경우
 		if (transferred_bytes == 0 && ex_over->op_type != ACCEPT) {
-			std::cout << "client[" << key << "]" << " Disconnect\n";
-			//disconnect(static_cast<int>(key));
+			Disconnect(static_cast<int>(key));
 			if (ex_over->op_type == SEND) delete ex_over;
 			continue;
 		}
@@ -127,7 +131,14 @@ int IOCPServer::GetUserId()
 
 void IOCPServer::Disconnect(int user_id)
 {
-	// 채팅에 연결된 모든 클라에게 disconnect 패킷 전송-> 실시간 채팅도 아니고 필요 없을 듯 한데..
+	std::cout << "client[" << user_id << "]" << " Disconnect\n";
 	users[user_id]->SetUse(true, false); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(users[user_id]->GetSocket());
+	S2C_DISCONNECT_PACKET p;
+	p.size = sizeof(S2C_DISCONNECT_PACKET);
+	p.type = S2C_DISCONNECT;
+	for (auto& user : users){
+		if (!user->GetUse() || user_id == user->GetId()) continue;
+		user->SendPacket(reinterpret_cast<char*>(&p));
+	}
 }

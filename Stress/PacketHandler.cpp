@@ -23,6 +23,10 @@ void PacketHandler::ProcessPacket(char* packet)
 		manager_interface->AdjustClientNumber(now_time, p);
 		break;
 	}
+	case S2C_DISCONNECT:
+		// 어차피 disconnect는 서버에서 계산해서 보내주니까 필요없지 않나..?
+		break;
+		
 	default: {
 		std::cout << "잘못된 패킷, 코드 수정이 필요합니다. \n";
 		break;

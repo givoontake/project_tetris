@@ -7,6 +7,7 @@
 #include "Exoverlapped.h"
 #include "Session.h"
 #include "PacketHandler.h"
+#include "MQueue.h"
 
 #pragma comment(lib, "WS2_32.lib")
 #pragma comment(lib, "MSWSock.lib")
@@ -18,6 +19,7 @@ class IOCPServer : public IServer
 	WSADATA wsadata;
 	SOCKADDR_IN server_addr;
 	ExOvelapped accept_over;
+	MQueue disconnect_queue;
 
 	std::unique_ptr<PacketHandler> packet_handler; // 먼저 선언되어 있다면 해당 변수는 나중에 선언되는 변수에서 사용 가능하다.
 	std::array<std::unique_ptr<Session>, MAX_USER> users;
@@ -31,10 +33,12 @@ public:
 	~IOCPServer();
 
 	virtual std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() override;
+	virtual MQueue& GetQueue() override;
+	virtual void Disconnect(int user_id) override;
 
 	void StartServer();
 	void ProcessGQCS();
 	int GetUserId();
-	void Disconnect(int user_id);
+	
 };
 

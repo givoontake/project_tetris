@@ -6,6 +6,9 @@ IOCPServer iocp_server;
 
 void worker_thread()
 {
+	if (!iocp_server.GetQueue().IsEmpty()) {
+		iocp_server.Disconnect(iocp_server.GetQueue().DeQ());
+	}
 	iocp_server.ProcessGQCS();
 }
 

@@ -13,6 +13,8 @@ constexpr char S2C_MESSAGE = 3;
 constexpr char C2S_MESSAGE = 4;
 constexpr char S2C_TEST = 5;
 constexpr char C2S_TEST = 6;
+constexpr char S2C_DISCONNECT = 7;
+constexpr char C2S_DISCONNECT = 8;
 
 #pragma pack(push, 1)
 
@@ -31,14 +33,14 @@ struct C2S_LOGIN_PACKET {
 struct S2C_MESSAGE_PACKET {
 	short size;
 	char type;
-	char id[ID_SIZE];
+	int id;
 	char message[MAX_MESSAGE_SIZE];
 };
 
 struct C2S_MESSAGE_PACKET {
 	short size;
 	char type;
-	char id[ID_SIZE];
+	int id;
 	char message[MAX_MESSAGE_SIZE];
 };
 
@@ -56,6 +58,18 @@ struct C2S_TEST_PACKET {
 	int id; // 테스트 프로그램도 다중 클라이언트를 관리중이므로 필요
 	short message_size;
 	long long last_time;
+};
+
+struct C2S_DISCONNECT_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct S2C_DISCONNECT_PACKET {
+	short size;
+	char type;
+	int id;
 };
 
 #pragma pack(pop)

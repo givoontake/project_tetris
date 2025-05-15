@@ -3,9 +3,12 @@
 
 class PacketHandler : public IPacketHandler
 {
+	ITestManager* manager_interface;
+
 public:
 	PacketHandler(ITestManager* i_manager);
-	ITestManager* manager_interface;
+
+	virtual ITestManager* GetManagerInterface() const override { return manager_interface; }
 	virtual void ProcessPacket(char* pakcet);
 };
 

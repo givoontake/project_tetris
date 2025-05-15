@@ -26,8 +26,8 @@ int main()
 		return 0;
 	}
 	std::vector <std::thread> worker_threads;
-	int recv_worker_threads = std::thread::hardware_concurrency() / 2;
-	int send_worker_threads = std::thread::hardware_concurrency() / 2;
+	int recv_worker_threads = std::thread::hardware_concurrency() / 4;
+	int send_worker_threads = std::thread::hardware_concurrency() / 4;
 	for (int i = 0; i < recv_worker_threads; ++i)
 		worker_threads.emplace_back(RecvWorkerThread);
 
