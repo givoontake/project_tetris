@@ -23,6 +23,7 @@ class TestManager : public ITestManager
 public: // 테스트하는데 굳이 private 할 이유는 없다
 	std::atomic<int> connected_client = 0;
 	char test_message[MAX_MESSAGE_SIZE];
+	long long delay = 0;
 
 public:
 	TestManager();
