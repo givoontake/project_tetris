@@ -44,7 +44,8 @@ void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는
 
 	short packet_size = GetPacketSize(recv_over.packet_buf);
 
-	// 남은 데이터에 패킷이 충분히 쌓였는지 확인하며 처리
+	if (remain_data_size + packet_size > BUF_SIZE) handler_interface->GetServerInterface()->GetQueue().EnQ(id);
+
 	while (remain_data_size >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
 		char p_buffer[BUF_SIZE];

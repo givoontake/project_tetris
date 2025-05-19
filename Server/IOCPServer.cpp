@@ -36,7 +36,6 @@ std::array<std::unique_ptr<Session>, MAX_USER>& IOCPServer::GetSessionList()
 MQueue& IOCPServer::GetQueue()
 {
 	return disconnect_queue;
-	// TODO: 여기에 return 문을 삽입합니다.
 }
 
 void IOCPServer::StartServer()
@@ -66,7 +65,7 @@ void IOCPServer::ProcessGQCS()
 		ExOvelapped* ex_over = reinterpret_cast<ExOvelapped*>(over);
 
 		if (!result){
-			if (ex_over->op_type == ACCEPT) std::cout << "Accept Error";
+			if (ex_over->op_type == ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
 			else { // 클라이언트 강제 종료일 경우
 				Disconnect(static_cast<int>(key));
 				if (ex_over->op_type == SEND) delete ex_over;

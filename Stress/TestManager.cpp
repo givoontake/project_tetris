@@ -33,6 +33,11 @@ std::array<std::unique_ptr<Session>, MAX_USER>& TestManager::GetSessionList()
 	return clients;
 }
 
+MQueue& TestManager::GetQueue()
+{
+	return disconnect_queue;
+}
+
 long long TestManager::GetCurrentTimeMS()
 {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -46,7 +51,7 @@ void TestManager::AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p)
 	if (delay < ms) {
 		++delay;
 	}
-	else {
+	else if (delay > ms){
 		--delay;
 	}
 
@@ -57,7 +62,7 @@ void TestManager::AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p)
 		ConnectToServer();
 	}
 
-	std::cout << "\r접속자 수: " << connected_client << " 지연 시간: " << delay << "ms     " << std::flush;
+	std::cout << "\r접속자 수: " << connected_client << " 지연 시간: " << delay << "ms " << std::flush;
 }
 
 bool TestManager::ConnectToServer()
@@ -176,7 +181,11 @@ void TestManager::SetTestMessege(int message_size)
 
 void TestManager::Disconnect(int client_id)
 {
-	// 채팅에 연결된 모든 클라에게 disconnect 패킷 전송-> 실시간 채팅도 아니고 필요 없을 듯 한데..
+	C2S_DISCONNECT_PACKET p;
+	p.size = sizeof(C2S_DISCONNECT_PACKET);
+	p.type = C2S_DISCONNECT;
+	p.id = client_id;
+	clients[client_id]->SendPacket(reinterpret_cast<char*>(&p));
 	clients[client_id]->SetUse(true, false); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(clients[client_id]->GetSocket());
 	while (true) {

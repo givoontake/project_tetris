@@ -17,7 +17,7 @@ void Session::SendPacket(char* packet)
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
 		//std::cout << "\r client[" << id << "]" << "WSASend() IOCP Sign Up Fail";
-		handler_interface->GetManagerInterface()->Disconnect(id);
+		handler_interface->GetManagerInterface()->GetQueue().EnQ(id);
 		delete send_over;
 	}
 }
@@ -33,7 +33,7 @@ void Session::RecvPacket()
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		//std::cout << "\r client[" << id << "]" << "WSARecv() IOCP Sign Up Fail";
-		handler_interface->GetManagerInterface()->Disconnect(id);
+		handler_interface->GetManagerInterface()->GetQueue().EnQ(id);
 	}
 }
 
@@ -45,7 +45,8 @@ void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는
 
 	short packet_size = GetPacketSize(recv_over.packet_buf);
 
-	// 남은 데이터에 패킷이 충분히 쌓였는지 확인하며 처리
+	if(remain_data_size + packet_size > BUF_SIZE) handler_interface->GetManagerInterface()->GetQueue().EnQ(id);
+
 	while (remain_data_size >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
 		char p_buffer[BUF_SIZE];
