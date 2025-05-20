@@ -69,8 +69,8 @@ void IOCPServer::ProcessGQCS()
 			else { // 클라이언트 강제 종료일 경우
 				Disconnect(static_cast<int>(key));
 				if (ex_over->op_type == SEND) delete ex_over;
-				continue;
 			}
+			continue;
 		}
 
 		// 클라이언트 정상 종료일 경우
@@ -87,6 +87,7 @@ void IOCPServer::ProcessGQCS()
 			if (new_id != -1) {
 				users[new_id]->SetId(new_id);
 				users[new_id]->SetSocket(client_socket);
+				users[new_id]->remain_data_size = 0;
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_id, 0);
 				users[new_id]->RecvPacket();
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);

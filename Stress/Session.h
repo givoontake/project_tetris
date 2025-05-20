@@ -14,11 +14,11 @@ class Session
 	IPacketHandler* handler_interface;
 	int id = -1;
 
-	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
-	int remain_data_size = 0;
+	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음
 
 	std::atomic<bool> in_use = false;
 public:
+	int remain_data_size = 0;
 	long long last_time; // 지연시간 파악에 사용
 	std::atomic<long long> last_send_time; // 타이머 스레드의 자동 send에 사용
 	
@@ -27,7 +27,7 @@ public:
 
 	void SendPacket(char* packet);
 	void RecvPacket();
-	void MergePacket(int recv_bytes, char* recv_data);
+	void MergePacket(int recv_bytes, char* recv_data, int key, BOOL res);
 	short GetPacketSize(char* packet);
 
 	//getters

@@ -18,7 +18,7 @@ void Session::SendPacket(char* packet)
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
 		//std::cout << "\r client[" << id << "]" << "WSASend() IOCP Sign Up Fail";
-		handler_interface->GetManagerInterface()->GetQueue().EnQ(id);
+		handler_interface->GetManagerInterface()->Disconnect(id);
 		delete send_over;
 	}
 }
@@ -35,20 +35,33 @@ void Session::RecvPacket()
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		//std::cout << "\r client[" << id << "]" << "WSARecv() IOCP Sign Up Fail";
-		handler_interface->GetManagerInterface()->GetQueue().EnQ(id);
+		handler_interface->GetManagerInterface()->Disconnect(id);
 	}
 }
 
-void Session::MergePacket(int recv_bytes, char* recv_data) // 세션에 있는게 맞는 것 같다. 나중에 방이 추가되면, 방에서도 세션에 접근만 해서 보내기만 하면 된다.
+void Session::MergePacket(int recv_bytes, char* recv_data, int key, BOOL res) // 세션에 있는게 맞는 것 같다. 나중에 방이 추가되면, 방에서도 세션에 접근만 해서 보내기만 하면 된다.
 {
-    // 일단 새로 들어온 데이터를 뒤에 붙임
+	// GPT o4 mini high: 보통 같은 함수 내 지역변수들은 연속적으로 할당된다. 배열 인덱스를 넘어선 메모리를 쓴다고 해서 즉시 오류가 발생하지는 않는다고 한다.
+	// 즉 배열 범위를 넘어서는 지나치게 큰 패킷은 연속된 다른 지역변수도 오염시켜 디버그 때 원래 값을 보기 어렵다고 한다.
+	if (recv_bytes == 0) {
+		std::cout << "id: " << key << " res: " << res << std::endl;
+	}
+
+	if (in_use == false) {
+		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
+		return;
+	}
+
+	// 일단 새로 들어온 데이터를 뒤에 붙임
 	memcpy(recv_over.packet_buf + remain_data_size, recv_data, recv_bytes);
 	remain_data_size += recv_bytes;
 
 	short packet_size = GetPacketSize(recv_over.packet_buf);
 
-	if(remain_data_size + packet_size > BUF_SIZE) handler_interface->GetManagerInterface()->GetQueue().EnQ(id);
-
+	if (remain_data_size + packet_size > BUF_SIZE) {
+		handler_interface->GetManagerInterface()->Disconnect(id);
+		return;
+	}
 	while (remain_data_size >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
 		char p_buffer[BUF_SIZE];
