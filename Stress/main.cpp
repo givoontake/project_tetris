@@ -13,6 +13,9 @@ void RecvWorkerThread()
 
 void SendWorkerThread()
 {
+	if (!test_manager.GetQueue().IsEmpty()) {
+		test_manager.Disconnect(test_manager.GetQueue().DeQ());
+	}
 	while (true) {
 		test_manager.ProcessSend();
 	}

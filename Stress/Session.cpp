@@ -8,6 +8,7 @@ Session::Session(IPacketHandler* p_handler) : handler_interface(p_handler)
 
 void Session::SendPacket(char* packet)
 {
+	if (!in_use) return;
 	ExOvelapped* send_over = new ExOvelapped;
 	send_over->SetExOverlapped(SEND);
 	short packet_size = GetPacketSize(packet);
@@ -24,6 +25,7 @@ void Session::SendPacket(char* packet)
 
 void Session::RecvPacket()
 {
+	if (!in_use) return;
 	int sign_count = 0;
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over.over, sizeof(recv_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
