@@ -21,26 +21,26 @@ constexpr char C2S_DISCONNECT = 8;
 struct S2C_LOGIN_PACKET {
 	short size;
 	char type;
-	char id[ID_SIZE];
+	int id;
 };
 
 struct C2S_LOGIN_PACKET {
 	short size;
 	char type;
-	char id[ID_SIZE];
+	int id;
 };
 
 struct S2C_MESSAGE_PACKET {
 	short size;
 	char type;
-	char id[ID_SIZE];
+	int id;
 	char message[MAX_MESSAGE_SIZE];
 };
 
 struct C2S_MESSAGE_PACKET {
 	short size;
 	char type;
-	char id[ID_SIZE];
+	int id;
 	char message[MAX_MESSAGE_SIZE];
 };
 
