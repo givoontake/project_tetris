@@ -25,7 +25,7 @@ public:
 
 	void SendPacket(char* packet);
 	void RecvPacket();
-	void MergePacket(int recv_bytes, char* recv_data);
+	void ProcessPacket(int recv_bytes);
 	short GetPacketSize(char* packet);
 
 	//getters

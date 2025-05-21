@@ -126,7 +126,7 @@ void TestManager::ProcessGQCS()
 	switch (ex_over->op_type) {
 
 	case RECV:
-		clients[key]->MergePacket(transferred_bytes, ex_over->packet_buf, key, result);
+		clients[key]->ProcessPacket(transferred_bytes, key, result);
 		clients[key]->RecvPacket();
 		break;
 
