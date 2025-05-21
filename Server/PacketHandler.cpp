@@ -7,7 +7,7 @@ PacketHandler::PacketHandler(IServer* i_server) : server_interface(i_server)
 
 }
 
-void PacketHandler::ProcessPacket(char* packet)
+void PacketHandler::HandlePacket(char* packet)
 {
 	std::array<std::unique_ptr<Session>, MAX_USER>& users = server_interface->GetSessionList();
 

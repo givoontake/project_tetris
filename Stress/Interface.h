@@ -10,7 +10,7 @@ class ITestManager;
 class IPacketHandler { // 패킷 처리를 위한 추상 클래스
 
 public:
-	virtual void ProcessPacket(char* packet) = 0;
+	virtual void HandlePacket(char* packet) = 0;
 	virtual ITestManager* GetManagerInterface() const = 0;
 };
 
