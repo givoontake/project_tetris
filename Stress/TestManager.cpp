@@ -47,20 +47,27 @@ long long TestManager::GetCurrentTimeMS()
 
 void TestManager::AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p)
 {
+	static long long delay_time1 = 100;
+	static long long delay_time2 = 200;
+	static int delay_multiplier = 1;
+	static long long last_adjust_time = 0;
+	static long long adjust_interval = 20;
+
+	long long adjust_time = adjust_interval * delay_multiplier;
+	if (now_time - last_adjust_time < adjust_time) return;
+	else last_adjust_time = now_time;
+
 	long long new_delay = now_time - p->last_time;
-	if (delay < new_delay) {
-		++delay;
-	}
-	else if (delay > new_delay) {
-		--delay;
+	if (delay < new_delay) ++delay;
+	else if (delay > new_delay) --delay;
+
+	if (delay <= delay_time2) {
+		delay_multiplier = 10;
+		if (delay <= delay_time1) delay_multiplier = 1;
+		if(connected_client.load() < MAX_USER) ConnectToServer();
 	}
 
-	if (delay > 100) { // 딜레이가 100ms 이상이면
-		Disconnect(p->id);
-	}
-	else {
-		ConnectToServer();
-	}
+	if (delay > delay_time2 && connected_client.load() > 20) Disconnect(p->id);
 
 	std::cout << "접속자 수: " << connected_client << " 지연 시간: " << delay << "ms \n";
 }
