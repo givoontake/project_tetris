@@ -132,9 +132,9 @@ int IOCPServer::GetUserId()
 void IOCPServer::Disconnect(int user_id)
 {
 	if (!users[user_id]->GetUse()) return;
-	std::cout << "client[" << user_id << "]" << " Disconnect\n";
-	users[user_id]->SetUse(true, false); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
+	if(!users[user_id]->SetUse(true, false)) return; // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(users[user_id]->GetSocket());
+	std::cout << "client[" << user_id << "]" << " Disconnect\n";
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
 	p.type = S2C_DISCONNECT;

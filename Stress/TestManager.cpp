@@ -47,8 +47,8 @@ long long TestManager::GetCurrentTimeMS()
 
 void TestManager::AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p)
 {
-	static long long delay_time1 = 100;
-	static long long delay_time2 = 200;
+	static long long delay_time1 = 50;
+	static long long delay_time2 = 100;
 	static int delay_multiplier = 1;
 	static long long last_adjust_time = 0;
 	static long long adjust_interval = 20;
@@ -58,8 +58,12 @@ void TestManager::AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p)
 	else last_adjust_time = now_time;
 
 	long long new_delay = now_time - p->last_time;
-	if (delay < new_delay) ++delay;
-	else if (delay > new_delay) --delay;
+	if (delay < new_delay) {
+		delay += ((new_delay - delay) / 10);
+	} 
+	else if (delay > new_delay) {
+		delay += ((delay - new_delay) / 10);
+	}
 
 	if (delay <= delay_time2) {
 		delay_multiplier = 10;
@@ -92,12 +96,8 @@ bool TestManager::ConnectToServer()
 	clients[new_id]->RecvPacket();
 
 	std::cout << "client[" << new_id << "]" << " connect\n";
-	
-	while (true) {
-		int expected = connected_client;
-		int desired = expected + 1;
-		if (connected_client.compare_exchange_strong(expected, desired)) break;
-	}
+	++connected_client;
+
 	CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_id, 0);
 
 	return true;
@@ -199,12 +199,8 @@ void TestManager::SetTestMessege(int message_size)
 
 void TestManager::Disconnect(int client_id)
 {
-	std::cout << "client[" << client_id << "]" << " Disconnect\n";
-	clients[client_id]->SetUse(true, false); // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
+	if(!clients[client_id]->SetUse(true, false)) return; // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(clients[client_id]->GetSocket());
-	while (true) {
-		int expected = connected_client;
-		int desired = expected - 1;
-		if (connected_client.compare_exchange_strong(expected, desired)) break;
-	}
+	std::cout << "client[" << client_id << "]" << " Disconnect\n";
+	--connected_client;
 }
