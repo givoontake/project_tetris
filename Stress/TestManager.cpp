@@ -62,7 +62,7 @@ void TestManager::AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p)
 		delay += ((new_delay - delay) / 10);
 	} 
 	else if (delay > new_delay) {
-		delay += ((delay - new_delay) / 10);
+		delay -= ((delay - new_delay) / 10);
 	}
 
 	if (delay <= delay_time2) {
