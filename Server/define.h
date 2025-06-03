@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 constexpr int BUF_SIZE = 10240;
 constexpr int MAX_MESSAGE_SIZE = 512;
 constexpr int PORT_NUM = 12345;
@@ -15,6 +16,11 @@ constexpr char S2C_TEST = 5;
 constexpr char C2S_TEST = 6;
 constexpr char S2C_DISCONNECT = 7;
 constexpr char C2S_DISCONNECT = 8;
+
+extern std::atomic<int> remainning_send_IOCP;
+extern std::atomic<int> remainning_total_IOCP;
+extern std::atomic<int> processed_IOCP;
+extern std::atomic<int> user_count;
 
 #pragma pack(push, 1)
 

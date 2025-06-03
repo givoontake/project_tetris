@@ -1,6 +1,6 @@
 #pragma once
 constexpr int BUF_SIZE = 10240;
-constexpr int MAX_MESSAGE_SIZE = 512;
+constexpr int MAX_MESSAGE_SIZE = 128;
 constexpr int PORT_NUM = 12345;
 
 constexpr int MAX_USER = 10000;

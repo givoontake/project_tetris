@@ -16,11 +16,15 @@ void Session::SendPacket(char* packet)
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
+		in_use = false; // Disconnect 패킷은 나중에 보내더라도, 서버에서 이 세션에 대해 더이상 처리할 필요는 없다.
 		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
 		//std::cout << "\r client[" << id << "]" << "WSASend() IOCP Sign Up Fail";
 		handler_interface->GetServerInterface()->GetQueue().EnQ(id);
 		delete send_over;
+		return;
 	}
+	++remainning_send_IOCP;
+	++remainning_total_IOCP;
 }
 
 void Session::RecvPacket()
@@ -35,7 +39,9 @@ void Session::RecvPacket()
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		//std::cout << "\r client[" << id << "]" << "WSARecv() IOCP Sign Up Fail";
 		handler_interface->GetServerInterface()->GetQueue().EnQ(id);
+		return;
 	}
+	++remainning_total_IOCP;
 }
 
 void Session::ProcessPacket(int recv_bytes) // 세션에 있는게 맞는 것 같다. 나중에 방이 추가되면, 방에서도 세션에 접근만 해서 보내기만 하면 된다.

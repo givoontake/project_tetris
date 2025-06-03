@@ -39,6 +39,7 @@ public:
 	void StartServer();
 	void ProcessGQCS();
 	int GetUserId();
+	bool GetRunning() const { return is_running; }
 	
 };
 

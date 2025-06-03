@@ -80,9 +80,8 @@ void IOCPServer::ProcessGQCS()
 			continue;
 		}
 
-		switch (ex_over->op_type)
-		{
-		case ACCEPT: {
+		switch (ex_over->op_type){
+		case ACCEPT: { 
 			int new_id = GetUserId();
 			if (new_id != -1) {
 				users[new_id]->SetId(new_id);
@@ -94,8 +93,8 @@ void IOCPServer::ProcessGQCS()
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 
-			std::cout << "client[" << new_id << "]" << " Connect\n";
-
+			++user_count;
+			std::cout << "client[" << new_id << "]" << " Connect. " << "total_user: " << user_count << std::endl;
 			ZeroMemory(&accept_over.over, sizeof(accept_over.over));
 			int addr_size = sizeof(SOCKADDR_IN);
 			AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.over);
@@ -104,15 +103,23 @@ void IOCPServer::ProcessGQCS()
 
 		case RECV: {
 			users[key]->ProcessPacket(transferred_bytes);
+			--remainning_total_IOCP;
 			users[key]->RecvPacket();
 			break;
 		}
 
-		case SEND:
+		case SEND: {
 			delete ex_over;
+			--remainning_send_IOCP;
+			--remainning_total_IOCP;
+			//if ((remainning_send_IOCP > 100) && (remainning_send_IOCP % 100 == 0)) std::cout << "remainning_send_IOCP: " << remainning_send_IOCP << std::endl;
 			// 송신 완료 후 추가 처리
 			break;
 		}
+		
+		}
+		++processed_IOCP;
+		if(processed_IOCP % 1000 == 0) std::cout << "r_send: " << remainning_send_IOCP <<" r_total: " << remainning_total_IOCP << " processed: " << processed_IOCP << std::endl;
 	}
 }
 
@@ -135,6 +142,8 @@ void IOCPServer::Disconnect(int user_id)
 	if(!users[user_id]->SetUse(true, false)) return; // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(users[user_id]->GetSocket());
 	std::cout << "client[" << user_id << "]" << " Disconnect\n";
+	--user_count;
+	std::cout << "client[" << user_id << "]" << " Connect. " << "total_user: " << user_count << std::endl;
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
 	p.type = S2C_DISCONNECT;
