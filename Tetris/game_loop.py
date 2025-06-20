@@ -1,60 +1,47 @@
 # game_loop.py
 import pygame
 from define import BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT, INITIAL_SCALE, FPS
-from game_state import GameState
-from network import NetworkClient
+from change_game_state import*
 
+class GameLoop:
+    def __init__(self):
+        pygame.init()
+        w = int(BASE_SCREEN_WIDTH * INITIAL_SCALE)
+        h = int(BASE_SCREEN_HEIGHT * INITIAL_SCALE)
+        self.screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
+        self.clock = pygame.time.Clock()
 
-def run():
-    pygame.init()
-    w = int(BASE_SCREEN_WIDTH * INITIAL_SCALE)
-    h = int(BASE_SCREEN_HEIGHT * INITIAL_SCALE)
-    screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
-    gs = GameState(screen)
-    clock = pygame.time.Clock()
-    net = None
+        # 초기 상태 설정
+        self.state = SelectModeState(self.screen)
+        self.state.init()
 
-    running = True
-    while running:
-        state = gs.state
+    def update(self):
+        dt = self.clock.tick(FPS)
+        events = pygame.event.get()
 
-        if state == 'select_mode':
-            next_state = gs.select_mode()
-        elif state == 'select_play':
-            next_state = gs.select_play()
-        elif state == 'check_connect':
-            if not gs.dev_mode:
-                net = NetworkClient()
-                gs.network_ok = net.connect()
-            else:
-                gs.network_ok = True
-            if gs.network_ok:
-                if gs.players == 1:
-                    next_state = 'single_play'
-                elif gs.players == 2:
-                    next_state = 'multi_play2'
-                else:
-                    next_state = 'multi_play5'
-            else:
-                next_state = 'connect_error'
-        elif state == 'connect_error':
-            next_state = gs.connect_error()
-        elif state == 'single_play':
-            next_state = gs.single_play()
-        elif state == 'multi_play2':
-            next_state = gs.multi_play2()
-        elif state == 'multi_play5':
-            next_state = gs.multi_play5()
-        else:
-            next_state = 'select_mode'
+        # 전역 이벤트 처리: 리사이즈, Quit
+        for ev in events:
+            if ev.type == pygame.VIDEORESIZE:
+                self.screen = pygame.display.set_mode((ev.w, ev.h), pygame.RESIZABLE)
+                self.state.screen = self.screen
+            elif ev.type == pygame.QUIT:
+                pygame.quit()
+                exit()
 
-        if next_state == 'quit':
-            running = False
-        gs.state = next_state
-        clock.tick(FPS)
+        # 상태별 업데이트(이벤트 전달)
+        next_state = self.state.update(dt, events)
+        if next_state is not self.state:
+            self.state = next_state
+            self.state.init()
 
-    pygame.quit()
+    def draw(self):
+        self.state.draw()
+        pygame.display.flip()
 
+    def run(self):
+        while True:
+            self.update()
+            self.draw()
 
 if __name__ == '__main__':
-    run()
+    GameLoop().run()
