@@ -71,7 +71,7 @@ class PreviewTetromino:
 
     def draw(self, offset_index):
         px = self.x
-        py = self.y + offset_index * self.preview_cell
+        py = self.y
         size = int(self.preview_cell)
         bg = pygame.Rect(px, py, size, size)
         pygame.draw.rect(self.screen, (50, 50, 50), bg)
