@@ -41,6 +41,10 @@ bool Tetris::CheckCollision(Tetromino& tetromino, MOVE_TYPE move_type) //bool 반
         if_move_tetromino.default_pos = shapes[if_move_tetromino.shape_index].default_pos; // 회전된 인덱스로 테트로미노 변경
         break;
     }
+
+    case DROP:{
+        ++if_move_tetromino.moved_y; // 일단 똑같이 1칸 움직였을 때부터 판정 시작
+    }
         
     default:
         break;
@@ -63,17 +67,48 @@ bool Tetris::CheckCollision(Tetromino& tetromino, MOVE_TYPE move_type) //bool 반
     for (auto& pos : real_moved_tetromino_pos) { // 아래 충돌 전에 판정을 하고, 충돌 후 바뀐 보드에 대해서 또 판정이 필요
         if (pos.x >= BOARD_WIDTH || pos.x < 0) return false; // 좌우로 벗어난 상태라면, 원래 위치로 돌아가야 한다.(움직임 인정 x)
         if (pos.y >= BOARD_HEIGHT || board[pos.y][pos.x] == true) { // 아래로 움직였다고 가정한 자리에 이미 블록이 있거나 바닥보다 아래라면, 이전 위치에 쌓여야 함.-> 인자로 받은 테트로미노
-            if (move_type == DOWN || move_type == TIMEOUT) {
+            if (move_type == DOWN || move_type == TIMEOUT || move_type == DROP) { // 1칸 드랍된 상황에서 잘못된 위치라면, 이전 위치에 쌓여야 함.
                 for (auto& pos : real_tetromino_pos) {
                     board[pos.y][pos.x] = true;
                 }
                 return true;
             }
-            else return false;
+            else return false; // 회전인 경우 키 인정 x
         }
     }
+
     // 이동한 곳에서 어떤 충돌도 없다면
     tetromino = if_move_tetromino;
+
+    // DROP 케이스는 충돌이 날 때까지 판정을 해서 쌓아줘야 함.
+    if (move_type == DROP) {
+        while (true) {
+            ++if_move_tetromino.moved_y; // 똑같이 1칸 증가시킴
+
+            // 판정을 위한 좌표 새로 업데이트
+            for (int i = 0; i < 4; ++i) { 
+                real_tetromino_pos[i].x = tetromino.default_pos[i].x + tetromino.moved_x;
+                real_tetromino_pos[i].y = tetromino.default_pos[i].y + tetromino.moved_y;
+            } 
+
+            // 판정을 위한 좌표 새로 업데이트2
+            for (int i = 0; i < 4; ++i) {
+                real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_x;
+                real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_y;
+            }
+
+            for (auto& pos : real_moved_tetromino_pos) {
+                if (pos.y >= BOARD_HEIGHT || board[pos.y][pos.x] == true) { // 드랍이므로 좌우 판정은 필요없다. 
+                    for (auto& pos : real_tetromino_pos) {
+                        board[pos.y][pos.x] = true;
+                    }
+                    return true;
+                }
+            }
+            tetromino = if_move_tetromino; // 드랍 케이스는 충돌이 날 때까지 판정해서 충돌이 나므로 무조건 true를 반환해야 한다.
+        }
+    }
+
     return false;
     // 타임아웃은 그냥 이 함수를 외부에서 호출하기 전에 타임을 초기화하고 인자로 타임아웃 넘기면 된다.
 }
