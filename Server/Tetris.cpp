@@ -1,5 +1,6 @@
 #include <vector>
 #include <algorithm>
+#include <random>
 #include "Tetris.h"
 #include "define_tetromino.h"
 
@@ -46,9 +47,7 @@ bool Tetris::HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE move_type) 
     case DROP:{
         ++if_move_tetromino.moved_y; // 일단 똑같이 1칸 움직였을 때부터 판정 시작
     }
-        
-    default:
-        break;
+
     }
 
     std::array<Position, 4> real_tetromino_pos;
@@ -114,10 +113,10 @@ bool Tetris::HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE move_type) 
     // 타임아웃은 그냥 이 함수를 외부에서 호출하기 전에 타임을 초기화하고 인자로 타임아웃 넘기면 된다.
 }
 
-int Tetris::CheckClearLine()
+int Tetris::ClearLine()
 {
     int count = 0;
-    for (int y = 0; y < board.size(); ++y) {
+    for (int y = 0; y < BOARD_HEIGHT; ++y) {
         if (std::all_of(board[y].begin(), board[y].end(), // 한 줄이 모두 true(채워짐)이면
             [](bool cell) { return cell; })) {
             std::fill(board[y].begin(), board[y].end(), false); // 현재 줄을 모두 false로 바꾸고
@@ -126,4 +125,79 @@ int Tetris::CheckClearLine()
         }
     }
     return count;
+}
+
+void Tetris::AddLine(int num)
+{
+    int add_num = 0;
+    // 지워진 라인에 따라 증가되는 라인 수가 다름
+    switch (num) {
+    case 1:
+        return;
+
+    case 2:
+        add_num = 1; 
+        break;
+
+    case 3:
+        add_num = 2;
+        break;
+
+    case 4:
+        add_num = 4;
+        break;
+    }
+
+    int stacked_top_index = -1;
+    for (int y = 0; y < BOARD_HEIGHT; ++y){
+        if (std::any_of(board[y].begin(), board[y].end(), [](bool cell){ return cell; })) { // 반환되는 반복자가 end()가 아니라면 존재한다는 뜻, 즉 하나라도 true라면?
+            // 처음으로 쌓여 있는 층을 찾으면, 그 층에 제일 높게 쌓인 블록이 존재하는 것
+            stacked_top_index = y;
+            break;
+        }
+    }
+
+    if (stacked_top_index < 0) { // 블록이 맵에 1개도 없을 경우
+        stacked_top_index = BOARD_HEIGHT - 1;
+        for (int y = stacked_top_index; y > stacked_top_index - add_num; --y){
+            std::fill(board[y].begin(), board[y].end(), true);
+            int x = GetRandomX();
+            board[y][x] = false;
+        }
+        return; // 쌓고 리턴
+    }
+
+    if (stacked_top_index - add_num < 0) {
+        // 이러면 이 플레이어는 죽은 것 -> 나중에 네트워크 코드 추가(뮤텍스도 나중에 추가 필요)
+
+        return;
+    }
+
+    else {
+        int now_first_index = stacked_top_index;
+        int now_end_index = BOARD_HEIGHT - 1;
+        int dst_first_index = stacked_top_index - add_num; // 음수 체크는 위에서 하므로 out_of_index는 안나옴
+        int dst_end_index = BOARD_HEIGHT - 1 - add_num;
+
+        std::move(board.begin() + now_first_index, board.end(), board.begin() + dst_first_index);
+        for (int y = now_end_index; y > dst_end_index; --y){ // 옮겨진 부분의 end 컨테이너는 유효 값으로 채워져 있음(헷갈리지 말기)
+            std::fill(board[y].begin(), board[y].end(), true);
+            int x = GetRandomX();
+            board[y][x] = false;
+        }
+    }
+}
+
+int Tetris::GetRandomX()
+{
+    // OS/하드웨어 엔트로피에서 시드 생성
+    static std::random_device rd;
+
+    // 넣어준 시드값에 의해 생성될 난수가 준비된다.
+    static std::mt19937 gen(rd());
+
+    // 0~BOARD_WIDTH - 1 범위에서 균등 분포로 값 출력
+    static std::uniform_int_distribution<int> dist(0, BOARD_WIDTH - 1);
+
+    return dist(gen);
 }

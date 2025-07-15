@@ -12,6 +12,8 @@ public:
 	Tetris();
 
 	bool HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE type);
-	int CheckClearLine();
+	int ClearLine();
+	void AddLine(int num);
+	int GetRandomX();
 };
 
