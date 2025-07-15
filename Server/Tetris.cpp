@@ -1,4 +1,5 @@
 #include <vector>
+#include <algorithm>
 #include "Tetris.h"
 #include "define_tetromino.h"
 
@@ -13,7 +14,7 @@ Tetris::Tetris()
 
 // 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
 // 그러면 회전된 테트로미노 관리가 수월해진다.
-bool Tetris::CheckCollision(Tetromino& tetromino, MOVE_TYPE move_type) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
+bool Tetris::HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE move_type) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
 {
     Tetromino if_move_tetromino = tetromino;
     switch(move_type){
@@ -111,4 +112,18 @@ bool Tetris::CheckCollision(Tetromino& tetromino, MOVE_TYPE move_type) //bool 반
 
     return false;
     // 타임아웃은 그냥 이 함수를 외부에서 호출하기 전에 타임을 초기화하고 인자로 타임아웃 넘기면 된다.
+}
+
+int Tetris::CheckClearLine()
+{
+    int count = 0;
+    for (int y = 0; y < board.size(); ++y) {
+        if (std::all_of(board[y].begin(), board[y].end(), // 한 줄이 모두 true(채워짐)이면
+            [](bool cell) { return cell; })) {
+            std::fill(board[y].begin(), board[y].end(), false); // 현재 줄을 모두 false로 바꾸고
+            std::rotate(board.begin(), board.begin() + y, board.begin() + y + 1); // false 줄을 맨 위로 옮기고, 맨 위에서 1줄씩 아래로 당김
+            ++count;
+        }
+    }
+    return count;
 }

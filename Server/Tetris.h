@@ -7,10 +7,11 @@ enum MOVE_TYPE { RIGHT, LEFT, DOWN, ROTATE, TIMEOUT, DROP }; // timeout-> ¿œ¡§  
 
 class Tetris
 {
-	bool board[BOARD_HEIGHT][BOARD_WIDTH];
+	std::array<std::array<bool, BOARD_WIDTH>, BOARD_HEIGHT> board;
 public:
 	Tetris();
 
-	bool CheckCollision(Tetromino& tetromino, MOVE_TYPE type);
+	bool HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE type);
+	int CheckClearLine();
 };
 
