@@ -26,9 +26,11 @@
     <ClCompile Include="RoomSession.cpp" />
     <ClCompile Include="Session.cpp" />
     <ClCompile Include="Tetris.cpp" />
+    <ClCompile Include="TetrisRoom.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="define.h" />
+    <ClInclude Include="define_room_packet.h" />
     <ClInclude Include="define_tetromino.h" />
     <ClInclude Include="ExOverlapped.h" />
     <ClInclude Include="IOCPServer.h" />
@@ -38,6 +40,7 @@
     <ClInclude Include="RoomSession.h" />
     <ClInclude Include="Session.h" />
     <ClInclude Include="Tetris.h" />
+    <ClInclude Include="TetrisRoom.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
