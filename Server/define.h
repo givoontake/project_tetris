@@ -5,6 +5,8 @@ constexpr int MAX_MESSAGE_SIZE = 512;
 constexpr int PORT_NUM = 12345;
 
 constexpr int MAX_USER = 10000;
+constexpr int MAX_ROOM = 5000;
+constexpr int MAX_ROOM_NAME = 48; // 16자 * UTF-8 1문자 크기(3)
 constexpr int MAX_ARRAY_SIZE = 127;
 constexpr int ID_SIZE = 16;
 
@@ -76,6 +78,13 @@ struct S2C_DISCONNECT_PACKET {
 	short size;
 	char type;
 	int id;
+};
+
+struct S2C_ADD_ROOM_PACKET {
+	short size; // 나중에 방, 게임 등으로 메세지 패킷과 분리한다면 char로 바꿀 수도 있지 않을까..?
+	char type;
+	int id;
+	char room_name[MAX_ROOM_NAME];
 };
 
 #pragma pack(pop)
