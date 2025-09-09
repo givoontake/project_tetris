@@ -1,29 +1,51 @@
 #pragma once
 #include <vector>
+#include <array>
 #include <mutex>
 #include "RoomSession.h"
-#include "define_room_packet.h"
+#include "Session.h"
 #include "define.h"
+#include "packetType.h"
+#include "RoomPacketHandler.h"
 
-enum ROOM_STATE {EMPTY, LOBBY, PLAY};
+enum ROOM_STATE {EMPTY, WAIT, PLAY};
 
 class TetrisRoom
 {
-	std::vector<RoomSession> users; 
-	ROOM_STATE room_state;
-	int room_id; // 있으면 나중에 순회할 때 편할 것 같은 느낌이 드는데..
-	int host_id;
-	char room_name[MAX_ROOM_NAME];
-	int max_user;
+	//std::array<RoomSession*, MAX_USER>& users;
+	std::vector<RoomSession> room_users; // 아토믹 변수는 복사가 안돼서..
+	RoomPacketHandler room_handler;
+	IOCPServer* server;
+	Atomic<ROOM_STATE> room_state;
 
-	std::mutex room_mutex;
+	int host_id;
+	int room_id;
+	char room_name[MAX_ROOM_NAME];
+	bool is_password;
+	char room_password[MAX_ROOM_PASSWORD];
+	char max_user;
+
+	//std::mutex room_mutex;
 	
 public:
 	TetrisRoom();
 	~TetrisRoom();
 
-	void AddUser(C2S_ADD_USER_PACKET& p);
-	void DeleteUser(C2S_DELETE_USER_PACKET& p);
-	void InitRoom(const char* name, int user_id, int _max_user);
+	ROOM_STATE GetRoomState() const { return room_state.GetSelf(); }
+
+	void SetRoomId(const int room_index);
+	void SetRoomState(const ROOM_STATE new_state); // 방 상태 변경은 딱히 동시접근할 일이 없어보임
+	int FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
+
+	void InitRoom(char* packet);
+	void AddUser(Session* new_session);
+	void DeleteUser(const int id);
+	void ReadyUser(const C2S_READY_PACKET& packet);
+	void KickUser(const C2S_KICK_PACKET& packet);
+	void StartGame(const C2S_START_PACKET& packet);
+	void Broadcast(char* packet);
+
+	void InitGame();
+	//void SendToSelf(char* packet, Session* session);
 };
 

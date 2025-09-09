@@ -2,41 +2,52 @@
 #include <WinSock2.h>
 #include <MSWSock.h>
 #include <mutex>
-#include <atomic>
 #include "ExOverlapped.h"
 #include "Interface.h"
+#include "atomic.h"
+
+enum USER_STATE {NONE, LOBBY, ROOM};
 
 class Session
 {
 	SOCKET socket;
-	ExOvelapped recv_over;
+	ExOverlapped recv_over;
 	std::mutex session_mutex;
-	IPacketHandler* handler_interface;
+	//IServer* server_interface;
 	int id = -1;
-
+	int room_id = -1;
+	int remain_data_size = 0;
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
-	std::atomic<bool> in_use = false;
-	
+	Atomic<USER_STATE> state;
+	bool disconnect_flag = false;
 public:
-	int remain_data_size = 0;
 
-	Session(IPacketHandler* p_handler); // 인자로 IPacketHandler를 받을 때 자식 클래스 Packethandler를 받는다->업캐스팅, 자식에서 재정의한 가상함수만 사용 가능하다.
+	Session(); // 인자로 IPacketHandler를 받을 때 자식 클래스 Packethandler를 받는다->업캐스팅, 자식에서 재정의한 가상함수만 사용 가능하다.
 
+	void InitSession(int new_id, SOCKET new_socket);
 	void SendPacket(char* packet);
 	void RecvPacket();
-	void ProcessPacket(int recv_bytes);
+	
 	short GetPacketSize(char* packet);
 
 	//getters
 	SOCKET GetSocket() const { return socket; }
+	ExOverlapped GetExOver() const { return recv_over; }
+
 	int GetId() const { return id; }
-	bool GetUse() const { return in_use; }
+	int GetRoomId() const { return room_id; }
+	bool GetDisconnectFlag() const { return disconnect_flag; }
+	int GetRemainDataSize() const { return remain_data_size; }
+	USER_STATE GetState() const { return state.GetSelf(); }
 
 	//setters
-	void SetSocket(SOCKET new_socket) { socket = new_socket; }
 	void SetId(int new_id) { id = new_id; }
-
-	bool SetUse(bool expected, bool desired);
+	void SetRoomId(int new_room_id) { room_id = new_room_id; }
+	void SetDisconnectFlag(bool new_flag) { disconnect_flag = new_flag; }
+	void SetRemainDataSize(int new_data_size) { remain_data_size += new_data_size; }
+	void SetUse(USER_STATE new_state) { state = new_state; }
+	bool SetUse(USER_STATE expected, USER_STATE desired);
+	
 };
 

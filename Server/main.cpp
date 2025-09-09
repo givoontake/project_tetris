@@ -14,17 +14,17 @@ void WorkerThread()
 	iocp_server.ProcessGQCS();
 }
 
-void WorkerThread2()
-{
-	while (iocp_server.GetRunning()) {
-		while (!iocp_server.GetQueue().IsEmpty()) {
-			int user_id = iocp_server.GetQueue().DeQ();
-			iocp_server.Disconnect(user_id);
-			std::cout << "WorkerT_hread2 DeQ, User ID: " << user_id << std::endl;
-		}
-		iocp_server.ProcessGQCS();
-	}
-}
+//void WorkerThread2()
+//{
+//	while (iocp_server.GetRunning()) {
+//		while (!iocp_server.GetTaskQueue().IsEmpty()) {
+//			int user_id = iocp_server.GetTaskQueue().DeQ();
+//			iocp_server.Disconnect(user_id);
+//			std::cout << "WorkerT_hread2 DeQ, User ID: " << user_id << std::endl;
+//		}
+//		iocp_server.ProcessGQCS();
+//	}
+//}
 
 int main()
 {
@@ -32,9 +32,9 @@ int main()
 	remainning_send_IOCP = 0;
 	std::vector <std::thread> worker_threads;
 	int num_threads = std::thread::hardware_concurrency();
-	for (int i = 0; i < num_threads -1; ++i)
+	for (int i = 0; i < num_threads; ++i)
 		worker_threads.emplace_back(WorkerThread);
-	worker_threads.emplace_back(WorkerThread2);
+	/*worker_threads.emplace_back(WorkerThread2);*/
 	for (auto& th : worker_threads)
 		th.join();
 }

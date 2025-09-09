@@ -39,6 +39,9 @@
     <ClCompile Include="TetrisRoom.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="RoomPacketHandler.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="IOCPServer.h">
@@ -74,7 +77,13 @@
     <ClInclude Include="TetrisRoom.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="define_room_packet.h">
+    <ClInclude Include="packetType.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="RoomPacketHandler.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="atomic.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

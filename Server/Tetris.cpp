@@ -6,11 +6,7 @@
 
 Tetris::Tetris()
 {
-    for (int i = 0; i < BOARD_HEIGHT; ++i) {
-        for (int j = 0; j < BOARD_WIDTH; ++j) {
-            board[i][j] = false;
-        }
-    } // 가로 = WIDTH = x / 세로 = HEIGHT = y
+    ClearBoard();
 }
 
 // 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
@@ -200,4 +196,13 @@ int Tetris::GetRandomX()
     static std::uniform_int_distribution<int> dist(0, BOARD_WIDTH - 1);
 
     return dist(gen);
+}
+
+void Tetris::ClearBoard()
+{
+    for (int i = 0; i < BOARD_HEIGHT; ++i) {
+        for (int j = 0; j < BOARD_WIDTH; ++j) {
+            board[i][j] = false;
+        }
+    } // 가로 = WIDTH = x / 세로 = HEIGHT = y
 }

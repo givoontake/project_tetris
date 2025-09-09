@@ -1,13 +1,47 @@
 #include "RoomSession.h"
 
-RoomSession::RoomSession(C2S_ADD_USER_PACKET& p)
+RoomSession::RoomSession()
 {
-	memcpy(user_name, p.name, sizeof(user_name));
-	user_id = p.id;
-	user_state = WAIT;
+
 }
 
 RoomSession::~RoomSession()
 {
 
+}
+
+void RoomSession::SetIsReady(bool param)
+{
+	is_ready = param;
+}
+
+bool RoomSession::SetUse(bool expected, bool desired)
+{
+	// false -> true
+	if (desired == true) {
+		if (in_use.Compare_exchange_strong(expected, desired)) return true;
+		else return false;
+	}
+
+	// true -> false
+	else {
+		if (in_use.Compare_exchange_strong(expected, desired)) return true;
+		else return false;
+	}
+}
+
+void RoomSession::InitSession(Session* s)
+{
+	session = s;
+	is_ready = false;
+	in_use = true;
+	tetris.ClearBoard();
+}
+
+void RoomSession::ClearSession()
+{
+	session = nullptr;
+	is_ready = false;
+	in_use = false;
+	tetris.ClearBoard();
 }

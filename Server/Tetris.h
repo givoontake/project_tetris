@@ -15,5 +15,6 @@ public:
 	int ClearLine();
 	void AddLine(int num);
 	int GetRandomX();
+	void ClearBoard();
 };
 
