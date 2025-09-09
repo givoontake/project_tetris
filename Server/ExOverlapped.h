@@ -5,13 +5,13 @@
 
 enum OP_TYPE { SEND, RECV, ACCEPT };
 
-struct ExOvelapped {
+struct ExOverlapped {
 	WSAOVERLAPPED over;
 	WSABUF wsabuf;
 	char packet_buf[BUF_SIZE];
 	OP_TYPE op_type;
 
-	ExOvelapped()
+	ExOverlapped()
 	{
 		ZeroMemory(&over, sizeof(over));
 		wsabuf.len = BUF_SIZE;
