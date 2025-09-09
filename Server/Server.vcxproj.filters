@@ -83,7 +83,7 @@
     <ClInclude Include="RoomPacketHandler.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="atomic.h">
+    <ClInclude Include="Atomic.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

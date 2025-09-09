@@ -8,7 +8,7 @@ IOCPServer::IOCPServer() : handler(this)
 	}
 
 	for (int i = 0; i < MAX_ROOM; ++i){
-		rooms[i] = new TetrisRoom();
+		rooms[i] = new TetrisRoom(this);
 		rooms[i]->SetRoomId(i); // 방 아이디를 정해줄 부분이 마땅치 않아 서버 생성 시 만들기로 했다..
 	}
 
@@ -36,16 +36,6 @@ IOCPServer::~IOCPServer()
 	closesocket(client_socket);
 	WSACleanup();
 }
-
-//std::array<std::unique_ptr<Session>, MAX_USER>& IOCPServer::GetSessionList()
-//{
-//	return users;
-//}
-
-//MQueue& IOCPServer::GetTaskQueue()
-//{
-//	return task_queue;
-//}
 
 void IOCPServer::StartServer()
 {
@@ -132,7 +122,7 @@ void IOCPServer::ProcessGQCS()
 
 void IOCPServer::ProcessPacket(int recv_bytes, int user_id)
 {
-	if (users[user_id]->GetState() == false) {
+	if (users[user_id]->GetState() == NONE) {
 		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
 		return;
 	}

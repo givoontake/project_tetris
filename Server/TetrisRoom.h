@@ -28,7 +28,7 @@ class TetrisRoom
 	//std::mutex room_mutex;
 	
 public:
-	TetrisRoom();
+	TetrisRoom(IOCPServer* server);
 	~TetrisRoom();
 
 	ROOM_STATE GetRoomState() const { return room_state.GetSelf(); }

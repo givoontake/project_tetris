@@ -30,7 +30,7 @@
     <ClCompile Include="TetrisRoom.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="atomic.h" />
+    <ClInclude Include="Atomic.h" />
     <ClInclude Include="define.h" />
     <ClInclude Include="define_tetromino.h" />
     <ClInclude Include="ExOverlapped.h" />

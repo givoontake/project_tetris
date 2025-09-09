@@ -1,6 +1,6 @@
 #include "TetrisRoom.h"
 
-TetrisRoom::TetrisRoom() : room_handler(this, server)
+TetrisRoom::TetrisRoom(IOCPServer* server) : server(server), room_handler(this, server)
 {
 	
 }
@@ -64,6 +64,8 @@ void TetrisRoom::AddUser(Session* new_session)
 			p.id = new_session->GetId();
 			p.is_add = true;
 			Broadcast(reinterpret_cast<char*>(&p));
+
+			return;
 		}	
 
 	}

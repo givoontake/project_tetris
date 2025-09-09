@@ -4,7 +4,7 @@
 #include <mutex>
 #include "ExOverlapped.h"
 #include "Interface.h"
-#include "atomic.h"
+#include "Atomic.h"
 
 enum USER_STATE {NONE, LOBBY, ROOM};
 
@@ -19,7 +19,7 @@ class Session
 	int remain_data_size = 0;
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
-	Atomic<USER_STATE> state;
+	Atomic<USER_STATE> state = NONE;
 	bool disconnect_flag = false;
 public:
 
@@ -33,7 +33,7 @@ public:
 
 	//getters
 	SOCKET GetSocket() const { return socket; }
-	ExOverlapped GetExOver() const { return recv_over; }
+	ExOverlapped& GetExOver() { return recv_over; }
 
 	int GetId() const { return id; }
 	int GetRoomId() const { return room_id; }

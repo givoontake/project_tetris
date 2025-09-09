@@ -22,7 +22,7 @@ public:
 	Session* GetSession() const { return session; }
 	bool GetInUse() const { return in_use.GetSelf(); }
 	bool GetIsReady() const { return is_ready; }
-	Tetris GetTetris() const { return tetris; }
+	Tetris& GetTetris() { return tetris; }
 
 	void SetIsReady(bool param);
 	bool SetUse(bool expected, bool desired);

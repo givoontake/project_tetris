@@ -57,49 +57,6 @@ void Session::RecvPacket()
 	++remainning_total_IOCP;
 }
 
-//void Session::ProcessPacket(int recv_bytes)
-//{
-//	if (in_use == false) {
-//		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
-//		return;
-//	}
-//
-//	// 모든 패킷 처리는 중앙 서버에서 하도록 변경할 예정
-//	// 중앙 서버의 디스커넥트에 직접 접근하도록 하지 말고, 디스커넥트 요청이 온 것처럼(예전에 생각한 방식)처리.. 아니다. 굳이 번거롭게 이러지 말자
-//	// 그냥 disconnect 처리 여부를 담당하는 플래그를 하나 만들자. 서버에서 패킷을 처리할 때 마다 이 플래그를 검사하도록 하자.
-//	// 그러면 간편해진다.
-//	if (recv_bytes + remain_data_size > BUF_SIZE) {
-//		//handler_interface->GetServerInterface()->Disconnect(id);
-//		disconnect_flag = true;
-//		return;
-//	}
-//
-//	else remain_data_size += recv_bytes;
-//
-//	if (remain_data_size < sizeof(short)) return;
-//
-//	short packet_size = GetPacketSize(recv_over.packet_buf);
-//
-//	// ---구조를 변경하면서 고민되는 점---
-//	// 단순히 세션이 처리 가능한 데이터가 있다고 작업 큐에 넣느냐-> 나중에 서버단에서 처리 후 데이터 땡기기 등 처리를 해야함
-//	// 세션에 작업 가능한 데이터를 잘라 따로 보관해 놓는다-> 나중에 서버가 따로 신경 쓸 부분은 없어짐.. 그러나 추가 메모리 필요
-//	// 뭐가 나으려나??
-//	while (remain_data_size >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
-//	{
-//		packet_size = GetPacketSize(recv_over.packet_buf);
-//		char p_buffer[BUF_SIZE];
-//		// 패킷 분리: packet_buffer에 복사 후 처리
-//		memcpy(p_buffer, recv_over.packet_buf, packet_size);
-//		// ProcessRecvPacket(p_buffer);
-//
-//		 // 처리한 패킷은 남은 데이터에서 제거
-//		remain_data_size -= packet_size;
-//		memmove(recv_over.packet_buf, recv_over.packet_buf + packet_size, remain_data_size);
-//		//handler_interface->HandlePacket(p_buffer);
-//	}
-//	// 
-//}
-
 short Session::GetPacketSize(char* packet)
 {
 	//switch (packet[2]) {
