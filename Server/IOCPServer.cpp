@@ -212,19 +212,13 @@ int IOCPServer::GetRoomId()
 
 void IOCPServer::Disconnect(int user_id)
 {
+	if (users[user_id]->GetState() == NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
 	users[user_id]->SetUse(NONE);
 	closesocket(users[user_id]->GetSocket());
-	std::cout << "client[" << user_id << "]" << " Disconnect\n";
-	--user_count;
-	std::cout << "client[" << user_id << "]" << " Connect. " << "total_user: " << user_count << std::endl;
-	// 디스커넥트 처리 패킷을 왜 다른애들이 알아야 하지.. 게임에 참가한 상태에서만 남들이 알면 그만이다. 애초에 본인한테 전송할 이유도 없으니 그냥 처리만 하면 된다.
-	// 나중에 게임 방에서는 브로드캐스트 필요.
+	std::cout << "client[" << user_id << "]" << " Disconnect" << "total_user: " << --user_count << std::endl;
 	
-	//S2C_DISCONNECT_PACKET p;
-	//p.size = sizeof(S2C_DISCONNECT_PACKET);
-	//p.type = S2C_DISCONNECT;
-	//for (auto& user : users){
-	//	if (!user->GetUse() || user_id == user->GetId()) continue;
-	//	user->SendPacket(reinterpret_cast<char*>(&p));
-	//}
+	S2C_DISCONNECT_PACKET p;
+	p.size = sizeof(S2C_DISCONNECT_PACKET);
+	p.type = S2C_DISCONNECT;
+	SendToSelf(reinterpret_cast<char*>(&p), user_id);
 }
