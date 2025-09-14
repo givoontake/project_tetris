@@ -3,7 +3,7 @@
 #include <MSWSock.h>
 #include "define.h"
 
-enum OP_TYPE { SEND, RECV, ACCEPT };
+enum OP_TYPE { SEND, RECV, ACCEPT, DISCONNECT };
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;

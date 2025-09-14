@@ -20,14 +20,13 @@ class Session
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
 	Atomic<USER_STATE> state = NONE;
-	bool disconnect_flag = false;
 public:
 
 	Session(); // 인자로 IPacketHandler를 받을 때 자식 클래스 Packethandler를 받는다->업캐스팅, 자식에서 재정의한 가상함수만 사용 가능하다.
 
 	void InitSession(int new_id, SOCKET new_socket);
-	void SendPacket(char* packet);
-	void RecvPacket();
+	void SendPacket(char* packet, const HANDLE iocp_handle);
+	void RecvPacket(const HANDLE iocp_handle);
 	
 	short GetPacketSize(char* packet);
 
@@ -37,14 +36,12 @@ public:
 
 	int GetId() const { return id; }
 	int GetRoomId() const { return room_id; }
-	bool GetDisconnectFlag() const { return disconnect_flag; }
 	int GetRemainDataSize() const { return remain_data_size; }
 	USER_STATE GetState() const { return state.GetSelf(); }
 
 	//setters
 	void SetId(int new_id) { id = new_id; }
 	void SetRoomId(int new_room_id) { room_id = new_room_id; }
-	void SetDisconnectFlag(bool new_flag) { disconnect_flag = new_flag; }
 	void SetRemainDataSize(int new_data_size) { remain_data_size += new_data_size; }
 	void SetUse(USER_STATE new_state) { state = new_state; }
 	bool SetUse(USER_STATE expected, USER_STATE desired);

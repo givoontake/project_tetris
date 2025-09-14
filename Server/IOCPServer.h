@@ -41,6 +41,7 @@ public:
 	int GetUserId();
 	int GetRoomId();
 	bool GetRunning() const { return is_running; }
+	HANDLE GetHandle() const { return iocp_handle; }
 	Session* GetSession(int user_id) const { return users[user_id]; }
 
 	//virtual MQueue& GetTaskQueue() override;

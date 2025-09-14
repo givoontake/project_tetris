@@ -63,7 +63,7 @@ void TetrisRoom::AddUser(Session* new_session)
 			// p.name = 세션에 이름 변수 추가 필요
 			p.id = new_session->GetId();
 			p.is_add = true;
-			Broadcast(reinterpret_cast<char*>(&p));
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
 			return;
 		}	
@@ -78,7 +78,7 @@ void TetrisRoom::AddUser(Session* new_session)
 	// p.name = 세션에 이름 변수 추가 필요
 	p.id = new_session->GetId();
 	p.is_add = false;
-	new_session->SendPacket(reinterpret_cast<char*>(&p)); // 방이 꽉 찼을 경우 본인에게만 실패 전송
+	new_session->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 방이 꽉 찼을 경우 본인에게만 실패 전송
 }
 
 void TetrisRoom::DeleteUser(const int id)
@@ -100,7 +100,7 @@ void TetrisRoom::DeleteUser(const int id)
 				}
 				p.new_host_id = new_host_id;
 			}
-			Broadcast(reinterpret_cast<char*>(&p));
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
 			break;
 			//room_mutex.unlock();
@@ -121,7 +121,7 @@ void TetrisRoom::ReadyUser(const C2S_READY_PACKET& packet)
 			p.type = S2C_READY;
 			p.id = r_user.GetSession()->GetId();
 			p.is_ready = r_user.GetIsReady();
-			Broadcast(reinterpret_cast<char*>(&p));
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 			break;
 		}
 	}
@@ -142,7 +142,7 @@ void TetrisRoom::KickUser(const C2S_KICK_PACKET& packet)
 			p.size = sizeof(S2C_KICK_PACKET);
 			p.type = S2C_KICK;
 			p.kick_user_id = packet.kick_user_id;
-			Broadcast(reinterpret_cast<char*>(&p));
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
 			break;
 		}
@@ -175,7 +175,7 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 			p.type = S2C_START;
 			p.is_start = false;
 
-			room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p)); // 시작 불가는 방장에게만 보내면 됨
+			room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
 			return;
 		}
 		else ++ready_user_count;
@@ -186,7 +186,7 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 		p.type = S2C_START;
 		p.is_start = false;
 
-		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p)); // 시작 불가는 방장에게만 보내면 됨
+		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
 		return;
 	}
 
@@ -199,14 +199,24 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 	p.size = sizeof(S2C_START_PACKET);
 	p.type = S2C_START;
 	p.is_start = true;
-	Broadcast(reinterpret_cast<char*>(&p));
+	Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 }
 
-void TetrisRoom::Broadcast(char* packet)
+void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 {
 	for (auto& r_user : room_users) {
-		if (r_user.GetInUse()) {
-			r_user.GetSession()->SendPacket(packet);
+		if (r_user.GetInUse() ) {
+			r_user.GetSession()->SendPacket(packet, iocp_handle);
+		}
+	}
+}
+
+void TetrisRoom::SendToSelf(char* packet, int self_id, const HANDLE iocp_handle)
+{
+	for (auto& r_user : room_users) {
+		if (r_user.GetInUse() && r_user.GetSession()->GetId() == self_id) {
+			r_user.GetSession()->SendPacket(packet, iocp_handle);
+			break;
 		}
 	}
 }

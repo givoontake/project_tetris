@@ -13,11 +13,10 @@ void Session::InitSession(int new_id, SOCKET new_socket)
 	socket = new_socket;
 	remain_data_size = 0;
 	room_id = -1;
-	disconnect_flag = false;
 	state = LOBBY;
 }
 
-void Session::SendPacket(char* packet)
+void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 {
 	if (state == NONE) return;
 	ExOverlapped* send_over = new ExOverlapped;
@@ -27,11 +26,9 @@ void Session::SendPacket(char* packet)
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		//state = false; // Disconnect 패킷은 나중에 보내더라도, 서버에서 이 세션에 대해 더이상 처리할 필요는 없다.
-		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
-		//std::cout << "\r client[" << id << "]" << "WSASend() IOCP Sign Up Fail";
-		//handler_interface->GetServerInterface()->GetQueue().EnQ(id);
-		disconnect_flag = true;
+		ExOverlapped* pqcs_over = new ExOverlapped;
+		pqcs_over->SetExOverlapped(DISCONNECT);
+		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<OVERLAPPED*>(pqcs_over));
 		delete send_over;
 		return;
 	}
@@ -39,7 +36,7 @@ void Session::SendPacket(char* packet)
 	++remainning_total_IOCP;
 }
 
-void Session::RecvPacket()
+void Session::RecvPacket(const HANDLE iocp_handle)
 {
 	if (state == NONE) return;
 	DWORD recv_flag = 0;
@@ -49,9 +46,9 @@ void Session::RecvPacket()
 	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		//std::cout << "\r client[" << id << "]" << "WSARecv() IOCP Sign Up Fail";
-		//handler_interface->GetServerInterface()->GetQueue().EnQ(id);
-		disconnect_flag = true;
+		ExOverlapped* pqcs_over = new ExOverlapped;
+		pqcs_over->SetExOverlapped(DISCONNECT);
+		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<OVERLAPPED*>(pqcs_over));
 		return;
 	}
 	++remainning_total_IOCP;

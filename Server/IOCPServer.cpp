@@ -49,8 +49,7 @@ void IOCPServer::StartServer()
 
 void IOCPServer::ProcessGQCS()
 {
-	while (is_running)
-	{
+	while (is_running){
 		DWORD transferred_bytes = 0;
 		ULONG_PTR key = 0;
 		WSAOVERLAPPED* over = nullptr;
@@ -79,13 +78,13 @@ void IOCPServer::ProcessGQCS()
 			continue;
 		}
 
-		switch (ex_over->op_type){
-		case ACCEPT: { 
+		switch (ex_over->op_type) {
+		case ACCEPT: {
 			int new_id = GetUserId();
 			if (new_id != -1) {
 				users[new_id]->InitSession(new_id, client_socket);
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_id, 0);
-				users[new_id]->RecvPacket();
+				users[new_id]->RecvPacket(iocp_handle);
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
@@ -101,7 +100,7 @@ void IOCPServer::ProcessGQCS()
 		case RECV: {
 			ProcessPacket(transferred_bytes, key);
 			--remainning_total_IOCP;
-			users[key]->RecvPacket();
+			users[key]->RecvPacket(iocp_handle);
 			break;
 		}
 
@@ -113,7 +112,12 @@ void IOCPServer::ProcessGQCS()
 			// 송신 완료 후 추가 처리
 			break;
 		}
-		
+
+		case DISCONNECT: {
+			Disconnect(static_cast<int>(key));
+			--remainning_total_IOCP;
+			break;
+		}
 		}
 		++processed_IOCP;
 		if(processed_IOCP % 1000 == 0) std::cout << "r_send: " << remainning_send_IOCP <<" r_total: " << remainning_total_IOCP << " processed: " << processed_IOCP << std::endl;
@@ -127,13 +131,8 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_id)
 		return;
 	}
 
-	// 모든 패킷 처리는 중앙 서버에서 하도록 변경할 예정
-	// 중앙 서버의 디스커넥트에 직접 접근하도록 하지 말고, 디스커넥트 요청이 온 것처럼(예전에 생각한 방식)처리.. 아니다. 굳이 번거롭게 이러지 말자
-	// 그냥 disconnect 처리 여부를 담당하는 플래그를 하나 만들자. 서버에서 패킷을 처리할 때 마다 이 플래그를 검사하도록 하자.
-	// 그러면 간편해진다.
 	if (recv_bytes + users[user_id]->GetRemainDataSize() > BUF_SIZE) {
-		//handler_interface->GetServerInterface()->Disconnect(id);
-		users[user_id]->SetDisconnectFlag(true);
+		Disconnect(user_id);
 		return;
 	}
 
@@ -143,10 +142,6 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_id)
 
 	short packet_size = users[user_id]->GetPacketSize(users[user_id]->GetExOver().packet_buf);
 
-	// ---구조를 변경하면서 고민되는 점---
-	// 단순히 세션이 처리 가능한 데이터가 있다고 작업 큐에 넣느냐-> 나중에 서버단에서 처리 후 데이터 땡기기 등 처리를 해야함
-	// 세션에 작업 가능한 데이터를 잘라 따로 보관해 놓는다-> 나중에 서버가 따로 신경 쓸 부분은 없어짐.. 그러나 추가 메모리 필요
-	// 뭐가 나으려나??
 	while (users[user_id]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
 		packet_size = users[user_id]->GetPacketSize(users[user_id]->GetExOver().packet_buf);
@@ -166,14 +161,14 @@ void IOCPServer::BroadCastLobby(char* packet)
 {
 	for (auto& user : users) {
 		if (user->GetState() == LOBBY) {// 현재 이 상태는 서버에 연결되어 있는 상태이므로, 나중에 로비, 방에 따라 구분 필요
-			user->SendPacket(packet);
+			user->SendPacket(packet, iocp_handle);
 		}
 	}
 }
 
 void IOCPServer::SendToSelf(char* packet, int self_id)
 {
-	users[self_id]->SendPacket(packet);
+	users[self_id]->SendPacket(packet, iocp_handle);
 }
 
 void IOCPServer::CreateRoom(char* packet)

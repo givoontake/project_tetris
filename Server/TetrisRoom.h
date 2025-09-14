@@ -7,6 +7,7 @@
 #include "define.h"
 #include "packetType.h"
 #include "RoomPacketHandler.h"
+#include "IOCPServer.h"
 
 enum ROOM_STATE {EMPTY, WAIT, PLAY};
 
@@ -43,7 +44,8 @@ public:
 	void ReadyUser(const C2S_READY_PACKET& packet);
 	void KickUser(const C2S_KICK_PACKET& packet);
 	void StartGame(const C2S_START_PACKET& packet);
-	void Broadcast(char* packet);
+	void Broadcast(char* packet, const HANDLE iocp_handle);
+	void SendToSelf(char* packet, int self_id, const HANDLE iocp_handle);
 
 	void InitGame();
 	//void SendToSelf(char* packet, Session* session);
