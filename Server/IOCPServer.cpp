@@ -115,6 +115,7 @@ void IOCPServer::ProcessGQCS()
 
 		case DISCONNECT: {
 			Disconnect(static_cast<int>(key));
+			delete ex_over;
 			--remainning_total_IOCP;
 			break;
 		}
