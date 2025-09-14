@@ -25,11 +25,8 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
-	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		ExOverlapped* pqcs_over = new ExOverlapped;
-		pqcs_over->SetExOverlapped(DISCONNECT);
-		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<OVERLAPPED*>(pqcs_over));
-		delete send_over;
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
+		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
 		return;
 	}
 	++remainning_send_IOCP;
@@ -46,9 +43,7 @@ void Session::RecvPacket(const HANDLE iocp_handle)
 	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		ExOverlapped* pqcs_over = new ExOverlapped;
-		pqcs_over->SetExOverlapped(DISCONNECT);
-		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<OVERLAPPED*>(pqcs_over));
+		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
 		return;
 	}
 	++remainning_total_IOCP;

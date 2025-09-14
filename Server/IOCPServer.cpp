@@ -112,13 +112,6 @@ void IOCPServer::ProcessGQCS()
 			// 송신 완료 후 추가 처리
 			break;
 		}
-
-		case DISCONNECT: {
-			Disconnect(static_cast<int>(key));
-			delete ex_over;
-			--remainning_total_IOCP;
-			break;
-		}
 		}
 		++processed_IOCP;
 		if(processed_IOCP % 1000 == 0) std::cout << "r_send: " << remainning_send_IOCP <<" r_total: " << remainning_total_IOCP << " processed: " << processed_IOCP << std::endl;
@@ -214,11 +207,11 @@ void IOCPServer::Disconnect(int user_id)
 {
 	if (users[user_id]->GetState() == NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
 	users[user_id]->SetUse(NONE);
-	closesocket(users[user_id]->GetSocket());
 	std::cout << "client[" << user_id << "]" << " Disconnect" << "total_user: " << --user_count << std::endl;
 	
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
 	p.type = S2C_DISCONNECT;
 	SendToSelf(reinterpret_cast<char*>(&p), user_id);
+	closesocket(users[user_id]->GetSocket());
 }
