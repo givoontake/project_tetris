@@ -61,7 +61,7 @@ void TetrisRoom::AddUser(Session* new_session)
 			p.size = sizeof(S2C_ADD_USER_PACKET);
 			p.type = S2C_ADD_USER;
 			// p.name = 세션에 이름 변수 추가 필요
-			p.id = new_session->GetId();
+			p.id = new_session->GetIndex();
 			p.is_add = true;
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
@@ -76,7 +76,7 @@ void TetrisRoom::AddUser(Session* new_session)
 	p.size = sizeof(S2C_ADD_USER_PACKET);
 	p.type = S2C_ADD_USER;
 	// p.name = 세션에 이름 변수 추가 필요
-	p.id = new_session->GetId();
+	p.id = new_session->GetIndex();
 	p.is_add = false;
 	new_session->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 방이 꽉 찼을 경우 본인에게만 실패 전송
 }
@@ -84,7 +84,7 @@ void TetrisRoom::AddUser(Session* new_session)
 void TetrisRoom::DeleteUser(const int id)
 {
 	for (auto& r_user : room_users){
-		if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
+		if (r_user.GetSession()->GetIndex() == id) { // 삭제할 아이디 검색
 			//room_mutex.lock();
 			r_user.SetUse(true, false);
 			r_user.ClearSession(); // 해당 아이디 세션 정리
@@ -113,13 +113,13 @@ void TetrisRoom::ReadyUser(const C2S_READY_PACKET& packet)
 	if (host_id == packet.id) return;
 
 	for (auto& r_user : room_users){
-		if (r_user.GetSession()->GetId() == packet.id) { // 레디 상태 변화
+		if (r_user.GetSession()->GetIndex() == packet.id) { // 레디 상태 변화
 			r_user.SetIsReady(packet.is_ready);
 
 			S2C_READY_PACKET p;
 			p.size = sizeof(S2C_READY_PACKET);
 			p.type = S2C_READY;
-			p.id = r_user.GetSession()->GetId();
+			p.id = r_user.GetSession()->GetIndex();
 			p.is_ready = r_user.GetIsReady();
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 			break;
@@ -134,7 +134,7 @@ void TetrisRoom::KickUser(const C2S_KICK_PACKET& packet)
 	if (packet.id != host_id) return;
 
 	for (auto& r_user : room_users) {
-		if (r_user.GetSession()->GetId() == packet.kick_user_id) { // 삭제할 아이디 검색
+		if (r_user.GetSession()->GetIndex() == packet.kick_user_id) { // 삭제할 아이디 검색
 			r_user.SetUse(true, false);
 			r_user.ClearSession(); // 해당 아이디 세션 정리
 
@@ -155,7 +155,7 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 
 	int host_index = -1;
 	for (int i = 0; i < max_user; i++){
-		if (room_users[i].GetSession()->GetId() == host_id) {
+		if (room_users[i].GetSession()->GetIndex() == host_id) {
 			host_index = i;
 			break;
 		}
@@ -168,7 +168,7 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 
 	for(auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue; // 사용 중이지 않은 인덱스는 건너뜀
-		if (r_user.GetSession()->GetId() == host_id) continue; // 방장은 건너뜀
+		if (r_user.GetSession()->GetIndex() == host_id) continue; // 방장은 건너뜀
 
 		if (!r_user.GetIsReady()) { // 방에 있는데 레디가 안된 사람이 있으면 시작 불가			
 			p.size = sizeof(S2C_START_PACKET);
@@ -214,7 +214,7 @@ void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 void TetrisRoom::SendToSelf(char* packet, int self_id, const HANDLE iocp_handle)
 {
 	for (auto& r_user : room_users) {
-		if (r_user.GetInUse() && r_user.GetSession()->GetId() == self_id) {
+		if (r_user.GetInUse() && r_user.GetSession()->GetIndex() == self_id) {
 			r_user.GetSession()->SendPacket(packet, iocp_handle);
 			break;
 		}
@@ -243,7 +243,7 @@ void TetrisRoom::SetRoomState(ROOM_STATE new_state)
 int TetrisRoom::FindNewHost()
 {
 	for (auto& r_user : room_users) {
-		if (r_user.GetInUse()) return r_user.GetSession()->GetId();
+		if (r_user.GetInUse()) return r_user.GetSession()->GetIndex();
 	}
 	return -1;
 }

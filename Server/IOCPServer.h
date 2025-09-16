@@ -9,6 +9,7 @@
 #include "PacketHandler.h"
 #include "MQueue.h"
 #include "TetrisRoom.h"
+#include "Atomic.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -21,6 +22,7 @@ class IOCPServer
 	ExOverlapped accept_over;
 	MQueue task_queue;
 	PacketHandler handler;
+	std::atomic<int> id_generator;
 
 	//std::unique_ptr<PacketHandler> packet_handler; // 먼저 선언되어 있다면 해당 변수는 나중에 선언되는 변수에서 사용 가능하다.
 	std::array<Session*, MAX_USER> users;
@@ -38,21 +40,23 @@ public:
 	//getters
 	//std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() { return users; };
 	//std::array<std::unique_ptr<TetrisRoom>, MAX_ROOM>& GetRoomList() { return rooms; };
+	int GetEmptyUserIndex();
+	int GetEmptyRoomIndex();
 	int GetUserId();
-	int GetRoomId();
 	bool GetRunning() const { return is_running; }
 	HANDLE GetHandle() const { return iocp_handle; }
-	Session* GetSession(int user_id) const { return users[user_id]; }
+	Session* GetSession(int user_index) const { return users[user_index]; }
 
 	//virtual MQueue& GetTaskQueue() override;
 
-	void Disconnect(int user_id);
+	void Disconnect(int user_index);
 	void StartServer();
 	void ProcessGQCS();
-	void ProcessPacket(int recv_bytes, int user_id);
+	void ProcessPacket(int recv_bytes, int user_index);
 	void BroadCastLobby(char* packet);
 	//void BroadCastRoom(char* packet, int room_id);
-	void SendToSelf(char* packet, int self_id);
+	void SendToSelf(char* packet, int self_index);
 	void CreateRoom(char* packet); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
+	
 };
 

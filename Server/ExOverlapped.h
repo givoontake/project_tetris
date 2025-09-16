@@ -10,16 +10,22 @@ struct ExOverlapped {
 	WSABUF wsabuf;
 	char packet_buf[BUF_SIZE];
 	OP_TYPE op_type;
+	int operation_id;
 
 	ExOverlapped()
 	{
 		ZeroMemory(&over, sizeof(over));
 		wsabuf.len = BUF_SIZE;
 		wsabuf.buf = packet_buf;
+		operation_id = -1;
 	}
 
-	void SetExOverlapped(OP_TYPE type) {
+	void SetOperationType(OP_TYPE type) {
 		op_type = type;
+	}
+
+	void SetOperationId(int id) {
+		operation_id = id;
 	}
 
 	//void SetExOverlapped(OP_TYPE type, char* packet) {

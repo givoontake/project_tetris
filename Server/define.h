@@ -13,11 +13,6 @@ constexpr int ID_SIZE = 16;
 
 constexpr int MAX_USER_NAME = 48;
 
-extern std::atomic<int> remainning_send_IOCP;
-extern std::atomic<int> remainning_total_IOCP;
-extern std::atomic<int> processed_IOCP;
-extern std::atomic<int> user_count;
-
 #pragma pack(push, 1)
 
 struct S2C_LOGIN_PACKET {

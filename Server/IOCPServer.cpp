@@ -26,7 +26,7 @@ IOCPServer::IOCPServer() : handler(this)
 	server_addr.sin_port = htons(PORT_NUM);
 	server_addr.sin_addr.S_un.S_addr = INADDR_ANY;
 
-	accept_over.SetExOverlapped(ACCEPT);
+	accept_over.SetOperationType(ACCEPT);
 
 }
 
@@ -80,17 +80,15 @@ void IOCPServer::ProcessGQCS()
 
 		switch (ex_over->op_type) {
 		case ACCEPT: {
-			int new_id = GetUserId();
-			if (new_id != -1) {
-				users[new_id]->InitSession(new_id, client_socket);
-				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_id, 0);
-				users[new_id]->RecvPacket(iocp_handle);
+			int new_index = GetEmptyUserIndex();
+			if (new_index != -1) {
+				users[new_index]->InitSession(new_index, GetUserId(), client_socket);
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
+				users[new_index]->RecvPacket(iocp_handle);
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 
-			++user_count;
-			std::cout << "client[" << new_id << "]" << " Connect. " << "total_user: " << user_count << std::endl;
 			ZeroMemory(&accept_over.over, sizeof(accept_over.over));
 			int addr_size = sizeof(SOCKADDR_IN);
 			AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.over);
@@ -98,55 +96,52 @@ void IOCPServer::ProcessGQCS()
 		}
 
 		case RECV: {
-			ProcessPacket(transferred_bytes, key);
-			--remainning_total_IOCP;
-			users[key]->RecvPacket(iocp_handle);
+			if (ex_over->operation_id == users[key]->GetId()) {
+				ProcessPacket(transferred_bytes, key);
+				users[key]->RecvPacket(iocp_handle);
+			}
+			
 			break;
 		}
 
 		case SEND: {
 			delete ex_over;
-			--remainning_send_IOCP;
-			--remainning_total_IOCP;
-			//if ((remainning_send_IOCP > 100) && (remainning_send_IOCP % 100 == 0)) std::cout << "remainning_send_IOCP: " << remainning_send_IOCP << std::endl;
-			// 송신 완료 후 추가 처리
+
 			break;
 		}
 		}
-		++processed_IOCP;
-		if(processed_IOCP % 1000 == 0) std::cout << "r_send: " << remainning_send_IOCP <<" r_total: " << remainning_total_IOCP << " processed: " << processed_IOCP << std::endl;
 	}
 }
 
-void IOCPServer::ProcessPacket(int recv_bytes, int user_id)
+void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 {
-	if (users[user_id]->GetState() == NONE) {
+	if (users[user_index]->GetState() == NONE) {
 		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
 		return;
 	}
 
-	if (recv_bytes + users[user_id]->GetRemainDataSize() > BUF_SIZE) {
-		Disconnect(user_id);
+	if (recv_bytes + users[user_index]->GetRemainDataSize() > BUF_SIZE) {
+		Disconnect(user_index);
 		return;
 	}
 
-	else users[user_id]->SetRemainDataSize(recv_bytes);
+	else users[user_index]->SetRemainDataSize(recv_bytes);
 
-	if (users[user_id]->GetRemainDataSize() < sizeof(short)) return;
+	if (users[user_index]->GetRemainDataSize() < sizeof(short)) return;
 
-	short packet_size = users[user_id]->GetPacketSize(users[user_id]->GetExOver().packet_buf);
+	short packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 
-	while (users[user_id]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
+	while (users[user_index]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
-		packet_size = users[user_id]->GetPacketSize(users[user_id]->GetExOver().packet_buf);
+		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 		char p_buffer[BUF_SIZE];
 		// 패킷 분리: packet_buffer에 복사 후 처리
-		memcpy(p_buffer, users[user_id]->GetExOver().packet_buf, packet_size);
+		memcpy(p_buffer, users[user_index]->GetExOver().packet_buf, packet_size);
 		handler.HandlePacket(p_buffer);
 
 		 // 처리한 패킷은 남은 데이터에서 제거
-		users[user_id]->SetRemainDataSize(-packet_size);
-		memmove(users[user_id]->GetExOver().packet_buf, users[user_id]->GetExOver().packet_buf + packet_size, users[user_id]->GetRemainDataSize());
+		users[user_index]->SetRemainDataSize(-packet_size);
+		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
 		//handler_interface->HandlePacket(p_buffer);
 	}
 }
@@ -160,29 +155,34 @@ void IOCPServer::BroadCastLobby(char* packet)
 	}
 }
 
-void IOCPServer::SendToSelf(char* packet, int self_id)
+void IOCPServer::SendToSelf(char* packet, int self_index)
 {
-	users[self_id]->SendPacket(packet, iocp_handle);
+	users[self_index]->SendPacket(packet, iocp_handle);
 }
 
 void IOCPServer::CreateRoom(char* packet)
 {
-	int room_id = GetRoomId();
-	if (room_id == -1) {
+	int room_index = GetEmptyRoomIndex();
+	if (room_index == -1) {
 		return;
 	}
 
 	// 어차피 오픈과 록은 마지막에 비밀번호 필드 차이 유무이므로, 그냥 오픈 구조체로 만들고 id에 접근한다.
 	C2S_ADD_OPEN_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
-	users[p->id]->SetRoomId(room_id); // 방에서 가진 룸 세션은 세션을 가지지 않으므로 접근해서 room_id 세팅이 불가능함
-	rooms[room_id]->InitRoom(packet); // 초기화는 그냥 방 내부에서 처리하기.
+	users[p->id]->SetRoomIndex(room_index); // 방에서 가진 룸 세션은 세션을 가지지 않으므로 접근해서 room_id 세팅이 불가능함
+	rooms[room_index]->InitRoom(packet); // 초기화는 그냥 방 내부에서 처리하기.
 }
 
 int IOCPServer::GetUserId()
 {
+	return id_generator.fetch_add(1) + 1; // fetch_add는 값을 실제로 원자적으로 증가시키지만, 반환하는 것은 증가 이전의 값
+}
+
+int IOCPServer::GetEmptyUserIndex()
+{
 	for (int i = 0; i < MAX_USER; ++i) {
 		if (!users[i]->GetState()) {
-			if (users[i]->SetUse(NONE, LOBBY)) {
+			if (users[i]->SetState(NONE, LOBBY)) {
 				return i;
 			}
 		}
@@ -191,7 +191,7 @@ int IOCPServer::GetUserId()
 	return -1;
 }
 
-int IOCPServer::GetRoomId()
+int IOCPServer::GetEmptyRoomIndex()
 {
 	for (int i = 0; i < MAX_ROOM; ++i) {
 		if (rooms[i]->GetRoomState() == EMPTY) {
@@ -203,15 +203,14 @@ int IOCPServer::GetRoomId()
 	return -1;
 }
 
-void IOCPServer::Disconnect(int user_id)
+void IOCPServer::Disconnect(int user_index)
 {
-	if (users[user_id]->GetState() == NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
-	users[user_id]->SetUse(NONE);
-	std::cout << "client[" << user_id << "]" << " Disconnect" << "total_user: " << --user_count << std::endl;
+	if (users[user_index]->GetState() == NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
 	
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
 	p.type = S2C_DISCONNECT;
-	SendToSelf(reinterpret_cast<char*>(&p), user_id);
-	closesocket(users[user_id]->GetSocket());
+	SendToSelf(reinterpret_cast<char*>(&p), user_index);
+	closesocket(users[user_index]->GetSocket()); // closesocket 이후 이전 소켓에 대한 iocp 완료(실패로) 통지가 언제 올지 불분명해서 다음에 연결된 소켓이 받을 경우 영향이 갈 수 있다고 하는데..
+	users[user_index]->SetState(NONE);
 }

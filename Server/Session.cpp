@@ -4,15 +4,16 @@
 
 Session::Session()
 {
-	recv_over.SetExOverlapped(RECV);
+	recv_over.SetOperationType(RECV);
 }
 
-void Session::InitSession(int new_id, SOCKET new_socket)
+void Session::InitSession(int new_index, int new_id, SOCKET new_socket)
 {
 	id = new_id;
+	index = new_index;
 	socket = new_socket;
-	remain_data_size = 0;
-	room_id = -1;
+	remain_data_size = 0; // 얘 기준으로 버퍼에 쓰니까 굳이 버퍼 자체를 초기화할 필요는 없어 보임.
+	room_index = -1;
 	state = LOBBY;
 }
 
@@ -20,17 +21,15 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 {
 	if (state == NONE) return;
 	ExOverlapped* send_over = new ExOverlapped;
-	send_over->SetExOverlapped(SEND);
+	send_over->SetOperationType(SEND);
+	send_over->SetOperationId(id);
 	short packet_size = GetPacketSize(packet);
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
-		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
-		return;
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
 	}
-	++remainning_send_IOCP;
-	++remainning_total_IOCP;
 }
 
 void Session::RecvPacket(const HANDLE iocp_handle)
@@ -43,10 +42,8 @@ void Session::RecvPacket(const HANDLE iocp_handle)
 	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, id, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
-		return;
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
 	}
-	++remainning_total_IOCP;
 }
 
 short Session::GetPacketSize(char* packet)
@@ -75,7 +72,7 @@ short Session::GetPacketSize(char* packet)
 	return packet_size;
 }
 
-bool Session::SetUse(USER_STATE expected, USER_STATE desired)
+bool Session::SetState(USER_STATE expected, USER_STATE desired)
 {
 	// false -> true
 	if (desired != expected) {
