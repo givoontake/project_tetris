@@ -1,3 +1,4 @@
+#include <iostream>
 #include <vector>
 #include <thread>
 #include "TestManager.h"
@@ -13,9 +14,6 @@ void RecvWorkerThread()
 
 void SendWorkerThread()
 {
-	if (!test_manager.GetQueue().IsEmpty()) {
-		test_manager.Disconnect(test_manager.GetQueue().DeQ());
-	}
 	while (true) {
 		test_manager.ProcessSend();
 	}
@@ -26,6 +24,7 @@ int main()
 	test_manager.SetTestMessege(MAX_MESSAGE_SIZE);
 	bool res = test_manager.ConnectToServer();
 	if (!res) {
+		std::cout << "서버 연결 실패" << std::endl;
 		return 0;
 	}
 	std::vector <std::thread> worker_threads;

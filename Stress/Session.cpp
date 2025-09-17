@@ -41,7 +41,6 @@ void Session::RecvPacket()
 
 void Session::ProcessPacket(int recv_bytes, int key, BOOL res) // 세션에 있는게 맞는 것 같다. 나중에 방이 추가되면, 방에서도 세션에 접근만 해서 보내기만 하면 된다.
 {
-	   
 	if (in_use == false) {
 		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
 		return;
@@ -52,7 +51,7 @@ void Session::ProcessPacket(int recv_bytes, int key, BOOL res) // 세션에 있는게 
 		return;
 	}
 
-	else remain_data_size += recv_bytes;
+	remain_data_size += recv_bytes;
 
 	if (remain_data_size < sizeof(short)) return;
 
@@ -75,27 +74,9 @@ void Session::ProcessPacket(int recv_bytes, int key, BOOL res) // 세션에 있는게 
 
 short Session::GetPacketSize(char* packet)
 {
-	switch (packet[2]) {
-	case C2S_TEST: {
-		C2S_TEST_PACKET* p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
-		short packet_size;
-		memcpy(&packet_size, packet, sizeof(packet_size));
-		packet_size += p->message_size;
-		return packet_size;
-	}
-	case S2C_TEST: {
-		S2C_TEST_PACKET* p = reinterpret_cast<S2C_TEST_PACKET*>(packet);
-		short packet_size;
-		memcpy(&packet_size, packet, sizeof(packet_size));
-		packet_size += p->message_size;
-		return packet_size;
-	}
-	default: {
-		short packet_size;
-		memcpy(&packet_size, packet, sizeof(packet_size));
-		return packet_size;
-	}
-	}
+	short packet_size;
+	memcpy(&packet_size, packet, sizeof(packet_size));
+	return packet_size;
 }
 
 bool Session::SetUse(bool expected, bool desired)
@@ -112,3 +93,10 @@ bool Session::SetUse(bool expected, bool desired)
 		else return false;
 	}
 }
+
+void Session::SetUse(bool desired)
+{
+	in_use = desired;
+}
+
+

@@ -33,11 +33,6 @@ std::array<std::unique_ptr<Session>, MAX_USER>& TestManager::GetSessionList()
 	return clients;
 }
 
-MQueue& TestManager::GetQueue()
-{
-	return disconnect_queue;
-}
-
 long long TestManager::GetCurrentTimeMS()
 {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -84,11 +79,11 @@ bool TestManager::ConnectToServer()
 	if (res == SOCKET_ERROR) {
 		std::cout << "서버 연결 실패: " << WSAGetLastError() << "\n";
 		closesocket(client_socket);
-		WSACleanup();
 		return false;
 	}
 
 	int new_id = GetClientId();
+	if (new_id == -1) return false;
 	clients[new_id]->SetId(new_id); // 이미 배열 인덱스를 id처럼 쓰고 있어서..나중에라도 의미가 있을까?
 	clients[new_id]->SetSocket(client_socket);
 	clients[new_id]->last_send_time = GetCurrentTimeMS();
@@ -155,17 +150,16 @@ void TestManager::ProcessSend()
 		if (ms > 1000) {
 			if (client->last_send_time.compare_exchange_strong(expected, desired)) {
 				C2S_TEST_PACKET p;
-				p.size = sizeof(C2S_TEST_PACKET);
+				int total_packet_size = sizeof(C2S_TEST_PACKET) + sizeof(test_message);
+				p.size = static_cast<short>(total_packet_size);
 				p.type = C2S_TEST;
 				p.id = client->GetId();
 				p.last_time = GetCurrentTimeMS();
-				p.message_size = sizeof(test_message);
-				int real_size = sizeof(C2S_TEST_PACKET) + sizeof(test_message);
-				char* pp = new char[real_size];
-				memcpy(pp, &p, sizeof(C2S_TEST_PACKET));
-				memcpy(pp + sizeof(C2S_TEST_PACKET), test_message, sizeof(test_message));
-				client->SendPacket(pp);
-				delete[] pp;
+				char* p_buffer = new char[total_packet_size];
+				memcpy(p_buffer, &p, sizeof(C2S_TEST_PACKET)); // 구조체 우선 복사
+				memcpy(p_buffer + sizeof(C2S_TEST_PACKET), test_message, sizeof(test_message)); // 구조체 뒤에 붙여서 메세지 복사
+				client->SendPacket(p_buffer);
+				delete[] p_buffer;
 			}
 		}
 		else continue;
@@ -188,19 +182,19 @@ int TestManager::GetClientId()
 void TestManager::SetTestMessege(int message_size)
 {
 	std::ifstream in("message.txt", std::ios::binary);
-	in.read(test_message, message_size);
 	if (!in.is_open()) {
 		std::cout << "파일 열기 실패, 프로그램을 종료합니다.\n" << std::endl;
 		exit(0);
 	}
+	in.read(test_message, message_size);
 
 	in.close();
 }
 
 void TestManager::Disconnect(int client_id)
 {
-	if(!clients[client_id]->SetUse(true, false)) return; // 원래는 카스는 필요 없긴 한데.. 함수를 또 만드는게 번거로워서 그냥 하나에 만들었다.
 	closesocket(clients[client_id]->GetSocket());
+	clients[client_id]->SetUse(false);
 	std::cout << "client[" << client_id << "]" << " Disconnect\n";
 	--connected_client;
 }

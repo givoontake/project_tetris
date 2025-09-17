@@ -40,5 +40,6 @@ public:
 	void SetId(int new_id) { id = new_id; }
 
 	bool SetUse(bool expected, bool desired);
+	void SetUse(bool desired);
 };
 

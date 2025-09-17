@@ -48,15 +48,13 @@ struct S2C_TEST_PACKET {
 	short size;
 	char type;
 	int id;
-	short message_size;
 	long long last_time;
 };
 
 struct C2S_TEST_PACKET {
 	short size;
 	char type;
-	int id; // 테스트 프로그램도 다중 클라이언트를 관리중이므로 필요
-	short message_size;
+	int id; 
 	long long last_time;
 };
 

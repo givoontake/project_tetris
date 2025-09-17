@@ -18,7 +18,6 @@ class ITestManager { // 서버의 세션 리스트 접근을 위한 추상 클래스
 public:
 	virtual std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() = 0;
 	virtual long long GetCurrentTimeMS() = 0;
-	virtual MQueue& GetQueue() = 0;
 	virtual void AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p) = 0;
 	virtual void Disconnect(int client_id) = 0;
 };
