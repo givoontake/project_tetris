@@ -1,31 +1,28 @@
 #include <iostream>
 #include "Session.h"
 
-Session::Session(IPacketHandler* p_handler) : handler_interface(p_handler)
+Session::Session()
 {
 	recv_over.SetExOverlapped(RECV);
 }
 
-void Session::SendPacket(char* packet)
+void Session::SendPacket(char* packet, HANDLE iocp_handle)
 {
-	if (!in_use) return;
-	ExOvelapped* send_over = new ExOvelapped;
+	if (s_state == NONE) return;
+	ExOverlapped* send_over = new ExOverlapped;
 	send_over->SetExOverlapped(SEND);
 	short packet_size = GetPacketSize(packet);
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		// WSA함수로 IOCP등록 시 발생하는 오류는 GQCS로 가지 않음 → 직접 처리해야 함
-		//std::cout << "\r client[" << id << "]" << "WSASend() IOCP Sign Up Fail";
-		handler_interface->GetManagerInterface()->Disconnect(id);
-		delete send_over;
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
 	}
 }
 
-void Session::RecvPacket()
+void Session::RecvPacket(HANDLE iocp_handle)
 {
-	if (!in_use) return;
+	if (s_state == NONE) return;
 	int sign_count = 0;
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over.over, sizeof(recv_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
@@ -34,41 +31,7 @@ void Session::RecvPacket()
 	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
 		&recv_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		//std::cout << "\r client[" << id << "]" << "WSARecv() IOCP Sign Up Fail";
-		handler_interface->GetManagerInterface()->Disconnect(id);
-	}
-}
-
-void Session::ProcessPacket(int recv_bytes, int key, BOOL res) // 세션에 있는게 맞는 것 같다. 나중에 방이 추가되면, 방에서도 세션에 접근만 해서 보내기만 하면 된다.
-{
-	if (in_use == false) {
-		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
-		return;
-	}
-
-	if (recv_bytes + remain_data_size > BUF_SIZE) {
-		handler_interface->GetManagerInterface()->Disconnect(id);
-		return;
-	}
-
-	remain_data_size += recv_bytes;
-
-	if (remain_data_size < sizeof(short)) return;
-
-	short packet_size = GetPacketSize(recv_over.packet_buf);
-
-	while (remain_data_size >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
-	{
-		packet_size = GetPacketSize(recv_over.packet_buf);
-		char p_buffer[BUF_SIZE];
-		// 패킷 분리: packet_buffer에 복사 후 처리
-		memcpy(p_buffer, recv_over.packet_buf, packet_size);
-		// ProcessRecvPacket(p_buffer);
-
-		 // 처리한 패킷은 남은 데이터에서 제거
-		remain_data_size -= packet_size;
-		memmove(recv_over.packet_buf, recv_over.packet_buf + packet_size, remain_data_size);
-		handler_interface->HandlePacket(p_buffer);
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
 	}
 }
 
@@ -79,24 +42,31 @@ short Session::GetPacketSize(char* packet)
 	return packet_size;
 }
 
-bool Session::SetUse(bool expected, bool desired)
+void Session::ClearSession()
 {
-	// false -> true
-	if (desired == true) {
-		if (in_use.compare_exchange_strong(expected, desired)) return true;
-		else return false;
-	}
+	index = -1;
+	id = -1;
+	remain_data_size = 0;
+	//last_time = -1;
+	//last_send_time = -1;
 
-	// true -> false
-	else {
-		if (in_use.compare_exchange_strong(expected, desired)) return true;
-		else return false;
-	}
+	//s_state = NONE;
 }
 
-void Session::SetUse(bool desired)
+bool Session::SetState(SESSION_STATE expected, SESSION_STATE desired)
 {
-	in_use = desired;
+	if (desired != expected) {
+		if (s_state.compare_exchange_strong(expected, desired)) return true;
+		else return false;
+	}
+
+	// 같으면 원하는 상태이므로 true 반환
+	return true;
+}
+
+void Session::SetState(SESSION_STATE desired)
+{
+	s_state = desired;
 }
 
 

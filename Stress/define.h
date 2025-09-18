@@ -16,7 +16,23 @@ constexpr char C2S_TEST = 6;
 constexpr char S2C_DISCONNECT = 7;
 constexpr char C2S_DISCONNECT = 8;
 
+constexpr char S2C_TEST_LOGIN = 101;
+constexpr char C2S_TEST_LOGIN = 102;
+
 #pragma pack(push, 1)
+
+struct S2C_TEST_LOGIN_PACKET {
+	short size;
+	char type;
+	int id;
+	int temp_id;
+};
+
+struct C2S_TEST_LOGIN_PACKET {
+	short size;
+	char type;
+	int temp_id;
+};
 
 struct S2C_LOGIN_PACKET {
 	short size;

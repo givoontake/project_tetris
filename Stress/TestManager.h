@@ -6,20 +6,18 @@
 #include <memory>
 #include "ExOverlapped.h"
 #include "Session.h"
-#include "PacketHandler.h"
 #include "MQueue.h"
 
 #pragma comment(lib, "WS2_32.lib")
 #pragma comment(lib, "MSWSock.lib")
 
-class TestManager : public ITestManager
+class TestManager
 {
 	HANDLE iocp_handle;
 	//SOCKET client_socket;
 	WSADATA wsadata;
 	SOCKADDR_IN server_addr;
-	std::array<std::unique_ptr<Session>, MAX_USER> clients;
-	std::unique_ptr<PacketHandler> packet_handler;
+	std::array<Session*, MAX_USER> sessions;
 
 public: // 테스트하는데 굳이 private 할 이유는 없다
 	std::atomic<int> connected_client = 0;
@@ -30,15 +28,16 @@ public:
 	TestManager();
 	~TestManager();
 
-	virtual std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() override;
-	virtual long long GetCurrentTimeMS() override;
-	virtual void AdjustClientNumber(long long now_time, S2C_TEST_PACKET* p) override;
-	virtual void Disconnect(int client_id) override;
-
 	bool ConnectToServer();
 	void ProcessGQCS();
 	void ProcessSend();
-	int GetClientId();
+	int GetClientIndex();
 	void SetTestMessege(int message_size);
+	void ProcessPacket(int recv_bytes, int user_index);
+	void HandlePacket(char* packet);
+	void Disconnect(int session_index);
+
+	long long GetCurrentTimeMS();
+	void AdjustSessionNumber(long long now_time, S2C_TEST_PACKET* p);
 };
 

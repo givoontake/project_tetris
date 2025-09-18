@@ -28,3 +28,6 @@ constexpr char S2C_START = 20;
 
 constexpr char C2S_KICK = 21;
 constexpr char S2C_KICK = 22;
+
+constexpr char S2C_TEST_LOGIN = 101;
+constexpr char C2S_TEST_LOGIN = 102;

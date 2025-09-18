@@ -134,16 +134,13 @@
     <ClCompile Include="MQueue.cpp" />
     <ClCompile Include="TestManager.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="Session.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="define.h" />
     <ClInclude Include="ExOverlapped.h" />
-    <ClInclude Include="Interface.h" />
     <ClInclude Include="MQueue.h" />
     <ClInclude Include="TestManager.h" />
-    <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="Session.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
