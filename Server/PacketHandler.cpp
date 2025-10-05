@@ -26,7 +26,7 @@ void PacketHandler::HandlePacket(char* packet)
 		send_p.size = sizeof(S2C_LOGIN_PACKET);
 		send_p.type = S2C_LOGIN;
 		send_p.id = recv_p->id;
-		server->SendToSelf((char*)&send_p, send_p.id);
+		server->SendToSelf((char*)&send_p, send_p.id); // 아이디 대신 인덱스 들어가야 하는데, 구조 문제때문에 일단 보류. 나중에 반드시 변경필요
 		break;
 	}
 		

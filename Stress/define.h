@@ -25,7 +25,6 @@ struct S2C_TEST_LOGIN_PACKET {
 	short size;
 	char type;
 	int id;
-	int temp_id;
 };
 
 struct C2S_TEST_LOGIN_PACKET {

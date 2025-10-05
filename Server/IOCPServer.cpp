@@ -86,13 +86,13 @@ void IOCPServer::ProcessGQCS()
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
 				users[new_index]->RecvPacket(iocp_handle);
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-				std::cout << "Session[" << new_index << "] connect/Id: " << id_generator  << std::endl;
+				std::cout << "Session[" << new_index << "] connect/Id: " << users[new_index]->GetId() << std::endl;
 
 				S2C_TEST_LOGIN_PACKET send_p;
 				send_p.size = sizeof(S2C_TEST_LOGIN_PACKET);
-				send_p.type = S2C_LOGIN;
+				send_p.type = S2C_TEST_LOGIN;
 				send_p.id = users[new_index]->GetId();
-				SendToSelf((char*)&send_p, send_p.id);
+				SendToSelf((char*)&send_p, new_index);
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 

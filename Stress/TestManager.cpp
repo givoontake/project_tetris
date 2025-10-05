@@ -157,6 +157,7 @@ void TestManager::ProcessSend()
 				memcpy(p_buffer, &p, sizeof(C2S_TEST_PACKET)); // 구조체 우선 복사
 				memcpy(p_buffer + sizeof(C2S_TEST_PACKET), test_message, sizeof(test_message)); // 구조체 뒤에 붙여서 메세지 복사
 				client->SendPacket(p_buffer, iocp_handle);
+				std::cout << "TestManager::ProcessSend(): client[" << client->GetIndex() << "] Send Test Packet\n";
 				delete[] p_buffer;
 			}
 		}
@@ -248,8 +249,8 @@ void TestManager::HandlePacket(char* packet)
 		S2C_TEST_LOGIN_PACKET* p = reinterpret_cast<S2C_TEST_LOGIN_PACKET*>(packet);
 		for (int i = 0; i < MAX_USER; ++i){ 
 			if (sessions[i]->GetState() == LOGIN) { // 다중 클라를 관리해야 하고, 인덱스 != id 상태이므로 그냥 상태를 통해 순서 관계없이 아이디 할당
-				sessions[i]->SetId(p->id);
 				sessions[i]->SetState(LOBBY);
+				sessions[i]->SetId(p->id);
 				std::cout << "client[" << sessions[i]->GetIndex() << "]" << " Login Success\n";
 			}
 		}

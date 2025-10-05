@@ -21,7 +21,7 @@ class Session
 public:
 	int remain_data_size = 0;
 	long long last_time; // 지연시간 파악에 사용
-	std::atomic<long long> last_send_time; // 타이머 스레드의 자동 send에 사용
+	std::atomic<long long> last_send_time = 0; // 타이머 스레드의 자동 send에 사용
 public:
 	Session();
 
