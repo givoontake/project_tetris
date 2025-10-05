@@ -1,4 +1,6 @@
 #pragma once
+#include <iostream>
+
 constexpr char S2C_LOGIN = 1;
 constexpr char C2S_LOGIN = 2;
 constexpr char S2C_MESSAGE = 3;
@@ -32,10 +34,7 @@ constexpr char S2C_KICK = 22;
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
 
-#include <iostream>
-#include "packetType.h"
-
-void PrintPacketType(char type)
+inline void PrintPacketType(char type)
 {
 	std::cout << "Packet Type: ";
 
