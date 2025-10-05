@@ -16,6 +16,8 @@ void PacketHandler::HandlePacket(char* packet)
 {
 	//static auto& users = server->GetSessionList();
 	//static auto& rooms = server->GetRoomList();
+	PrintPacketType(packet[2]);
+
 	switch (packet[2]) {
 
 	case C2S_LOGIN: {

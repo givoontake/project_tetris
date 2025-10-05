@@ -31,3 +31,42 @@ constexpr char S2C_KICK = 22;
 
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
+
+#include <iostream>
+#include "packetType.h"
+
+void PrintPacketType(char type)
+{
+	std::cout << "Packet Type: ";
+
+	switch (type)
+	{
+	case S2C_LOGIN: std::cout << "S2C_LOGIN"; break;
+	case C2S_LOGIN: std::cout << "C2S_LOGIN"; break;
+	case S2C_MESSAGE: std::cout << "S2C_MESSAGE"; break;
+	case C2S_MESSAGE: std::cout << "C2S_MESSAGE"; break;
+	case S2C_TEST: std::cout << "S2C_TEST"; break;
+	case C2S_TEST: std::cout << "C2S_TEST"; break;
+	case S2C_DISCONNECT: std::cout << "S2C_DISCONNECT"; break;
+	case C2S_DISCONNECT: std::cout << "C2S_DISCONNECT"; break;
+	case C2S_ADD_OPEN_ROOM: std::cout << "C2S_ADD_OPEN_ROOM"; break;
+	case S2C_ADD_OPEN_ROOM: std::cout << "S2C_ADD_OPEN_ROOM"; break;
+	case C2S_ADD_LOCK_ROOM: std::cout << "C2S_ADD_LOCK_ROOM"; break;
+	case S2C_ADD_LOCK_ROOM: std::cout << "S2C_ADD_LOCK_ROOM"; break;
+	case C2S_ADD_USER: std::cout << "C2S_ADD_USER"; break;
+	case S2C_ADD_USER: std::cout << "S2C_ADD_USER"; break;
+	case C2S_DELETE_USER: std::cout << "C2S_DELETE_USER"; break;
+	case S2C_DELETE_USER: std::cout << "S2C_DELETE_USER"; break;
+	case C2S_READY: std::cout << "C2S_READY"; break;
+	case S2C_READY: std::cout << "S2C_READY"; break;
+	case C2S_START: std::cout << "C2S_START"; break;
+	case S2C_START: std::cout << "S2C_START"; break;
+	case C2S_KICK: std::cout << "C2S_KICK"; break;
+	case S2C_KICK: std::cout << "S2C_KICK"; break;
+	case S2C_TEST_LOGIN: std::cout << "S2C_TEST_LOGIN"; break;
+	case C2S_TEST_LOGIN: std::cout << "C2S_TEST_LOGIN"; break;
+	default: std::cout << "UNKNOWN_PACKET_TYPE"; break;
+	}
+
+	std::cout << std::endl;
+}
