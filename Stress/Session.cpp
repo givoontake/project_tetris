@@ -42,6 +42,15 @@ short Session::GetPacketSize(char* packet)
 	return packet_size;
 }
 
+void Session::InitSession()
+{
+	index = -1;
+	id = -1;
+	remain_data_size = 0;
+	last_time = -1;
+	last_send_time = -1;
+}
+
 void Session::ClearSession()
 {
 	index = -1;

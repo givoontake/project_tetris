@@ -78,6 +78,7 @@ bool TestManager::ConnectToServer()
 
 	int new_index = GetClientIndex();
 	if (new_index == -1) return false;
+	sessions[new_index]->InitSession();
 	sessions[new_index]->SetId(new_index); // 이미 배열 인덱스를 id처럼 쓰고 있어서..나중에라도 의미가 있을까?
 	sessions[new_index]->SetIndex(new_index);
 	sessions[new_index]->SetSocket(client_socket);
@@ -217,6 +218,7 @@ void TestManager::ProcessPacket(int recv_bytes, int user_index)
 		memcpy(p_buffer, sessions[user_index]->GetExOver().packet_buf, packet_size);
 		HandlePacket(p_buffer);
 
+		if(sessions[user_index]->GetState() == NONE) return; // 만약 handlepacket에서 disconnect 된 이후에, 이 코드 전에 로그인이 되어 버리면.. 문제가 생길 수 있다. 이 부분을 해결하고 싶은데..
 		// 처리한 패킷은 남은 데이터에서 제거
 		sessions[user_index]->SetRemainDataSize(-packet_size);
 		int debug_remain_data_size = sessions[user_index]->GetRemainDataSize();
@@ -239,7 +241,7 @@ void TestManager::Disconnect(int session_id)
 	p.id = sessions[dis_index]->GetId();
 	sessions[dis_index]->SendPacket(reinterpret_cast<char*>(&p), iocp_handle); // disconnect 패킷 전송
 	closesocket(sessions[dis_index]->GetSocket());
-	sessions[dis_index]->ClearSession();
+	//sessions[dis_index]->ClearSession(); -> 여기서 remain_data_size = 0하고 이후 processpacket에서 패킷 크기를 빼버려 엑세스 오류가 생길 수 밖에 없어 보인다.
 	sessions[dis_index]->SetState(NONE);
 	std::cout << "client[" << dis_index << "]" << " Disconnect\n";
 	--connected_client;

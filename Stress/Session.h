@@ -29,6 +29,8 @@ public:
 	void RecvPacket(HANDLE iocp_handle);
 	//void ProcessPacket(int recv_bytes, int key, BOOL res);
 	short GetPacketSize(char* packet);
+
+	void InitSession();
 	void ClearSession();
 
 	//getters
