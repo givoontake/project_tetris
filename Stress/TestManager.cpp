@@ -219,6 +219,7 @@ void TestManager::ProcessPacket(int recv_bytes, int user_index)
 
 		// 처리한 패킷은 남은 데이터에서 제거
 		sessions[user_index]->SetRemainDataSize(-packet_size);
+		int debug_remain_data_size = sessions[user_index]->GetRemainDataSize();
 		memmove(sessions[user_index]->GetExOver().packet_buf, sessions[user_index]->GetExOver().packet_buf + packet_size, sessions[user_index]->GetRemainDataSize());
 		packet_size = sessions[user_index]->GetPacketSize(sessions[user_index]->GetExOver().packet_buf);
 	}
@@ -232,6 +233,11 @@ void TestManager::Disconnect(int session_id)
 		if (sessions[i]->GetId() == session_id) dis_index = i;
 	}
 	if (dis_index == -1) return;
+	C2S_DISCONNECT_PACKET p;
+	p.size = sizeof(C2S_DISCONNECT_PACKET);
+	p.type = C2S_DISCONNECT;
+	p.id = sessions[dis_index]->GetId();
+	sessions[dis_index]->SendPacket(reinterpret_cast<char*>(&p), iocp_handle); // disconnect 패킷 전송
 	closesocket(sessions[dis_index]->GetSocket());
 	sessions[dis_index]->ClearSession();
 	sessions[dis_index]->SetState(NONE);

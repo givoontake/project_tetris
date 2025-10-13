@@ -216,7 +216,7 @@ void IOCPServer::Disconnect(int user_index)
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
 	p.type = S2C_DISCONNECT;
-	SendToSelf(reinterpret_cast<char*>(&p), user_index);
+	//SendToSelf(reinterpret_cast<char*>(&p), user_index);
 	closesocket(users[user_index]->GetSocket()); // closesocket 이후 이전 소켓에 대한 iocp 완료(실패로) 통지가 언제 올지 불분명해서 다음에 연결된 소켓이 받을 경우 영향이 갈 수 있다고 하는데..
 	users[user_index]->SetState(NONE);
 	std::cout << "Session[" << user_index << "] disconnect/Id: " << id_generator << std::endl;
