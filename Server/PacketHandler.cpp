@@ -16,7 +16,7 @@ void PacketHandler::HandlePacket(char* packet)
 {
 	//static auto& users = server->GetSessionList();
 	//static auto& rooms = server->GetRoomList();
-	PrintPacketType(packet[2]);
+	//PrintPacketType(packet[2]);
 
 	switch (packet[2]) {
 
@@ -50,7 +50,7 @@ void PacketHandler::HandlePacket(char* packet)
 
 	case C2S_TEST: {
 		// recv_p->size에 구조체 + 가변길이 데이터가 들어있다는 가정하에 구현->나중에 테스트 프로그램 로직도 바꿔야함
-		std::cout << "테스트 패킷 수신" << std::endl;
+		//std::cout << "테스트 패킷 수신" << std::endl;
 		C2S_TEST_PACKET* recv_p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
 		char* send_p = new char[recv_p->size];
 		int msg_size = recv_p->size - sizeof(C2S_TEST_PACKET);

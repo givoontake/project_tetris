@@ -10,7 +10,7 @@ struct ExOverlapped {
 	WSABUF wsabuf;
 	char packet_buf[BUF_SIZE];
 	OP_TYPE op_type;
-	int operation_id;
+	int operation_id; // 세션의 id와 같음
 
 	ExOverlapped()
 	{

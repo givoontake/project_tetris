@@ -10,6 +10,7 @@ Session::Session()
 void Session::InitSession(int new_index, int new_id, SOCKET new_socket)
 {
 	id = new_id;
+	recv_over.SetOperationId(new_id);
 	index = new_index;
 	socket = new_socket;
 	remain_data_size = 0; // 얘 기준으로 버퍼에 쓰니까 굳이 버퍼 자체를 초기화할 필요는 없어 보임.

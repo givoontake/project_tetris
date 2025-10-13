@@ -35,6 +35,7 @@ long long TestManager::GetCurrentTimeMS()
 
 void TestManager::AdjustSessionNumber(long long now_time, S2C_TEST_PACKET* p)
 {
+	//std::cout << "TestManager::AdjustSessionNumber(): client index[" << p->id << "] Adjust Session Number\n";
 	static long long delay_time1 = 50;
 	static long long delay_time2 = 100;
 	static int delay_multiplier = 1;
@@ -78,6 +79,7 @@ bool TestManager::ConnectToServer()
 	int new_index = GetClientIndex();
 	if (new_index == -1) return false;
 	sessions[new_index]->SetId(new_index); // 이미 배열 인덱스를 id처럼 쓰고 있어서..나중에라도 의미가 있을까?
+	sessions[new_index]->SetIndex(new_index);
 	sessions[new_index]->SetSocket(client_socket);
 	sessions[new_index]->last_send_time = GetCurrentTimeMS();
 	sessions[new_index]->remain_data_size = 0;
@@ -157,7 +159,7 @@ void TestManager::ProcessSend()
 				memcpy(p_buffer, &p, sizeof(C2S_TEST_PACKET)); // 구조체 우선 복사
 				memcpy(p_buffer + sizeof(C2S_TEST_PACKET), test_message, sizeof(test_message)); // 구조체 뒤에 붙여서 메세지 복사
 				client->SendPacket(p_buffer, iocp_handle);
-				std::cout << "TestManager::ProcessSend(): client[" << client->GetIndex() << "] Send Test Packet\n";
+				//std::cout << "TestManager::ProcessSend(): client index[" << client->GetIndex() << "] Send Test Packet\n";
 				delete[] p_buffer;
 			}
 		}
@@ -206,11 +208,10 @@ void TestManager::ProcessPacket(int recv_bytes, int user_index)
 
 	if (sessions[user_index]->GetRemainDataSize() < sizeof(short)) return;
 
-	short packet_size = sessions[user_index]->GetPacketSize(sessions[user_index]->GetExOver().packet_buf);
+	short packet_size = sessions[user_index]->GetPacketSize(sessions[user_index]->GetExOver().packet_buf); // 처리해야할 데이터 크기
 
 	while (sessions[user_index]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
-		packet_size = sessions[user_index]->GetPacketSize(sessions[user_index]->GetExOver().packet_buf);
 		char p_buffer[BUF_SIZE];
 		// 패킷 분리: packet_buffer에 복사 후 처리
 		memcpy(p_buffer, sessions[user_index]->GetExOver().packet_buf, packet_size);
@@ -219,7 +220,7 @@ void TestManager::ProcessPacket(int recv_bytes, int user_index)
 		// 처리한 패킷은 남은 데이터에서 제거
 		sessions[user_index]->SetRemainDataSize(-packet_size);
 		memmove(sessions[user_index]->GetExOver().packet_buf, sessions[user_index]->GetExOver().packet_buf + packet_size, sessions[user_index]->GetRemainDataSize());
-		//handler_interface->HandlePacket(p_buffer);
+		packet_size = sessions[user_index]->GetPacketSize(sessions[user_index]->GetExOver().packet_buf);
 	}
 }
 
@@ -240,18 +241,19 @@ void TestManager::Disconnect(int session_id)
 
 void TestManager::HandlePacket(char* packet)
 {
+	//std::cout << "TestManager::HandlePacket(): packet type " << static_cast<int>(packet[2]) << "\n";
 	S2C_TEST_LOGIN_PACKET* p = reinterpret_cast<S2C_TEST_LOGIN_PACKET*>(packet);
-	if (p->id < 0 || p->id >= MAX_USER) return;
-	if (sessions[p->id]->GetState() == NONE) return;
 
 	switch (packet[2]) {
 	case S2C_TEST_LOGIN: {
 		S2C_TEST_LOGIN_PACKET* p = reinterpret_cast<S2C_TEST_LOGIN_PACKET*>(packet);
 		for (int i = 0; i < MAX_USER; ++i){ 
 			if (sessions[i]->GetState() == LOGIN) { // 다중 클라를 관리해야 하고, 인덱스 != id 상태이므로 그냥 상태를 통해 순서 관계없이 아이디 할당
-				sessions[i]->SetState(LOBBY);
-				sessions[i]->SetId(p->id);
-				std::cout << "client[" << sessions[i]->GetIndex() << "]" << " Login Success\n";
+				if (sessions[i]->SetState(LOGIN, LOBBY)) { // 나중에 조건문을 합쳐도 될 것 같다.
+					sessions[i]->SetId(p->id);
+					std::cout << "client[" << sessions[i]->GetIndex() << "]" << " Login Success\n";
+					break;
+				}
 			}
 		}
 		break;

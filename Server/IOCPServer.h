@@ -22,7 +22,7 @@ class IOCPServer
 	ExOverlapped accept_over;
 	MQueue task_queue;
 	PacketHandler handler;
-	std::atomic<int> id_generator;
+	std::atomic<int> id_generator = -1;
 
 	//std::unique_ptr<PacketHandler> packet_handler; // 먼저 선언되어 있다면 해당 변수는 나중에 선언되는 변수에서 사용 가능하다.
 	std::array<Session*, MAX_USER> users;

@@ -103,7 +103,6 @@ void IOCPServer::ProcessGQCS()
 		}
 
 		case RECV: {
-			std::cout << "Session[" << key << "]/Id: " << id_generator << "패킷 수신" << std::endl;
 			if (ex_over->operation_id == users[key]->GetId()) {
 				ProcessPacket(transferred_bytes, key);
 				users[key]->RecvPacket(iocp_handle);
@@ -141,7 +140,6 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 
 	while (users[user_index]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
-		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 		char p_buffer[BUF_SIZE];
 		// 패킷 분리: packet_buffer에 복사 후 처리
 		memcpy(p_buffer, users[user_index]->GetExOver().packet_buf, packet_size);
@@ -150,7 +148,7 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 		 // 처리한 패킷은 남은 데이터에서 제거
 		users[user_index]->SetRemainDataSize(-packet_size);
 		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
-		//handler_interface->HandlePacket(p_buffer);
+		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 	}
 }
 
