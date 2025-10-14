@@ -93,6 +93,12 @@ void IOCPServer::ProcessGQCS()
 				//send_p.type = S2C_TEST_LOGIN;
 				//send_p.id = users[new_index]->GetId();
 				//SendToSelf((char*)&send_p, new_index);
+
+				S2C_LOGIN_PACKET send_p;
+				send_p.size = sizeof(S2C_LOGIN_PACKET);
+				send_p.type = S2C_TEST_LOGIN;
+				send_p.id = users[new_index]->GetId();
+				SendToSelf((char*)&send_p, new_index);
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 
