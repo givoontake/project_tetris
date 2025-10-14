@@ -18,6 +18,10 @@ class BaseState:
     def draw(self):
         pass
 
+    # 리사이즈 훅(기본 구현: 화면만 교체)
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+
 class SelectModeState(BaseState):
     def init(self):
         self.buttons = [
@@ -25,6 +29,11 @@ class SelectModeState(BaseState):
             Button('Developer', (0.4, 0.45, 0.2, 0.1), self.screen),
             Button('Quit', (0.4, 0.6, 0.2, 0.1), self.screen)
         ]
+
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        # 버튼은 상대 좌표 기반이므로 재생성으로 갱신
+        self.init()
 
     def update(self, dt, events):
         for ev in events:
@@ -56,6 +65,10 @@ class SelectPlayState(BaseState):
             Button('Back', (0.9,0.02,0.08,0.05), self.screen)
         ]
 
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        self.init()
+
     def update(self, dt, events):
         for ev in events:
             if ev.type == pygame.QUIT:
@@ -83,6 +96,10 @@ class ConnectState(BaseState):
         self.net = None
         self.network_ok = False
 
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        # 특별한 레이아웃 없음
+
     def init(self):
         if not self.dev_mode:
             self.net = NetworkClient()
@@ -103,6 +120,10 @@ class ConnectState(BaseState):
 class ConnectErrorState(BaseState):
     def init(self):
         self.back_btn = Button('Back', (0.4,0.6,0.2,0.1), self.screen)
+
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        self.init()
 
     def update(self, dt, events):
         for ev in events:
@@ -128,10 +149,16 @@ class SinglePlayState(BaseState):
         self.tetris = None
 
     def init(self):
-        self.tetris = TetrisGame(self.screen, *self._compute_layout())
-        self.tetris.init()
+        ox, oy, scale = self._compute_layout()
+        self.tetris = TetrisGame(self.screen, ox, oy, scale)
+        self.tetris.init()  # TetrisGame.__init__에서 자동 init을 제거했으므로 여기서 1회 호출
 
-    # ← 수정된 부분: dt, events 받아서 TetrisGame.update에 그대로 전달
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        ox, oy, scale = self._compute_layout()
+        if self.tetris:
+            self.tetris.set_layout(ox, oy, scale)
+
     def update(self, dt, events):
         self.tetris.update(dt, events)
         if self.tetris.game_over:
@@ -157,12 +184,18 @@ class MultiPlayState(BaseState):
         self.screens = []
 
     def init(self):
+        self.screens.clear()
         layout = self._compute_layout()
         regions = self._regions_2(layout) if self.players == 2 else self._regions_5(layout)
         for ox, oy, scale in regions:
             self.screens.append(
                 TetrisScreen(self.screen, ox, oy, scale, TEST_TETROMINOS.copy())
             )
+
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        # 레이아웃/스크린 재구성(기존 기능 유지)
+        self.init()
 
     def update(self, dt, events):
         # (멀티 플레이 자동 낙하나 입력처리 추가 원하면 여기서 호출)

@@ -12,21 +12,54 @@ class TetrisGame:
         self.offset_x = offset_x
         self.offset_y = offset_y
         self.scale    = scale
-        self.init()
+        # 이 시점에는 초기화하지 않음(상태에서 1회만 호출)
+        self.grid = None
+        self.next_shapes = None
+        self.score = 0
+        self.game_over = False
+        self.drop_timer = 0
+        self.drop_interval = 500
+        self.tetris_screen = None
+        self.current_tetromino = None
+
+    def set_layout(self, offset_x, offset_y, scale):
+        """리사이즈 시 레이아웃/스케일 갱신(코어 게임 상태 유지)."""
+        self.offset_x = offset_x
+        self.offset_y = offset_y
+        self.scale = scale
+
+        # 프리뷰 유지한 채 UI만 재생성
+        preview_deque = deque()
+        if self.tetris_screen and self.tetris_screen.preview_queue:
+            preview_deque = deque(list(self.tetris_screen.preview_queue))
+
+        self.tetris_screen = TetrisScreen(
+            self.screen,
+            self.offset_x, self.offset_y,
+            self.scale,
+            preview_deque
+        )
+
+        # 현재 조각의 화면 오프셋/스케일 갱신
+        if self.current_tetromino:
+            self.current_tetromino.offset_x = self.offset_x
+            self.current_tetromino.offset_y = self.offset_y
+            self.current_tetromino.scale = self.scale
+            self.current_tetromino.cell = CELL_SIZE * self.scale
 
     def init(self):
         # 그리드 초기화
-        self.grid      = [[None] * GRID_COLUMNS for _ in range(GRID_ROWS)]
+        self.grid = [[None] * GRID_COLUMNS for _ in range(GRID_ROWS)]
         # 7-bag 준비
-        bag             = list(SHAPES.keys()); random.shuffle(bag)
-        self.next_shapes= deque(bag)
+        bag = list(SHAPES.keys()); random.shuffle(bag)
+        self.next_shapes = deque(bag)
 
-        self.score     = 0
+        self.score = 0
         self.game_over = False
 
         # **떨어짐 타이머** 설정 (밀리초 단위)
-        self.drop_timer    = 0
-        self.drop_interval = 500    # 0.5초마다 한 칸
+        self.drop_timer = 0
+        self.drop_interval = 500  # 0.5초마다 한 칸
 
         # 프리뷰 초기화
         init_prev = list(self.next_shapes)[:10]
@@ -126,7 +159,6 @@ class TetrisGame:
             elif event.key == pygame.K_UP:    self.rotate()
             elif event.key == pygame.K_SPACE: self.drop()
 
-    # ← 수정: dt, events 인자 추가
     def update(self, dt, events) -> None:
         # 1) 키 입력 처리
         for ev in events:
@@ -159,7 +191,8 @@ class TetrisGame:
                     pygame.draw.rect(self.screen, color, rect)
                     pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
         # 4) 현재 조각
-        self.current_tetromino.draw()
+        if self.current_tetromino:
+            self.current_tetromino.draw()
         # 5) 점수 표시
         font = pygame.font.SysFont(None, 24)
         score_surf = font.render(f"Score: {self.score}", True, (255, 255, 255))

@@ -23,7 +23,12 @@ class GameLoop:
         for ev in events:
             if ev.type == pygame.VIDEORESIZE:
                 self.screen = pygame.display.set_mode((ev.w, ev.h), pygame.RESIZABLE)
-                self.state.screen = self.screen
+                # 상태가 훅을 제공하면 레이아웃 갱신을 상태에 위임
+                if hasattr(self.state, "on_resize"):
+                    self.state.on_resize(ev.w, ev.h, self.screen)
+                else:
+                    # 하위호환: 최소한 화면 참조만 갱신
+                    self.state.screen = self.screen
             elif ev.type == pygame.QUIT:
                 pygame.quit()
                 exit()
