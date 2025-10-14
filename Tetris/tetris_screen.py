@@ -9,16 +9,19 @@ class TetrisScreen:
         self.scale = scale
         self.preview_queue = preview_queue
         self.grid = Grid(screen, offset_x, offset_y, scale)
-        px = offset_x + GRID_COLUMNS*CELL_SIZE*scale
+        px = offset_x + GRID_COLUMNS * CELL_SIZE * scale
         py = offset_y
-        self.previews = [PreviewTetromino(screen,px,py,scale,None),
-                         PreviewTetromino(screen,px,py+PREVIEW_CELL_SIZE*scale,scale,None)]
+        self.previews = [
+            PreviewTetromino(screen, px, py, scale, None),
+            PreviewTetromino(screen, px, py + PREVIEW_CELL_SIZE * scale, scale, None)
+        ]
 
     def init(self): pass
     def update(self, dt): pass
+
     def draw(self):
         self.grid.draw()
         for idx, prev in enumerate(self.previews):
-            if idx<len(self.preview_queue):
+            if idx < len(self.preview_queue):
                 prev.shape_key = self.preview_queue[idx]
                 prev.draw(idx)

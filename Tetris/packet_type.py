@@ -1,0 +1,34 @@
+# packet_types.py
+# C++ packetType.h와 "이름/값" 완전 일치
+S2C_LOGIN         = 1
+C2S_LOGIN         = 2
+S2C_MESSAGE       = 3
+C2S_MESSAGE       = 4
+S2C_TEST          = 5
+C2S_TEST          = 6
+S2C_DISCONNECT    = 7
+C2S_DISCONNECT    = 8
+
+C2S_ADD_OPEN_ROOM = 9
+S2C_ADD_OPEN_ROOM = 10
+
+C2S_ADD_LOCK_ROOM = 11
+S2C_ADD_LOCK_ROOM = 12
+
+C2S_ADD_USER      = 13
+S2C_ADD_USER      = 14
+
+C2S_DELETE_USER   = 15
+S2C_DELETE_USER   = 16
+
+C2S_READY         = 17
+S2C_READY         = 18
+
+C2S_START         = 19
+S2C_START         = 20
+
+C2S_KICK          = 21
+S2C_KICK          = 22
+
+S2C_TEST_LOGIN    = 101
+C2S_TEST_LOGIN    = 102

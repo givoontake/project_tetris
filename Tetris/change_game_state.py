@@ -4,6 +4,7 @@ from tetris_game import TetrisGame
 from network import NetworkClient
 from define import *
 from tetris_screen import TetrisScreen
+from session import Session  # 세션 사용
 
 class BaseState:
     def __init__(self, screen):
@@ -89,20 +90,24 @@ class SelectPlayState(BaseState):
             btn.draw(self.screen)
 
 class ConnectState(BaseState):
-    def __init__(self, screen, players, dev_mode=False):
+    # players 선택 인자(기본 1)
+    def __init__(self, screen, players=1, dev_mode=False):
         super().__init__(screen)
         self.players = players
         self.dev_mode = dev_mode
         self.net = None
         self.network_ok = False
+        self.session = None  # 세션 보관
 
     def on_resize(self, w, h, screen):
         self.screen = screen
-        # 특별한 레이아웃 없음
 
     def init(self):
         if not self.dev_mode:
-            self.net = NetworkClient()
+            # 세션 생성/초기화 후 NetworkClient에 전달
+            self.session = Session.shared()
+            self.session.reset()
+            self.net = NetworkClient(self.session)
             self.network_ok = self.net.connect()
         else:
             self.network_ok = True
@@ -118,29 +123,27 @@ class ConnectState(BaseState):
         self.screen.fill((0,0,0))
 
 class ConnectErrorState(BaseState):
+    """연결 실패 화면 — Back 버튼 제거"""
     def init(self):
-        self.back_btn = Button('Back', (0.4,0.6,0.2,0.1), self.screen)
+        pass  # 버튼 없음
 
     def on_resize(self, w, h, screen):
         self.screen = screen
-        self.init()
+        # 버튼이 없으므로 재구성 불필요
 
     def update(self, dt, events):
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); exit()
-            if self.back_btn.clicked(ev):
-                return SelectPlayState(self.screen)
-        return self
+        return self  # 머무름(요청: Back 버튼 삭제)
 
     def draw(self):
         self.screen.fill((0,0,0))
         font = pygame.font.SysFont(None,36)
-        msg = font.render('Connection Failed', True, (255,0,0))
+        msg  = font.render('Connection Failed', True, (255,0,0))
         sw, sh = self.screen.get_size()
-        rect = msg.get_rect(center=(sw//2,sh//2-50))
-        self.screen.blit(msg,rect)
-        self.back_btn.draw(self.screen)
+        rect   = msg.get_rect(center=(sw//2, sh//2 - 50))
+        self.screen.blit(msg, rect)
 
 class SinglePlayState(BaseState):
     def __init__(self, screen, dev_mode=False):
@@ -151,7 +154,7 @@ class SinglePlayState(BaseState):
     def init(self):
         ox, oy, scale = self._compute_layout()
         self.tetris = TetrisGame(self.screen, ox, oy, scale)
-        self.tetris.init()  # TetrisGame.__init__에서 자동 init을 제거했으므로 여기서 1회 호출
+        self.tetris.init()
 
     def on_resize(self, w, h, screen):
         self.screen = screen
@@ -194,11 +197,9 @@ class MultiPlayState(BaseState):
 
     def on_resize(self, w, h, screen):
         self.screen = screen
-        # 레이아웃/스크린 재구성(기존 기능 유지)
         self.init()
 
     def update(self, dt, events):
-        # (멀티 플레이 자동 낙하나 입력처리 추가 원하면 여기서 호출)
         return self
 
     def draw(self):

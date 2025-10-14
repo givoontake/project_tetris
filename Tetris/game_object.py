@@ -1,3 +1,4 @@
+# game_object.py
 import pygame
 from define import *
 
@@ -28,13 +29,12 @@ class Grid:
 class Tetromino:
     def __init__(self, screen, grid_x, grid_y, scale, shape_key, offset_x=0, offset_y=0):
         self.screen   = screen
-        self.grid_x   = grid_x        # 그리드 셀 단위 X
-        self.grid_y   = grid_y        # 그리드 셀 단위 Y
+        self.grid_x   = grid_x
+        self.grid_y   = grid_y
         self.scale    = scale
         self.shape_key= shape_key
         self.rotation = 0
         self.cell     = CELL_SIZE * scale
-        # 화면 내부 그리드 오프셋
         self.offset_x = offset_x
         self.offset_y = offset_y
 
@@ -50,8 +50,8 @@ class Tetromino:
 
     def draw(self):
         for cx, cy in SHAPES[self.shape_key][self.rotation]:
-            px = int(self.offset_x + cx * self.cell + self.grid_x * self.cell)
-            py = int(self.offset_y + cy * self.cell + self.grid_y * self.cell)
+            px = int(self.offset_x + (self.grid_x + cx) * self.cell)
+            py = int(self.offset_y + (self.grid_y + cy) * self.cell)
             rect = pygame.Rect(px, py, int(self.cell), int(self.cell))
             pygame.draw.rect(self.screen, COLORS[self.shape_key], rect)
             pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
@@ -69,17 +69,15 @@ class PreviewTetromino:
     def init(self): pass
     def update(self, dt): pass
 
-    def draw(self, offset_index):
-        px = self.x
-        py = self.y
+    def draw(self, _offset_index):
+        px = self.x; py = self.y
         size = int(self.preview_cell)
         bg = pygame.Rect(px, py, size, size)
         pygame.draw.rect(self.screen, (50, 50, 50), bg)
         pygame.draw.rect(self.screen, (80, 80, 80), bg, 1)
 
         shape = SHAPES[self.shape_key][0]
-        xs = [c for c, _ in shape]
-        ys = [r for _, r in shape]
+        xs = [c for c, _ in shape]; ys = [r for _, r in shape]
         minx, maxx = min(xs), max(xs)
         miny, maxy = min(ys), max(ys)
         w = (maxx - minx + 1) * self.cell
