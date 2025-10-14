@@ -2,6 +2,7 @@
 import pygame
 from define import BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT, INITIAL_SCALE, FPS
 from change_game_state import *
+from handle_packet import *
 
 class GameLoop:
     def __init__(self):

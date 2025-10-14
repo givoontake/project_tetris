@@ -2,15 +2,16 @@
 import socket
 import threading
 import queue
-import struct
+
 from define import SERVER_HOST, SERVER_PORT
 from session import Session
-from packet_type import *           # C++과 이름 완전 일치
-from define_packet import *
+from packet_type import *              # S2C_LOGIN 등 타입 상수
+from handle_packet import HandlePacket  # 공통 직렬화/파싱기
 
 class NetworkClient:
     """
-    - 연결 즉시 수신 스레드에서 패킷 스트림을 병합/파싱
+    - 연결 후 수신 스레드에서 TCP 스트림을 버퍼링
+    - HandlePacket.parse_stream()으로 패킷 경계 파싱
     - S2C_LOGIN 수신 시 Session.id 설정 → 로그인 완료
     """
     def __init__(self, session: Session):
@@ -25,6 +26,7 @@ class NetworkClient:
         self._lock = threading.Lock()
 
         self._rx_buffer = bytearray()
+        self._pkt = HandlePacket()  # ✅ 포맷/언팩 담당자
 
     def connect(self):
         try:
@@ -37,8 +39,10 @@ class NetworkClient:
             return True
         except Exception:
             self.running = False
-            try: self.sock.close()
-            except Exception: pass
+            try:
+                self.sock.close()
+            except Exception:
+                pass
             return False
 
     def send(self, data: bytes):
@@ -55,7 +59,7 @@ class NetworkClient:
                 if not chunk:
                     break
                 self._rx_buffer.extend(chunk)
-                self._drain_packets()
+                self._drain_packets()   # ✅ 이름 유지 (내부 구현만 변경)
         except Exception:
             pass
         finally:
@@ -63,38 +67,22 @@ class NetworkClient:
 
     def _drain_packets(self):
         """
-        C 패킷 레이아웃:
-          short size; char type; ...  (pack(1), little-endian 가정)
-        HEADER_FMT_LE = '<Hb' (size(2), type(1))
+        HandlePacket을 이용해 _rx_buffer에서 가능한 모든 패킷을 꺼내 처리.
+        (이 함수명은 기존 호출부 호환을 위해 유지)
         """
-        view = memoryview(self._rx_buffer)
-        offset = 0
-        buflen = len(view)
-        while True:
-            if buflen - offset < HEADER_SIZE:
-                break
-            size, ptype = struct.unpack_from(HEADER_FMT_LE, view, offset)
-            if buflen - offset < size:
-                break  # payload 아직 덜 옴
-            packet = view[offset: offset + size].tobytes()
-
-            # ---- handle packet by type ----
+        for ptype, pkt in self._pkt.parse_stream(self._rx_buffer):
             if ptype == S2C_LOGIN:
-                pkt = unpack_S2C_LOGIN_PACKET(packet)
-                # 5) S2C_LOGIN 수신 → 내 id 설정
-                self.session.set_id(pkt["id"])
-
-            # (추가 타입은 이후 확장)
-            offset += size
-        # 남은 바이트 보관
-        del self._rx_buffer[:offset]
+                # 로그인 성공 → 내 ID 설정
+                self.session.set_id(pkt.id)
+            # TODO: 다른 타입도 여기서 분기 추가
 
     # ---- send loop ----
     def send_loop(self):
         try:
             while self.running:
                 self._send_ev.wait(timeout=1.0)
-                if not self.running: break
+                if not self.running:
+                    break
                 self._send_ev.clear()
                 while not self._send_q.empty():
                     try:
@@ -114,7 +102,8 @@ class NetworkClient:
     # ---- close ----
     def _request_close(self):
         with self._lock:
-            if not self.running: return
+            if not self.running:
+                return
             self.running = False
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
@@ -129,8 +118,12 @@ class NetworkClient:
     def close(self):
         self._request_close()
         if self.recv_thread and self.recv_thread.is_alive():
-            try: self.recv_thread.join(timeout=0.2)
-            except Exception: pass
+            try:
+                self.recv_thread.join(timeout=0.2)
+            except Exception:
+                pass
         if self.send_thread and self.send_thread.is_alive():
-            try: self.send_thread.join(timeout=0.2)
-            except Exception: pass
+            try:
+                self.send_thread.join(timeout=0.2)
+            except Exception:
+                pass
