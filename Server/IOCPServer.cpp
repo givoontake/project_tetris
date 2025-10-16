@@ -96,7 +96,7 @@ void IOCPServer::ProcessGQCS()
 
 				S2C_LOGIN_PACKET send_p;
 				send_p.size = sizeof(S2C_LOGIN_PACKET);
-				send_p.type = S2C_TEST_LOGIN;
+				send_p.type = S2C_LOGIN;
 				send_p.id = users[new_index]->GetId();
 				SendToSelf((char*)&send_p, new_index);
 			}
