@@ -1,64 +1,93 @@
 # define_format.py
 """
-C++ define.h의 #pragma pack(1) 구조체와 1:1로 대응하는 struct 포맷 모음.
-- 리틀엔디안 고정('<')
-- size: unsigned short(H), type: unsigned char(B)
-- int: unsigned int(I), long long: signed long long(q)
-- bool: 1바이트로 간주 → unsigned char(B)
+C++ define.h의 #pragma pack(1) 구조체와 1:1로 대응하는 struct 포맷 모음 (모두 signed).
+- 리틀엔디안 고정('<')  ※ 필드 단위 포맷 사전(PACK_FIELD_FMT)은 엔디언 접두 미포함
+- size:  signed short  (h)
+- type:  signed char   (b)
+- int:   signed int    (i)
+- long long: signed long long (q)
+- bool:  signed char   (b)  # 1바이트
 - 고정 길이 char 배열: N바이트 문자열 'Ns'
 ※ 아래 길이 상수는 define.h와 반드시 동일해야 합니다.
 """
 
+# ---- 길이 상수 ----
 MAX_ROOM_NAME = 48
 MAX_ROOM_PASSWORD = 48
 MAX_USER_NAME = 48
 
-HEADER_FMT = "<HB"
+# ---- Test Login ----
 
-# Test Login
-S2C_TEST_LOGIN_PACKET_FMT = "<HBI"
-C2S_TEST_LOGIN_PACKET_FMT = "<HBI"
+# ---- Login ----
+S2C_LOGIN_PACKET_FMT = "<hbi"
+C2S_LOGIN_PACKET_FMT = "<hbi"
 
-# Login
-S2C_LOGIN_PACKET_FMT = "<HBI"
-C2S_LOGIN_PACKET_FMT = "<HBI"
+# ---- Message ----
+S2C_MESSAGE_PACKET_FMT = "<hbi"
+C2S_MESSAGE_PACKET_FMT = "<hbi"
 
-# Message
-S2C_MESSAGE_PACKET_FMT = "<HBI"
-C2S_MESSAGE_PACKET_FMT = "<HBI"
+# ---- Test (핑/지연 등) ----
+# S2C_TEST_PACKET_FMT = "<hbiq"
+# C2S_TEST_PACKET_FMT = "<hbiq"
 
-# Test (핑/지연 등)
-# S2C_TEST_PACKET_FMT = "<HBIq"
-# C2S_TEST_PACKET_FMT = "<HBIq"
+# ---- Disconnect ----
+C2S_DISCONNECT_PACKET_FMT = "<hbi"
+S2C_DISCONNECT_PACKET_FMT = "<hbi"
 
-# Disconnect
-C2S_DISCONNECT_PACKET_FMT = "<HBI"
-S2C_DISCONNECT_PACKET_FMT = "<HBI"
+# ---- Add Open Room ----
+C2S_ADD_OPEN_ROOM_PACKET_FMT = f"<hbib{MAX_ROOM_NAME}s"
+S2C_ADD_OPEN_ROOM_PACKET_FMT = f"<hbib{MAX_ROOM_NAME}s"
 
-# Add Open Room
-C2S_ADD_OPEN_ROOM_PACKET_FMT = f"<HBIB{MAX_ROOM_NAME}s"
-S2C_ADD_OPEN_ROOM_PACKET_FMT = f"<HBIB{MAX_ROOM_NAME}s" 
+# ---- Add Lock Room ----
+C2S_ADD_LOCK_ROOM_PACKET_FMT = f"<hbib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
+S2C_ADD_LOCK_ROOM_PACKET_FMT = f"<hbib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
 
-# Add Lock Room
-C2S_ADD_LOCK_ROOM_PACKET_FMT = f"<HBIB{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
-S2C_ADD_LOCK_ROOM_PACKET_FMT = f"<HBIB{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
+# ---- Add User ----
+C2S_ADD_USER_PACKET_FMT = f"<hbii{MAX_USER_NAME}s"
+S2C_ADD_USER_PACKET_FMT = f"<hbib{MAX_USER_NAME}s"  # bool → signed char(b)
 
-# Add User
-C2S_ADD_USER_PACKET_FMT = f"<HBII{MAX_USER_NAME}s"
-S2C_ADD_USER_PACKET_FMT = f"<HBIB{MAX_USER_NAME}s"  # bool → 1바이트(B)
+# ---- Delete User ----
+C2S_DELETE_USER_PACKET_FMT = "<hbi"
+S2C_DELETE_USER_PACKET_FMT = "<hbii"
 
-# Delete User
-C2S_DELETE_USER_PACKET_FMT = "<HBI"
-S2C_DELETE_USER_PACKET_FMT = "<HBII"
+# ---- Ready ----
+C2S_READY_PACKET_FMT = "<hbib"  # bool → signed char(b)
+S2C_READY_PACKET_FMT = "<hbib"  # bool → signed char(b)
 
-# Ready
-C2S_READY_PACKET_FMT = "<HBIB"  # bool → 1바이트(B)
-S2C_READY_PACKET_FMT = "<HBIB"  # bool → 1바이트(B)
+# ---- Start ----
+C2S_START_PACKET_FMT = "<hbi"
+S2C_START_PACKET_FMT = "<hbb"  # bool → signed char(b)
 
-# Start
-C2S_START_PACKET_FMT = "<HBI"
-S2C_START_PACKET_FMT = "<HBB"  # bool → 1바이트(B)
+# ---- Kick ----
+C2S_KICK_PACKET_FMT = "<hbii"
+S2C_KICK_PACKET_FMT = "<hbi"
 
-# Kick
-C2S_KICK_PACKET_FMT = "<HBII"
-S2C_KICK_PACKET_FMT = "<HBI"
+
+# =====================================================================
+#  필드 단위: "문자열 → 포맷" 사전 및(옵션) 스키마 샘플
+#  - 엔디언 접두는 붙이지 않습니다(필드 단위 포맷이므로). 호출부에서 '<' 등을 결합하세요.
+#  - 패킷 빌더가 이 사전을 참고하여 이름 기준으로 struct.pack에 쓸 포맷을 선택합니다.
+# =====================================================================
+
+# 추천 이름: PACK_FIELD_FMT  (간단 키-포맷 매핑)
+PACK_FIELD_FMT = {
+    "id": "i",            # int
+    "temp_id": "i",
+    "room_id": "i",
+    "new_host_id": "i",
+    "kick_user_id": "i",
+
+    # 1바이트 값
+    "max_user": "b",      # char (signed)
+    "is_add": "b",        # bool을 1바이트 signed char로 전송
+    "is_ready": "b",
+    "is_start": "b",
+
+    # 8바이트 정수
+    "last_time": "q",     # long long
+
+    # 고정 길이 문자열(바이트 배열)
+    "room_name":     f"{MAX_ROOM_NAME}s",
+    "room_password": f"{MAX_ROOM_PASSWORD}s",
+    "name":          f"{MAX_USER_NAME}s",
+}

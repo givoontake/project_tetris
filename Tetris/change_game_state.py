@@ -1,27 +1,25 @@
 import pygame
+import queue
 from menu import Button
 from tetris_game import TetrisGame
 from network import NetworkClient
 from define import *
 from tetris_screen import TetrisScreen
-from session import Session  # 세션 사용
+from session import Session
+from packet_type import S2C_LOGIN  # 로그인 타입 상수 사용
+
 
 class BaseState:
     def __init__(self, screen):
         self.screen = screen
 
-    def init(self):
-        pass
+    def init(self): pass
+    def update(self, dt, events): return self
+    def draw(self): pass
 
-    def update(self, dt, events):
-        return self
-
-    def draw(self):
-        pass
-
-    # 리사이즈 훅(기본 구현: 화면만 교체)
     def on_resize(self, w, h, screen):
         self.screen = screen
+
 
 class SelectModeState(BaseState):
     def init(self):
@@ -33,7 +31,6 @@ class SelectModeState(BaseState):
 
     def on_resize(self, w, h, screen):
         self.screen = screen
-        # 버튼은 상대 좌표 기반이므로 재생성으로 갱신
         self.init()
 
     def update(self, dt, events):
@@ -52,6 +49,7 @@ class SelectModeState(BaseState):
         self.screen.fill((0,0,0))
         for btn in self.buttons:
             btn.draw(self.screen)
+
 
 class SelectPlayState(BaseState):
     def __init__(self, screen, dev_mode=False):
@@ -89,22 +87,29 @@ class SelectPlayState(BaseState):
         for btn in self.buttons:
             btn.draw(self.screen)
 
+
 class ConnectState(BaseState):
-    # players 선택 인자(기본 1)
+    """
+    - 서버 연결 성공 후에도 로그인 패킷 수신 전까지 검은 화면 유지
+    - 로그인 패킷 도착 시: 세션 id만 세팅(메인 스레드에서 직접) + "Login Success!" 1초 표시 후 SelectPlay
+    - handle_packet은 그대로 호출(타 패킷 처리 용도)
+    """
     def __init__(self, screen, players=1, dev_mode=False):
         super().__init__(screen)
         self.players = players
         self.dev_mode = dev_mode
         self.net = None
         self.network_ok = False
-        self.session = None  # 세션 보관
+        self.session = None
+
+        self._login_done = False
+        self._login_msg_start_ms = None  # pygame.time.get_ticks()
 
     def on_resize(self, w, h, screen):
         self.screen = screen
 
     def init(self):
         if not self.dev_mode:
-            # 세션 생성/초기화 후 NetworkClient에 전달
             self.session = Session.shared()
             self.session.reset()
             self.net = NetworkClient(self.session)
@@ -112,30 +117,92 @@ class ConnectState(BaseState):
         else:
             self.network_ok = True
 
-    def update(self, dt, events):
-        if self.network_ok:
-            if self.players == 1:
-                return SinglePlayState(self.screen, dev_mode=self.dev_mode)
-            return MultiPlayState(self.screen, self.players)
-        return ConnectErrorState(self.screen)
+    def _drain_packets(self, max_per_frame=64):
+        """
+        수신 스레드가 채워둔 '완성 패킷 큐'를 메인 스레드에서 드레인.
+        - S2C_LOGIN은 여기서 직접 파싱해 세션 id 세팅 + 디버그 출력
+        - 그 외 패킷은 기존대로 pm.handle_packet(pkt)을 호출(호환성 유지)
+        """
+        if not self.network_ok or not self.net:
+            return
 
-    def draw(self):
-        self.screen.fill((0,0,0))
+        pm = self.net.get_packet_manager()
+        q = self.net.get_packet_queue()
 
-class ConnectErrorState(BaseState):
-    """연결 실패 화면 — Back 버튼 제거"""
-    def init(self):
-        pass  # 버튼 없음
+        processed = 0
+        while processed < max_per_frame:
+            try:
+                pkt = q.get_nowait()
+            except queue.Empty:
+                break
 
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        # 버튼이 없으므로 재구성 불필요
+            processed += 1
+
+            # ---- 로그인 직접 처리 ----
+            if len(pkt) >= 7 and pkt[2] == S2C_LOGIN:
+                size_val = int.from_bytes(pkt[0:2], "little", signed=True)
+                type_val = int.from_bytes(pkt[2:3], "little", signed=True)
+                id_val   = int.from_bytes(pkt[3:7], "little", signed=True)
+                print(f"[S2C_LOGIN][MAIN] size={size_val} type={type_val} id={id_val}")
+                print(f"[S2C_LOGIN][HEX ] {pkt.hex(' ')}")
+                # 세션 id만 세팅
+                if self.session:
+                    self.session.set_id(id_val)
+                # 성공 표시용 타임스탬프
+                if not self._login_done:
+                    self._login_done = True
+                    self._login_msg_start_ms = pygame.time.get_ticks()
+
+            # ---- 나머지는 기존 handle_packet에 위임 ----
+            try:
+                pm.handle_packet(pkt)
+            except Exception as e:
+                print(f"[ConnectState] handle_packet error: {e}")
 
     def update(self, dt, events):
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); exit()
-        return self  # 머무름(요청: Back 버튼 삭제)
+
+        if not self.network_ok:
+            return ConnectErrorState(self.screen)
+
+        # 매 프레임 큐 드레인
+        self._drain_packets()
+
+        # 로그인 전: 검은 화면 유지
+        if not self._login_done:
+            return self
+
+        # 로그인 성공 후 1초간 메시지 표시
+        now = pygame.time.get_ticks()
+        if self._login_msg_start_ms is not None and (now - self._login_msg_start_ms) < 1000:
+            return self
+
+        # 1초 경과 → 인원 선택 화면
+        return SelectPlayState(self.screen, dev_mode=self.dev_mode)
+
+    def draw(self):
+        self.screen.fill((0,0,0))
+        if self._login_done and self._login_msg_start_ms is not None:
+            elapsed = pygame.time.get_ticks() - self._login_msg_start_ms
+            if elapsed < 1000:
+                font = pygame.font.SysFont(None, 48)
+                msg  = font.render('Login Success!', True, (0, 200, 0))
+                sw, sh = self.screen.get_size()
+                rect   = msg.get_rect(center=(sw//2, sh//2))
+                self.screen.blit(msg, rect)
+
+
+class ConnectErrorState(BaseState):
+    def init(self): pass
+    def on_resize(self, w, h, screen): self.screen = screen
+
+    def update(self, dt, events):
+        for ev in events:
+            if ev.type == pygame.QUIT:
+                pygame.quit(); exit()
+        return self
 
     def draw(self):
         self.screen.fill((0,0,0))
@@ -144,6 +211,7 @@ class ConnectErrorState(BaseState):
         sw, sh = self.screen.get_size()
         rect   = msg.get_rect(center=(sw//2, sh//2 - 50))
         self.screen.blit(msg, rect)
+
 
 class SinglePlayState(BaseState):
     def __init__(self, screen, dev_mode=False):
@@ -179,6 +247,7 @@ class SinglePlayState(BaseState):
         offset_x = (sw - design_w*scale)/2
         offset_y = (sh - design_h*scale)/2
         return (offset_x, offset_y, scale)
+
 
 class MultiPlayState(BaseState):
     def __init__(self, screen, players):
