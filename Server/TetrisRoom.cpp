@@ -10,7 +10,7 @@ TetrisRoom::~TetrisRoom()
 
 }
 
-void TetrisRoom::InitRoom(char* packet) // 네트워크 절약을 위해 비밀번호 포함 여부를 다르게 하여 패킷을 두 개로 구분, 같은 역할이므로 하나의 함수로 받아 케이스로 처리
+void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약을 위해 비밀번호 포함 여부를 다르게 하여 패킷을 두 개로 구분, 같은 역할이므로 하나의 함수로 받아 케이스로 처리
 {
 	switch (packet[2]) {
 	case C2S_ADD_OPEN_ROOM: {
@@ -25,7 +25,7 @@ void TetrisRoom::InitRoom(char* packet) // 네트워크 절약을 위해 비밀번호 포함 여
 		}
 		memcpy(room_name, p->room_name, sizeof(room_name));
 		is_password = false;
-		room_state = WAIT;
+		AddUser(session);
 		break;
 	}
 
@@ -41,7 +41,7 @@ void TetrisRoom::InitRoom(char* packet) // 네트워크 절약을 위해 비밀번호 포함 여
 		memcpy(room_name, p->room_name, sizeof(room_name));
 		is_password = true;
 		memcpy(room_password, p->room_password, sizeof(room_password));
-		room_state = WAIT;
+		AddUser(session);
 		break;
 	}
 	}
@@ -205,7 +205,7 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 {
 	for (auto& r_user : room_users) {
-		if (r_user.GetInUse() ) {
+		if (r_user.GetInUse()) {
 			r_user.GetSession()->SendPacket(packet, iocp_handle);
 		}
 	}
