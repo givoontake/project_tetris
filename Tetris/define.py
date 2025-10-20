@@ -1,4 +1,8 @@
 # define.py
+# Network
+BUF_SIZE = 10240
+SERVER_HOST = '127.0.0.1'
+SERVER_PORT = 12345
 
 # Screen dimensions (FHD)
 BASE_SCREEN_WIDTH = 1920
@@ -20,10 +24,6 @@ BLANK_HEIGHT = 50
 
 # FPS
 FPS = 30
-
-# Network
-SERVER_HOST = '127.0.0.1'
-SERVER_PORT = 12345
 
 # Tetromino shapes and colors
 SHAPES = {

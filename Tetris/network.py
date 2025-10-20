@@ -2,36 +2,33 @@
 import socket
 import threading
 
-from define import SERVER_HOST, SERVER_PORT
-from session import Session
+from define import SERVER_HOST, SERVER_PORT, BUF_SIZE
 from packet_manager import PacketManager
 
-
-class NetworkClient:
+class NetworkWorker:
     """
     - 연결 후 수신 스레드에서 TCP 스트림을 버퍼링
     - PacketManager: merge → process (완성 패킷은 내부 thread-safe 큐에 적재)
     - 메인 스레드(상태 머신): 큐 드레인 → 필요 시 직접 파싱(S2C_LOGIN 등) → pm.handle_packet() 호출
     """
 
-    def __init__(self, session: Session):
-        self.session = session
+    def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.running = False
         self.recv_thread: threading.Thread | None = None
-        self._lock = threading.Lock()
+        self.socket_lock = threading.Lock()
 
-        self._pm = PacketManager()  # 핸들러 등록/콜백 사용하지 않음(로그인은 메인 스레드에서 직접 처리)
+        self._pm = PacketManager()
 
     # ---- 메인 스레드에서 사용할 접근자 ----
-    def get_packet_manager(self) -> PacketManager:
-        return self._pm
+    # def get_packet_manager(self) -> PacketManager:
+    #     return self._pm
 
-    def get_packet_queue(self):
-        return self._pm.queue
+    # def get_packet_queue(self):
+    #     return self._pm.queue
 
     # ---- 연결/해제 ----
-    def connect(self) -> bool:
+    def connect_to_server(self) -> bool:
         try:
             self.sock.connect((SERVER_HOST, SERVER_PORT))
             self.running = True
@@ -46,8 +43,8 @@ class NetworkClient:
                 pass
             return False
 
-    def _request_close(self):
-        with self._lock:
+    def close(self):
+        with self.socket_lock:
             if not self.running:
                 return
             self.running = False
@@ -60,8 +57,7 @@ class NetworkClient:
             except Exception:
                 pass
 
-    def close(self):
-        self._request_close()
+    # 수신 스레드가 아직 살아 있으면 join 시도 (약간의 유예)
         if self.recv_thread and self.recv_thread.is_alive():
             try:
                 self.recv_thread.join(timeout=0.2)
@@ -72,25 +68,25 @@ class NetworkClient:
     def recv_loop(self):
         try:
             while self.running:
-                chunk = self.sock.recv(4096)
-                if not chunk:
+                recv_packet = self.sock.recv(BUF_SIZE)
+                if not recv_packet:
                     break
                 # 병합 + 커팅(완성 패킷은 큐 적재)
-                self._pm.merge_packet(chunk)
+                self._pm.merge_packet(recv_packet)
                 self._pm.process_packet()
         except Exception:
             pass
         finally:
-            self._request_close()
+            self.close()
 
     # ---- 즉시 송신(필요 시) ----
     def send_packet(self, data: bytes) -> bool:
         if not self.running:
             return False
         try:
-            with self._lock:
+            with self.socket_lock: # with: 자원을 자동으로 열고 닫아줌. 여기서는 락을 자동 관리해줌(lock_guard랑 동일)
                 self.sock.sendall(data)
             return True
         except Exception:
-            self._request_close()
+            self.close()
             return False

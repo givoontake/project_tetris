@@ -11,30 +11,23 @@
 
 import struct
 import queue
-from typing import Callable, Dict
 
 from define_format import *             # 포맷 문자열 모음 (MAX_* 포함)
 from packet_type import *               # S2C_LOGIN, ...
 
+MAX_QUEUE_SIZE = 1024
 
 class PacketManager:
     def __init__(self):
         # 내부 누적 버퍼 (TCP 수신 조각 저장)
-        self._recv_buffer = bytearray()
-        # 타입별 처리 콜백: {ptype: Callable[[object], None]}
-        self._handlers: Dict[int, Callable[[object], None]] = {}
+        self.recv_buffer = bytearray()
         # 메인 스레드로 넘길 '완성 패킷' 큐 (thread-safe)
-        self.queue: "queue.Queue[bytes]" = queue.Queue(maxsize=1024)
-
-    # ---- 콜백 등록 ----
-    def register_handler(self, ptype: int, handler: Callable[[object], None]) -> None:
-        """특정 패킷 타입에 대한 처리 콜백을 등록한다."""
-        self._handlers[ptype] = handler
+        self.queue: "queue.Queue[dict]"= queue.Queue(maxsize=MAX_QUEUE_SIZE)
 
     # ---- 병합 단계 ----
     def merge_packet(self, chunk: bytes) -> None:
         """TCP로 받은 조각(chunk)을 내부 버퍼에 병합."""
-        self._recv_buffer.extend(chunk)
+        self.recv_buffer.extend(chunk)
 
     # ---- 커팅 단계 (큐에 적재) ----
     def process_packet(self) -> None:
@@ -42,7 +35,7 @@ class PacketManager:
         내부 버퍼에서 완성된 패킷을 하나씩 잘라 '큐에 넣기만' 한다.
         handle_packet()은 호출하지 않는다(메인 스레드에서 호출).
         """
-        view = memoryview(self._recv_buffer)
+        view = memoryview(self.recv_buffer)
         buflen = len(view)
         offset = 0
 
@@ -61,114 +54,108 @@ class PacketManager:
             pkt_bytes = view[offset:offset + size].tobytes()
 
             # 스레드 세이프 큐에 적재 (꽉 차면 최신성 보존을 위해 가장 오래된 것을 드롭)
-            try:
-                self.queue.put_nowait(pkt_bytes)
-            except queue.Full:
-                # 오래된 것 하나 버리고 다시 넣기
+            while True:
                 try:
-                    _ = self.queue.get_nowait()
-                except Exception:
-                    pass
-                # 재시도 (실패해도 그냥 스킵)
-                try:
-                    self.queue.put_nowait(pkt_bytes)
-                except Exception:
-                    pass
+                    self.queue.put(pkt_bytes, block=True, timeout=0.1)
+                    break  # 성공하면 빠져나감
+                except queue.Full:
+                    continue  # 큐가 꽉 차 있으면 계속 재시도
 
             offset += size
 
         # 처리 완료 후, 사용한 부분 제거
         if offset:
-            del self._recv_buffer[:offset]
+            del self.recv_buffer[:offset]
 
-    # ---- 실제 패킷 처리 (메인 스레드에서 호출) ----
     def handle_packet(self, pkt_bytes: bytes) -> None:
-        ptype = pkt_bytes[2]  # type 바이트(3번째)
+        pkt_type = pkt_bytes[2]  # type 바이트(3번째)
 
         def slice_packet(off: int, n: int) -> bytes:
             return pkt_bytes[off:off+n]
 
         offset = 0
 
-        if ptype == S2C_LOGIN:
+        data = {}
+
+        if pkt_type == S2C_LOGIN:
             print("로그인 패킷 도착")
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);  offset += 4
             data = {"size": size, "type": type, "id": id}
 
-        elif ptype == S2C_MESSAGE:
+        elif pkt_type == S2C_MESSAGE:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);  offset += 4
             data = {"size": size, "type": type, "id": id}
 
-        elif ptype == S2C_DISCONNECT:
+        elif pkt_type == S2C_DISCONNECT:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);  offset += 4
             data = {"size": size, "type": type, "id": id}
 
-        elif ptype == S2C_ADD_OPEN_ROOM:
+        elif pkt_type == S2C_ADD_OPEN_ROOM:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);        offset += 4
-            maxuser = slice_packet(offset, 1);   offset += 1
-            roomname = slice_packet(offset, MAX_ROOM_NAME); offset += MAX_ROOM_NAME
+            max_user = slice_packet(offset, 1);   offset += 1
+            room_name = slice_packet(offset, MAX_ROOM_NAME); offset += MAX_ROOM_NAME
             data = {
                 "size": size, "type": type, "id": id,
-                "maxuser": maxuser, "roomname": roomname
+                "max_user": max_user, "room_name": room_name
             }
 
-        elif ptype == S2C_ADD_LOCK_ROOM:
+        elif pkt_type == S2C_ADD_LOCK_ROOM:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);        offset += 4
-            maxuser = slice_packet(offset, 1);   offset += 1
-            roomname = slice_packet(offset, MAX_ROOM_NAME); offset += MAX_ROOM_NAME
-            roompassword = slice_packet(offset, MAX_ROOM_PASSWORD); offset += MAX_ROOM_PASSWORD
+            max_user = slice_packet(offset, 1);   offset += 1
+            room_name = slice_packet(offset, MAX_ROOM_NAME); offset += MAX_ROOM_NAME
+            room_password = slice_packet(offset, MAX_ROOM_PASSWORD); offset += MAX_ROOM_PASSWORD
             data = {
                 "size": size, "type": type, "id": id,
-                "maxuser": maxuser, "roomname": roomname, "roompassword": roompassword
+                "max_user": max_user, "room_name": room_name, "room_password": room_password
             }
 
-        elif ptype == S2C_ADD_USER:
+        elif pkt_type == S2C_ADD_USER:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);        offset += 4
-            isadd = slice_packet(offset, 1);     offset += 1
+            is_add = slice_packet(offset, 1);     offset += 1
             name = slice_packet(offset, MAX_USER_NAME); offset += MAX_USER_NAME
-            data = {"size": size, "type": type, "id": id, "isadd": isadd, "name": name}
+            data = {"size": size, "type": type, "id": id, "is_add": is_add, "name": name}
 
-        elif ptype == S2C_DELETE_USER:
+        elif pkt_type == S2C_DELETE_USER:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);          offset += 4
-            newhostid = slice_packet(offset, 4);   offset += 4
-            data = {"size": size, "type": type, "id": id, "newhostid": newhostid}
+            new_host_id = slice_packet(offset, 4);   offset += 4
+            data = {"size": size, "type": type, "id": id, "new_host_id": new_host_id}
 
-        elif ptype == S2C_READY:
+        elif pkt_type == S2C_READY:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
             id = slice_packet(offset, 4);        offset += 4
-            isready = slice_packet(offset, 1);   offset += 1
-            data = {"size": size, "type": type, "id": id, "isready": isready}
+            is_ready = slice_packet(offset, 1);   offset += 1
+            data = {"size": size, "type": type, "id": id, "is_ready": is_ready}
 
-        elif ptype == S2C_START:
+        elif pkt_type == S2C_START:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
-            isstart = slice_packet(offset, 1); offset += 1
-            data = {"size": size, "type": type, "isstart": isstart}
+            is_start = slice_packet(offset, 1); offset += 1
+            data = {"size": size, "type": type, "is_start": is_start}
 
-        elif ptype == S2C_KICK:
+        elif pkt_type == S2C_KICK:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
-            kickuserid = slice_packet(offset, 4); offset += 4
-            data = {"size": size, "type": type, "kickuserid": kickuserid}
+            kick_user_id = slice_packet(offset, 4); offset += 4
+            data = {"size": size, "type": type, "kick_user_id": kick_user_id}
 
-        else:
-            return  # S2C 외 타입 무시
-
-        handler = self._handlers.get(ptype)
-        if handler:
-            handler(data)
+        while True:
+            try:
+                self.queue.put_nowait(data)
+                break
+            except self.queue.full():
+                continue
