@@ -23,7 +23,7 @@ BLANK_WIDTH = 100
 BLANK_HEIGHT = 50
 
 # FPS
-FPS = 30
+FPS = 60
 
 # Tetromino shapes and colors
 SHAPES = {

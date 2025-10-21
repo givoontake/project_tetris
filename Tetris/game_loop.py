@@ -1,42 +1,69 @@
 # game_loop.py
+import time
 import pygame
+import queue
 from define import BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT, INITIAL_SCALE, FPS
 from change_game_state import *
+from network import NetworkWorker
+
 
 class GameLoop:
     def __init__(self):
         pygame.init()
+
+        # 초기 화면 생성
         w = int(BASE_SCREEN_WIDTH * INITIAL_SCALE)
         h = int(BASE_SCREEN_HEIGHT * INITIAL_SCALE)
         self.screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
         pygame.display.set_caption("Tetris")
-        self.clock = pygame.time.Clock()
+
         self.net_worker = NetworkWorker()
-        self.session = None
-        # 게임 시작과 동시에 서버 연결 시도
-        self.state = None
-        # self.state.init()
 
-    def update(self):
-        dt = self.clock.tick(FPS)
+        # 시작 시 서버 연결 시도 → ConnectState로 진입
+        is_connect = self.net_worker.connect_to_server()
+        self.state = ConnectState(self.screen, is_connect=is_connect)
+        self.state.init()
+
+        self.prev_time = time.perf_counter()
+        self.frame_time = 1.0 / FPS 
+
+        # 선택: 바쁜 대기 방지용 아주 짧은 sleep
+        self.cpu_idle_time = 0.001 
+
+    def handle_events(self):
+        """공통 이벤트 처리(리사이즈/종료 등)."""
         events = pygame.event.get()
-
         for ev in events:
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
             if ev.type == pygame.VIDEORESIZE:
                 self.screen = pygame.display.set_mode((ev.w, ev.h), pygame.RESIZABLE)
                 if hasattr(self.state, "on_resize"):
                     self.state.on_resize(ev.w, ev.h, self.screen)
-                else:
-                    self.state.screen = self.screen
-            elif ev.type == pygame.QUIT:
-                pygame.quit(); raise SystemExit
-            
-        
 
-        next_state = self.state.update(dt, events)
-        if next_state is not self.state:
-            self.state = next_state
-            self.state.init()
+        return events
+
+    def update(self, dt, events):
+        q = self.net_worker._pm.queue
+        max_process = 30
+        process_count = 0
+
+        # --- 패킷 큐 드레인 (없으면 data=None으로 한 번만 업데이트) ---
+        while process_count < max_process:
+            try:
+                data = q.get_nowait()
+            except queue.Empty:
+                data = None
+            next_state = self.state.update(events, data) # 큐가 비어있어도 1번은 업데이트 하도록
+            if next_state is not self.state:
+                self.state = next_state
+                if hasattr(self.state, "init"):
+                    self.state.init()
+                break # 상태가 변경되면 해당 프레임에서 처리 끝 (하나의 이벤트 스냅샷은 하나의 상태에 쓰이도록)
+            process_count += 1
+            if data is None:
+                break
 
     def draw(self):
         self.state.draw()
@@ -44,56 +71,19 @@ class GameLoop:
 
     def run(self):
         while True:
-            self.update()
-            self.draw()
+            # --- 시간 계산 ---
+            now = time.perf_counter()
+            dt = now - self.prev_time
 
-    def process_queue(self):
+            # --- 이벤트 처리 (항상 매 루프) ---
+            events = self.handle_events()
 
-    # 현재 state가 들고 있는 네트워크 객체에서 큐를 찾는다.
-        q = None
-        net = getattr(self.state, "net", None)
-        if net is not None:
-            # (선호) 접근자 메서드가 있으면 사용
-            get_q = getattr(net, "get_packet_queue", None)
-            if callable(get_q):
-                q = get_q()
-            else:
-                # (백업) PacketManager 내부 큐 직접 접근 (현재 프로젝트는 이 경로)
-                pm = getattr(net, "_pm", None)
-                if pm is not None:
-                    q = getattr(pm, "queue", None)
-
-        if q is None:
-            return  # 큐가 없으면 할 일 없음
-
-        # 큐 드레인 (비블로킹)
-        items = []
-        while True:
-            try:
-                items.append(q.get_nowait())
-            except _q.Empty:
-                break
-
-        if not items:
-            return
-
-        # 상태 업데이트에 패킷 리스트를 인자로 전달 시도: update(dt, events, packets)
-        try:
-            self.state.update(0, [], items)
-        except TypeError:
-            # 시그니처가 다르면 on_queue 콜백을 우선 시도
-            on_queue = getattr(self.state, "on_queue", None)
-            if callable(on_queue):
-                for it in items:
-                    on_queue(it)
-            else:
-                # 최후: 상태 객체에 임시로 적재하여 상태 내부에서 소비하도록 함
-                buf = getattr(self.state, "queued_items", [])
-                buf.extend(items)
-                setattr(self.state, "queued_items", buf)
+            # --- 렌더링 (타이머 기반 고정 간격) ---
+            if dt > self.frame_time:
+                self.update(dt, events)
+                self.draw()
+                self.prev_time = now
 
 
 if __name__ == '__main__':
-    res = GameLoop().net_worker.connect_to_server()
-    GameLoop.state = ConnectState(res)
     GameLoop().run()
