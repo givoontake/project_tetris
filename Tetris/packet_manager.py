@@ -99,8 +99,8 @@ class PacketManager:
         elif pkt_type == S2C_ADD_OPEN_ROOM:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
-            id = slice_packet(offset, 4);        offset += 4
-            max_user = slice_packet(offset, 1);   offset += 1
+            id = slice_packet(offset, 4); offset += 4
+            max_user = slice_packet(offset, 1); offset += 1
             room_name = slice_packet(offset, MAX_ROOM_NAME); offset += MAX_ROOM_NAME
             data = {
                 "size": size, "type": type, "id": id,
@@ -110,7 +110,7 @@ class PacketManager:
         elif pkt_type == S2C_ADD_LOCK_ROOM:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
-            id = slice_packet(offset, 4);        offset += 4
+            id = slice_packet(offset, 4); offset += 4
             max_user = slice_packet(offset, 1);   offset += 1
             room_name = slice_packet(offset, MAX_ROOM_NAME); offset += MAX_ROOM_NAME
             room_password = slice_packet(offset, MAX_ROOM_PASSWORD); offset += MAX_ROOM_PASSWORD
@@ -122,23 +122,23 @@ class PacketManager:
         elif pkt_type == S2C_ADD_USER:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
-            id = slice_packet(offset, 4);        offset += 4
-            is_add = slice_packet(offset, 1);     offset += 1
+            id = slice_packet(offset, 4); offset += 4
+            is_add = slice_packet(offset, 1); offset += 1
             name = slice_packet(offset, MAX_USER_NAME); offset += MAX_USER_NAME
             data = {"size": size, "type": type, "id": id, "is_add": is_add, "name": name}
 
         elif pkt_type == S2C_DELETE_USER:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
-            id = slice_packet(offset, 4);          offset += 4
-            new_host_id = slice_packet(offset, 4);   offset += 4
+            id = slice_packet(offset, 4); offset += 4
+            new_host_id = slice_packet(offset, 4); offset += 4
             data = {"size": size, "type": type, "id": id, "new_host_id": new_host_id}
 
         elif pkt_type == S2C_READY:
             size = slice_packet(offset, 2); offset += 2
             type = slice_packet(offset, 1); offset += 1
-            id = slice_packet(offset, 4);        offset += 4
-            is_ready = slice_packet(offset, 1);   offset += 1
+            id = slice_packet(offset, 4); offset += 4
+            is_ready = slice_packet(offset, 1); offset += 1
             data = {"size": size, "type": type, "id": id, "is_ready": is_ready}
 
         elif pkt_type == S2C_START:

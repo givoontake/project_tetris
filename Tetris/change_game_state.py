@@ -1,13 +1,13 @@
 # change_game_state.py
 import time
 import pygame
-from menu import Button
+from menu import *
 from tetris_game import TetrisGame
 from define import *
 from tetris_screen import TetrisScreen
 from session import Session
 from packet_type import S2C_LOGIN  # 필요 시 사용
-
+from typing import Optional
 
 class BaseState:
     def __init__(self, screen):
@@ -25,6 +25,149 @@ class BaseState:
 
     def on_resize(self, w, h, screen):
         self.screen = screen
+
+class ConnectState(BaseState):
+    """
+    - is_connect == False: "Connection Failed" 1초 표시 후 종료
+    - is_connect == True : "Login Success!" 1초 표시 후 SelectPlayState로 전환
+    """
+    def __init__(self, screen, is_connect, dev_mode=False, net_worker=None):
+        super().__init__(screen)
+        self.is_connect = bool(is_connect)
+        self.dev_mode = dev_mode
+        self._start_ms = None  # pygame.time.get_ticks()
+        self.net_worker = net_worker  # ← 보관
+
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+
+    def init(self):
+        self._start_ms = pygame.time.get_ticks()
+
+    def update(self, events, data=None):
+        for ev in events:
+            if ev.type == pygame.QUIT:
+                pygame.quit(); raise SystemExit
+
+        if self._start_ms is None:
+            return self
+
+        elapsed = pygame.time.get_ticks() - self._start_ms
+
+        if not self.is_connect:
+            if elapsed >= 1000:
+                pygame.quit(); raise SystemExit
+            return self
+
+        if elapsed >= 1000:
+            return LoginState(self.screen, net_worker=self.net_worker)
+
+        return self
+
+    def draw(self):
+        self.screen.fill((0, 0, 0))
+        sw, sh = self.screen.get_size()
+        font = pygame.font.SysFont(None, 48)
+
+        if self.is_connect:
+            msg = font.render('Login Success!', True, (0, 200, 0))
+        else:
+            msg = font.render('Connection Failed', True, (255, 0, 0))
+
+        rect = msg.get_rect(center=(sw // 2, sh // 2))
+        self.screen.blit(msg, rect)
+
+class LoginState(BaseState):
+    def __init__(self, screen, net_worker=None):
+            super().__init__(screen)
+            self.net = net_worker
+            self.title_font = pygame.font.SysFont(None, 36)
+            self.label_font = pygame.font.SysFont(None, 28)
+
+            # 런타임 배치 요소
+            self.id_box: Optional[InputBox] = None
+            self.pw_box: Optional[InputBox] = None
+            self.btn_login: Optional[Button] = None
+            self._layout = None  # (id_rect, pw_rect, btn_rect)
+
+    def init(self):
+        self._rebuild_layout()
+
+    def _rebuild_layout(self):
+        sw, sh = self.screen.get_size()
+
+        # 중앙 배치
+        ibox_w, ibox_h = 360, 42
+        gap_y = 64
+        center_x = (sw - ibox_w) // 2
+        center_y = (sh - (ibox_h * 2 + gap_y + 46)) // 2  # 46은 버튼 높이
+
+        id_rect = pygame.Rect(center_x, center_y, ibox_w, ibox_h)
+        pw_rect = pygame.Rect(center_x, center_y + ibox_h + 20, ibox_w, ibox_h)
+        btn_w, btn_h = 160, 46
+        btn_rect = pygame.Rect((sw - btn_w) // 2, pw_rect.bottom + 28, btn_w, btn_h)
+
+        self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디")
+        self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", is_password=True)
+        self.btn_login = Button(btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, text="로그인")
+
+        self._layout = (id_rect, pw_rect, btn_rect)
+
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        self._rebuild_layout()
+
+    def send_login(self):
+        user_id = self.id_box.text if self.id_box else ""
+        user_pw = self.pw_box.text if self.pw_box else ""
+        print(f"[LOGIN] id='{user_id}'  pw='{user_pw}'")  # 콘솔 출력
+        # 필요 시 상태 전환:
+        # return SelectPlayState(self.screen)
+        return None
+
+    def update(self, events, data=None):
+        dt_ms = 16  # 간단한 커서 점멸용(정확한 dt 필요 없으므로 고정)
+        self.id_box.update(dt_ms)
+        self.pw_box.update(dt_ms)
+
+        next_state = None
+
+        for ev in events:
+            if ev.type == pygame.QUIT:
+                pygame.quit(); raise SystemExit
+
+            self.id_box.handle_event(ev)
+            self.pw_box.handle_event(ev)
+
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN: #enter 누르기
+                ns = self.send_login()
+                if ns: return ns
+
+            if self.btn_login.clicked(ev): # 마우스 클릭
+                ns = self.send_login()
+                if ns: return ns
+
+        return self
+
+    def draw(self):
+        self.screen.fill((18, 18, 18))
+        sw, _ = self.screen.get_size()
+
+        # 제목
+        title = self.title_font.render("로그인", True, (255, 255, 255))
+        self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
+
+        # 라벨
+        id_label = self.label_font.render("아이디", True, (255, 255, 255))
+        pw_label = self.label_font.render("비밀번호", True, (255, 255, 255))
+        id_rect, pw_rect, _ = self._layout
+        self.screen.blit(id_label, (id_rect.x, id_rect.y - 24))
+        self.screen.blit(pw_label, (pw_rect.x, pw_rect.y - 24))
+
+        # 입력창 + 버튼
+        self.id_box.draw(self.screen)
+        self.pw_box.draw(self.screen)
+        self.btn_login.draw(self.screen)
 
 
 class SelectModeState(BaseState):
@@ -93,58 +236,6 @@ class SelectPlayState(BaseState):
         self.screen.fill((0, 0, 0))
         for b in self.buttons:
             b.draw(self.screen)
-
-
-class ConnectState(BaseState):
-    """
-    - is_connect == False: "Connection Failed" 1초 표시 후 종료
-    - is_connect == True : "Login Success!" 1초 표시 후 SelectPlayState로 전환
-    """
-    def __init__(self, screen, is_connect, dev_mode=False):
-        super().__init__(screen)
-        self.is_connect = bool(is_connect)
-        self.dev_mode = dev_mode
-        self._start_ms = None  # pygame.time.get_ticks()
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-
-    def init(self):
-        self._start_ms = pygame.time.get_ticks()
-
-    def update(self, events, data=None):
-        for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit(); raise SystemExit
-
-        if self._start_ms is None:
-            return self
-
-        elapsed = pygame.time.get_ticks() - self._start_ms
-
-        if not self.is_connect:
-            if elapsed >= 1000:
-                pygame.quit(); raise SystemExit
-            return self
-
-        if elapsed >= 1000:
-            return SelectPlayState(self.screen, dev_mode=self.dev_mode)
-
-        return self
-
-    def draw(self):
-        self.screen.fill((0, 0, 0))
-        sw, sh = self.screen.get_size()
-        font = pygame.font.SysFont(None, 48)
-
-        if self.is_connect:
-            msg = font.render('Login Success!', True, (0, 200, 0))
-        else:
-            msg = font.render('Connection Failed', True, (255, 0, 0))
-
-        rect = msg.get_rect(center=(sw // 2, sh // 2))
-        self.screen.blit(msg, rect)
-
 
 class SinglePlayState(BaseState):
     def __init__(self, screen, dev_mode=False):

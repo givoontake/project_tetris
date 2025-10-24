@@ -21,7 +21,7 @@ class GameLoop:
 
         # 시작 시 서버 연결 시도 → ConnectState로 진입
         is_connect = self.net_worker.connect_to_server()
-        self.state = ConnectState(self.screen, is_connect=is_connect)
+        self.state = ConnectState(self.screen, is_connect=is_connect, net_worker = self.net_worker)
         self.state.init()
 
         self.prev_time = time.perf_counter()
