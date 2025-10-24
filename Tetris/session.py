@@ -1,6 +1,7 @@
 # session.py
 from typing import Optional
 import threading
+from asset_manager import *
 
 class Session:
     """
@@ -13,6 +14,8 @@ class Session:
 
     def __init__(self):
         self.id: Optional[int] = None
+        self.block_texture = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None}
+        self.update_texture({'I': DEFAULT_RED, 'J': DEFAULT_ORANGE, 'L': DEFAULT_YELLOW, 'O': DEFAULT_GREEN, 'S': DEFAULT_BLUE, 'T': DEFAULT_INDIGO, 'Z': DEFAULT_PURPLE})
 
     @classmethod
     def shared(cls) -> "Session":
@@ -21,6 +24,10 @@ class Session:
                 if cls._shared is None:
                     cls._shared = Session()
         return cls._shared
+    
+    def update_texture(self, new_texture: dict):
+        for shape, new_type in new_texture.items():
+            self.block_texture[shape] = ASSET[new_type]
 
     def reset(self):
         self.id = None
