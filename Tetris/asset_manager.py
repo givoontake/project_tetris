@@ -9,14 +9,9 @@ from define import *
 
 class AssetManager:
     def __init__(self):
-        self.asset = []
-
-    def load_all(self):
-        for i in range(len(ASSET)):
-            type = ASSET[i][TYPE]
-            surface = self.load_image(ASSET[i][PATH], CELL_SIZE, CELL_SIZE)
-            self.asset.append([type, surface])
-
+        #self.asset = []
+        pass
+    
     def load_image(filename: str, width: int, height: int) -> pygame.Surface:
         """
         지정된 파일 경로의 이미지를 로드하고,
@@ -37,3 +32,42 @@ class AssetManager:
         scaled_image = pygame.transform.smoothscale(image, (int(width), int(height)))
         return scaled_image
 
+DEFAULT_RED = 1
+DEFAULT_ORANGE = 2
+DEFAULT_YELLOW = 3
+DEFAULT_GREEN = 4
+DEFAULT_BLUE = 5
+DEFAULT_INDIGO = 6
+DEFAULT_PURPLE = 7
+
+CANDY_RED = 8
+CANDY_ORANGE = 9
+CANDY_YELLOW = 10  
+CANDY_GREEN = 11
+CANDY_BLUE = 12
+CANDY_INDIGO = 13
+CANDY_PURPLE = 14
+
+# 리스트에 알기쉽게 접근하기 위해 정의
+
+am = AssetManager()
+
+ASSET = {
+    # --- Default Blocks ---
+    DEFAULT_RED:     am.load_image("blocks/default/default_red.png"),
+    DEFAULT_ORANGE:  am.load_image("blocks/default/default_orange.png"),
+    DEFAULT_YELLOW:  am.load_image("blocks/default/default_yellow.png"),
+    DEFAULT_GREEN:   am.load_image("blocks/default/default_green.png"),
+    DEFAULT_BLUE:    am.load_image("blocks/default/default_blue.png"),
+    DEFAULT_INDIGO:  am.load_image("blocks/default/default_indigo.png"),
+    DEFAULT_PURPLE:  am.load_image("blocks/default/default_purple.png"),
+
+    # --- Candy Blocks ---
+    CANDY_RED:       am.load_image("blocks/candy/candy_red.png"),
+    CANDY_ORANGE:    am.load_image("blocks/candy/candy_orange.png"),
+    CANDY_YELLOW:    am.load_image("blocks/candy/candy_yellow.png"),
+    CANDY_GREEN:     am.load_image("blocks/candy/candy_green.png"),
+    CANDY_BLUE:      am.load_image("blocks/candy/candy_blue.png"),
+    CANDY_INDIGO:    am.load_image("blocks/candy/candy_indigo.png"),
+    CANDY_PURPLE:    am.load_image("blocks/candy/candy_purple.png"),
+}
