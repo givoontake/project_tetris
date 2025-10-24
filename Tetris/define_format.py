@@ -71,6 +71,8 @@ S2C_KICK_PACKET_FMT = "<hbi"
 
 # 추천 이름: PACK_FIELD_FMT  (간단 키-포맷 매핑)
 PACK_FIELD_FMT = {
+    "size": "h",
+    "type": "b",
     "id": "i",            # int
     "temp_id": "i",
     "room_id": "i",
@@ -90,4 +92,31 @@ PACK_FIELD_FMT = {
     "room_name":     f"{MAX_ROOM_NAME}s",
     "room_password": f"{MAX_ROOM_PASSWORD}s",
     "name":          f"{MAX_USER_NAME}s",
+}
+
+FIELD_SIZE = {
+    # 공통 헤더
+    "size": 2,   # h
+    "type": 1,   # b
+
+    # 4바이트 정수
+    "id": 4,
+    "temp_id": 4,
+    "room_id": 4,
+    "new_host_id": 4,
+    "kick_user_id": 4,
+
+    # 1바이트 값
+    "max_user": 1,
+    "is_add": 1,
+    "is_ready": 1,
+    "is_start": 1,
+
+    # 8바이트 정수
+    "last_time": 8,
+
+    # 고정 길이 문자열(바이트 배열)
+    "room_name": MAX_ROOM_NAME,
+    "room_password": MAX_ROOM_PASSWORD,
+    "name": MAX_USER_NAME,
 }

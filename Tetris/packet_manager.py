@@ -24,6 +24,45 @@ class PacketManager:
         # 메인 스레드로 넘길 '완성 패킷' 큐 (thread-safe)
         self.queue: "queue.Queue[dict]"= queue.Queue(maxsize=MAX_QUEUE_SIZE)
 
+    def dic_to_bytes(self, data: dict) ->bytes: # 송신을 위한 데이터 변환
+        packet_bytes = bytearray()
+
+        for key, value in data.items():
+            if key not in PACK_FIELD_FMT:
+                raise KeyError(f"PACK_FIELD_FMT에 '{key}'가 정의되어 있지 않습니다.")
+            
+            fmt = PACK_FIELD_FMT[key]
+
+            # ---- 문자열(char 배열) 처리 ----
+            if fmt.endswith("s"):
+                n = int(fmt[:-1])  
+                val_bytes = str(value).encode("utf-8")
+                val_bytes = val_bytes[:n].ljust(n, b"\x00")
+                packet_bytes.extend(struct.pack(f"<{fmt}", val_bytes))
+
+            # ---- bool, int, short, long long 등 ----
+            elif fmt in ("b", "h", "i", "q"):
+                packet_bytes.extend(struct.pack(f"<{fmt}", int(value)))
+
+            else:
+                raise ValueError(f"지원하지 않는 포맷: {fmt} (key='{key}')")
+
+        return bytes(packet_bytes)
+    
+    def bytes_to_dict(self, pkt: bytes) -> dict:
+
+        pkt_struct = PACKET_STRUCT[pkt[2]] # 패킷 구조체(리스트)
+        
+        offset = 0
+        data = {}
+        for field in range(len(pkt_struct)): #구조체 내 필드 명
+            fmt = PACK_FIELD_FMT[field] # 필드 명에 따른 포맷
+            size = FIELD_SIZE[field] # 필드 명에 따른 필드 크기
+            value = struct.unpack_from("<" + fmt, pkt, offset)[0] 
+            data[field] = value
+            offset += size
+
+        return data
     # ---- 병합 단계 ----
     def merge_packet(self, chunk: bytes) -> None:
         """TCP로 받은 조각(chunk)을 내부 버퍼에 병합."""

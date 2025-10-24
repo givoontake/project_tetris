@@ -29,45 +29,86 @@ S2C_START         = 20
 C2S_KICK          = 21
 S2C_KICK          = 22
 
-PACKET_STRUCT = { # 구조체를 대체
+# ---- Login ----
+S2C_LOGIN_PACKET = ["size", "type", "id"]
+C2S_LOGIN_PACKET = ["size", "type"]
 
+# ---- Message ----
+S2C_MESSAGE_PACKET = ["size", "type", "id"]
+C2S_MESSAGE_PACKET = ["size", "type", "id"]
+
+# ---- Disconnect ----
+C2S_DISCONNECT_PACKET = ["size", "type", "id"]
+S2C_DISCONNECT_PACKET = ["size", "type", "id"]
+
+# ---- Add Open Room ----
+C2S_ADD_OPEN_ROOM_PACKET = ["size", "type", "id", "max_user", "room_name"]
+S2C_ADD_OPEN_ROOM_PACKET = ["size", "type", "id", "max_user", "room_name"]
+
+# ---- Add Lock Room ----
+C2S_ADD_LOCK_ROOM_PACKET = ["size", "type", "id", "max_user", "room_name", "room_password"]
+S2C_ADD_LOCK_ROOM_PACKET = ["size", "type", "id", "max_user", "room_name", "room_password"]
+
+# ---- Add User ----
+C2S_ADD_USER_PACKET = ["size", "type", "id", "room_id", "name"]
+S2C_ADD_USER_PACKET = ["size", "type", "id", "is_add", "name"]
+
+# ---- Delete User ----
+C2S_DELETE_USER_PACKET = ["size", "type", "id"]
+S2C_DELETE_USER_PACKET = ["size", "type", "id", "new_host_id"]
+
+# ---- Ready ----
+C2S_READY_PACKET = ["size", "type", "id", "is_ready"]
+S2C_READY_PACKET = ["size", "type", "id", "is_ready"]
+
+# ---- Start ----
+C2S_START_PACKET = ["size", "type", "id"]
+S2C_START_PACKET = ["size", "type", "is_start"]
+
+# ---- Kick ----
+C2S_KICK_PACKET = ["size", "type", "id", "kick_user_id"]
+S2C_KICK_PACKET = ["size", "type", "kick_user_id"]
+
+
+# 타입 코드(int) -> 필드 목록(list[str]) 매핑
+PACKET_STRUCT: dict[int, list[str]] = {
     # ---- Login ----
-    S2C_LOGIN: ["size", "type", "id"],
-    C2S_LOGIN: ["size", "type", "id"],
+    S2C_LOGIN:         S2C_LOGIN_PACKET,
+    C2S_LOGIN:         C2S_LOGIN_PACKET,
 
     # ---- Message ----
-    S2C_MESSAGE: ["size", "type", "id"],
-    C2S_MESSAGE: ["size", "type", "id"],
+    S2C_MESSAGE:       S2C_MESSAGE_PACKET,
+    C2S_MESSAGE:       C2S_MESSAGE_PACKET,
 
     # ---- Disconnect ----
-    C2S_DISCONNECT: ["size", "type", "id"],
-    S2C_DISCONNECT: ["size", "type", "id"],
+    S2C_DISCONNECT:    S2C_DISCONNECT_PACKET,
+    C2S_DISCONNECT:    C2S_DISCONNECT_PACKET,
 
     # ---- Add Open Room ----
-    C2S_ADD_OPEN_ROOM: ["size", "type", "id", "max_user", "room_name"],
-    S2C_ADD_OPEN_ROOM: ["size", "type", "id", "max_user", "room_name"],
+    S2C_ADD_OPEN_ROOM: S2C_ADD_OPEN_ROOM_PACKET,
+    C2S_ADD_OPEN_ROOM: C2S_ADD_OPEN_ROOM_PACKET,
 
     # ---- Add Lock Room ----
-    C2S_ADD_LOCK_ROOM: ["size", "type", "id", "max_user", "room_name", "room_password"],
-    S2C_ADD_LOCK_ROOM: ["size", "type", "id", "max_user", "room_name", "room_password"],
+    S2C_ADD_LOCK_ROOM: S2C_ADD_LOCK_ROOM_PACKET,
+    C2S_ADD_LOCK_ROOM: C2S_ADD_LOCK_ROOM_PACKET,
 
     # ---- Add User ----
-    C2S_ADD_USER: ["size", "type", "id", "room_id", "name"],
-    S2C_ADD_USER: ["size", "type", "id", "is_add", "name"],
+    S2C_ADD_USER:      S2C_ADD_USER_PACKET,
+    C2S_ADD_USER:      C2S_ADD_USER_PACKET,
 
     # ---- Delete User ----
-    C2S_DELETE_USER: ["size", "type", "id"],
-    S2C_DELETE_USER: ["size", "type", "id", "new_host_id"],
+    S2C_DELETE_USER:   S2C_DELETE_USER_PACKET,
+    C2S_DELETE_USER:   C2S_DELETE_USER_PACKET,
 
     # ---- Ready ----
-    C2S_READY: ["size", "type", "id", "is_ready"],
-    S2C_READY: ["size", "type", "id", "is_ready"],
+    S2C_READY:         S2C_READY_PACKET,
+    C2S_READY:         C2S_READY_PACKET,
 
     # ---- Start ----
-    C2S_START: ["size", "type", "id"],
-    S2C_START: ["size", "type", "is_start"],
+    S2C_START:         S2C_START_PACKET,
+    C2S_START:         C2S_START_PACKET,
 
     # ---- Kick ----
-    C2S_KICK: ["size", "type", "id", "kick_user_id"],
-    S2C_KICK: ["size", "type", "kick_user_id"],
+    S2C_KICK:          S2C_KICK_PACKET,
+    C2S_KICK:          C2S_KICK_PACKET,
 }
