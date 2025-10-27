@@ -9,10 +9,31 @@ from define import *
 
 class AssetManager:
     def __init__(self):
-        #self.asset = []
+        self.block_asset = {}
         pass
+
+    def init(self):
+        self.block_asset = {
+    # --- Default Blocks ---
+        DEFAULT_RED:     self.load_image("blocks/default/default_red.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_ORANGE:  self.load_image("blocks/default/default_orange.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_YELLOW:  self.load_image("blocks/default/default_yellow.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_GREEN:   self.load_image("blocks/default/default_green.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_BLUE:    self.load_image("blocks/default/default_blue.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_INDIGO:  self.load_image("blocks/default/default_indigo.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_PURPLE:  self.load_image("blocks/default/default_purple.png", CELL_SIZE, CELL_SIZE),
+
+        # --- Candy Blocks ---
+        CANDY_RED:       self.load_image("blocks/candy/candy_red.png", CELL_SIZE, CELL_SIZE),
+        CANDY_ORANGE:    self.load_image("blocks/candy/candy_orange.png", CELL_SIZE, CELL_SIZE),
+        CANDY_YELLOW:    self.load_image("blocks/candy/candy_yellow.png", CELL_SIZE, CELL_SIZE),
+        CANDY_GREEN:     self.load_image("blocks/candy/candy_green.png", CELL_SIZE, CELL_SIZE),
+        CANDY_BLUE:      self.load_image("blocks/candy/candy_blue.png", CELL_SIZE, CELL_SIZE),
+        CANDY_INDIGO:    self.load_image("blocks/candy/candy_indigo.png", CELL_SIZE, CELL_SIZE),
+        CANDY_PURPLE:    self.load_image("blocks/candy/candy_purple.png", CELL_SIZE, CELL_SIZE),
+        }
     
-    def load_image(filename: str, width: int, height: int) -> pygame.Surface:
+    def load_image(self, filename: str, width: int, height: int) -> pygame.Surface:
         """
         지정된 파일 경로의 이미지를 로드하고,
         절대 크기 (width, height)로 스케일링하여 반환한다.
@@ -47,27 +68,3 @@ CANDY_GREEN = 11
 CANDY_BLUE = 12
 CANDY_INDIGO = 13
 CANDY_PURPLE = 14
-
-# 리스트에 알기쉽게 접근하기 위해 정의
-
-am = AssetManager()
-
-ASSET = {
-    # --- Default Blocks ---
-    DEFAULT_RED:     am.load_image("blocks/default/default_red.png"),
-    DEFAULT_ORANGE:  am.load_image("blocks/default/default_orange.png"),
-    DEFAULT_YELLOW:  am.load_image("blocks/default/default_yellow.png"),
-    DEFAULT_GREEN:   am.load_image("blocks/default/default_green.png"),
-    DEFAULT_BLUE:    am.load_image("blocks/default/default_blue.png"),
-    DEFAULT_INDIGO:  am.load_image("blocks/default/default_indigo.png"),
-    DEFAULT_PURPLE:  am.load_image("blocks/default/default_purple.png"),
-
-    # --- Candy Blocks ---
-    CANDY_RED:       am.load_image("blocks/candy/candy_red.png"),
-    CANDY_ORANGE:    am.load_image("blocks/candy/candy_orange.png"),
-    CANDY_YELLOW:    am.load_image("blocks/candy/candy_yellow.png"),
-    CANDY_GREEN:     am.load_image("blocks/candy/candy_green.png"),
-    CANDY_BLUE:      am.load_image("blocks/candy/candy_blue.png"),
-    CANDY_INDIGO:    am.load_image("blocks/candy/candy_indigo.png"),
-    CANDY_PURPLE:    am.load_image("blocks/candy/candy_purple.png"),
-}

@@ -5,7 +5,7 @@ import queue
 from define import BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT, INITIAL_SCALE, FPS
 from change_game_state import *
 from network import NetworkWorker
-
+from asset_manager import *
 
 class GameLoop:
     def __init__(self):
@@ -17,8 +17,11 @@ class GameLoop:
         self.screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
         pygame.display.set_caption("Tetris")
 
+        self.am = AssetManager()
+        self.am.init()
         self.net_worker = NetworkWorker()
-
+        self.my_session = Session(self.am.block_asset)
+        
         # 시작 시 서버 연결 시도 → ConnectState로 진입
         is_connect = self.net_worker.connect_to_server()
         self.state = ConnectState(self.screen, is_connect=is_connect, net_worker = self.net_worker)
@@ -33,6 +36,14 @@ class GameLoop:
     def handle_events(self):
         """공통 이벤트 처리(리사이즈/종료 등)."""
         events = pygame.event.get()
+
+            # 🔍 [디버그 출력: 현재 상태 + 이벤트 리스트]
+        for ev in events:
+            if ev.type == pygame.MOUSEBUTTONDOWN:
+                btn_name = {1: "L", 2: "M", 3: "R"}.get(ev.button, ev.button)
+                print(f"  DOWN → button={btn_name}, pos={getattr(ev, 'pos', None)}")
+                print(f"\n[STATE] {type(self.state).__name__}")
+
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit()
@@ -75,11 +86,9 @@ class GameLoop:
             now = time.perf_counter()
             dt = now - self.prev_time
 
-            # --- 이벤트 처리 (항상 매 루프) ---
-            events = self.handle_events()
-
             # --- 렌더링 (타이머 기반 고정 간격) ---
             if dt > self.frame_time:
+                events = self.handle_events()
                 self.update(dt, events)
                 self.draw()
                 self.prev_time = now

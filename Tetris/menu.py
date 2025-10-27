@@ -7,12 +7,12 @@ GRAY   = (100, 100, 100)
 WHITE  = (255, 255, 255)
 
 class Button:
-    def __init__(self, text, rel_rect, surf):
+    def __init__(self, surf, rel_rect, text):
         sw, sh = surf.get_size()
         x, y, w, h = rel_rect
         self.rect = pygame.Rect(int(x*sw), int(y*sh), int(w*sw), int(h*sh))
         fs = max(14, int(self.rect.height * 0.55))
-        self.font = pygame.font.SysFont(None, fs)
+        self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
         self.text = text
         self._render_text()
 
@@ -20,12 +20,12 @@ class Button:
         self.text_surf = self.font.render(self.text, True, WHITE)
         self.text_rect = self.text_surf.get_rect(center=self.rect.center)
 
-    def on_resize(self, surf, rel_rect):
+    def on_resize(self, rel_rect, surf):
         sw, sh = surf.get_size()
         x, y, w, h = rel_rect
         self.rect = pygame.Rect(int(x*sw), int(y*sh), int(w*sw), int(h*sh))
         fs = max(14, int(self.rect.height * 0.55))
-        self.font = pygame.font.SysFont(None, fs)
+        self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
         self._render_text()
 
     def draw(self, surf):
@@ -50,7 +50,7 @@ class InputBox:
         self.color_active = (60, 140, 255)
         self.color = self.color_idle
 
-        self.font = pygame.font.SysFont(None, 28)
+        self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
         self.padding = 10
         self.cursor_visible = True
         self.cursor_timer_ms = 0

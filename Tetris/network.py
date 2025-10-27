@@ -74,10 +74,10 @@ class NetworkWorker:
                 # 병합 + 커팅(완성 패킷은 큐 적재)
                 self._pm.merge_packet(recv_packet)
                 self._pm.process_packet()
-        except Exception:
-            pass
-        finally:
+        except Exception as e:
+            print(f"[recv_loop] 예외 발생: {type(e).__name__} - {e}")
             self.close()
+            
 
     # ---- 즉시 송신(필요 시) ----
     def send_packet(self, data: bytes) -> bool:
