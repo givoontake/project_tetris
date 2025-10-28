@@ -11,6 +11,8 @@ constexpr int MAX_ROOM_PASSWORD = 48;
 constexpr int MAX_ARRAY_SIZE = 127;
 constexpr int ID_SIZE = 16;
 
+constexpr int MAX_USER_ID = 48;
+constexpr int MAX_USER_PASSWORD = 48;
 constexpr int MAX_USER_NAME = 48;
 
 #pragma pack(push, 1)
@@ -36,7 +38,8 @@ struct S2C_LOGIN_PACKET {
 struct C2S_LOGIN_PACKET {
 	short size;
 	char type;
-	int id;
+	char user_id[MAX_USER_ID];
+	char user_password[MAX_USER_PASSWORD];
 };
 
 struct S2C_MESSAGE_PACKET {

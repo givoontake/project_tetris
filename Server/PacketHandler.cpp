@@ -22,11 +22,12 @@ void PacketHandler::HandlePacket(char* packet)
 
 	case C2S_LOGIN: {
 		C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
-		S2C_LOGIN_PACKET send_p;
+		std::cout << "size: " << recv_p->size << ", type: " << (int)recv_p->type << ", id: " << recv_p->user_id << ", pw: " << recv_p->user_password << std::endl;
+		/*S2C_LOGIN_PACKET send_p;
 		send_p.size = sizeof(S2C_LOGIN_PACKET);
-		send_p.type = S2C_LOGIN;
-		send_p.id = recv_p->id;
-		server->SendToSelf((char*)&send_p, send_p.id); // 아이디 대신 인덱스 들어가야 하는데, 구조 문제때문에 일단 보류. 나중에 반드시 변경필요
+		send_p.type = S2C_LOGIN;*/
+		//send_p.id = // 이 패킷을 받고 나서 아이디 할당하도록 변경 후 나중에 로직 완성
+		//server->SendToSelf((char*)&send_p, send_p.id); // 아이디 대신 인덱스 들어가야 하는데, 구조 문제때문에 일단 보류. 나중에 반드시 변경필요
 		break;
 	}
 		
