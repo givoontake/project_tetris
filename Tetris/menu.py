@@ -38,6 +38,9 @@ class Button:
                 event.button == 1 and
                 self.rect.collidepoint(event.pos))
 
+import pygame
+from typing import Optional
+
 class InputBox:
     def __init__(self, x: int, y: int, w: int, h: int, placeholder: str = "", is_password: bool = False):
         self.rect = pygame.Rect(x, y, w, h)
@@ -52,9 +55,18 @@ class InputBox:
 
         self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
         self.padding = 10
+
+        # 커서 점멸
         self.cursor_visible = True
         self.cursor_timer_ms = 0
         self.cursor_blink_ms = 500
+
+        # 백스페이스 키 반복(typematic) 상태
+        self.backspace_active = False
+        self.backspace_timer_ms = 0
+        self.backspace_delay_ms = 500   # 첫 반복까지 지연 0.5초
+        self.backspace_repeat_ms = 50  # 이후 반복 간격 0.05초
+        self.backspace_delay_done = False
 
     def handle_event(self, ev: pygame.event.Event):
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -63,15 +75,28 @@ class InputBox:
 
         if ev.type == pygame.KEYDOWN and self.active:
             if ev.key == pygame.K_BACKSPACE:
-                self.text = self.text[:-1]
+                # 누르는 순간 즉시 1글자 삭제
+                if self.text:
+                    self.text = self.text[:-1]
+                # 반복 시작 상태 초기화
+                self.backspace_active = True
+                self.backspace_timer_ms = 0
+                self.backspace_delay_done = False
             elif ev.key == pygame.K_RETURN:
-                # 엔터는 상위(LoginState)에서 처리
+                # 엔터는 상위에서 처리
                 pass
             else:
                 if ev.unicode and ev.unicode.isprintable():
                     self.text += ev.unicode
 
+        elif ev.type == pygame.KEYUP and ev.key == pygame.K_BACKSPACE:
+            # 손을 떼면 반복 종료
+            self.backspace_active = False
+            self.backspace_timer_ms = 0
+            self.backspace_delay_done = False
+
     def update(self, dt_ms: int):
+        # 커서 점멸
         if self.active:
             self.cursor_timer_ms += dt_ms
             if self.cursor_timer_ms >= self.cursor_blink_ms:
@@ -81,7 +106,27 @@ class InputBox:
             self.cursor_visible = False
             self.cursor_timer_ms = 0
 
+        # 백스페이스 반복 처리
+        if self.active and self.backspace_active:
+            self.backspace_timer_ms += dt_ms
+
+            if not self.backspace_delay_done:
+                # 최초 500ms 지연
+                if self.backspace_timer_ms >= self.backspace_delay_ms:
+                    self.backspace_timer_ms -= self.backspace_delay_ms
+                    self.backspace_delay_done = True
+            else:
+                # 지연 이후 100ms 간격 반복
+                while self.backspace_timer_ms >= self.backspace_repeat_ms:
+                    self.backspace_timer_ms -= self.backspace_repeat_ms
+                    if self.text:
+                        self.text = self.text[:-1]
+                    else:
+                        self.backspace_timer_ms = 0
+                        break
+
     def draw(self, surf: pygame.Surface):
+        # 배경
         pygame.draw.rect(surf, self.color, self.rect, border_radius=8)
 
         # 표시 텍스트 (비밀번호면 마스킹)
@@ -91,12 +136,12 @@ class InputBox:
         else:
             txt = self.font.render(show, True, (255, 255, 255))
 
-        surf.blit(txt, (self.rect.x + self.padding,
-                        self.rect.y + (self.rect.height - txt.get_height()) // 2))
+        text_pos = (self.rect.x + self.padding, self.rect.y + (self.rect.height - txt.get_height()) // 2)
+        surf.blit(txt, text_pos)
 
         # 커서
         if self.active and self.cursor_visible:
-            cursor_x = self.rect.x + self.padding + txt.get_width()
+            cursor_x = text_pos[0] + txt.get_width()
             cursor_y = self.rect.y + 8
             pygame.draw.rect(surf, (255, 255, 255),
                              (cursor_x, cursor_y, 2, self.rect.height - 16))
