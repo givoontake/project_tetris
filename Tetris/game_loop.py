@@ -24,11 +24,11 @@ class GameLoop:
         
         # 시작 시 서버 연결 시도 → ConnectState로 진입
         is_connect = self.net_worker.connect_to_server()
-        self.state = ConnectState(self.screen, is_connect=is_connect, net_worker = self.net_worker)
+        self.state = ConnectState(self.screen, is_connect=is_connect, net_worker=self.net_worker)
         self.state.init()
 
         self.prev_time = time.perf_counter()
-        self.frame_time = 1.0 / FPS 
+        self.frame_time = 1.0 / FPS  # 초 단위
 
         # 선택: 바쁜 대기 방지용 아주 짧은 sleep
         self.cpu_idle_time = 0.001 
@@ -37,7 +37,7 @@ class GameLoop:
         """공통 이벤트 처리(리사이즈/종료 등)."""
         events = pygame.event.get()
 
-            # 🔍 [디버그 출력: 현재 상태 + 이벤트 리스트]
+        # 🔍 [디버그 출력: 현재 상태 + 마우스 다운만]
         for ev in events:
             if ev.type == pygame.MOUSEBUTTONDOWN:
                 btn_name = {1: "L", 2: "M", 3: "R"}.get(ev.button, ev.button)
@@ -55,7 +55,11 @@ class GameLoop:
 
         return events
 
-    def update(self, dt, events):
+    def update(self, dt_ms, events):
+        """
+        메인 루프에서 ms 단위 dt를 받아 상태로 전달.
+        네트워크 패킷 큐를 드레인하면서 state.update(dt_ms, events, data)를 호출.
+        """
         q = self.net_worker._pm.queue
         max_process = 30
         process_count = 0
@@ -66,12 +70,15 @@ class GameLoop:
                 data = q.get_nowait()
             except queue.Empty:
                 data = None
-            next_state = self.state.update(events, data) # 큐가 비어있어도 1번은 업데이트 하도록
+
+            next_state = self.state.update(dt_ms, events, data)  # ✅ dt 전달
             if next_state is not self.state:
                 self.state = next_state
                 if hasattr(self.state, "init"):
                     self.state.init()
-                break # 상태가 변경되면 해당 프레임에서 처리 끝 (하나의 이벤트 스냅샷은 하나의 상태에 쓰이도록)
+                # 상태가 변경되면 해당 프레임에서 처리 끝 (하나의 이벤트 스냅샷은 하나의 상태에 쓰이도록)
+                break
+
             process_count += 1
             if data is None:
                 break
@@ -82,14 +89,12 @@ class GameLoop:
 
     def run(self):
         while True:
-            # --- 시간 계산 ---
             now = time.perf_counter()
-            dt = now - self.prev_time
-
-            # --- 렌더링 (타이머 기반 고정 간격) ---
+            dt = now - self.prev_time  # 초 단위
             if dt > self.frame_time:
+                dt_ms = dt * 1000.0      # ✅ ms 단위로 변환
                 events = self.handle_events()
-                self.update(dt, events)
+                self.update(dt_ms, events)
                 self.draw()
                 self.prev_time = now
 

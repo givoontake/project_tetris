@@ -17,8 +17,8 @@ class BaseState:
     def init(self): 
         pass
 
-    def update(self, events, data=None):
-        """dt 없이 이벤트/데이터만 받아 상태 갱신"""
+    def update(self, dt_ms, events, data=None):
+        """메인 루프에서 계산된 dt(ms)를 전달받아 갱신."""
         return self
 
     def draw(self):
@@ -27,17 +27,18 @@ class BaseState:
     def on_resize(self, w, h, screen):
         self.screen = screen
 
+
 class ConnectState(BaseState):
     """
     - is_connect == False: "Connection Failed" 1초 표시 후 종료
-    - is_connect == True : "Login Success!" 1초 표시 후 SelectPlayState로 전환
+    - is_connect == True : "Connected!" 1초 표시 후 LoginState로 전환
     """
     def __init__(self, screen, is_connect, dev_mode=False, net_worker=None):
         super().__init__(screen)
         self.is_connect = bool(is_connect)
         self.dev_mode = dev_mode
         self._start_ms = None  # pygame.time.get_ticks()
-        self.net_worker = net_worker  # ← 보관
+        self.net_worker = net_worker
         self.screen = screen
 
     def on_resize(self, w, h, screen):
@@ -46,7 +47,7 @@ class ConnectState(BaseState):
     def init(self):
         self._start_ms = pygame.time.get_ticks()
 
-    def update(self, events, data=None):
+    def update(self, dt_ms, events, data=None):
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit
@@ -74,16 +75,15 @@ class ConnectState(BaseState):
             msg = font.render('Connected!', True, (0, 200, 0))
         else:
             msg = font.render('Connection Failed', True, (255, 0, 0))
-
         rect = msg.get_rect(center=(sw // 2, sh // 2))
         self.screen.blit(msg, rect)
+
 
 class LoginState(BaseState):
     def __init__(self, screen, net_worker=None):
         super().__init__(screen)
         self.net_worker = net_worker
         self.title_font = pygame.font.Font("resource/dodamdodam.ttf", 36)
-        #self.label_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
 
         # 런타임 배치 요소
         self.id_box: Optional[InputBox] = None
@@ -98,9 +98,9 @@ class LoginState(BaseState):
         sw, sh = self.screen.get_size()
         # 중앙 배치
         input_box_w, input_box_h = 360, 42
-        gap_y = 64
         center_x = (sw - input_box_w) // 2
-        center_y = (sh - (input_box_h * 2 + gap_y + 46)) // 2  # 46은 버튼 높이
+        # 버튼 높이(46) + 간격 포함
+        center_y = (sh - (input_box_h * 2 + 64 + 46)) // 2
 
         id_rect = pygame.Rect(center_x, center_y, input_box_w, input_box_h)
         pw_rect = pygame.Rect(center_x, center_y + input_box_h + 20, input_box_w, input_box_h)
@@ -120,14 +120,24 @@ class LoginState(BaseState):
     def send_login(self):
         user_id = self.id_box.text
         user_pw = self.pw_box.text
-        data = {"size": 2+1+MAX_USER_ID+MAX_USER_PASSWORD,"type": C2S_LOGIN, "user_id": user_id, "user_password": user_pw}
-        self.net_worker.send_packet(data)
+        # 주의: 실제 송신은 bytes가 필요. 현재 프로젝트 구조에 맞춰 Dictionary → bytes 변환이 필요할 수 있음.
+        data = {
+            "size": 2 + 1 + MAX_USER_ID + MAX_USER_PASSWORD,
+            "type": C2S_LOGIN,
+            "user_id": user_id,
+            "user_password": user_pw
+        }
+        # NetworkWorker.send_packet는 bytes 인자를 기대. 실제 구현에 맞춰 직렬화 필요.
+        # 예시) self.net_worker.send_packet(pm.dic_to_bytes(data))
+        try:
+            self.net_worker.send_packet(data)  # 기존 구조 유지 (프로젝트 측 처리에 맞춤)
+        except Exception as e:
+            print("[LoginState] send_login error:", e)
 
-    def update(self, events, data=None):
-
-        if data != None:
+    def update(self, dt_ms, events, data=None):
+        if data is not None:
             d = data
-            # 나중에 다음 상태로 넘기는 코드 작성
+            # TODO: 서버 응답에 따른 상태 전환 로직
 
         for ev in events:
             if ev.type == pygame.QUIT:
@@ -136,14 +146,13 @@ class LoginState(BaseState):
             self.id_box.handle_event(ev)
             self.pw_box.handle_event(ev)
 
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN: #enter 누르기
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:  # enter
                 self.send_login()
 
-            if self.btn_login.clicked(ev): # 마우스 클릭
+            if self.btn_login.clicked(ev):  # 마우스 클릭
                 self.send_login()
 
-        
-        dt_ms = 16  # 간단한 커서 점멸용(정확한 dt 필요 없으므로 고정)
+        # ✅ 메인 루프에서 받은 dt_ms 사용
         self.id_box.update(dt_ms)
         self.pw_box.update(dt_ms)
 
@@ -153,36 +162,27 @@ class LoginState(BaseState):
         self.screen.fill((18, 18, 18))
         sw, _ = self.screen.get_size()
 
-        # 제목
         title = self.title_font.render("로그인", True, (255, 255, 255))
         self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
 
-        # 라벨
-        # id_label = self.label_font.render("아이디", True, (255, 255, 255))
-        # pw_label = self.label_font.render("비밀번호", True, (255, 255, 255))
-        # id_rect, pw_rect, _ = self._layout
-        # self.screen.blit(id_label, (id_rect.x, id_rect.y - 24))
-        # self.screen.blit(pw_label, (pw_rect.x, pw_rect.y - 24))
-
-        # 입력창 + 버튼
         self.id_box.draw(self.screen)
         self.pw_box.draw(self.screen)
-        #self.btn_login.draw(self.screen)
+        # self.btn_login.draw(self.screen)  # 필요 시 표시
 
 
 class SelectModeState(BaseState):
     def init(self):
         self.buttons = [
-            Button('Game',      (0.4, 0.3,  0.2, 0.1), self.screen),
-            Button('Developer', (0.4, 0.45, 0.2, 0.1), self.screen),
-            Button('Quit',      (0.4, 0.6,  0.2, 0.1), self.screen),
+            Button(self.screen, (0.4, 0.3,  0.2, 0.1), "Game"),
+            Button(self.screen, (0.4, 0.45, 0.2, 0.1), "Developer"),
+            Button(self.screen, (0.4, 0.6,  0.2, 0.1), "Quit"),
         ]
 
     def on_resize(self, w, h, screen):
         self.screen = screen
         self.init()
 
-    def update(self, events, data=None):
+    def update(self, dt_ms, events, data=None):
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit
@@ -207,22 +207,21 @@ class SelectPlayState(BaseState):
 
     def init(self):
         self.buttons = [
-            Button('Single',   (0.4, 0.3,  0.2, 0.1), self.screen),
-            Button('2 Player', (0.4, 0.45, 0.2, 0.1), self.screen),
-            Button('5 Player', (0.4, 0.6,  0.2, 0.1), self.screen),
-            Button('Back',     (0.9, 0.02, 0.08, 0.05), self.screen),
+            Button(self.screen, (0.4, 0.3,  0.2, 0.1), "Single"),
+            Button(self.screen, (0.4, 0.45, 0.2, 0.1), "2 Player"),
+            Button(self.screen, (0.4, 0.6,  0.2, 0.1), "5 Player"),
+            Button(self.screen, (0.9, 0.02, 0.08, 0.05), "Back"),
         ]
 
     def on_resize(self, w, h, screen):
         self.screen = screen
         self.init()
 
-    def update(self, events, data=None):
+    def update(self, dt_ms, events, data=None):
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit
             if self.buttons[0].clicked(ev):
-                # Connect 성공/실패는 GameLoop에서 판단해 is_connect로 넘겨줄 수도 있음
                 return ConnectState(self.screen, is_connect=True,  dev_mode=self.dev_mode)
             if self.buttons[1].clicked(ev):
                 return ConnectState(self.screen, is_connect=True,  dev_mode=self.dev_mode)
@@ -237,18 +236,17 @@ class SelectPlayState(BaseState):
         for b in self.buttons:
             b.draw(self.screen)
 
+
 class SinglePlayState(BaseState):
     def __init__(self, screen, dev_mode=False):
         super().__init__(screen)
         self.dev_mode = dev_mode
         self.tetris: TetrisGame | None = None
-        self._prev_time = None  # perf_counter 값 저장(상태 내부에서만 dt 계산용)
 
     def init(self):
         ox, oy, scale = self._compute_layout()
         self.tetris = TetrisGame(self.screen, ox, oy, scale)
         self.tetris.init()
-        self._prev_time = time.perf_counter()
 
     def on_resize(self, w, h, screen):
         self.screen = screen
@@ -256,15 +254,8 @@ class SinglePlayState(BaseState):
         if self.tetris:
             self.tetris.set_layout(ox, oy, scale)
 
-    def update(self, events, data=None):
-        # 상태 인터페이스는 dt 없이 유지하면서, 내부에서만 dt(ms) 계산
-        if self._prev_time is None:
-            self._prev_time = time.perf_counter()
-        now = time.perf_counter()
-        dt_ms = (now - self._prev_time) * 1000.0
-        self._prev_time = now
-
-        # TetrisGame은 기존 시그니처 유지 (dt 필요)
+    def update(self, dt_ms, events, data=None):
+        # ✅ 메인 루프에서 받은 dt_ms를 그대로 전달
         self.tetris.update(dt_ms, events)
 
         # 필요 시 data 처리
@@ -306,7 +297,7 @@ class MultiPlayState(BaseState):
         self.screen = screen
         self.init()
 
-    def update(self, events, data=None):
+    def update(self, dt_ms, events, data=None):
         # 멀티 보드 렌더만 담당. 로직이 필요하면 여기서 처리
         return self
 
