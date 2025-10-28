@@ -10,28 +10,31 @@ from define import *
 class AssetManager:
     def __init__(self):
         self.block_asset = {}
+        self.button_asset = {}
         pass
 
     def init(self):
         self.block_asset = {
     # --- Default Blocks ---
-        DEFAULT_RED:     self.load_image("blocks/default/default_red.png", CELL_SIZE, CELL_SIZE),
-        DEFAULT_ORANGE:  self.load_image("blocks/default/default_orange.png", CELL_SIZE, CELL_SIZE),
-        DEFAULT_YELLOW:  self.load_image("blocks/default/default_yellow.png", CELL_SIZE, CELL_SIZE),
-        DEFAULT_GREEN:   self.load_image("blocks/default/default_green.png", CELL_SIZE, CELL_SIZE),
-        DEFAULT_BLUE:    self.load_image("blocks/default/default_blue.png", CELL_SIZE, CELL_SIZE),
-        DEFAULT_INDIGO:  self.load_image("blocks/default/default_indigo.png", CELL_SIZE, CELL_SIZE),
-        DEFAULT_PURPLE:  self.load_image("blocks/default/default_purple.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_RED:     self.load_image("resource/blocks/default/default_red.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_ORANGE:  self.load_image("resource/blocks/default/default_orange.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_YELLOW:  self.load_image("resource/blocks/default/default_yellow.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_GREEN:   self.load_image("resource/blocks/default/default_green.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_BLUE:    self.load_image("resource/blocks/default/default_blue.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_INDIGO:  self.load_image("resource/blocks/default/default_indigo.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_PURPLE:  self.load_image("resource/blocks/default/default_purple.png", CELL_SIZE, CELL_SIZE),
 
         # --- Candy Blocks ---
-        CANDY_RED:       self.load_image("blocks/candy/candy_red.png", CELL_SIZE, CELL_SIZE),
-        CANDY_ORANGE:    self.load_image("blocks/candy/candy_orange.png", CELL_SIZE, CELL_SIZE),
-        CANDY_YELLOW:    self.load_image("blocks/candy/candy_yellow.png", CELL_SIZE, CELL_SIZE),
-        CANDY_GREEN:     self.load_image("blocks/candy/candy_green.png", CELL_SIZE, CELL_SIZE),
-        CANDY_BLUE:      self.load_image("blocks/candy/candy_blue.png", CELL_SIZE, CELL_SIZE),
-        CANDY_INDIGO:    self.load_image("blocks/candy/candy_indigo.png", CELL_SIZE, CELL_SIZE),
-        CANDY_PURPLE:    self.load_image("blocks/candy/candy_purple.png", CELL_SIZE, CELL_SIZE),
+        CANDY_RED:       self.load_image("resource/blocks/candy/candy_red.png", CELL_SIZE, CELL_SIZE),
+        CANDY_ORANGE:    self.load_image("resource/blocks/candy/candy_orange.png", CELL_SIZE, CELL_SIZE),
+        CANDY_YELLOW:    self.load_image("resource/blocks/candy/candy_yellow.png", CELL_SIZE, CELL_SIZE),
+        CANDY_GREEN:     self.load_image("resource/blocks/candy/candy_green.png", CELL_SIZE, CELL_SIZE),
+        CANDY_BLUE:      self.load_image("resource/blocks/candy/candy_blue.png", CELL_SIZE, CELL_SIZE),
+        CANDY_INDIGO:    self.load_image("resource/blocks/candy/candy_indigo.png", CELL_SIZE, CELL_SIZE),
+        CANDY_PURPLE:    self.load_image("resource/blocks/candy/candy_purple.png", CELL_SIZE, CELL_SIZE),
         }
+
+        self.button_asset = {BUTTON_LOGIN: self.load_image("resource/button/button_login.png", 300, 100)}
     
     def load_image(self, filename: str, width: int, height: int) -> pygame.Surface:
         """
@@ -68,3 +71,5 @@ CANDY_GREEN = 11
 CANDY_BLUE = 12
 CANDY_INDIGO = 13
 CANDY_PURPLE = 14
+
+BUTTON_LOGIN = 1001
