@@ -1,6 +1,7 @@
 # menu.py
 import pygame
 from define import *
+from define_format import MAX_INPUT_SIZE
 
 ORANGE = (255, 165, 0)
 GRAY   = (100, 100, 100)
@@ -38,9 +39,6 @@ class Button:
                 event.button == 1 and
                 self.rect.collidepoint(event.pos))
 
-import pygame
-from typing import Optional
-
 class InputBox:
     def __init__(self, x: int, y: int, w: int, h: int, placeholder: str = "", is_password: bool = False):
         self.rect = pygame.Rect(x, y, w, h)
@@ -62,11 +60,13 @@ class InputBox:
         self.cursor_blink_ms = 500
 
         # 백스페이스 키 반복(typematic) 상태
-        self.backspace_active = False
-        self.backspace_timer_ms = 0
-        self.backspace_delay_ms = 500   # 첫 반복까지 지연 0.5초
-        self.backspace_repeat_ms = 50  # 이후 반복 간격 0.05초
-        self.backspace_delay_done = False
+        self.input_active = False
+        self.input_timer_ms = 0
+        self.input_delay_ms = 500   # 첫 반복까지 대기(0.5s)
+        self.input_repeat_ms = 50  # 이후 반복 간격(0.1s)
+        self.input_delay_done = False
+        self.repeat_key = None      # 현재 눌려 반복 중인 키 코드
+        self.repeat_char = ""       # 문자키의 unicode(반복 시 재사용)
 
     def handle_event(self, ev: pygame.event.Event):
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -78,25 +78,43 @@ class InputBox:
                 # 누르는 순간 즉시 1글자 삭제
                 if self.text:
                     self.text = self.text[:-1]
-                # 반복 시작 상태 초기화
-                self.backspace_active = True
-                self.backspace_timer_ms = 0
-                self.backspace_delay_done = False
+                # 반복 시작
+                self.input_active = True
+                self.input_timer_ms = 0
+                self.input_delay_done = False
+                self.repeat_key = pygame.K_BACKSPACE
+                self.repeat_char = ""
             elif ev.key == pygame.K_RETURN:
                 # 엔터는 상위에서 처리
                 pass
             else:
                 if ev.unicode and ev.unicode.isprintable():
-                    self.text += ev.unicode
+                    if len(self.text) < MAX_INPUT_SIZE:
+                        self.text += ev.unicode
+                    # 반복 시작(문자키)
+                    self.input_active = True
+                    self.input_timer_ms = 0
+                    self.input_delay_done = False
+                    self.repeat_key = ev.key
+                    self.repeat_char = ev.unicode
+                else:
+                    # 인쇄 불가 키는 반복 비활성
+                    self.input_active = False
+                    self.repeat_key = None
+                    self.repeat_char = ""
 
-        elif ev.type == pygame.KEYUP and ev.key == pygame.K_BACKSPACE:
-            # 손을 떼면 반복 종료
-            self.backspace_active = False
-            self.backspace_timer_ms = 0
-            self.backspace_delay_done = False
+        elif ev.type == pygame.KEYUP:
+            # 손을 떼면(현재 반복 중인 키를 뗀 경우) 반복 종료
+            if self.repeat_key is not None and ev.key == self.repeat_key:
+                self.input_active = False
+                self.input_timer_ms = 0
+                self.input_delay_done = False
+                self.repeat_key = None
+                self.repeat_char = ""
+
 
     def update(self, dt_ms: int):
-        # 커서 점멸
+    # 커서 점멸
         if self.active:
             self.cursor_timer_ms += dt_ms
             if self.cursor_timer_ms >= self.cursor_blink_ms:
@@ -106,24 +124,36 @@ class InputBox:
             self.cursor_visible = False
             self.cursor_timer_ms = 0
 
-        # 백스페이스 반복 처리
-        if self.active and self.backspace_active:
-            self.backspace_timer_ms += dt_ms
+        # 키 반복
+        if self.active and self.input_active and self.repeat_key is not None:
+            self.input_timer_ms += dt_ms
 
-            if not self.backspace_delay_done:
-                # 최초 500ms 지연
-                if self.backspace_timer_ms >= self.backspace_delay_ms:
-                    self.backspace_timer_ms -= self.backspace_delay_ms
-                    self.backspace_delay_done = True
+            if not self.input_delay_done:
+                # 첫 500ms 지연
+                if self.input_timer_ms >= self.input_delay_ms:
+                    self.input_timer_ms -= self.input_delay_ms
+                    self.input_delay_done = True
             else:
                 # 지연 이후 100ms 간격 반복
-                while self.backspace_timer_ms >= self.backspace_repeat_ms:
-                    self.backspace_timer_ms -= self.backspace_repeat_ms
-                    if self.text:
-                        self.text = self.text[:-1]
+                while self.input_timer_ms >= self.input_repeat_ms:
+                    self.input_timer_ms -= self.input_repeat_ms
+
+                    if self.repeat_key == pygame.K_BACKSPACE:
+                        if self.text:
+                            self.text = self.text[:-1]
+                        else:
+                            # 더 지울 게 없으면 타이머만 정리하고 반복 유지
+                            self.input_timer_ms = 0
+                            break
                     else:
-                        self.backspace_timer_ms = 0
-                        break
+                        # 문자키 반복(인쇄 가능 + 길이 제한)
+                        if self.repeat_char and self.repeat_char.isprintable() and len(self.text) < MAX_INPUT_SIZE:
+                            self.text += self.repeat_char
+                        else:
+                            # 반복 불가(공간 부족/인쇄 불가) 시 타이머만 정리
+                            self.input_timer_ms = 0
+                            break
+
 
     def draw(self, surf: pygame.Surface):
         # 배경
