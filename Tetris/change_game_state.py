@@ -8,7 +8,9 @@ from tetris_screen import TetrisScreen
 from session import Session
 from define_format import *
 from packet_type import *
+from asset_manager import *
 from typing import Optional
+from network import NetworkWorker
 
 class BaseState:
     def __init__(self, screen):
@@ -33,7 +35,7 @@ class ConnectState(BaseState):
     - is_connect == False: "Connection Failed" 1초 표시 후 종료
     - is_connect == True : "Connected!" 1초 표시 후 LoginState로 전환
     """
-    def __init__(self, screen, is_connect, dev_mode=False, net_worker=None):
+    def __init__(self, screen, is_connect, dev_mode=False, net_worker: Optional[NetworkWorker] = None):
         super().__init__(screen)
         self.is_connect = bool(is_connect)
         self.dev_mode = dev_mode
@@ -79,66 +81,57 @@ class ConnectState(BaseState):
         self.screen.blit(msg, rect)
 
 
-class LoginState(BaseState):
-    def __init__(self, screen, net_worker=None):
-        super().__init__(screen)
+class LoginState:
+    def __init__(self, screen, net_worker: Optional[NetworkWorker] = None):
+        self.screen = screen
         self.net_worker = net_worker
         self.title_font = pygame.font.Font("resource/dodamdodam.ttf", 36)
 
-        # 런타임 배치 요소
         self.id_box: Optional[InputBox] = None
         self.pw_box: Optional[InputBox] = None
         self.btn_login: Optional[Button] = None
-        self._layout = None  # (id_rect, pw_rect, btn_rect)
 
     def init(self):
         self.set_layout()
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
-        # 중앙 배치
         input_box_w, input_box_h = 360, 42
         center_x = (sw - input_box_w) // 2
-        # 버튼 높이(46) + 간격 포함
         center_y = (sh - (input_box_h * 2 + 64 + 46)) // 2
 
         id_rect = pygame.Rect(center_x, center_y, input_box_w, input_box_h)
         pw_rect = pygame.Rect(center_x, center_y + input_box_h + 20, input_box_w, input_box_h)
-        btn_w, btn_h = 160, 46
-        btn_rect = pygame.Rect((sw - btn_w) // 2, pw_rect.bottom + 28, btn_w, btn_h)
+        btn_rect = pygame.Rect((sw - 300) // 2, pw_rect.bottom + 28, 300, 100)
 
         self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디")
         self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", is_password=True)
-        self.btn_login = Button(self.screen, (btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h), text="로그인")
 
-        self._layout = (id_rect, pw_rect, btn_rect)
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        self.set_layout()
+        # 버튼은 폰트 전달 없이 생성됨
+        self.btn_login = Button(
+            btn_type=BUTTON_LOGIN,
+            x=btn_rect.x,
+            y=btn_rect.y,
+            w=btn_rect.w,
+            h=btn_rect.h,
+            text="로그인"
+        )
 
     def send_login(self):
         user_id = self.id_box.text
         user_pw = self.pw_box.text
-        # 주의: 실제 송신은 bytes가 필요. 현재 프로젝트 구조에 맞춰 Dictionary → bytes 변환이 필요할 수 있음.
         data = {
             "size": 2 + 1 + MAX_USER_ID + MAX_USER_PASSWORD,
             "type": C2S_LOGIN,
             "user_id": user_id,
             "user_password": user_pw
         }
-        # NetworkWorker.send_packet는 bytes 인자를 기대. 실제 구현에 맞춰 직렬화 필요.
-        # 예시) self.net_worker.send_packet(pm.dic_to_bytes(data))
         try:
-            self.net_worker.send_packet(data)  # 기존 구조 유지 (프로젝트 측 처리에 맞춤)
+            self.net_worker.send_packet(self.net_worker._pm.dic_to_bytes(data))
         except Exception as e:
             print("[LoginState] send_login error:", e)
 
     def update(self, dt_ms, events, data=None):
-        if data is not None:
-            d = data
-            # TODO: 서버 응답에 따른 상태 전환 로직
-
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit
@@ -146,29 +139,24 @@ class LoginState(BaseState):
             self.id_box.handle_event(ev)
             self.pw_box.handle_event(ev)
 
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:  # enter
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
                 self.send_login()
 
-            if self.btn_login.clicked(ev):  # 마우스 클릭
+            if self.btn_login.handle_event(ev):
                 self.send_login()
 
-        # ✅ 메인 루프에서 받은 dt_ms 사용
         self.id_box.update(dt_ms)
         self.pw_box.update(dt_ms)
-
         return self
 
     def draw(self):
         self.screen.fill((18, 18, 18))
         sw, _ = self.screen.get_size()
-
         title = self.title_font.render("로그인", True, (255, 255, 255))
         self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
-
         self.id_box.draw(self.screen)
         self.pw_box.draw(self.screen)
-        # self.btn_login.draw(self.screen)  # 필요 시 표시
-
+        self.btn_login.draw(self.screen)
 
 class SelectModeState(BaseState):
     def init(self):

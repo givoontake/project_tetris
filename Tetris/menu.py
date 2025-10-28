@@ -2,42 +2,92 @@
 import pygame
 from define import *
 from define_format import MAX_INPUT_SIZE
+from asset_manager import *
 
 ORANGE = (255, 165, 0)
 GRAY   = (100, 100, 100)
 WHITE  = (255, 255, 255)
 
 class Button:
-    def __init__(self, surf, rel_rect, text):
-        sw, sh = surf.get_size()
-        x, y, w, h = rel_rect
-        self.rect = pygame.Rect(int(x*sw), int(y*sh), int(w*sw), int(h*sh))
-        fs = max(14, int(self.rect.height * 0.55))
-        self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
+    """
+    이미지 기반 절대좌표 버튼.
+    - btn_type: 에셋 키(ex: BUTTON_LOGIN)
+    - x, y: 화면 픽셀 좌상단 좌표
+    - w, h: 그려질 크기(생략 시 원본 이미지 크기 사용)
+    - text: 버튼 위에 표시될 텍스트
+    """
+    # c++의 static과 같은 변수 -> 로드 작업은 매번 하기 부담스러움
+    static_am: AssetManager | None = None   # 공용 에셋 매니저
+    static_font: pygame.font.Font | None = None    # 공용 폰트
+
+    def __init__(self, btn_type: int, x: int, y: int,
+                 w: int | None, h: int | None, text: str,
+                 text_color=(255, 255, 255)):
+        # --- 공용 AssetManager 초기화 ---
+        if Button.static_am is None:
+            Button.static_am = AssetManager()
+            Button.static_am.init()
+
+        # --- 공용 폰트 초기화 ---
+        if Button.static_font is None:
+            Button.static_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
+
+        self.btn_type = btn_type
         self.text = text
-        self._render_text()
+        self.text_color = text_color
 
-    def _render_text(self):
-        self.text_surf = self.font.render(self.text, True, WHITE)
-        self.text_rect = self.text_surf.get_rect(center=self.rect.center)
+        # 원본 이미지 로드
+        try:
+            self.image = Button.static_am.button_asset[self.btn_type]
+        except KeyError:
+            raise KeyError(f"[Button] button_asset에 타입 {self.btn_type} 이미지가 없습니다.")
 
-    def on_resize(self, rel_rect, surf):
-        sw, sh = surf.get_size()
-        x, y, w, h = rel_rect
-        self.rect = pygame.Rect(int(x*sw), int(y*sh), int(w*sw), int(h*sh))
-        fs = max(14, int(self.rect.height * 0.55))
-        self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
-        self._render_text()
+        img_w, img_h = self.image.get_width(), self.image.get_height()
+        draw_w = img_w if w is None else int(w)
+        draw_h = img_h if h is None else int(h)
 
-    def draw(self, surf):
-        bg = ORANGE if self.rect.collidepoint(pygame.mouse.get_pos()) else GRAY
-        pygame.draw.rect(surf, bg, self.rect, border_radius=8)
-        surf.blit(self.text_surf, self.text_rect)
+        self.rect = pygame.Rect(int(x), int(y), draw_w, draw_h)
+        self.hovered = False
+        self.pressed = False
 
-    def clicked(self, event):
-        return (event.type == pygame.MOUSEBUTTONDOWN and
-                event.button == 1 and
-                self.rect.collidepoint(event.pos))
+    def handle_event(self, ev: pygame.event.Event) -> bool:
+        if ev.type == pygame.MOUSEMOTION:
+            self.hovered = self.rect.collidepoint(ev.pos)
+        if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+            if self.rect.collidepoint(ev.pos):
+                self.pressed = True
+        elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
+            was_pressed = self.pressed
+            self.pressed = False
+            if was_pressed and self.rect.collidepoint(ev.pos):
+                return True
+        return False
+
+    def draw(self, surface: pygame.Surface):
+        if self.hovered:
+            hover_img = Button.static_am.button_asset.get(self.btn_type + 1)
+            if hover_img == None:
+                pass
+            else:
+                if self.pressed:
+                    self.image = Button.static_am.button_asset[self.btn_type + 2]
+                else:
+                    self.image = Button.static_am.button_asset[self.btn_type + 1]
+        else:
+            self.image = Button.static_am.button_asset[self.btn_type]
+
+        img_w, img_h = self.image.get_size()
+        cx, cy = self.rect.center
+        draw_x = cx - img_w // 2
+        draw_y = cy - img_h // 2
+        surface.blit(self.image, (draw_x, draw_y))
+
+        # 텍스트 중앙 정렬
+        if self.text:
+            txt_surf = Button.static_font.render(self.text, True, self.text_color)
+            txt_rect = txt_surf.get_rect(center=self.rect.center)
+            surface.blit(txt_surf, txt_rect)
+
 
 class InputBox:
     def __init__(self, x: int, y: int, w: int, h: int, placeholder: str = "", is_password: bool = False):
