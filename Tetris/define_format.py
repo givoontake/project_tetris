@@ -93,7 +93,7 @@ PACK_FIELD_FMT = {
 
     # 고정 길이 문자열(바이트 배열)
     "user_id":       f"{MAX_USER_NAME}s",
-    "user_password"  f"{MAX_USER_PASSWORD}s"
+    "user_password":  f"{MAX_USER_PASSWORD}s",
     "room_name":     f"{MAX_ROOM_NAME}s",
     "room_password": f"{MAX_ROOM_PASSWORD}s",
     "name":          f"{MAX_USER_NAME}s",
