@@ -82,7 +82,7 @@ void IOCPServer::ProcessGQCS()
 		case ACCEPT: {
 			int new_index = GetEmptyUserIndex();
 			if (new_index != -1) {
-				users[new_index]->InitSession(new_index, GetUserId(), client_socket);
+				users[new_index]->InitSession(new_index, GetNewUserId(), client_socket);
 				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
 				users[new_index]->RecvPacket(iocp_handle);
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
@@ -94,11 +94,11 @@ void IOCPServer::ProcessGQCS()
 				//send_p.id = users[new_index]->GetId();
 				//SendToSelf((char*)&send_p, new_index);
 
-				S2C_LOGIN_PACKET send_p;
-				send_p.size = sizeof(S2C_LOGIN_PACKET);
-				send_p.type = S2C_LOGIN;
-				send_p.id = users[new_index]->GetId();
-				SendToSelf((char*)&send_p, new_index);
+				//S2C_LOGIN_PACKET send_p;
+				//send_p.size = sizeof(S2C_LOGIN_PACKET);
+				//send_p.type = S2C_LOGIN;
+				//send_p.id = users[new_index]->GetId();
+				//SendToSelf((char*)&send_p, new_index);
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 
@@ -149,7 +149,7 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 		char p_buffer[BUF_SIZE];
 		// 패킷 분리: packet_buffer에 복사 후 처리
 		memcpy(p_buffer, users[user_index]->GetExOver().packet_buf, packet_size);
-		handler.HandlePacket(p_buffer);
+		handler.HandlePacket(p_buffer, user_index);
 
 		 // 처리한 패킷은 남은 데이터에서 제거
 		users[user_index]->SetRemainDataSize(-packet_size);
@@ -185,7 +185,7 @@ void IOCPServer::CreateRoom(char* packet)
 	rooms[room_index]->InitRoom(packet, users[p->id]); // 초기화는 그냥 방 내부에서 처리하기.
 }
 
-int IOCPServer::GetUserId()
+int IOCPServer::GetNewUserId()
 {
 	return id_generator.fetch_add(1) + 1; // fetch_add는 값을 실제로 원자적으로 증가시키지만, 반환하는 것은 증가 이전의 값
 }

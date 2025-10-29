@@ -30,7 +30,7 @@ C2S_KICK          = 21
 S2C_KICK          = 22
 
 # ---- Login ----
-S2C_LOGIN_PACKET = ["size", "type", "id"]
+S2C_LOGIN_PACKET = ["size", "type", "id", "user_name"]
 C2S_LOGIN_PACKET = ["size", "type", "user_id", "user_password"]
 
 # ---- Message ----

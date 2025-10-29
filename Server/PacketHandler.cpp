@@ -12,7 +12,11 @@ PacketHandler::PacketHandler(IOCPServer* server) : server(server)
 // IServer 가상함수로 만들고 업캐스팅을 하는 작업은..불필요하게 복잡해지는 느낌이 있다.
 // IOCP의 맴버 함수로 만들면 편하긴 한데.. switch로 만들꺼라 너무 길어길 것 같아 걱정이다.. 어떻게 해야할까?
 
-void PacketHandler::HandlePacket(char* packet)
+char temp_id[MAX_USER_ID] = "master";
+char temp_password[MAX_USER_PASSWORD] = "1234";
+char temp_name[MAX_USER_NAME] = "master";
+
+void PacketHandler::HandlePacket(char* packet, int user_index)
 {
 	//static auto& users = server->GetSessionList();
 	//static auto& rooms = server->GetRoomList();
@@ -22,12 +26,19 @@ void PacketHandler::HandlePacket(char* packet)
 
 	case C2S_LOGIN: {
 		C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
-		std::cout << "size: " << recv_p->size << ", type: " << (int)recv_p->type << ", id: " << recv_p->user_id << ", pw: " << recv_p->user_password << std::endl;
-		/*S2C_LOGIN_PACKET send_p;
+
+		// 우선은 연결 요청이 들어오는 즉시 세션을 사용하도록 함. -> 나중에 반드시 바꿔야함
+		S2C_LOGIN_PACKET send_p;
 		send_p.size = sizeof(S2C_LOGIN_PACKET);
-		send_p.type = S2C_LOGIN;*/
-		//send_p.id = // 이 패킷을 받고 나서 아이디 할당하도록 변경 후 나중에 로직 완성
-		//server->SendToSelf((char*)&send_p, send_p.id); // 아이디 대신 인덱스 들어가야 하는데, 구조 문제때문에 일단 보류. 나중에 반드시 변경필요
+		send_p.type = S2C_LOGIN;
+		memcpy(send_p.user_name, temp_name, MAX_USER_NAME);
+		if (!memcmp(temp_id, recv_p->user_id, MAX_USER_ID) && !memcmp(temp_password, recv_p->user_password, MAX_USER_PASSWORD)) send_p.id = server->GetSession(user_index)->GetId();	
+		else send_p.id = -1;
+
+		std::cout << "size: " << recv_p->size << ", type: " << (int)recv_p->type << ", id: " << recv_p->user_id << ", pw: " << recv_p->user_password << std::endl;
+
+		server->SendToSelf((char*)&send_p, user_index);
+
 		break;
 	}
 		

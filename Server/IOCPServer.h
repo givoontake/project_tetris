@@ -42,7 +42,7 @@ public:
 	//std::array<std::unique_ptr<TetrisRoom>, MAX_ROOM>& GetRoomList() { return rooms; };
 	int GetEmptyUserIndex();
 	int GetEmptyRoomIndex();
-	int GetUserId();
+	int GetNewUserId();
 	bool GetRunning() const { return is_running; }
 	HANDLE GetHandle() const { return iocp_handle; }
 	Session* GetSession(int user_index) const { return users[user_index]; }

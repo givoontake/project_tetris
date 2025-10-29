@@ -8,5 +8,5 @@ protected:
 	IOCPServer* server;
 public:
 	PacketHandler(IOCPServer* server);
-	virtual void HandlePacket(char* pakcet);
+	virtual void HandlePacket(char* pakcet, int user_index);
 };

@@ -14,9 +14,9 @@ C++ define.h의 #pragma pack(1) 구조체와 1:1로 대응하는 struct 포맷 �
 # ---- 길이 상수 ----
 MAX_USER_ID = 48
 MAX_USER_PASSWORD = 48
+MAX_USER_NAME = 48
 MAX_ROOM_NAME = 48
 MAX_ROOM_PASSWORD = 48
-MAX_USER_NAME = 48
 MAX_INPUT_SIZE = 16
 
 # ---- Test Login ----
@@ -94,6 +94,7 @@ PACK_FIELD_FMT = {
     # 고정 길이 문자열(바이트 배열)
     "user_id":       f"{MAX_USER_NAME}s",
     "user_password":  f"{MAX_USER_PASSWORD}s",
+    "user_name":      f"{MAX_USER_NAME}s",
     "room_name":     f"{MAX_ROOM_NAME}s",
     "room_password": f"{MAX_ROOM_PASSWORD}s",
     "name":          f"{MAX_USER_NAME}s",
@@ -123,6 +124,7 @@ FIELD_SIZE = {
     # 고정 길이 문자열(바이트 배열)
     "user_id": MAX_USER_NAME,
     "user_password": MAX_USER_PASSWORD,
+    "user_name": MAX_USER_NAME,
     "room_name": MAX_ROOM_NAME,
     "room_password": MAX_ROOM_PASSWORD,
     "name": MAX_USER_NAME,

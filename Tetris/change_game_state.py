@@ -131,7 +131,16 @@ class LoginState:
         except Exception as e:
             print("[LoginState] send_login error:", e)
 
-    def update(self, dt_ms, events, data=None):
+    def update(self, dt_ms, events, data: Optional[dict] = None):
+        if data:
+            print(", ".join(f"{k}: {v}" for k, v in data.items()))
+            if data.get("id") == -1:
+                pass
+                # 아이디 혹은 비밀번호를 다시 입력하라는 창 추가 필요
+            
+            else:
+                # 내 세션의 아이디를 설정하는 코드 필요
+                return SelectModeState(self.screen)
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit

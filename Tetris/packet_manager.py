@@ -56,14 +56,14 @@ class PacketManager:
         
         offset = 0
         data = {}
-        for field in range(len(pkt_struct)): #구조체 내 필드 명
+        for field in pkt_struct: #구조체 내 필드 명
             fmt = PACK_FIELD_FMT[field] # 필드 명에 따른 포맷
-            size = FIELD_SIZE[field] # 필드 명에 따른 필드 크기
+            field_size = FIELD_SIZE[field] # 필드 명에 따른 필드 크기
             value = struct.unpack_from("<" + fmt, pkt, offset)[0] 
             data[field] = value
-            offset += size
+            offset += field_size
 
-        return data
+        return dict(data)
     # ---- 병합 단계 ----
     def merge_packet(self, pkt: bytes) -> None:
         """TCP로 받은 조각(chunk)을 내부 버퍼에 병합."""
@@ -94,12 +94,14 @@ class PacketManager:
             pkt_bytes = bytes(buf[offset:offset + size])
 
             # 스레드 세이프 큐에 적재 (꽉 차면 최신성 보존을 위해 가장 오래된 것을 드롭)
+            data = self.bytes_to_dict(pkt_bytes)
+            
             while True:
                 try:
-                    self.queue.put(pkt_bytes, block=True, timeout=0.1)
-                    break  # 성공하면 빠져나감
-                except queue.Full:
-                    continue  # 큐가 꽉 차 있으면 계속 재시도
+                    self.queue.put_nowait(data)
+                    break
+                except self.queue.full():
+                    continue
 
             offset += size
 
@@ -111,11 +113,5 @@ class PacketManager:
     def handle_packet(self, pkt_bytes: bytes) -> None:
         pkt_type = pkt_bytes[2]  # type 바이트(3번째)
 
-        data = self.bytes_to_dict(pkt_bytes)
         
-        while True:
-            try:
-                self.queue.put_nowait(data)
-                break
-            except self.queue.full():
-                continue
+    

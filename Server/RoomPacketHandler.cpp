@@ -7,7 +7,7 @@ RoomPacketHandler::RoomPacketHandler(TetrisRoom* room, IOCPServer* server) : roo
 
 }
 
-void RoomPacketHandler::HandlePacket(char* packet)
+void RoomPacketHandler::HandlePacket(char* packet, int user_index)
 {
 	switch (packet[2]) {
 	case C2S_ADD_USER: {
