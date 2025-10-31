@@ -35,9 +35,9 @@ class AssetManager:
         }
 
         self.button_asset = {
-        BUTTON_LOGIN: self.load_image("resource/button/button_login.png", 300, 100),
+        BUTTON_LOGIN_IDLE: self.load_image("resource/button/button_login_idle.png", 300, 100),
         BUTTON_LOGIN_HOVER: self.load_image("resource/button/button_login_hover.png", 300, 100),
-        BUTTON_LOGIN_PRESS: self.load_image("resource/button/button_login_hover.png", 300*0.9, 100*0.9)
+        BUTTON_LOGIN_PRESS: self.load_image("resource/button/button_login_press.png", 300*0.9, 100*0.9)
         }
     
     def load_image(self, filename: str, width: int, height: int) -> pygame.Surface:
@@ -76,6 +76,6 @@ CANDY_BLUE = 12
 CANDY_INDIGO = 13
 CANDY_PURPLE = 14
 
-BUTTON_LOGIN = 1001
+BUTTON_LOGIN_IDLE = 1001
 BUTTON_LOGIN_HOVER = 1002
 BUTTON_LOGIN_PRESS = 1003

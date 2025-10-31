@@ -7,86 +7,132 @@ from asset_manager import *
 ORANGE = (255, 165, 0)
 GRAY   = (100, 100, 100)
 WHITE  = (255, 255, 255)
+BLACK = (0, 0, 0)
 
 class Button:
     """
-    이미지 기반 절대좌표 버튼.
-    - btn_type: 에셋 키(ex: BUTTON_LOGIN)
-    - x, y: 화면 픽셀 좌상단 좌표
-    - w, h: 그려질 크기(생략 시 원본 이미지 크기 사용)
-    - text: 버튼 위에 표시될 텍스트
+    통합 버튼 클래스.
+
+    - idle_btn_type / hover_btn_type / press_btn_type 은 AssetManager에 등록된 이미지 키
+      -> Button은 이미지를 새로 로드하거나 스케일하지 않는다.
+      -> 그냥 AssetManager에서 꺼낸 Surface를 그대로 쓴다.
+    - 세 타입 키가 모두 None이면 fallback(단색 사각형)으로 렌더한다.
+    - handle_event(ev)에서 클릭이 성립하면 True를 반환한다.
+
+    사용 전:
+        Button.shared_am = AssetManager(...)        # 외부에서 준비된 에셋 매니저 (이미지 다 들어있음)
+        Button.shared_font = pygame.font.Font(... ) # 외부에서 넣어주거나, 없으면 __init__에서 기본 생성
     """
-    # c++의 static과 같은 변수 -> 로드 작업은 매번 하기 부담스러움
-    static_am: AssetManager | None = None   # 공용 에셋 매니저
-    static_font: pygame.font.Font | None = None    # 공용 폰트
 
-    def __init__(self, btn_type: int, x: int, y: int,
-                 w: int | None, h: int | None, text: str,
-                 text_color=(255, 255, 255)):
-        # --- 공용 AssetManager 초기화 ---
-        if Button.static_am is None:
-            Button.static_am = AssetManager()
-            Button.static_am.init()
+    shared_am: AssetManager | None = None
+    shared_font: pygame.font.Font | None = None
 
-        # --- 공용 폰트 초기화 ---
-        if Button.static_font is None:
-            Button.static_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
+    def __init__(
+        self,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        text: str,
+        idle_btn_type=None,
+        hover_btn_type=None,
+        press_btn_type=None,
+    ):
+        # 버튼 위치/크기 정보
+        self.rect = pygame.Rect(x, y, w, h)
 
-        self.btn_type = btn_type
+        # 상태 플래그
         self.text = text
-        self.text_color = text_color
-
-        # 원본 이미지 로드
-        try:
-            self.image = Button.static_am.button_asset[self.btn_type]
-        except KeyError:
-            raise KeyError(f"[Button] button_asset에 타입 {self.btn_type} 이미지가 없습니다.")
-
-        img_w, img_h = self.image.get_width(), self.image.get_height()
-        draw_w = img_w if w is None else int(w)
-        draw_h = img_h if h is None else int(h)
-
-        self.rect = pygame.Rect(int(x), int(y), draw_w, draw_h)
         self.hovered = False
         self.pressed = False
+        self._pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
+
+        # AssetManager는 외부에서 반드시 세팅되어 있어야 함
+        if Button.shared_am is None:
+            # 네가 원래 하려던 스타일은 없으면 생성하는 거였는데,
+            # 이제는 "AssetManager가 사이즈까지 맞춰서 들고 있다"가 전제니까
+            # 여기서 새로 만들면 의미가 없음 → 없으면 그냥 에러 내서 바로 잡게 하자.
+            Button.shared_am = AssetManager()
+            Button.shared_am.init()
+        self.am = Button.shared_am
+
+        # 폰트 준비 (공용 폰트 없으면 기본 생성)
+        if Button.shared_font is None:
+            Button.shared_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
+        self.font = Button.shared_font
+
+        # 텍스트 surface 미리 만들어두기
+        self.text_surface = self.font.render(self.text, True, (255, 255, 255))
+        self.text_rect = self.text_surface.get_rect(center=self.rect.center)
+
+        # 상태별 이미지 Surface 직접 참조 (스케일 X, 로드 X)
+        self.idle_img  = self.am.button_asset[idle_btn_type]  if idle_btn_type  is not None else None
+        self.hover_img = self.am.button_asset[hover_btn_type] if hover_btn_type is not None else None
+        self.press_img = self.am.button_asset[press_btn_type] if press_btn_type is not None else None
 
     def handle_event(self, ev: pygame.event.Event) -> bool:
+        """
+        마우스 이벤트 처리:
+        - hover 상태 추적
+        - 눌림/뗌 추적
+        - '버튼 안에서 눌렀고 버튼 안에서 뗀 경우'만 True 반환
+        """
+        clicked = False
+
         if ev.type == pygame.MOUSEMOTION:
             self.hovered = self.rect.collidepoint(ev.pos)
-        if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+
+        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             if self.rect.collidepoint(ev.pos):
                 self.pressed = True
+                self._pressed_inside = True
+            else:
+                self.pressed = False
+                self._pressed_inside = False
+
         elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
-            was_pressed = self.pressed
+            if self.pressed and self._pressed_inside and self.rect.collidepoint(ev.pos):
+                clicked = True
             self.pressed = False
-            if was_pressed and self.rect.collidepoint(ev.pos):
-                return True
-        return False
+            self._pressed_inside = False
+
+        return clicked
 
     def draw(self, surface: pygame.Surface):
-        if self.hovered:
-            hover_img = Button.static_am.button_asset.get(self.btn_type + 1)
-            if hover_img == None:
-                pass
-            else:
-                if self.pressed:
-                    self.image = Button.static_am.button_asset[self.btn_type + 2]
-                else:
-                    self.image = Button.static_am.button_asset[self.btn_type + 1]
+        """
+        현재 상태에 맞는 이미지를 골라 그린다.
+        우선순위: press_img > hover_img > idle_img
+        아무 이미지도 없으면 fallback 사각형으로 그린다.
+        텍스트는 항상 위에 얹는다.
+        """
+
+        used_img = None
+        if self.pressed and self.press_img is not None:
+            used_img = self.press_img
+        elif self.hovered and self.hover_img is not None:
+            used_img = self.hover_img
+        elif self.idle_img is not None:
+            used_img = self.idle_img
+
+        if used_img is not None:
+            # 준비된 이미지 그대로 blit
+            surface.blit(used_img, self.rect.topleft)
         else:
-            self.image = Button.static_am.button_asset[self.btn_type]
+            # fallback: 단색 버튼(색은 원하는 걸로 바꿔도 됨)
+            if self.pressed:
+                color = ORANGE    # ORANGE-ish
+            elif self.hovered:
+                color = GRAY # GRAY-ish
+            else:
+                color = BLACK    # DARK-ish
 
-        img_w, img_h = self.image.get_size()
-        cx, cy = self.rect.center
-        draw_x = cx - img_w // 2
-        draw_y = cy - img_h // 2
-        surface.blit(self.image, (draw_x, draw_y))
+            pygame.draw.rect(surface, color, self.rect, border_radius=8)
+            pygame.draw.rect(surface, (180, 180, 180), self.rect, width=2, border_radius=8)
 
-        # 텍스트 중앙 정렬
-        if self.text:
-            txt_surf = Button.static_font.render(self.text, True, self.text_color)
-            txt_rect = txt_surf.get_rect(center=self.rect.center)
-            surface.blit(txt_surf, txt_rect)
+        # 텍스트 중앙에 그리기
+        self.text_rect.center = self.rect.center
+        surface.blit(self.text_surface, self.text_rect)
+
 
 
 class InputBox:
@@ -227,86 +273,7 @@ class InputBox:
                              (cursor_x, cursor_y, 2, self.rect.height - 16))
             
 
-class PopupButton:
-    """
-    심플한 직사각형 텍스트 버튼.
-    - bg 기본 검정 / hover 회색 / press 주황
-    - 흰 글씨
-    - 클릭 판정: 내부에서 down 후 내부에서 up 되면 True 반환
-    """
-    static_font: pygame.font.Font | None = None
-
-    def __init__(self, x: int, y: int, w: int, h: int, text: str):
-        if PopupButton.static_font is None:
-            PopupButton.static_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
-
-        self.rect = pygame.Rect(int(x), int(y), int(w), int(h))
-        self.text = text
-
-        # 상태
-        self.hovered = False
-        self.pressed = False    # 마우스가 눌린 상태(Down 이후 아직 Up 전인지)
-        self._armed = False     # "이 버튼 안에서 눌렀다"를 기록해서 Up 때 클릭 여부 판단
-
-        # 색 정의
-        self.color_idle  = (0, 0, 0)             # 평소: 검정
-        self.color_hover = (100, 100, 100)       # hover: 회색
-        self.color_press = (255, 165, 0)         # press: 주황 (ORANGE)
-
-        self.text_color  = (255, 255, 255)       # 흰 글씨
-
-    def handle_event(self, ev: pygame.event.Event) -> bool:
-        """
-        True를 반환하는 순간은 "정상 클릭"으로 간주됨.
-        정상 클릭: 이 rect 안에서 MOUSEBUTTONDOWN(좌클릭) → 이후 MOUSEBUTTONUP도 이 rect 안.
-        """
-        clicked = False
-
-        if ev.type == pygame.MOUSEMOTION:
-            self.hovered = self.rect.collidepoint(ev.pos)
-
-        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
-            if self.rect.collidepoint(ev.pos):
-                self.pressed = True
-                self._armed = True
-            else:
-                self.pressed = False
-                self._armed = False
-
-        elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
-            # 버튼을 떼는 순간 pressed 해제
-            was_armed = self._armed
-            self.pressed = False
-
-            # 업 위치도 안에 있고, 다운 시에도 안에서 시작했다면 클릭 성공
-            if was_armed and self.rect.collidepoint(ev.pos):
-                clicked = True
-
-            # 업이 끝났으니 armed 해제
-            self._armed = False
-
-        return clicked
-
-    def draw(self, surf: pygame.Surface):
-        # 현재 색 결정
-        if self.pressed and self._armed:
-            bg = self.color_press
-        elif self.hovered:
-            bg = self.color_hover
-        else:
-            bg = self.color_idle
-
-        # 버튼 박스
-        pygame.draw.rect(surf, bg, self.rect, border_radius=8)
-
-        # 텍스트 중앙 렌더
-        font = PopupButton.static_font
-        label = font.render(self.text, True, self.text_color)
-        label_rect = label.get_rect(center=self.rect.center)
-        surf.blit(label, label_rect)
-
-
-class PopupAlert:
+class PopupBox:
     def __init__(self, screen: pygame.Surface, message: str,
                  left_text: str = "확인", right_text: str = "취소"):
         """
@@ -316,7 +283,7 @@ class PopupAlert:
         """
         self.screen = screen
         self.message = message
-        self.visible = True  # False가 되면 외부에서 안 그리고 안 처리하면 됨
+        self.visible = False
         self.left_button_text = left_text
         self.right_button_text = right_text
 
@@ -347,8 +314,8 @@ class PopupAlert:
         left_x  = self.win_x
         right_x = self.win_x + btn_w
 
-        self.left_button = PopupButton(left_x,  btn_y, btn_w, btn_h, self.left_button_text)
-        self.right_button= PopupButton(right_x, btn_y, btn_w, btn_h, self.right_button_text)
+        self.left_button = Button(left_x,  btn_y, btn_w, btn_h, self.left_button_text)
+        self.right_button= Button(right_x, btn_y, btn_w, btn_h, self.right_button_text)
 
     def _recalc_layout(self):
         """현재 screen 사이즈를 기준으로 팝업 사각형을 다시 계산한다."""

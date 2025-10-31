@@ -39,7 +39,7 @@ class LoginState:
         self.id_box: Optional[InputBox] = None
         self.pw_box: Optional[InputBox] = None
         self.btn_login: Optional[Button] = None
-        self.popup = PopupAlert(self.screen, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
+        self.popup = PopupBox(self.screen, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
         self.set_layout()
 
     def connect(self):
@@ -60,7 +60,6 @@ class LoginState:
 
         # 버튼은 폰트 전달 없이 생성됨
         self.btn_login = Button(
-            btn_type=BUTTON_LOGIN,
             x=btn_rect.x,
             y=btn_rect.y,
             w=btn_rect.w,
