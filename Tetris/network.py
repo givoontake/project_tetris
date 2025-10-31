@@ -30,7 +30,9 @@ class NetworkWorker:
     # ---- 연결/해제 ----
     def connect_to_server(self) -> bool:
         try:
-            self.sock.connect((SERVER_HOST, SERVER_PORT))
+            temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            temp_sock.connect((SERVER_HOST, SERVER_PORT))
+            self.sock = temp_sock
             self.running = True
             self.recv_thread = threading.Thread(target=self.recv_loop, daemon=True)
             self.recv_thread.start()
@@ -38,24 +40,10 @@ class NetworkWorker:
         except Exception:
             self.running = False
             try:
-                self.sock.close()
+                temp_sock.close()
             except Exception:
                 pass
             return False
-
-    def close(self):
-        with self.socket_lock:
-            if not self.running:
-                return
-            self.running = False
-            try:
-                self.sock.shutdown(socket.SHUT_RDWR)
-            except Exception:
-                pass
-            try:
-                self.sock.close()
-            except Exception:
-                pass
 
     # 수신 스레드가 아직 살아 있으면 join 시도 (약간의 유예)
         if self.recv_thread and self.recv_thread.is_alive():
