@@ -22,10 +22,8 @@ class GameLoop:
         self.net_worker = NetworkWorker()
         self.my_session = Session(self.am.block_asset)
         
-        # 시작 시 서버 연결 시도 → ConnectState로 진입
-        is_connect = self.net_worker.connect_to_server()
-        self.state = ConnectState(self.screen, is_connect=is_connect, net_worker=self.net_worker)
-        self.state.init()
+        self.state = LoginState(self.screen, net_worker=self.net_worker)
+        self.state.connect()
 
         self.prev_time = time.perf_counter()
         self.frame_time = 1.0 / FPS  # 초 단위

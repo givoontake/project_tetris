@@ -30,57 +30,6 @@ class BaseState:
         self.screen = screen
 
 
-class ConnectState(BaseState):
-    """
-    - is_connect == False: "Connection Failed" 1초 표시 후 종료
-    - is_connect == True : "Connected!" 1초 표시 후 LoginState로 전환
-    """
-    def __init__(self, screen, is_connect, dev_mode=False, net_worker: Optional[NetworkWorker] = None):
-        super().__init__(screen)
-        self.is_connect = bool(is_connect)
-        self.dev_mode = dev_mode
-        self._start_ms = None  # pygame.time.get_ticks()
-        self.net_worker = net_worker
-        self.screen = screen
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-
-    def init(self):
-        self._start_ms = pygame.time.get_ticks()
-
-    def update(self, dt_ms, events, data=None):
-        for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit(); raise SystemExit
-
-        if self._start_ms is None:
-            return self
-
-        elapsed = pygame.time.get_ticks() - self._start_ms
-
-        if not self.is_connect:
-            if elapsed >= 1000:
-                pygame.quit(); raise SystemExit
-            return self
-
-        if elapsed >= 1000:
-            return LoginState(self.screen, net_worker=self.net_worker)
-
-        return self
-
-    def draw(self):
-        self.screen.fill((0, 0, 0))
-        sw, sh = self.screen.get_size()
-        font = pygame.font.Font("resource/dodamdodam.ttf", 48)
-        if self.is_connect:
-            msg = font.render('Connected!', True, (0, 200, 0))
-        else:
-            msg = font.render('Connection Failed', True, (255, 0, 0))
-        rect = msg.get_rect(center=(sw // 2, sh // 2))
-        self.screen.blit(msg, rect)
-
-
 class LoginState:
     def __init__(self, screen, net_worker: Optional[NetworkWorker] = None):
         self.screen = screen
@@ -90,9 +39,11 @@ class LoginState:
         self.id_box: Optional[InputBox] = None
         self.pw_box: Optional[InputBox] = None
         self.btn_login: Optional[Button] = None
-
-    def init(self):
+        self.popup = PopupAlert(self.screen, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
         self.set_layout()
+
+    def connect(self):
+        if not self.net_worker.connect_to_server(): self.popup.visible = True
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
@@ -141,10 +92,21 @@ class LoginState:
             else:
                 # 내 세션의 아이디를 설정하는 코드 필요
                 return SelectModeState(self.screen)
+            
+        if self.popup.visible:
+            btn_name = self.popup.handle_event(events)
+            if btn_name == "재시도":
+                self.popup.visible = False
+                self.connect()
+            elif btn_name == "종료":
+                pygame.quit(); raise SystemExit
+
+            return self  # 로그인 UI는 건드리지도 않음
+        
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit
-
+                
             self.id_box.handle_event(ev)
             self.pw_box.handle_event(ev)
 
@@ -166,6 +128,8 @@ class LoginState:
         self.id_box.draw(self.screen)
         self.pw_box.draw(self.screen)
         self.btn_login.draw(self.screen)
+        if self.popup.visible:
+            self.popup.draw()
 
 class SelectModeState(BaseState):
     def init(self):
@@ -218,13 +182,7 @@ class SelectPlayState(BaseState):
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit
-            if self.buttons[0].clicked(ev):
-                return ConnectState(self.screen, is_connect=True,  dev_mode=self.dev_mode)
-            if self.buttons[1].clicked(ev):
-                return ConnectState(self.screen, is_connect=True,  dev_mode=self.dev_mode)
-            if self.buttons[2].clicked(ev):
-                return ConnectState(self.screen, is_connect=True,  dev_mode=self.dev_mode)
-            if self.buttons[3].clicked(ev):
+
                 return SelectModeState(self.screen)
         return self
 
