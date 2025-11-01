@@ -35,12 +35,12 @@ class GameLoop:
         """공통 이벤트 처리(리사이즈/종료 등)."""
         events = pygame.event.get()
 
-        # 🔍 [디버그 출력: 현재 상태 + 마우스 다운만]
-        for ev in events:
-            if ev.type == pygame.MOUSEBUTTONDOWN:
-                btn_name = {1: "L", 2: "M", 3: "R"}.get(ev.button, ev.button)
-                print(f"  DOWN → button={btn_name}, pos={getattr(ev, 'pos', None)}")
-                print(f"\n[STATE] {type(self.state).__name__}")
+        # # 🔍 [디버그 출력: 현재 상태 + 마우스 다운만]
+        # for ev in events:
+        #     if ev.type == pygame.MOUSEBUTTONDOWN:
+        #         btn_name = {1: "L", 2: "M", 3: "R"}.get(ev.button, ev.button)
+        #         print(f"  DOWN → button={btn_name}, pos={getattr(ev, 'pos', None)}")
+        #         print(f"\n[STATE] {type(self.state).__name__}")
 
         for ev in events:
             if ev.type == pygame.QUIT:
