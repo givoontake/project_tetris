@@ -127,7 +127,7 @@ class Button:
                 color = BLACK    # DARK-ish
 
             pygame.draw.rect(surface, color, self.rect, border_radius=8)
-            pygame.draw.rect(surface, (180, 180, 180), self.rect, width=2, border_radius=8)
+            # pygame.draw.rect(surface, (180, 180, 180), self.rect, width=2, border_radius=8)
 
         # 텍스트 중앙에 그리기
         self.text_rect.center = self.rect.center
