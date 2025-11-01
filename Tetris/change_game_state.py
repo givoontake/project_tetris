@@ -90,7 +90,7 @@ class LoginState:
             
             else:
                 # 내 세션의 아이디를 설정하는 코드 필요
-                return SelectModeState(self.screen)
+                return LobbyState(self.screen)
             
         if self.popup.visible:
             btn_name = self.popup.handle_event(events)
@@ -129,6 +129,67 @@ class LoginState:
         self.btn_login.draw(self.screen)
         if self.popup.visible:
             self.popup.draw()
+
+
+class LobbyState(BaseState):
+    shared_am: AssetManager | None = None
+
+    def __init__(self, screen):
+        self.screen = screen
+        if LobbyState.shared_am is None:
+            LobbyState.shared_am = AssetManager()
+            LobbyState.shared_am.init()
+        self.am = LobbyState.shared_am
+
+        self.logo_surface = None
+        self.buttons: list[Button] = []
+        self.draw_x, self.draw_y = 0, 0
+    
+        self.set_layout()
+
+    def set_layout(self):
+        sw, sh = self.screen.get_size()
+
+        self.logo_surface = self.am.button_asset[BUTTON_LOGO_IDLE]
+        logo_w, logo_h = self.logo_surface.get_size()
+
+        btn_w, btn_h = 200, 100
+        #btn_y = 0
+
+        top_menus_text = ["방만들기", "상점", "설정"]
+
+        logo = Button(self.draw_x, self.draw_y, logo_w, logo_h, None, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
+        self.buttons.append(logo)
+        self.draw_x += logo_w
+
+        btn_w, btn_h = 200, 100
+
+        for btn_text in top_menus_text:
+            self.buttons.append(Button(self.draw_x, self.draw_y, btn_w, btn_h, btn_text))
+            self.draw_x += btn_w
+
+    def on_resize(self, w, h, screen):
+        self.screen = screen
+        self.set_layout()
+
+    def update(self, dt_ms, events, data=None):
+        for ev in events:
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                raise SystemExit
+
+            for btn in self.buttons:
+                btn.handle_event(ev)
+                # 어떤 버튼이 눌렸느냐에 따른 동작 추가
+
+        return self
+
+    def draw(self):
+        self.screen.fill(BLACK)
+
+        for btn in self.buttons:
+            btn.draw(self.screen)
+
 
 class SelectModeState(BaseState):
     def init(self):

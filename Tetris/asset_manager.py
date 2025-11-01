@@ -37,7 +37,10 @@ class AssetManager:
         self.button_asset = {
         BUTTON_LOGIN_IDLE: self.load_image("resource/button/button_login_idle.png", 300, 100),
         BUTTON_LOGIN_HOVER: self.load_image("resource/button/button_login_hover.png", 300, 100),
-        BUTTON_LOGIN_PRESS: self.load_image("resource/button/button_login_press.png", 300*0.9, 100*0.9)
+        BUTTON_LOGIN_PRESS: self.load_image("resource/button/button_login_press.png", 300, 100),
+        BUTTON_LOGO_IDLE: self.load_image("resource/button/tetris_logo.png", 500, 100),
+        BUTTON_LOGO_HOVER: self.load_image("resource/button/tetris_logo.png", 500, 100),
+        BUTTON_LOGO_PRESS: self.load_image("resource/button/tetris_logo.png", 500, 100)
         }
     
     def load_image(self, filename: str, width: int, height: int) -> pygame.Surface:
@@ -79,3 +82,7 @@ CANDY_PURPLE = 14
 BUTTON_LOGIN_IDLE = 1001
 BUTTON_LOGIN_HOVER = 1002
 BUTTON_LOGIN_PRESS = 1003
+
+BUTTON_LOGO_IDLE = 1004
+BUTTON_LOGO_HOVER = 1005
+BUTTON_LOGO_PRESS = 1006
