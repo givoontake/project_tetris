@@ -33,10 +33,11 @@ class Button:
         y: int,
         w: int,
         h: int,
-        text: str,
+        text: str = None,
         idle_btn_type=None,
         hover_btn_type=None,
         press_btn_type=None,
+        react = True
     ):
         # 버튼 위치/크기 정보
         self.rect = pygame.Rect(x, y, w, h)
@@ -70,7 +71,11 @@ class Button:
         self.hover_img = self.am.button_asset[hover_btn_type] if hover_btn_type is not None else None
         self.press_img = self.am.button_asset[press_btn_type] if press_btn_type is not None else None
 
+        self.react = react
+
     def handle_event(self, ev: pygame.event.Event) -> bool:
+        if self.react == False:
+            return False
         """
         마우스 이벤트 처리:
         - hover 상태 추적
@@ -126,12 +131,12 @@ class Button:
             else:
                 color = BLACK    # DARK-ish
 
-            pygame.draw.rect(surface, color, self.rect, border_radius=8)
-            # pygame.draw.rect(surface, (180, 180, 180), self.rect, width=2, border_radius=8)
+            pygame.draw.rect(surface, color, self.rect)
 
         # 텍스트 중앙에 그리기
-        self.text_rect.center = self.rect.center
-        surface.blit(self.text_surface, self.text_rect)
+        if self.text is not None:
+            self.text_rect.center = self.rect.center
+            surface.blit(self.text_surface, self.text_rect)
 
 
 
