@@ -141,12 +141,24 @@ class Button:
 
 
 class InputBox:
-    def __init__(self, x: int, y: int, w: int, h: int, placeholder: str = "", is_password: bool = False):
+    def __init__(
+        self,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        placeholder: str = "",
+        max_input_len: int | None = None, # optional과 같음
+        is_password: bool = False,
+        allow_korean: bool = True,   # ✅ 한글 허용 여부
+    ):
         self.rect = pygame.Rect(x, y, w, h)
         self.placeholder = placeholder
         self.text = ""
         self.active = False
         self.is_password = is_password
+        self.allow_korean = allow_korean
+        self.max_input_len = max_input_len
 
         self.color_idle = (40, 40, 40)
         self.color_active = (60, 140, 255)
@@ -160,53 +172,76 @@ class InputBox:
         self.cursor_timer_ms = 0
         self.cursor_blink_ms = 500
 
-        # 백스페이스 키 반복(typematic) 상태
+        # 🔁 연속 입력/삭제(기존 typematic 로직 복구)
         self.input_active = False
         self.input_timer_ms = 0
         self.input_delay_ms = 500   # 첫 반복까지 대기(0.5s)
-        self.input_repeat_ms = 50  # 이후 반복 간격(0.1s)
+        self.input_repeat_ms = 50   # 이후 반복 간격(0.05s)
         self.input_delay_done = False
-        self.repeat_key = None      # 현재 눌려 반복 중인 키 코드
-        self.repeat_char = ""       # 문자키의 unicode(반복 시 재사용)
+        self.repeat_key = None      # 현재 반복 중인 키
+        self.repeat_char = ""       # 문자키 반복용
+
+    def filter_char(self, ch: str) -> bool:
+        """이 문자 ch를 받아줄지 여부 (allow_korean에 따라 필터)."""
+        if not ch:
+            return False
+        if not ch.isprintable():
+            return False
+
+        if self.allow_korean:
+            # 한글 포함 전부 허용
+            return True
+        else:
+            # 한글/비ASCII 막고, ASCII만 허용
+            return ch.isascii()
 
     def handle_event(self, ev: pygame.event.Event):
+        # 마우스 클릭으로 포커스 on/off
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             self.active = self.rect.collidepoint(ev.pos)
             self.color = self.color_active if self.active else self.color_idle
 
-        if ev.type == pygame.KEYDOWN and self.active:
+        # 포커스가 없으면 키 반복 상태만 정리하고 리턴
+        if not self.active:
+            if ev.type == pygame.KEYUP and self.repeat_key is not None and ev.key == self.repeat_key:
+                self.input_active = False
+                self.input_timer_ms = 0
+                self.input_delay_done = False
+                self.repeat_key = None
+                self.repeat_char = ""
+            return
+
+        # 🔤 한글/영문/기호 입력: TEXTINPUT에서만 처리
+        if ev.type == pygame.TEXTINPUT:
+            for ch in ev.text or "":
+                if not self.filter_char(ch):
+                    continue
+                if len(self.text) >= MAX_INPUT_SIZE:
+                    break
+                self.text += ch
+            return
+
+        # ⌨ 제어키 처리 (백스페이스 typematic + 엔터)
+        if ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_BACKSPACE:
-                # 누르는 순간 즉시 1글자 삭제
+                # 누를 때 한 글자 바로 삭제
                 if self.text:
                     self.text = self.text[:-1]
-                # 반복 시작
+
+                # 백스페이스 반복 시작
                 self.input_active = True
                 self.input_timer_ms = 0
                 self.input_delay_done = False
                 self.repeat_key = pygame.K_BACKSPACE
                 self.repeat_char = ""
+
             elif ev.key == pygame.K_RETURN:
-                # 엔터는 상위에서 처리
+                # 엔터는 상위(LoginState 등)에서 처리
                 pass
-            else:
-                if ev.unicode and ev.unicode.isprintable():
-                    if len(self.text) < MAX_INPUT_SIZE:
-                        self.text += ev.unicode
-                    # 반복 시작(문자키)
-                    self.input_active = True
-                    self.input_timer_ms = 0
-                    self.input_delay_done = False
-                    self.repeat_key = ev.key
-                    self.repeat_char = ev.unicode
-                else:
-                    # 인쇄 불가 키는 반복 비활성
-                    self.input_active = False
-                    self.repeat_key = None
-                    self.repeat_char = ""
 
         elif ev.type == pygame.KEYUP:
-            # 손을 떼면(현재 반복 중인 키를 뗀 경우) 반복 종료
             if self.repeat_key is not None and ev.key == self.repeat_key:
+                # 백스페이스 떼면 반복 중지
                 self.input_active = False
                 self.input_timer_ms = 0
                 self.input_delay_done = False
@@ -215,7 +250,7 @@ class InputBox:
 
 
     def update(self, dt_ms: int):
-    # 커서 점멸
+        # 커서 점멸
         if self.active:
             self.cursor_timer_ms += dt_ms
             if self.cursor_timer_ms >= self.cursor_blink_ms:
@@ -225,17 +260,17 @@ class InputBox:
             self.cursor_visible = False
             self.cursor_timer_ms = 0
 
-        # 키 반복
+        # 🔁 연속 입력/삭제(기존 로직 그대로)
         if self.active and self.input_active and self.repeat_key is not None:
             self.input_timer_ms += dt_ms
 
             if not self.input_delay_done:
-                # 첫 500ms 지연
+                # 첫 500ms 대기
                 if self.input_timer_ms >= self.input_delay_ms:
                     self.input_timer_ms -= self.input_delay_ms
                     self.input_delay_done = True
             else:
-                # 지연 이후 100ms 간격 반복
+                # 이후 50ms 간격 반복
                 while self.input_timer_ms >= self.input_repeat_ms:
                     self.input_timer_ms -= self.input_repeat_ms
 
@@ -243,40 +278,46 @@ class InputBox:
                         if self.text:
                             self.text = self.text[:-1]
                         else:
-                            # 더 지울 게 없으면 타이머만 정리하고 반복 유지
+                            # 더 지울 게 없으면 타이머 정리
                             self.input_timer_ms = 0
                             break
                     else:
-                        # 문자키 반복(인쇄 가능 + 길이 제한)
-                        if self.repeat_char and self.repeat_char.isprintable() and len(self.text) < MAX_INPUT_SIZE:
+                        # 문자키 반복은 ASCII만 (allow_korean=False에서만 설정됨)
+                        if (self.repeat_char
+                            and self.filter_char(self.repeat_char)
+                            and len(self.text) < MAX_INPUT_SIZE):
                             self.text += self.repeat_char
                         else:
-                            # 반복 불가(공간 부족/인쇄 불가) 시 타이머만 정리
                             self.input_timer_ms = 0
                             break
-
 
     def draw(self, surf: pygame.Surface):
         # 배경
         pygame.draw.rect(surf, self.color, self.rect, border_radius=8)
 
-        # 표시 텍스트 (비밀번호면 마스킹)
+        # 보여줄 텍스트 (비밀번호면 ●로 마스킹)
         show = self.text if not self.is_password else ("●" * len(self.text))
         if not self.text and not self.active:
             txt = self.font.render(self.placeholder, True, (150, 150, 150))
         else:
             txt = self.font.render(show, True, (255, 255, 255))
 
-        text_pos = (self.rect.x + self.padding, self.rect.y + (self.rect.height - txt.get_height()) // 2)
+        text_pos = (
+            self.rect.x + self.padding,
+            self.rect.y + (self.rect.height - txt.get_height()) // 2,
+        )
         surf.blit(txt, text_pos)
 
         # 커서
         if self.active and self.cursor_visible:
             cursor_x = text_pos[0] + txt.get_width()
             cursor_y = self.rect.y + 8
-            pygame.draw.rect(surf, (255, 255, 255),
-                             (cursor_x, cursor_y, 2, self.rect.height - 16))
-            
+            pygame.draw.rect(
+                surf,
+                (255, 255, 255),
+                (cursor_x, cursor_y, 2, self.rect.height - 16),
+            )
+
 
 class PopupBox:
     def __init__(self, screen: pygame.Surface, message: str,

@@ -16,6 +16,7 @@ class GameLoop:
         h = int(BASE_SCREEN_HEIGHT * INITIAL_SCALE)
         self.screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
         pygame.display.set_caption("Tetris")
+        pygame.key.start_text_input()
 
         self.am = AssetManager()
         self.am.init()

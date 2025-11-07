@@ -55,8 +55,8 @@ class LoginState:
         pw_rect = pygame.Rect(center_x, center_y + input_box_h + 20, input_box_w, input_box_h)
         btn_rect = pygame.Rect((sw - 300) // 2, pw_rect.bottom + 28, 300, 100)
 
-        self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디")
-        self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", is_password=True)
+        self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디", MAX_INPUT_SIZE)
+        self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", MAX_INPUT_SIZE, is_password=True)
 
         # 버튼은 폰트 전달 없이 생성됨
         self.btn_login = Button(
