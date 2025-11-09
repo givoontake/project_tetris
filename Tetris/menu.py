@@ -5,8 +5,10 @@ from define_format import MAX_INPUT_SIZE
 from asset_manager import *
 
 ORANGE = (255, 165, 0)
-GRAY   = (100, 100, 100)
+GRAY   = (128, 128, 128)
+PLACEHOLDER = (100, 100, 100)
 WHITE  = (255, 255, 255)
+BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
 
 class Button:
@@ -148,175 +150,155 @@ class InputBox:
         w: int,
         h: int,
         placeholder: str = "",
-        max_input_len: int | None = None, # optional과 같음
+        max_input_len: int | None = None,  # optional과 같음
         is_password: bool = False,
         allow_korean: bool = True,   # ✅ 한글 허용 여부
     ):
         self.rect = pygame.Rect(x, y, w, h)
         self.placeholder = placeholder
         self.text = ""
+        self.editing_text = ""
         self.active = False
         self.is_password = is_password
         self.allow_korean = allow_korean
         self.max_input_len = max_input_len
 
-        self.color_idle = (40, 40, 40)
-        self.color_active = (60, 140, 255)
-        self.color = self.color_idle
-
         self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
         self.padding = 10
+        self.color = GRAY
 
         # 커서 점멸
         self.cursor_visible = True
         self.cursor_timer_ms = 0
         self.cursor_blink_ms = 500
 
-        # 🔁 연속 입력/삭제(기존 typematic 로직 복구)
-        self.input_active = False
-        self.input_timer_ms = 0
-        self.input_delay_ms = 500   # 첫 반복까지 대기(0.5s)
-        self.input_repeat_ms = 50   # 이후 반복 간격(0.05s)
-        self.input_delay_done = False
-        self.repeat_key = None      # 현재 반복 중인 키
-        self.repeat_char = ""       # 문자키 반복용
+        # 키 입력은 윈도우 입력기를 통해 처리하지만 완성된 글자만 반환하므로 지우기는 따로 처리해야함
+        self.backspace_pressed = False
+        #self.backspace_repeat_active = False
+        self.backspace_repeat_timer = 0
+        self.backspace_repeat_time1 = 500
+        self.backspace_repeat_time1_active = True
+        self.backspace_repeat_time2 = 50
+        self.backspace_repeat_time2_active = False
 
-    def filter_char(self, ch: str) -> bool:
-        """이 문자 ch를 받아줄지 여부 (allow_korean에 따라 필터)."""
-        if not ch:
-            return False
-        if not ch.isprintable():
-            return False
+    def add_char(self, ch: str):
+        if not self.active:
+            return
+        # 빈 문자, 제어문자 필터링
+        if not ch or not ch.isprintable():
+            return
+        # 한글 비허용이면 ASCII만 받음
+        if not self.allow_korean and not ch.isascii():
+            return
+        # 길이 초과 방지
+        if self.max_input_len is not None and len(self.text) >= self.max_input_len:
+            return
+        
+        if not ch.isascii():
+            self.backspace_repeat_time1_active = False
+            self.backspace_repeat_time2_active = True
+        # 통과했으면 추가
+        self.text += ch
 
-        if self.allow_korean:
-            # 한글 포함 전부 허용
-            return True
-        else:
-            # 한글/비ASCII 막고, ASCII만 허용
-            return ch.isascii()
+    def delete_char(self):
+        if not self.active:
+            return
+        if self.text:
+            self.text = self.text[:-1]
 
     def handle_event(self, ev: pygame.event.Event):
         # 마우스 클릭으로 포커스 on/off
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             self.active = self.rect.collidepoint(ev.pos)
-            self.color = self.color_active if self.active else self.color_idle
+            if self.active:
+                self.color = BLUE
+            else:
+                self.color = GRAY
 
-        # 포커스가 없으면 키 반복 상태만 정리하고 리턴
-        if not self.active:
-            if ev.type == pygame.KEYUP and self.repeat_key is not None and ev.key == self.repeat_key:
-                self.input_active = False
-                self.input_timer_ms = 0
-                self.input_delay_done = False
-                self.repeat_key = None
-                self.repeat_char = ""
-            return
+        # ===== 한글/영문 조합 중 문자열 (프리뷰) =====
+        elif ev.type == pygame.TEXTEDITING:
+            # 한글 허용인 필드만 조합 상태 표시
+            if self.active:
+                self.editing_text = ev.text
 
-        # 🔤 한글/영문/기호 입력: TEXTINPUT에서만 처리
-        if ev.type == pygame.TEXTINPUT:
-            for ch in ev.text or "":
-                if not self.filter_char(ch):
-                    continue
-                if len(self.text) >= MAX_INPUT_SIZE:
-                    break
-                self.text += ch
-            return
+        # ===== 최종 확정된 문자 입력 =====
+        elif ev.type == pygame.TEXTINPUT:
+            self.add_char(ev.text)
 
-        # ⌨ 제어키 처리 (백스페이스 typematic + 엔터)
-        if ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_BACKSPACE:
-                # 누를 때 한 글자 바로 삭제
-                if self.text:
-                    self.text = self.text[:-1]
-
-                # 백스페이스 반복 시작
-                self.input_active = True
-                self.input_timer_ms = 0
-                self.input_delay_done = False
-                self.repeat_key = pygame.K_BACKSPACE
-                self.repeat_char = ""
+        # ===== 제어키 처리 (백스페이스 + 엔터) =====
+        elif ev.type == pygame.KEYDOWN:
+            if ev.key == pygame.K_BACKSPACE:  # TEXTINPUT으로는 문자 아니면 처리 안됨, 따로 처리 필요
+                self.delete_char()
+                self.backspace_pressed = True
 
             elif ev.key == pygame.K_RETURN:
-                # 엔터는 상위(LoginState 등)에서 처리
+                # 엔터는 상위(State)에서 처리
                 pass
-
         elif ev.type == pygame.KEYUP:
-            if self.repeat_key is not None and ev.key == self.repeat_key:
-                # 백스페이스 떼면 반복 중지
-                self.input_active = False
-                self.input_timer_ms = 0
-                self.input_delay_done = False
-                self.repeat_key = None
-                self.repeat_char = ""
-
+            if ev.key == pygame.K_BACKSPACE:
+                self.backspace_repeat_timer = 0
+                self.backspace_repeat_time1_active = True
+                self.backspace_repeat_time2_active = False
+                self.backspace_pressed = False
 
     def update(self, dt_ms: int):
-        # 커서 점멸
+        # 커서 점멸만 유지
         if self.active:
             self.cursor_timer_ms += dt_ms
             if self.cursor_timer_ms >= self.cursor_blink_ms:
-                self.cursor_timer_ms = 0
+                self.cursor_timer_ms -= self.cursor_blink_ms
                 self.cursor_visible = not self.cursor_visible
+
+            if self.backspace_repeat_time1_active and self.backspace_pressed:
+                self.backspace_repeat_timer += dt_ms
+                if self.backspace_repeat_timer >= self.backspace_repeat_time1:
+                    self.backspace_repeat_timer -= self.backspace_repeat_time1
+                    self.backspace_repeat_time1_active = False
+                    self.backspace_repeat_time2_active = True
+                    self.delete_char()
+
+            elif self.backspace_repeat_time2_active and self.backspace_pressed:
+                self.backspace_repeat_timer += dt_ms
+                if self.backspace_repeat_timer >= self.backspace_repeat_time2:
+                    self.backspace_repeat_timer -= self.backspace_repeat_time2
+                    self.delete_char()
+                
         else:
             self.cursor_visible = False
             self.cursor_timer_ms = 0
+            self.backspace_repeat_timer = 0
+            self.backspace_repeat_time1_active = True
+            self.backspace_repeat_time2_active = False
 
-        # 🔁 연속 입력/삭제(기존 로직 그대로)
-        if self.active and self.input_active and self.repeat_key is not None:
-            self.input_timer_ms += dt_ms
-
-            if not self.input_delay_done:
-                # 첫 500ms 대기
-                if self.input_timer_ms >= self.input_delay_ms:
-                    self.input_timer_ms -= self.input_delay_ms
-                    self.input_delay_done = True
-            else:
-                # 이후 50ms 간격 반복
-                while self.input_timer_ms >= self.input_repeat_ms:
-                    self.input_timer_ms -= self.input_repeat_ms
-
-                    if self.repeat_key == pygame.K_BACKSPACE:
-                        if self.text:
-                            self.text = self.text[:-1]
-                        else:
-                            # 더 지울 게 없으면 타이머 정리
-                            self.input_timer_ms = 0
-                            break
-                    else:
-                        # 문자키 반복은 ASCII만 (allow_korean=False에서만 설정됨)
-                        if (self.repeat_char
-                            and self.filter_char(self.repeat_char)
-                            and len(self.text) < MAX_INPUT_SIZE):
-                            self.text += self.repeat_char
-                        else:
-                            self.input_timer_ms = 0
-                            break
 
     def draw(self, surf: pygame.Surface):
         # 배경
-        pygame.draw.rect(surf, self.color, self.rect, border_radius=8)
+        pygame.draw.rect(surf, self.color, self.rect)
 
         # 보여줄 텍스트 (비밀번호면 ●로 마스킹)
-        show = self.text if not self.is_password else ("●" * len(self.text))
-        if not self.text and not self.active:
-            txt = self.font.render(self.placeholder, True, (150, 150, 150))
+        show_text = ""
+        if len(self.text) >= self.max_input_len:
+            show_text = self.text
         else:
-            txt = self.font.render(show, True, (255, 255, 255))
+            show_text = self.text + self.editing_text
+        show_text = show_text if not self.is_password else ("●" * len(show_text))
+        if not show_text and not self.active:
+            txt = self.font.render(self.placeholder, True, PLACEHOLDER)
+        else:
+            txt = self.font.render(show_text, True, WHITE)
 
-        text_pos = (
-            self.rect.x + self.padding,
-            self.rect.y + (self.rect.height - txt.get_height()) // 2,
-        )
+        text_x = self.rect.x + self.padding
+        text_y = self.rect.y + (self.rect.height - txt.get_height()) // 2
+        text_pos = (text_x, text_y)
         surf.blit(txt, text_pos)
 
         # 커서
         if self.active and self.cursor_visible:
-            cursor_x = text_pos[0] + txt.get_width()
-            cursor_y = self.rect.y + 8
-            pygame.draw.rect(
-                surf,
-                (255, 255, 255),
-                (cursor_x, cursor_y, 2, self.rect.height - 16),
-            )
+            cursor_x = text_x + txt.get_width()
+            cursor_y = text_y
+            cursor_h = txt.get_height()
+            pygame.draw.rect(surf, WHITE,(cursor_x, cursor_y, 2, cursor_h))
+
 
 
 class PopupBox:
