@@ -8,7 +8,7 @@ ORANGE = (255, 165, 0)
 GRAY   = (128, 128, 128)
 PLACEHOLDER = (100, 100, 100)
 WHITE  = (255, 255, 255)
-BLUE = (0, 0, 255)
+BLUE = (0, 0, 150)
 BLACK = (0, 0, 0)
 
 class Button:
@@ -156,6 +156,7 @@ class InputBox:
     ):
         self.rect = pygame.Rect(x, y, w, h)
         self.placeholder = placeholder
+        self.text_h = int(h*0.8)
         self.text = ""
         self.editing_text = ""
         self.active = False
@@ -163,8 +164,8 @@ class InputBox:
         self.allow_korean = allow_korean
         self.max_input_len = max_input_len
 
-        self.font = pygame.font.Font("resource/dodamdodam.ttf", 28)
-        self.padding = 10
+        self.font = pygame.font.Font("resource/dodamdodam.ttf", self.text_h)
+        self.padding = int(self.text_h / 2)
         self.color = GRAY
 
         # 커서 점멸
@@ -205,6 +206,38 @@ class InputBox:
             return
         if self.text:
             self.text = self.text[:-1]
+
+    def get_text_width(self, text: str) -> int:
+        width, _ = self.font.size(text)
+        return width
+
+    def get_render_text(self) -> str:
+        text_px_len = None
+        if len(self.text) < self.max_input_len:
+            render_text = self.text + self.editing_text
+            text_px_len = self.get_text_width(self.text) + self.get_text_width(self.editing_text)
+        else:
+            render_text = self.text
+            text_px_len = self.get_text_width(self.text)
+
+        box_px_len = self.rect.w - self.padding * 2# 좌우 기본 패딩
+        offset = 0
+        
+        if self.is_password:
+            render_text = "●" * (len(self.text) + len(self.editing_text))
+                                      
+        while True:            
+            if text_px_len <= box_px_len:
+                return render_text
+            
+            else:
+                if self.get_text_width(self.text[offset:]) <= box_px_len:
+                    return self.text[offset:]
+                else:
+                    offset += 1
+                    if offset >= len(self.text):
+                        return ""
+
 
     def handle_event(self, ev: pygame.event.Event):
         # 마우스 클릭으로 포커스 on/off
@@ -276,12 +309,7 @@ class InputBox:
         pygame.draw.rect(surf, self.color, self.rect)
 
         # 보여줄 텍스트 (비밀번호면 ●로 마스킹)
-        show_text = ""
-        if len(self.text) >= self.max_input_len:
-            show_text = self.text
-        else:
-            show_text = self.text + self.editing_text
-        show_text = show_text if not self.is_password else ("●" * len(show_text))
+        show_text = self.get_render_text()
         if not show_text and not self.active:
             txt = self.font.render(self.placeholder, True, PLACEHOLDER)
         else:
@@ -296,7 +324,7 @@ class InputBox:
         if self.active and self.cursor_visible:
             cursor_x = text_x + txt.get_width()
             cursor_y = text_y
-            cursor_h = txt.get_height()
+            cursor_h = self.text_h
             pygame.draw.rect(surf, WHITE,(cursor_x, cursor_y, 2, cursor_h))
 
 
