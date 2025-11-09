@@ -213,6 +213,7 @@ class InputBox:
 
     def get_render_text(self) -> str:
         text_px_len = None
+        render_text = ""
         if len(self.text) < self.max_input_len:
             render_text = self.text + self.editing_text
             text_px_len = self.get_text_width(self.text) + self.get_text_width(self.editing_text)
@@ -231,8 +232,8 @@ class InputBox:
                 return render_text
             
             else:
-                if self.get_text_width(self.text[offset:]) <= box_px_len:
-                    return self.text[offset:]
+                if self.get_text_width(render_text[offset:]) <= box_px_len:
+                    return render_text[offset:]
                 else:
                     offset += 1
                     if offset >= len(self.text):
