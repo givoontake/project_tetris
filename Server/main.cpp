@@ -24,6 +24,8 @@ void WorkerThread()
 
 int main()
 {
+	SetConsoleOutputCP(65001);
+
 	iocp_server.StartServer();
 	std::vector <std::thread> worker_threads;
 	int num_threads = std::thread::hardware_concurrency();
