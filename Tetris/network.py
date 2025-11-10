@@ -64,7 +64,7 @@ class NetworkWorker:
                 self._pm.process_packet()
         except Exception as e:
             print(f"[recv_loop] 예외 발생: {type(e).__name__} - {e}")
-            self.close()
+            self.sock.close()
             
 
     # ---- 즉시 송신(필요 시) ----
@@ -75,6 +75,6 @@ class NetworkWorker:
             with self.socket_lock: # with: 자원을 자동으로 열고 닫아줌. 여기서는 락을 자동 관리해줌(lock_guard랑 동일)
                 self.sock.sendall(data)
             return True
-        except Exception:
-            self.close()
+        except Exception as e:
+            print(f"[send_packet] 예외 발생: {type(e).__name__} - {e}")
             return False
