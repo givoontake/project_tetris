@@ -6,12 +6,12 @@
 
 class RoomSession
 {
-	Session* session = nullptr; // »ó¼ÓÀ¸·Î ÇÏ¸é ¼¼¼ÇÀ» ¹Ş¾Æ¿Ã ¼ö°¡ ¾øÀ½
+	Session* session = nullptr; // ìƒì†ìœ¼ë¡œ í•˜ë©´ ì„¸ì…˜ì„ ë°›ì•„ì˜¬ ìˆ˜ê°€ ì—†ìŒ
 	Tetris tetris;
-	// std::string user_name; // ¹æ »ı¼ºÇÒ ¶§ ¸¸µéµµ·Ï ÀÏ´Ü ÇÏ°í, ³ªÁß¿¡ È¸¿ø°¡ÀÔ - DB ¿¬µ¿À¸·Î session Å¬·¡½º¿¡ Æ÷ÇÔÇØº¸ÀÚ.
+	// std::string user_name; // ë°© ìƒì„±í•  ë•Œ ë§Œë“¤ë„ë¡ ì¼ë‹¨ í•˜ê³ , ë‚˜ì¤‘ì— íšŒì›ê°€ì… - DB ì—°ë™ìœ¼ë¡œ session í´ë˜ìŠ¤ì— í¬í•¨í•´ë³´ì.
 	// char user_name[MAX_USER_NAME];
 	bool is_ready = false;
-	Atomic<bool> in_use = false; // ·ë¿¡¼­ ÇØ´ç ¹è¿­ ÀÎµ¦½º°¡ »ç¿ë ÁßÀÎÁö¸¦ ÆÇº°ÇÏ±â À§ÇÑ º¯¼ö
+	Atomic<bool> in_use = false; // ë£¸ì—ì„œ í•´ë‹¹ ë°°ì—´ ì¸ë±ìŠ¤ê°€ ì‚¬ìš© ì¤‘ì¸ì§€ë¥¼ íŒë³„í•˜ê¸° ìœ„í•œ ë³€ìˆ˜
 
 	long long timer;
 
@@ -30,4 +30,3 @@ public:
 	void InitSession(Session* s);
 	void ClearSession();
 };
-

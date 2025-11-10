@@ -5,10 +5,10 @@
 #include"define.h"
 #include "MQueue.h"
 
-//class Session; // ÀÌ¹Ì Session¿¡¼­ ÀÌ ÆÄÀÏÀÇ Çì´õ interface.h¸¦ °¡Áö°í ÀÖ¾î¼­ Çì´õ¸¦ ¼±¾ğÇÏ¸é ¼øÈ¯ ¹®Á¦°¡ »ı±ä´Ù.
+//class Session; // ì´ë¯¸ Sessionì—ì„œ ì´ íŒŒì¼ì˜ í—¤ë” interface.hë¥¼ ê°€ì§€ê³  ìˆì–´ì„œ í—¤ë”ë¥¼ ì„ ì–¸í•˜ë©´ ìˆœí™˜ ë¬¸ì œê°€ ìƒê¸´ë‹¤.
 //class IServer;
 
-//class IPacketHandler { // ÆĞÅ¶ Ã³¸®¸¦ À§ÇÑ Ãß»ó Å¬·¡½º
+//class IPacketHandler { // íŒ¨í‚· ì²˜ë¦¬ë¥¼ ìœ„í•œ ì¶”ìƒ í´ë˜ìŠ¤
 //
 //public:
 //	virtual void HandlePacket(char* packet) = 0;
@@ -16,9 +16,10 @@
 //	virtual IServer* GetServerInterface() const = 0;
 //};
 
-//class IServer { // ¼­¹ö Á¢±ÙÀ» À§ÇÑ Ãß»ó Å¬·¡½º
+//class IServer { // ì„œë²„ ì ‘ê·¼ì„ ìœ„í•œ ì¶”ìƒ í´ë˜ìŠ¤
 //public:
 //	//virtual std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() = 0;
 //	virtual MQueue& GetTaskQueue() = 0;
 //	//virtual void Disconnect(int user_id) = 0;
 //};
+

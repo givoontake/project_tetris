@@ -23,3 +23,4 @@ bool MQueue::IsEmpty()
 	std::lock_guard<std::mutex> lock(q_mutex);
 	return m_queue.empty();
 }
+

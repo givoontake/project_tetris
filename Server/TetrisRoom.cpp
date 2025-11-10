@@ -10,7 +10,7 @@ TetrisRoom::~TetrisRoom()
 
 }
 
-void TetrisRoom::InitRoom(char* packet, Session* session) // ³×Æ®¿öÅ© Àı¾àÀ» À§ÇØ ºñ¹Ğ¹øÈ£ Æ÷ÇÔ ¿©ºÎ¸¦ ´Ù¸£°Ô ÇÏ¿© ÆĞÅ¶À» µÎ °³·Î ±¸ºĞ, °°Àº ¿ªÇÒÀÌ¹Ç·Î ÇÏ³ªÀÇ ÇÔ¼ö·Î ¹Ş¾Æ ÄÉÀÌ½º·Î Ã³¸®
+void TetrisRoom::InitRoom(char* packet, Session* session) // ë„¤íŠ¸ì›Œí¬ ì ˆì•½ì„ ìœ„í•´ ë¹„ë°€ë²ˆí˜¸ í¬í•¨ ì—¬ë¶€ë¥¼ ë‹¤ë¥´ê²Œ í•˜ì—¬ íŒ¨í‚·ì„ ë‘ ê°œë¡œ êµ¬ë¶„, ê°™ì€ ì—­í• ì´ë¯€ë¡œ í•˜ë‚˜ì˜ í•¨ìˆ˜ë¡œ ë°›ì•„ ì¼€ì´ìŠ¤ë¡œ ì²˜ë¦¬
 {
 	switch (packet[2]) {
 	case C2S_ADD_OPEN_ROOM: {
@@ -18,8 +18,8 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // ³×Æ®¿öÅ© Àı¾àÀ» À§Ç
 		if (!(p->max_user == 1 || p->max_user == 2 || p->max_user == 5)) break;
 		host_id = p->id;
 		max_user = p->max_user;
-		// resize´Â ¸¸¾à ±âÁ¸ º¤ÅÍ ¸Ş¸ğ¸®°¡ ºÎÁ·ÇÒ °æ¿ì »õ ¸Ş¸ğ¸®¸¦ ÇÒ´çÇÏ°í ±âÁ¸ ¸Ş¸ğ¸® ³»¿ëÀ» º¹»çÇÏ´Âµ¥, ¿©±â¼­ ¾ÆÅä¹Í º¹»ç ºÒ°¡ ¹®Á¦°¡ ¹ß»ıÇÒ ¼ö ÀÖÀ½
-		room_users.reserve(p->max_user); // ¹Ì¸® ¸Ş¸ğ¸®¸¦ ÇÒ´çÇÏ°í °´Ã¼¸¦ Ã¤¿ì¸é ¹®Á¦ x
+		// resizeëŠ” ë§Œì•½ ê¸°ì¡´ ë²¡í„° ë©”ëª¨ë¦¬ê°€ ë¶€ì¡±í•  ê²½ìš° ìƒˆ ë©”ëª¨ë¦¬ë¥¼ í• ë‹¹í•˜ê³  ê¸°ì¡´ ë©”ëª¨ë¦¬ ë‚´ìš©ì„ ë³µì‚¬í•˜ëŠ”ë°, ì—¬ê¸°ì„œ ì•„í† ë¯¹ ë³µì‚¬ ë¶ˆê°€ ë¬¸ì œê°€ ë°œìƒí•  ìˆ˜ ìˆìŒ
+		room_users.reserve(p->max_user); // ë¯¸ë¦¬ ë©”ëª¨ë¦¬ë¥¼ í• ë‹¹í•˜ê³  ê°ì²´ë¥¼ ì±„ìš°ë©´ ë¬¸ì œ x
 		for (int i = 0; i < p->max_user; ++i){
 			room_users.emplace_back(); 
 		}
@@ -60,7 +60,7 @@ void TetrisRoom::AddUser(Session* new_session)
 			S2C_ADD_USER_PACKET p;
 			p.size = sizeof(S2C_ADD_USER_PACKET);
 			p.type = S2C_ADD_USER;
-			// p.name = ¼¼¼Ç¿¡ ÀÌ¸§ º¯¼ö Ãß°¡ ÇÊ¿ä
+			// p.name = ì„¸ì…˜ì— ì´ë¦„ ë³€ìˆ˜ ì¶”ê°€ í•„ìš”
 			p.id = new_session->GetIndex();
 			p.is_add = true;
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
@@ -70,32 +70,32 @@ void TetrisRoom::AddUser(Session* new_session)
 
 	}
 
-	// ¼º°ø°ú ½ÇÆĞ¿¡ µû¶ó ÆĞÅ¶À» ³ª´­±î? »ç½Ç ¹æÀÌ ´Ù Â÷ ÀÖ´Ù¸é Å¬¶óÀÌ¾ğÆ® ¼öÁØ¿¡¼­ ¼Û½Å ÀÚÃ¼¸¦ ¸·¾Æ¾ß ÇÒ °Í °°±â´Â ÇÑµ¥..
-	// ¾Æ´ÏÁö. Å¬¶ó¿¡¼­ ½ÇÁ¦·Î ¹æÀÌ ºó °ÍÀ¸·Î º¸¿´¾îµµ, ´©±º°¡°¡ ¸ÕÀú Â÷ÁöÇß´Ù¸é ±×°Ç ¾Ë ¼ö°¡ ¾øÀ¸´Ï±î Ã³¸®°¡ ÇÊ¿ä
+	// ì„±ê³µê³¼ ì‹¤íŒ¨ì— ë”°ë¼ íŒ¨í‚·ì„ ë‚˜ëˆŒê¹Œ? ì‚¬ì‹¤ ë°©ì´ ë‹¤ ì°¨ ìˆë‹¤ë©´ í´ë¼ì´ì–¸íŠ¸ ìˆ˜ì¤€ì—ì„œ ì†¡ì‹  ìì²´ë¥¼ ë§‰ì•„ì•¼ í•  ê²ƒ ê°™ê¸°ëŠ” í•œë°..
+	// ì•„ë‹ˆì§€. í´ë¼ì—ì„œ ì‹¤ì œë¡œ ë°©ì´ ë¹ˆ ê²ƒìœ¼ë¡œ ë³´ì˜€ì–´ë„, ëˆ„êµ°ê°€ê°€ ë¨¼ì € ì°¨ì§€í–ˆë‹¤ë©´ ê·¸ê±´ ì•Œ ìˆ˜ê°€ ì—†ìœ¼ë‹ˆê¹Œ ì²˜ë¦¬ê°€ í•„ìš”
 	S2C_ADD_USER_PACKET p;
 	p.size = sizeof(S2C_ADD_USER_PACKET);
 	p.type = S2C_ADD_USER;
-	// p.name = ¼¼¼Ç¿¡ ÀÌ¸§ º¯¼ö Ãß°¡ ÇÊ¿ä
+	// p.name = ì„¸ì…˜ì— ì´ë¦„ ë³€ìˆ˜ ì¶”ê°€ í•„ìš”
 	p.id = new_session->GetIndex();
 	p.is_add = false;
-	new_session->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // ¹æÀÌ ²Ë Ã¡À» °æ¿ì º»ÀÎ¿¡°Ô¸¸ ½ÇÆĞ Àü¼Û
+	new_session->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // ë°©ì´ ê½‰ ì°¼ì„ ê²½ìš° ë³¸ì¸ì—ê²Œë§Œ ì‹¤íŒ¨ ì „ì†¡
 }
 
 void TetrisRoom::DeleteUser(const int id)
 {
 	for (auto& r_user : room_users){
-		if (r_user.GetSession()->GetIndex() == id) { // »èÁ¦ÇÒ ¾ÆÀÌµğ °Ë»ö
+		if (r_user.GetSession()->GetIndex() == id) { // ì‚­ì œí•  ì•„ì´ë”” ê²€ìƒ‰
 			//room_mutex.lock();
 			r_user.SetUse(true, false);
-			r_user.ClearSession(); // ÇØ´ç ¾ÆÀÌµğ ¼¼¼Ç Á¤¸®
+			r_user.ClearSession(); // í•´ë‹¹ ì•„ì´ë”” ì„¸ì…˜ ì •ë¦¬
 
 			S2C_DELETE_USER_PACKET p;
 			p.size = sizeof(S2C_DELETE_USER_PACKET);
 			p.type = S2C_DELETE_USER;
 			p.id = id;
-			if (p.id == host_id) { // »õ ¹æÀå ¿©ºÎ¿¡ µû¸¥ Ã³¸®
+			if (p.id == host_id) { // ìƒˆ ë°©ì¥ ì—¬ë¶€ì— ë”°ë¥¸ ì²˜ë¦¬
 				int new_host_id = FindNewHost();
-				if (new_host_id == -1) { // ÇöÀç ¹æ¿¡ ¾Æ¹«µµ ¾øÀ¸¸é
+				if (new_host_id == -1) { // í˜„ì¬ ë°©ì— ì•„ë¬´ë„ ì—†ìœ¼ë©´
 					SetRoomState(EMPTY);
 				}
 				p.new_host_id = new_host_id;
@@ -113,7 +113,7 @@ void TetrisRoom::ReadyUser(const C2S_READY_PACKET& packet)
 	if (host_id == packet.id) return;
 
 	for (auto& r_user : room_users){
-		if (r_user.GetSession()->GetIndex() == packet.id) { // ·¹µğ »óÅÂ º¯È­
+		if (r_user.GetSession()->GetIndex() == packet.id) { // ë ˆë”” ìƒíƒœ ë³€í™”
 			r_user.SetIsReady(packet.is_ready);
 
 			S2C_READY_PACKET p;
@@ -134,9 +134,9 @@ void TetrisRoom::KickUser(const C2S_KICK_PACKET& packet)
 	if (packet.id != host_id) return;
 
 	for (auto& r_user : room_users) {
-		if (r_user.GetSession()->GetIndex() == packet.kick_user_id) { // »èÁ¦ÇÒ ¾ÆÀÌµğ °Ë»ö
+		if (r_user.GetSession()->GetIndex() == packet.kick_user_id) { // ì‚­ì œí•  ì•„ì´ë”” ê²€ìƒ‰
 			r_user.SetUse(true, false);
-			r_user.ClearSession(); // ÇØ´ç ¾ÆÀÌµğ ¼¼¼Ç Á¤¸®
+			r_user.ClearSession(); // í•´ë‹¹ ì•„ì´ë”” ì„¸ì…˜ ì •ë¦¬
 
 			S2C_KICK_PACKET p;
 			p.size = sizeof(S2C_KICK_PACKET);
@@ -161,39 +161,39 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 		}
 	}
 
-	if(host_index == -1) return; // host_id°¡ ³í¸®ÀûÀ¸·Î´Â Á¸ÀçÇØ¾ß ÇÏÁö¸¸.. ¹ö±× ¿¹¿ÜÃ³¸®
+	if(host_index == -1) return; // host_idê°€ ë…¼ë¦¬ì ìœ¼ë¡œëŠ” ì¡´ì¬í•´ì•¼ í•˜ì§€ë§Œ.. ë²„ê·¸ ì˜ˆì™¸ì²˜ë¦¬
 
 	int ready_user_count = 0;
 	S2C_START_PACKET p;
 
 	for(auto& r_user : room_users){
-		if (!r_user.GetInUse()) continue; // »ç¿ë ÁßÀÌÁö ¾ÊÀº ÀÎµ¦½º´Â °Ç³Ê¶Ü
-		if (r_user.GetSession()->GetIndex() == host_id) continue; // ¹æÀåÀº °Ç³Ê¶Ü
+		if (!r_user.GetInUse()) continue; // ì‚¬ìš© ì¤‘ì´ì§€ ì•Šì€ ì¸ë±ìŠ¤ëŠ” ê±´ë„ˆëœ€
+		if (r_user.GetSession()->GetIndex() == host_id) continue; // ë°©ì¥ì€ ê±´ë„ˆëœ€
 
-		if (!r_user.GetIsReady()) { // ¹æ¿¡ ÀÖ´Âµ¥ ·¹µğ°¡ ¾ÈµÈ »ç¶÷ÀÌ ÀÖÀ¸¸é ½ÃÀÛ ºÒ°¡			
+		if (!r_user.GetIsReady()) { // ë°©ì— ìˆëŠ”ë° ë ˆë””ê°€ ì•ˆëœ ì‚¬ëŒì´ ìˆìœ¼ë©´ ì‹œì‘ ë¶ˆê°€			
 			p.size = sizeof(S2C_START_PACKET);
 			p.type = S2C_START;
 			p.is_start = false;
 
-			room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // ½ÃÀÛ ºÒ°¡´Â ¹æÀå¿¡°Ô¸¸ º¸³»¸é µÊ
+			room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // ì‹œì‘ ë¶ˆê°€ëŠ” ë°©ì¥ì—ê²Œë§Œ ë³´ë‚´ë©´ ë¨
 			return;
 		}
 		else ++ready_user_count;
 	}
 
-	if (ready_user_count == 0) { // ¹æÀå¸¸ Á¸ÀçÇÏ¸é ´ç¿¬È÷ ½ÃÀÛ ºÒ°¡
+	if (ready_user_count == 0) { // ë°©ì¥ë§Œ ì¡´ì¬í•˜ë©´ ë‹¹ì—°íˆ ì‹œì‘ ë¶ˆê°€
 		p.size = sizeof(S2C_START_PACKET);
 		p.type = S2C_START;
 		p.is_start = false;
 
-		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // ½ÃÀÛ ºÒ°¡´Â ¹æÀå¿¡°Ô¸¸ º¸³»¸é µÊ
+		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // ì‹œì‘ ë¶ˆê°€ëŠ” ë°©ì¥ì—ê²Œë§Œ ë³´ë‚´ë©´ ë¨
 		return;
 	}
 
-	// ¸ğµç Á¶°Ç Åë°ú->°ÔÀÓ ½ÃÀÛ
+	// ëª¨ë“  ì¡°ê±´ í†µê³¼->ê²Œì„ ì‹œì‘
 	room_state = PLAY; 
 
-	// Å×Æ®¸®½º °ÔÀÓ Áß¿¡ µé¾î¿À´Â ÆĞÅ¶Àº ¶Ç µû·Î ºĞ¸®ÇÏ°í ½Í±â´Â ÇÑµ¥..
+	// í…ŒíŠ¸ë¦¬ìŠ¤ ê²Œì„ ì¤‘ì— ë“¤ì–´ì˜¤ëŠ” íŒ¨í‚·ì€ ë˜ ë”°ë¡œ ë¶„ë¦¬í•˜ê³  ì‹¶ê¸°ëŠ” í•œë°..
 	InitGame();
 
 	p.size = sizeof(S2C_START_PACKET);
@@ -247,3 +247,4 @@ int TetrisRoom::FindNewHost()
 	}
 	return -1;
 }
+

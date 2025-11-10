@@ -13,7 +13,7 @@ void Session::InitSession(int new_index, int new_id, SOCKET new_socket)
 	recv_over.SetOperationId(new_id);
 	index = new_index;
 	socket = new_socket;
-	remain_data_size = 0; // ¾ê ±âÁØÀ¸·Î ¹öÆÛ¿¡ ¾²´Ï±î ±»ÀÌ ¹öÆÛ ÀÚÃ¼¸¦ ÃÊ±âÈ­ÇÒ ÇÊ¿ä´Â ¾ø¾î º¸ÀÓ.
+	remain_data_size = 0; // ì–˜ ê¸°ì¤€ìœ¼ë¡œ ë²„í¼ì— ì“°ë‹ˆê¹Œ êµ³ì´ ë²„í¼ ìì²´ë¥¼ ì´ˆê¸°í™”í•  í•„ìš”ëŠ” ì—†ì–´ ë³´ì„.
 	room_index = -1;
 	state = LOBBY;
 }
@@ -28,8 +28,8 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
-	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // ÀÌ ÀÛ¾÷ÀÌ ½ÇÆĞÇß´Ù´Â °ÍÀº IOCP¿¡ µî·ÏµÇÁö ¾Ê¾Ò´Ù´Â ¶æ, ±×·¯³ª ÀÌ ½ÇÆĞ´Â DISCONNECT »çÀ¯¿¡ ÇØ´ç
-		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // µû¶ó¼­ IOCP¿¡ Á÷Á¢ µî·ÏÇÏ°í, Àü¼Û ¹ÙÀÌÆ®¸¦ 0À¸·Î ÇÏ¿© IOCP ·çÇÁ¿¡¼­ DISCONNECT
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // ì´ ì‘ì—…ì´ ì‹¤íŒ¨í–ˆë‹¤ëŠ” ê²ƒì€ IOCPì— ë“±ë¡ë˜ì§€ ì•Šì•˜ë‹¤ëŠ” ëœ», ê·¸ëŸ¬ë‚˜ ì´ ì‹¤íŒ¨ëŠ” DISCONNECT ì‚¬ìœ ì— í•´ë‹¹
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // ë”°ë¼ì„œ IOCPì— ì§ì ‘ ë“±ë¡í•˜ê³ , ì „ì†¡ ë°”ì´íŠ¸ë¥¼ 0ìœ¼ë¡œ í•˜ì—¬ IOCP ë£¨í”„ì—ì„œ DISCONNECT
 		std::cout << id << " Session::SendPacket() WSASend error, PGCS\n";
 	}
 }
@@ -38,7 +38,7 @@ void Session::RecvPacket(const HANDLE iocp_handle)
 {
 	if (state == NONE) return;
 	DWORD recv_flag = 0;
-	ZeroMemory(&recv_over.over, sizeof(recv_over.over)); // iocp ÀÛ¾÷À» ÇÒ ¶§¸¶´Ù ¿À¹ö·¦ ±¸Á¶Ã¼ ÃÊ±âÈ­ ÇÊ¿ä(¾ÈÁ¤¼º)
+	ZeroMemory(&recv_over.over, sizeof(recv_over.over)); // iocp ì‘ì—…ì„ í•  ë•Œë§ˆë‹¤ ì˜¤ë²„ë© êµ¬ì¡°ì²´ ì´ˆê¸°í™” í•„ìš”(ì•ˆì •ì„±)
 	recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
 	recv_over.wsabuf.buf = recv_over.packet_buf + remain_data_size;
 	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
@@ -82,6 +82,7 @@ bool Session::SetState(USER_STATE expected, USER_STATE desired)
 		else return false;
 	}
 
-	// °°À¸¸é ¿øÇÏ´Â »óÅÂÀÌ¹Ç·Î true ¹İÈ¯
+	// ê°™ìœ¼ë©´ ì›í•˜ëŠ” ìƒíƒœì´ë¯€ë¡œ true ë°˜í™˜
 	return true;
 }
+

@@ -9,12 +9,12 @@ IOCPServer::IOCPServer() : handler(this)
 
 	for (int i = 0; i < MAX_ROOM; ++i){
 		rooms[i] = new TetrisRoom(this);
-		rooms[i]->SetRoomId(i); // ¹æ ¾ÆÀÌµğ¸¦ Á¤ÇØÁÙ ºÎºĞÀÌ ¸¶¶¥Ä¡ ¾Ê¾Æ ¼­¹ö »ı¼º ½Ã ¸¸µé±â·Î Çß´Ù..
+		rooms[i]->SetRoomId(i); // ë°© ì•„ì´ë””ë¥¼ ì •í•´ì¤„ ë¶€ë¶„ì´ ë§ˆë•…ì¹˜ ì•Šì•„ ì„œë²„ ìƒì„± ì‹œ ë§Œë“¤ê¸°ë¡œ í–ˆë‹¤..
 	}
 
 	//packet_handler = std::make_unique<PacketHandler>(this);
 	//for (auto& user : users) {
-	//	user = std::make_unique<Session>(packet_handler.get()); // packet_handler´Â unique_ptrÀÌ¹Ç·Î get()À» ÀÌ¿ëÇØ raw ptrÀ» ³Ñ±ä´Ù.
+	//	user = std::make_unique<Session>(packet_handler.get()); // packet_handlerëŠ” unique_ptrì´ë¯€ë¡œ get()ì„ ì´ìš©í•´ raw ptrì„ ë„˜ê¸´ë‹¤.
 	//}
 
 	WSAStartup(MAKEWORD(2, 2), &wsadata);
@@ -53,7 +53,7 @@ void IOCPServer::ProcessGQCS()
 		DWORD transferred_bytes = 0;
 		ULONG_PTR key = 0;
 		WSAOVERLAPPED* over = nullptr;
-		BOOL result = GetQueuedCompletionStatus( // ÀÎÀÚ·Î ³Ñ±ä ÁÖ¼Ò º¯¼öÀÇ °ªÀ» Ã¤¿öÁØ´Ù.
+		BOOL result = GetQueuedCompletionStatus( // ì¸ìë¡œ ë„˜ê¸´ ì£¼ì†Œ ë³€ìˆ˜ì˜ ê°’ì„ ì±„ì›Œì¤€ë‹¤.
 			iocp_handle,
 			&transferred_bytes,
 			&key,
@@ -64,14 +64,14 @@ void IOCPServer::ProcessGQCS()
 
 		if (!result){
 			if (ex_over->op_type == ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
-			else { // Å¬¶óÀÌ¾ğÆ® °­Á¦ Á¾·áÀÏ °æ¿ì
+			else { // í´ë¼ì´ì–¸íŠ¸ ê°•ì œ ì¢…ë£Œì¼ ê²½ìš°
 				Disconnect(static_cast<int>(key));
 				if (ex_over->op_type == SEND) delete ex_over;
 			}
 			continue;
 		}
 
-		// Å¬¶óÀÌ¾ğÆ® Á¤»ó Á¾·áÀÏ °æ¿ì
+		// í´ë¼ì´ì–¸íŠ¸ ì •ìƒ ì¢…ë£Œì¼ ê²½ìš°
 		if (transferred_bytes == 0 && ex_over->op_type != ACCEPT) {
 			Disconnect(static_cast<int>(key));
 			if (ex_over->op_type == SEND) delete ex_over;
@@ -100,7 +100,7 @@ void IOCPServer::ProcessGQCS()
 				//send_p.id = users[new_index]->GetId();
 				//SendToSelf((char*)&send_p, new_index);
 			}
-			else std::cout << "¼­¹ö°¡ È¥ÀâÇÕ´Ï´Ù. ¿¬°áÀ» Á¾·áÇÕ´Ï´Ù.\n";
+			else std::cout << "ì„œë²„ê°€ í˜¼ì¡í•©ë‹ˆë‹¤. ì—°ê²°ì„ ì¢…ë£Œí•©ë‹ˆë‹¤.\n";
 
 			ZeroMemory(&accept_over.over, sizeof(accept_over.over));
 			int addr_size = sizeof(SOCKADDR_IN);
@@ -144,14 +144,14 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 
 	short packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 
-	while (users[user_index]->GetRemainDataSize() >= packet_size) // ³²¾ÆÀÖ´Â µ¥ÀÌÅÍ Å©±â°¡ ½ÇÁ¦ Ã³¸®°¡´ÉÇÑ µ¥ÀÌÅÍ Å©±âÀÌ»ó Á¸ÀçÇÑ´Ù¸é
+	while (users[user_index]->GetRemainDataSize() >= packet_size) // ë‚¨ì•„ìˆëŠ” ë°ì´í„° í¬ê¸°ê°€ ì‹¤ì œ ì²˜ë¦¬ê°€ëŠ¥í•œ ë°ì´í„° í¬ê¸°ì´ìƒ ì¡´ì¬í•œë‹¤ë©´
 	{
 		char p_buffer[BUF_SIZE];
-		// ÆĞÅ¶ ºĞ¸®: packet_buffer¿¡ º¹»ç ÈÄ Ã³¸®
+		// íŒ¨í‚· ë¶„ë¦¬: packet_bufferì— ë³µì‚¬ í›„ ì²˜ë¦¬
 		memcpy(p_buffer, users[user_index]->GetExOver().packet_buf, packet_size);
 		handler.HandlePacket(p_buffer, user_index);
 
-		 // Ã³¸®ÇÑ ÆĞÅ¶Àº ³²Àº µ¥ÀÌÅÍ¿¡¼­ Á¦°Å
+		 // ì²˜ë¦¬í•œ íŒ¨í‚·ì€ ë‚¨ì€ ë°ì´í„°ì—ì„œ ì œê±°
 		users[user_index]->SetRemainDataSize(-packet_size);
 		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
 		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
@@ -161,7 +161,7 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 void IOCPServer::BroadCastLobby(char* packet)
 {
 	for (auto& user : users) {
-		if (user->GetState() == LOBBY) {// ÇöÀç ÀÌ »óÅÂ´Â ¼­¹ö¿¡ ¿¬°áµÇ¾î ÀÖ´Â »óÅÂÀÌ¹Ç·Î, ³ªÁß¿¡ ·Îºñ, ¹æ¿¡ µû¶ó ±¸ºĞ ÇÊ¿ä
+		if (user->GetState() == LOBBY) {// í˜„ì¬ ì´ ìƒíƒœëŠ” ì„œë²„ì— ì—°ê²°ë˜ì–´ ìˆëŠ” ìƒíƒœì´ë¯€ë¡œ, ë‚˜ì¤‘ì— ë¡œë¹„, ë°©ì— ë”°ë¼ êµ¬ë¶„ í•„ìš”
 			user->SendPacket(packet, iocp_handle);
 		}
 	}
@@ -179,15 +179,15 @@ void IOCPServer::CreateRoom(char* packet)
 		return;
 	}
 
-	// ¾îÂ÷ÇÇ ¿ÀÇÂ°ú ·ÏÀº ¸¶Áö¸·¿¡ ºñ¹Ğ¹øÈ£ ÇÊµå Â÷ÀÌ À¯¹«ÀÌ¹Ç·Î, ±×³É ¿ÀÇÂ ±¸Á¶Ã¼·Î ¸¸µé°í id¿¡ Á¢±ÙÇÑ´Ù.
+	// ì–´ì°¨í”¼ ì˜¤í”ˆê³¼ ë¡ì€ ë§ˆì§€ë§‰ì— ë¹„ë°€ë²ˆí˜¸ í•„ë“œ ì°¨ì´ ìœ ë¬´ì´ë¯€ë¡œ, ê·¸ëƒ¥ ì˜¤í”ˆ êµ¬ì¡°ì²´ë¡œ ë§Œë“¤ê³  idì— ì ‘ê·¼í•œë‹¤.
 	C2S_ADD_OPEN_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
 	users[p->id]->SetRoomIndex(room_index);
-	rooms[room_index]->InitRoom(packet, users[p->id]); // ÃÊ±âÈ­´Â ±×³É ¹æ ³»ºÎ¿¡¼­ Ã³¸®ÇÏ±â.
+	rooms[room_index]->InitRoom(packet, users[p->id]); // ì´ˆê¸°í™”ëŠ” ê·¸ëƒ¥ ë°© ë‚´ë¶€ì—ì„œ ì²˜ë¦¬í•˜ê¸°.
 }
 
 int IOCPServer::GetNewUserId()
 {
-	return id_generator.fetch_add(1) + 1; // fetch_add´Â °ªÀ» ½ÇÁ¦·Î ¿øÀÚÀûÀ¸·Î Áõ°¡½ÃÅ°Áö¸¸, ¹İÈ¯ÇÏ´Â °ÍÀº Áõ°¡ ÀÌÀüÀÇ °ª
+	return id_generator.fetch_add(1) + 1; // fetch_addëŠ” ê°’ì„ ì‹¤ì œë¡œ ì›ìì ìœ¼ë¡œ ì¦ê°€ì‹œí‚¤ì§€ë§Œ, ë°˜í™˜í•˜ëŠ” ê²ƒì€ ì¦ê°€ ì´ì „ì˜ ê°’
 }
 
 int IOCPServer::GetEmptyUserIndex()
@@ -217,13 +217,13 @@ int IOCPServer::GetEmptyRoomIndex()
 
 void IOCPServer::Disconnect(int user_index)
 {
-	if (users[user_index]->GetState() == NONE) return; // ÀÌ¹Ì ²÷±è->¶Ç send -> send ½ÇÆĞ -> PQCS -> Disconnect ¹«ÇÑ·çÇÁ ¹æÁö
+	if (users[user_index]->GetState() == NONE) return; // ì´ë¯¸ ëŠê¹€->ë˜ send -> send ì‹¤íŒ¨ -> PQCS -> Disconnect ë¬´í•œë£¨í”„ ë°©ì§€
 	
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
 	p.type = S2C_DISCONNECT;
 	//SendToSelf(reinterpret_cast<char*>(&p), user_index);
-	closesocket(users[user_index]->GetSocket()); // closesocket ÀÌÈÄ ÀÌÀü ¼ÒÄÏ¿¡ ´ëÇÑ iocp ¿Ï·á(½ÇÆĞ·Î) ÅëÁö°¡ ¾ğÁ¦ ¿ÃÁö ºÒºĞ¸íÇØ¼­ ´ÙÀ½¿¡ ¿¬°áµÈ ¼ÒÄÏÀÌ ¹ŞÀ» °æ¿ì ¿µÇâÀÌ °¥ ¼ö ÀÖ´Ù°í ÇÏ´Âµ¥..
+	closesocket(users[user_index]->GetSocket()); // closesocket ì´í›„ ì´ì „ ì†Œì¼“ì— ëŒ€í•œ iocp ì™„ë£Œ(ì‹¤íŒ¨ë¡œ) í†µì§€ê°€ ì–¸ì œ ì˜¬ì§€ ë¶ˆë¶„ëª…í•´ì„œ ë‹¤ìŒì— ì—°ê²°ëœ ì†Œì¼“ì´ ë°›ì„ ê²½ìš° ì˜í–¥ì´ ê°ˆ ìˆ˜ ìˆë‹¤ê³  í•˜ëŠ”ë°..
 	users[user_index]->SetState(NONE);
 	std::cout << "Session[" << user_index << "] disconnect/Id: " << id_generator << std::endl;
 }

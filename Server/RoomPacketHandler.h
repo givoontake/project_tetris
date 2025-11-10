@@ -11,4 +11,3 @@ public:
 	RoomPacketHandler(TetrisRoom* room, IOCPServer* server);
 	virtual void HandlePacket(char* packet, int user_index) override;
 };
-

@@ -12,4 +12,3 @@ public:
 	int DeQ();
 	bool IsEmpty();
 };
-

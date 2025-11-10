@@ -10,3 +10,4 @@ public:
 	PacketHandler(IOCPServer* server);
 	virtual void HandlePacket(char* pakcet, int user_index);
 };
+

@@ -18,12 +18,12 @@ class Session
 	int index = -1;
 	int room_index = -1;
 	int remain_data_size = 0;
-	// ³²Àº µ¥ÀÌÅÍ´Â recv_over ¹öÆÛ¿¡ µé¾î ÀÖÀ¸¹Ç·Î Ãß°¡·Î ¸¸µé ÇÊ¿ä°¡ ¾øÀ½.
+	// ë‚¨ì€ ë°ì´í„°ëŠ” recv_over ë²„í¼ì— ë“¤ì–´ ìˆìœ¼ë¯€ë¡œ ì¶”ê°€ë¡œ ë§Œë“¤ í•„ìš”ê°€ ì—†ìŒ.
 
 	Atomic<USER_STATE> state = NONE;
 public:
 
-	Session(); // ÀÎÀÚ·Î IPacketHandler¸¦ ¹ŞÀ» ¶§ ÀÚ½Ä Å¬·¡½º Packethandler¸¦ ¹Ş´Â´Ù->¾÷Ä³½ºÆÃ, ÀÚ½Ä¿¡¼­ ÀçÁ¤ÀÇÇÑ °¡»óÇÔ¼ö¸¸ »ç¿ë °¡´ÉÇÏ´Ù.
+	Session(); // ì¸ìë¡œ IPacketHandlerë¥¼ ë°›ì„ ë•Œ ìì‹ í´ë˜ìŠ¤ Packethandlerë¥¼ ë°›ëŠ”ë‹¤->ì—…ìºìŠ¤íŒ…, ìì‹ì—ì„œ ì¬ì •ì˜í•œ ê°€ìƒí•¨ìˆ˜ë§Œ ì‚¬ìš© ê°€ëŠ¥í•˜ë‹¤.
 
 	void InitSession(int new_index, int new_id, SOCKET new_socket);
 	void SendPacket(char* packet, const HANDLE iocp_handle);
@@ -45,8 +45,7 @@ public:
 	void SetIndex(int new_index) { index = new_index; }
 	void SetRoomIndex(int new_room_id) { room_index = new_room_id; }
 	void SetRemainDataSize(int new_data_size) { remain_data_size += new_data_size; }
-	void SetState(USER_STATE new_state) { state = new_state; } // Èì..?
+	void SetState(USER_STATE new_state) { state = new_state; } // í ..?
 	bool SetState(USER_STATE expected, USER_STATE desired);
 	
 };
-

@@ -69,3 +69,4 @@ inline void PrintPacketType(char type)
 
 	std::cout << std::endl;
 }
+

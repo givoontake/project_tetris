@@ -8,9 +8,9 @@ PacketHandler::PacketHandler(IOCPServer* server) : server(server)
 {
 }
 
-// ÆĞÅ¶ ÇÚµé·¯¸¦ µû·Î ¸¸µé°æ¿ì IOCPServer ¸É¹ö º¯¼ö Á¢±ÙÀ» À§ÇÑ getter°¡ ¸¹ÀÌ ÇÊ¿äÇÏ´Ù..
-// IServer °¡»óÇÔ¼ö·Î ¸¸µé°í ¾÷Ä³½ºÆÃÀ» ÇÏ´Â ÀÛ¾÷Àº..ºÒÇÊ¿äÇÏ°Ô º¹ÀâÇØÁö´Â ´À³¦ÀÌ ÀÖ´Ù.
-// IOCPÀÇ ¸É¹ö ÇÔ¼ö·Î ¸¸µé¸é ÆíÇÏ±ä ÇÑµ¥.. switch·Î ¸¸µé²¨¶ó ³Ê¹« ±æ¾î±æ °Í °°¾Æ °ÆÁ¤ÀÌ´Ù.. ¾î¶»°Ô ÇØ¾ßÇÒ±î?
+// íŒ¨í‚· í•¸ë“¤ëŸ¬ë¥¼ ë”°ë¡œ ë§Œë“¤ê²½ìš° IOCPServer ë§´ë²„ ë³€ìˆ˜ ì ‘ê·¼ì„ ìœ„í•œ getterê°€ ë§ì´ í•„ìš”í•˜ë‹¤..
+// IServer ê°€ìƒí•¨ìˆ˜ë¡œ ë§Œë“¤ê³  ì—…ìºìŠ¤íŒ…ì„ í•˜ëŠ” ì‘ì—…ì€..ë¶ˆí•„ìš”í•˜ê²Œ ë³µì¡í•´ì§€ëŠ” ëŠë‚Œì´ ìˆë‹¤.
+// IOCPì˜ ë§´ë²„ í•¨ìˆ˜ë¡œ ë§Œë“¤ë©´ í¸í•˜ê¸´ í•œë°.. switchë¡œ ë§Œë“¤êº¼ë¼ ë„ˆë¬´ ê¸¸ì–´ê¸¸ ê²ƒ ê°™ì•„ ê±±ì •ì´ë‹¤.. ì–´ë–»ê²Œ í•´ì•¼í• ê¹Œ?
 
 char temp_id[MAX_USER_ID] = "master";
 char temp_password[MAX_USER_PASSWORD] = "1234";
@@ -27,7 +27,7 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	case C2S_LOGIN: {
 		C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
 
-		// ¿ì¼±Àº ¿¬°á ¿äÃ»ÀÌ µé¾î¿À´Â Áï½Ã ¼¼¼ÇÀ» »ç¿ëÇÏµµ·Ï ÇÔ. -> ³ªÁß¿¡ ¹İµå½Ã ¹Ù²ã¾ßÇÔ
+		// ìš°ì„ ì€ ì—°ê²° ìš”ì²­ì´ ë“¤ì–´ì˜¤ëŠ” ì¦‰ì‹œ ì„¸ì…˜ì„ ì‚¬ìš©í•˜ë„ë¡ í•¨. -> ë‚˜ì¤‘ì— ë°˜ë“œì‹œ ë°”ê¿”ì•¼í•¨
 		S2C_LOGIN_PACKET send_p;
 		send_p.size = sizeof(S2C_LOGIN_PACKET);
 		send_p.type = S2C_LOGIN;
@@ -42,7 +42,7 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 		break;
 	}
 		
-	case C2S_MESSAGE: { // Å×½ºÆ®´Â ¸Ş¼¼Áö °¡º¯À¸·Î ÇØ³õ°í ÀÌ°Ç °¡º¯À¸·Î ¾ÈÇß³×;; ¹¹Çß³Ä ³ª
+	case C2S_MESSAGE: { // í…ŒìŠ¤íŠ¸ëŠ” ë©”ì„¸ì§€ ê°€ë³€ìœ¼ë¡œ í•´ë†“ê³  ì´ê±´ ê°€ë³€ìœ¼ë¡œ ì•ˆí–ˆë„¤;; ë­í–ˆëƒ ë‚˜
 		C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
 		char* send_p = new char[recv_p->size];
 		int msg_size = recv_p->size - sizeof(C2S_MESSAGE_PACKET);
@@ -50,8 +50,8 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 		front_p.size = recv_p->size;
 		front_p.type = S2C_MESSAGE;
 		front_p.id = recv_p->id;
-		memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET)); // ±¸Á¶Ã¼ ºÎºĞ º¹»ç
-		memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size); // °¡º¯µ¥ÀÌÅÍ º¹»ç
+		memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET)); // êµ¬ì¡°ì²´ ë¶€ë¶„ ë³µì‚¬
+		memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size); // ê°€ë³€ë°ì´í„° ë³µì‚¬
 
 		server->BroadCastLobby(send_p);
 
@@ -61,8 +61,8 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	}
 
 	case C2S_TEST: {
-		// recv_p->size¿¡ ±¸Á¶Ã¼ + °¡º¯±æÀÌ µ¥ÀÌÅÍ°¡ µé¾îÀÖ´Ù´Â °¡Á¤ÇÏ¿¡ ±¸Çö->³ªÁß¿¡ Å×½ºÆ® ÇÁ·Î±×·¥ ·ÎÁ÷µµ ¹Ù²ã¾ßÇÔ
-		//std::cout << "Å×½ºÆ® ÆĞÅ¶ ¼ö½Å" << std::endl;
+		// recv_p->sizeì— êµ¬ì¡°ì²´ + ê°€ë³€ê¸¸ì´ ë°ì´í„°ê°€ ë“¤ì–´ìˆë‹¤ëŠ” ê°€ì •í•˜ì— êµ¬í˜„->ë‚˜ì¤‘ì— í…ŒìŠ¤íŠ¸ í”„ë¡œê·¸ë¨ ë¡œì§ë„ ë°”ê¿”ì•¼í•¨
+		//std::cout << "í…ŒìŠ¤íŠ¸ íŒ¨í‚· ìˆ˜ì‹ " << std::endl;
 		C2S_TEST_PACKET* recv_p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
 		char* send_p = new char[recv_p->size];
 		int msg_size = recv_p->size - sizeof(C2S_TEST_PACKET);
@@ -71,8 +71,8 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 		front_p.type = S2C_TEST;
 		front_p.id = recv_p->id;
 		front_p.last_time = recv_p->last_time;
-		memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET)); // ±¸Á¶Ã¼ ºÎºĞ º¹»ç
-		memcpy(send_p + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_TEST_PACKET), msg_size); // °¡º¯µ¥ÀÌÅÍ º¹»ç
+		memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET)); // êµ¬ì¡°ì²´ ë¶€ë¶„ ë³µì‚¬
+		memcpy(send_p + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_TEST_PACKET), msg_size); // ê°€ë³€ë°ì´í„° ë³µì‚¬
 
 		server->BroadCastLobby(send_p);
 
@@ -99,3 +99,4 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	}
 	
 }
+

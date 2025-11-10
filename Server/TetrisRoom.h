@@ -14,7 +14,7 @@ enum ROOM_STATE {EMPTY, WAIT, PLAY};
 class TetrisRoom
 {
 	//std::array<RoomSession*, MAX_USER>& users;
-	std::vector<RoomSession> room_users; // ¾ÆÅä¹Í º¯¼ö´Â º¹»ç°¡ ¾ÈµÅ¼­..
+	std::vector<RoomSession> room_users; // ì•„í† ë¯¹ ë³€ìˆ˜ëŠ” ë³µì‚¬ê°€ ì•ˆë¼ì„œ..
 	RoomPacketHandler room_handler;
 	IOCPServer* server;
 	Atomic<ROOM_STATE> room_state;
@@ -35,8 +35,8 @@ public:
 	ROOM_STATE GetRoomState() const { return room_state.GetSelf(); }
 
 	void SetRoomId(const int room_index);
-	void SetRoomState(const ROOM_STATE new_state); // ¹æ »óÅÂ º¯°æÀº µüÈ÷ µ¿½ÃÁ¢±ÙÇÒ ÀÏÀÌ ¾ø¾îº¸ÀÓ
-	int FindNewHost(); // ¹æÀåÀÌ ³ª°¬À» ¶§ »õ·Î¿î ¹æÀå Ã£±â
+	void SetRoomState(const ROOM_STATE new_state); // ë°© ìƒíƒœ ë³€ê²½ì€ ë”±íˆ ë™ì‹œì ‘ê·¼í•  ì¼ì´ ì—†ì–´ë³´ì„
+	int FindNewHost(); // ë°©ì¥ì´ ë‚˜ê°”ì„ ë•Œ ìƒˆë¡œìš´ ë°©ì¥ ì°¾ê¸°
 
 	void InitRoom(char* packet, Session* session);
 	void AddUser(Session* new_session);
@@ -50,4 +50,3 @@ public:
 	void InitGame();
 	//void SendToSelf(char* packet, Session* session);
 };
-

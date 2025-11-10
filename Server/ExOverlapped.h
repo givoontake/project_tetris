@@ -10,7 +10,7 @@ struct ExOverlapped {
 	WSABUF wsabuf;
 	char packet_buf[BUF_SIZE];
 	OP_TYPE op_type;
-	int operation_id; // ¼¼¼ÇÀÇ id¿Í °°À½
+	int operation_id; // ì„¸ì…˜ì˜ idì™€ ê°™ìŒ
 
 	ExOverlapped()
 	{
@@ -33,3 +33,4 @@ struct ExOverlapped {
 	//	op_type = type;
 	//}
 };
+

@@ -24,12 +24,12 @@ class IOCPServer
 	PacketHandler handler;
 	std::atomic<int> id_generator = -1;
 
-	//std::unique_ptr<PacketHandler> packet_handler; // ¸ÕÀú ¼±¾ğµÇ¾î ÀÖ´Ù¸é ÇØ´ç º¯¼ö´Â ³ªÁß¿¡ ¼±¾ğµÇ´Â º¯¼ö¿¡¼­ »ç¿ë °¡´ÉÇÏ´Ù.
+	//std::unique_ptr<PacketHandler> packet_handler; // ë¨¼ì € ì„ ì–¸ë˜ì–´ ìˆë‹¤ë©´ í•´ë‹¹ ë³€ìˆ˜ëŠ” ë‚˜ì¤‘ì— ì„ ì–¸ë˜ëŠ” ë³€ìˆ˜ì—ì„œ ì‚¬ìš© ê°€ëŠ¥í•˜ë‹¤.
 	std::array<Session*, MAX_USER> users;
 	std::array<TetrisRoom*, MAX_ROOM> rooms;
 	
-	// º¯¼ö-> ÄÁÅ×ÀÌ³Ê »ı¼º ½Ã °´Ã¼ »ı¼ºÀÚ¿¡ ÀÎÀÚ ³Ö´Â°Ô ¾ÈµÈ´Ù.
-	// Æ÷ÀÎÅÍ -> »ı¼ºÀÚ¿¡¼­ ÀÎÀÚ ³Ö°í µ¿ÀûÇÒ´ç ÇÏ¸é µÈ´Ù.
+	// ë³€ìˆ˜-> ì»¨í…Œì´ë„ˆ ìƒì„± ì‹œ ê°ì²´ ìƒì„±ìì— ì¸ì ë„£ëŠ”ê²Œ ì•ˆëœë‹¤.
+	// í¬ì¸í„° -> ìƒì„±ìì—ì„œ ì¸ì ë„£ê³  ë™ì í• ë‹¹ í•˜ë©´ ëœë‹¤.
 
 	bool is_running = true;
 	
@@ -56,7 +56,5 @@ public:
 	void BroadCastLobby(char* packet);
 	//void BroadCastRoom(char* packet, int room_id);
 	void SendToSelf(char* packet, int self_index);
-	void CreateRoom(char* packet); // ÄÁÅ×ÀÌ³Ê Á¶ÀÛÀÌ ÇÊ¿äÇÑ ÆĞÅ¶Àº ¼­¹ö¿¡ ÇÔ¼ö¸¦ ÀÏ´Ü ¸¸µé¾î µÎ°í Ã³¸®
-	
+	void CreateRoom(char* packet); // ì»¨í…Œì´ë„ˆ ì¡°ì‘ì´ í•„ìš”í•œ íŒ¨í‚·ì€ ì„œë²„ì— í•¨ìˆ˜ë¥¼ ì¼ë‹¨ ë§Œë“¤ì–´ ë‘ê³  ì²˜ë¦¬
 };
-

@@ -3,7 +3,7 @@
 constexpr int BOARD_WIDTH = 10;
 constexpr int BOARD_HEIGHT = 20;
 
-enum MOVE_TYPE { RIGHT, LEFT, DOWN, ROTATE, TIMEOUT, DROP }; // timeout-> ÀÏÁ¤  ½Ã°£ÀÌ Áö³ª ÀÚµ¿À¸·Î ¾Æ·¡·Î ÇÑ Ä­ ÀÌµ¿ÇÏ´Â °Í
+enum MOVE_TYPE { RIGHT, LEFT, DOWN, ROTATE, TIMEOUT, DROP }; // timeout-> ì¼ì •  ì‹œê°„ì´ ì§€ë‚˜ ìë™ìœ¼ë¡œ ì•„ë˜ë¡œ í•œ ì¹¸ ì´ë™í•˜ëŠ” ê²ƒ
 
 class Tetris
 {
@@ -17,4 +17,3 @@ public:
 	int GetRandomX();
 	void ClearBoard();
 };
-

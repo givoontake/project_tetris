@@ -6,7 +6,7 @@ constexpr int PORT_NUM = 12345;
 
 constexpr int MAX_USER = 10000;
 constexpr int MAX_ROOM = 5000;
-constexpr int MAX_ROOM_NAME = 48; // 16ÀÚ * UTF-8 1¹®ÀÚ Å©±â(3)
+constexpr int MAX_ROOM_NAME = 48; // 16ì * UTF-8 1ë¬¸ì í¬ê¸°(3)
 constexpr int MAX_ROOM_PASSWORD = 48;
 constexpr int MAX_ARRAY_SIZE = 127;
 constexpr int ID_SIZE = 16;
@@ -65,7 +65,7 @@ struct S2C_TEST_PACKET {
 struct C2S_TEST_PACKET {
 	short size;
 	char type;
-	int id; // Å×½ºÆ® ÇÁ·Î±×·¥µµ ´ÙÁß Å¬¶óÀÌ¾ğÆ®¸¦ °ü¸®ÁßÀÌ¹Ç·Î ÇÊ¿ä
+	int id; // í…ŒìŠ¤íŠ¸ í”„ë¡œê·¸ë¨ë„ ë‹¤ì¤‘ í´ë¼ì´ì–¸íŠ¸ë¥¼ ê´€ë¦¬ì¤‘ì´ë¯€ë¡œ í•„ìš”
 	long long last_time;
 };
 
@@ -82,7 +82,7 @@ struct S2C_DISCONNECT_PACKET {
 };
 
 struct C2S_ADD_OPEN_ROOM_PACKET {
-	short size; // ³ªÁß¿¡ ¹æ, °ÔÀÓ µîÀ¸·Î ¸Ş¼¼Áö ÆĞÅ¶°ú ºĞ¸®ÇÑ´Ù¸é char·Î ¹Ù²Ü ¼öµµ ÀÖÁö ¾ÊÀ»±î..?
+	short size; // ë‚˜ì¤‘ì— ë°©, ê²Œì„ ë“±ìœ¼ë¡œ ë©”ì„¸ì§€ íŒ¨í‚·ê³¼ ë¶„ë¦¬í•œë‹¤ë©´ charë¡œ ë°”ê¿€ ìˆ˜ë„ ìˆì§€ ì•Šì„ê¹Œ..?
 	char type;
 	int id;
 	char max_user;

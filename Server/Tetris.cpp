@@ -9,9 +9,9 @@ Tetris::Tetris()
     ClearBoard();
 }
 
-// ÁÂÇ¥ °ü¸®´Â Á¤ÀÇµÈ Å×Æ®·Î¹Ì³ë Àı´ë ÁÂÇ¥ + Å°º¸µå·Î ÀÌµ¿ÇÑ »ó´ë ÁÂÇ¥¸¦ ´õÇØ ÇöÀç Å×Æ®·Î¹Ì³ë ÁÂÇ¥¸¦ ±¸ÇÑ´Ù.
-// ±×·¯¸é È¸ÀüµÈ Å×Æ®·Î¹Ì³ë °ü¸®°¡ ¼ö¿ùÇØÁø´Ù.
-bool Tetris::HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE move_type) //bool ¹İÈ¯Àº Ãæµ¹ ¼º°ø ½Ã ´ÙÀ½ ºí·Ï ½ºÆùÀÌ µÇ¾î¾ß ÇÏ´Â °ÍÀ» »ı°¢ÇÔ
+// ì¢Œí‘œ ê´€ë¦¬ëŠ” ì •ì˜ëœ í…ŒíŠ¸ë¡œë¯¸ë…¸ ì ˆëŒ€ ì¢Œí‘œ + í‚¤ë³´ë“œë¡œ ì´ë™í•œ ìƒëŒ€ ì¢Œí‘œë¥¼ ë”í•´ í˜„ì¬ í…ŒíŠ¸ë¡œë¯¸ë…¸ ì¢Œí‘œë¥¼ êµ¬í•œë‹¤.
+// ê·¸ëŸ¬ë©´ íšŒì „ëœ í…ŒíŠ¸ë¡œë¯¸ë…¸ ê´€ë¦¬ê°€ ìˆ˜ì›”í•´ì§„ë‹¤.
+bool Tetris::HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE move_type) //bool ë°˜í™˜ì€ ì¶©ëŒ ì„±ê³µ ì‹œ ë‹¤ìŒ ë¸”ë¡ ìŠ¤í°ì´ ë˜ì–´ì•¼ í•˜ëŠ” ê²ƒì„ ìƒê°í•¨
 {
     Tetromino if_move_tetromino = tetromino;
     switch(move_type){
@@ -33,15 +33,15 @@ bool Tetris::HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE move_type) 
 
     case ROTATE: {
         const std::vector<Tetromino>& shapes = TETROMINOS.at(if_move_tetromino.type);
-        if (if_move_tetromino.shape_index + 1 < shapes.size())++if_move_tetromino.shape_index; // ´ÙÀ½ ÀÎµ¦½º°¡ Á¸ÀçÇÏ¸é
-        else if_move_tetromino.shape_index = 0; // ´ÙÀ½ ÀÎµ¦½º°¡ ¾ø´Ù¸é
+        if (if_move_tetromino.shape_index + 1 < shapes.size())++if_move_tetromino.shape_index; // ë‹¤ìŒ ì¸ë±ìŠ¤ê°€ ì¡´ì¬í•˜ë©´
+        else if_move_tetromino.shape_index = 0; // ë‹¤ìŒ ì¸ë±ìŠ¤ê°€ ì—†ë‹¤ë©´
 
-        if_move_tetromino.default_pos = shapes[if_move_tetromino.shape_index].default_pos; // È¸ÀüµÈ ÀÎµ¦½º·Î Å×Æ®·Î¹Ì³ë º¯°æ
+        if_move_tetromino.default_pos = shapes[if_move_tetromino.shape_index].default_pos; // íšŒì „ëœ ì¸ë±ìŠ¤ë¡œ í…ŒíŠ¸ë¡œë¯¸ë…¸ ë³€ê²½
         break;
     }
 
     case DROP:{
-        ++if_move_tetromino.moved_y; // ÀÏ´Ü ¶È°°ÀÌ 1Ä­ ¿òÁ÷¿´À» ¶§ºÎÅÍ ÆÇÁ¤ ½ÃÀÛ
+        ++if_move_tetromino.moved_y; // ì¼ë‹¨ ë˜‘ê°™ì´ 1ì¹¸ ì›€ì§ì˜€ì„ ë•Œë¶€í„° íŒì • ì‹œì‘
     }
 
     }
@@ -58,65 +58,65 @@ bool Tetris::HandleTetrominoKeyInput(Tetromino& tetromino, MOVE_TYPE move_type) 
         real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_y;
     }
 
-    // ÁÂ¿ì ÀÌµ¿ ¹× È¸ÀüÀº ÂøÁö °è»êÀÌ µÇ¸é ¾ÈµÈ´Ù -> ¿·À¸·Î ³¢¿ö³Ö´Â µ¿ÀÛ µîÀÌ °¡´ÉÇØ¾ß ÇÔ.
-    // ÂøÁö(´Ù¿î, Å¸ÀÓ¾Æ¿ô)¸¸ »óÅÂ º¯°æÀÌ °¡´ÉÇØ¾ß ÇÑ´Ù.
-    for (auto& pos : real_moved_tetromino_pos) { // ¾Æ·¡ Ãæµ¹ Àü¿¡ ÆÇÁ¤À» ÇÏ°í, Ãæµ¹ ÈÄ ¹Ù²ï º¸µå¿¡ ´ëÇØ¼­ ¶Ç ÆÇÁ¤ÀÌ ÇÊ¿ä
-        if (pos.x >= BOARD_WIDTH || pos.x < 0) return false; // ÁÂ¿ì·Î ¹ş¾î³­ »óÅÂ¶ó¸é, ¿ø·¡ À§Ä¡·Î µ¹¾Æ°¡¾ß ÇÑ´Ù.(¿òÁ÷ÀÓ ÀÎÁ¤ x)
-        if (pos.y >= BOARD_HEIGHT || board[pos.y][pos.x] == true) { // ¾Æ·¡·Î ¿òÁ÷¿´´Ù°í °¡Á¤ÇÑ ÀÚ¸®¿¡ ÀÌ¹Ì ºí·ÏÀÌ ÀÖ°Å³ª ¹Ù´Úº¸´Ù ¾Æ·¡¶ó¸é, ÀÌÀü À§Ä¡¿¡ ½×¿©¾ß ÇÔ.-> ÀÎÀÚ·Î ¹ŞÀº Å×Æ®·Î¹Ì³ë
-            if (move_type == DOWN || move_type == TIMEOUT || move_type == DROP) { // 1Ä­ µå¶øµÈ »óÈ²¿¡¼­ Àß¸øµÈ À§Ä¡¶ó¸é, ÀÌÀü À§Ä¡¿¡ ½×¿©¾ß ÇÔ.
+    // ì¢Œìš° ì´ë™ ë° íšŒì „ì€ ì°©ì§€ ê³„ì‚°ì´ ë˜ë©´ ì•ˆëœë‹¤ -> ì˜†ìœ¼ë¡œ ë¼ì›Œë„£ëŠ” ë™ì‘ ë“±ì´ ê°€ëŠ¥í•´ì•¼ í•¨.
+    // ì°©ì§€(ë‹¤ìš´, íƒ€ì„ì•„ì›ƒ)ë§Œ ìƒíƒœ ë³€ê²½ì´ ê°€ëŠ¥í•´ì•¼ í•œë‹¤.
+    for (auto& pos : real_moved_tetromino_pos) { // ì•„ë˜ ì¶©ëŒ ì „ì— íŒì •ì„ í•˜ê³ , ì¶©ëŒ í›„ ë°”ë€ ë³´ë“œì— ëŒ€í•´ì„œ ë˜ íŒì •ì´ í•„ìš”
+        if (pos.x >= BOARD_WIDTH || pos.x < 0) return false; // ì¢Œìš°ë¡œ ë²—ì–´ë‚œ ìƒíƒœë¼ë©´, ì›ë˜ ìœ„ì¹˜ë¡œ ëŒì•„ê°€ì•¼ í•œë‹¤.(ì›€ì§ì„ ì¸ì • x)
+        if (pos.y >= BOARD_HEIGHT || board[pos.y][pos.x] == true) { // ì•„ë˜ë¡œ ì›€ì§ì˜€ë‹¤ê³  ê°€ì •í•œ ìë¦¬ì— ì´ë¯¸ ë¸”ë¡ì´ ìˆê±°ë‚˜ ë°”ë‹¥ë³´ë‹¤ ì•„ë˜ë¼ë©´, ì´ì „ ìœ„ì¹˜ì— ìŒ“ì—¬ì•¼ í•¨.-> ì¸ìë¡œ ë°›ì€ í…ŒíŠ¸ë¡œë¯¸ë…¸
+            if (move_type == DOWN || move_type == TIMEOUT || move_type == DROP) { // 1ì¹¸ ë“œëëœ ìƒí™©ì—ì„œ ì˜ëª»ëœ ìœ„ì¹˜ë¼ë©´, ì´ì „ ìœ„ì¹˜ì— ìŒ“ì—¬ì•¼ í•¨.
                 for (auto& pos : real_tetromino_pos) {
                     board[pos.y][pos.x] = true;
                 }
                 return true;
             }
-            else return false; // È¸ÀüÀÎ °æ¿ì Å° ÀÎÁ¤ x
+            else return false; // íšŒì „ì¸ ê²½ìš° í‚¤ ì¸ì • x
         }
     }
 
-    // ÀÌµ¿ÇÑ °÷¿¡¼­ ¾î¶² Ãæµ¹µµ ¾ø´Ù¸é
+    // ì´ë™í•œ ê³³ì—ì„œ ì–´ë–¤ ì¶©ëŒë„ ì—†ë‹¤ë©´
     tetromino = if_move_tetromino;
 
-    // DROP ÄÉÀÌ½º´Â Ãæµ¹ÀÌ ³¯ ¶§±îÁö ÆÇÁ¤À» ÇØ¼­ ½×¾ÆÁà¾ß ÇÔ.
+    // DROP ì¼€ì´ìŠ¤ëŠ” ì¶©ëŒì´ ë‚  ë•Œê¹Œì§€ íŒì •ì„ í•´ì„œ ìŒ“ì•„ì¤˜ì•¼ í•¨.
     if (move_type == DROP) {
         while (true) {
-            ++if_move_tetromino.moved_y; // ¶È°°ÀÌ 1Ä­ Áõ°¡½ÃÅ´
+            ++if_move_tetromino.moved_y; // ë˜‘ê°™ì´ 1ì¹¸ ì¦ê°€ì‹œí‚´
 
-            // ÆÇÁ¤À» À§ÇÑ ÁÂÇ¥ »õ·Î ¾÷µ¥ÀÌÆ®
+            // íŒì •ì„ ìœ„í•œ ì¢Œí‘œ ìƒˆë¡œ ì—…ë°ì´íŠ¸
             for (int i = 0; i < 4; ++i) { 
                 real_tetromino_pos[i].x = tetromino.default_pos[i].x + tetromino.moved_x;
                 real_tetromino_pos[i].y = tetromino.default_pos[i].y + tetromino.moved_y;
             } 
 
-            // ÆÇÁ¤À» À§ÇÑ ÁÂÇ¥ »õ·Î ¾÷µ¥ÀÌÆ®2
+            // íŒì •ì„ ìœ„í•œ ì¢Œí‘œ ìƒˆë¡œ ì—…ë°ì´íŠ¸2
             for (int i = 0; i < 4; ++i) {
                 real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_x;
                 real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_y;
             }
 
             for (auto& pos : real_moved_tetromino_pos) {
-                if (pos.y >= BOARD_HEIGHT || board[pos.y][pos.x] == true) { // µå¶øÀÌ¹Ç·Î ÁÂ¿ì ÆÇÁ¤Àº ÇÊ¿ä¾ø´Ù. 
+                if (pos.y >= BOARD_HEIGHT || board[pos.y][pos.x] == true) { // ë“œëì´ë¯€ë¡œ ì¢Œìš° íŒì •ì€ í•„ìš”ì—†ë‹¤. 
                     for (auto& pos : real_tetromino_pos) {
                         board[pos.y][pos.x] = true;
                     }
                     return true;
                 }
             }
-            tetromino = if_move_tetromino; // µå¶ø ÄÉÀÌ½º´Â Ãæµ¹ÀÌ ³¯ ¶§±îÁö ÆÇÁ¤ÇØ¼­ Ãæµ¹ÀÌ ³ª¹Ç·Î ¹«Á¶°Ç true¸¦ ¹İÈ¯ÇØ¾ß ÇÑ´Ù.
+            tetromino = if_move_tetromino; // ë“œë ì¼€ì´ìŠ¤ëŠ” ì¶©ëŒì´ ë‚  ë•Œê¹Œì§€ íŒì •í•´ì„œ ì¶©ëŒì´ ë‚˜ë¯€ë¡œ ë¬´ì¡°ê±´ trueë¥¼ ë°˜í™˜í•´ì•¼ í•œë‹¤.
         }
     }
 
     return false;
-    // Å¸ÀÓ¾Æ¿ôÀº ±×³É ÀÌ ÇÔ¼ö¸¦ ¿ÜºÎ¿¡¼­ È£ÃâÇÏ±â Àü¿¡ Å¸ÀÓÀ» ÃÊ±âÈ­ÇÏ°í ÀÎÀÚ·Î Å¸ÀÓ¾Æ¿ô ³Ñ±â¸é µÈ´Ù.
+    // íƒ€ì„ì•„ì›ƒì€ ê·¸ëƒ¥ ì´ í•¨ìˆ˜ë¥¼ ì™¸ë¶€ì—ì„œ í˜¸ì¶œí•˜ê¸° ì „ì— íƒ€ì„ì„ ì´ˆê¸°í™”í•˜ê³  ì¸ìë¡œ íƒ€ì„ì•„ì›ƒ ë„˜ê¸°ë©´ ëœë‹¤.
 }
 
 int Tetris::ClearLine()
 {
     int count = 0;
     for (int y = 0; y < BOARD_HEIGHT; ++y) {
-        if (std::all_of(board[y].begin(), board[y].end(), // ÇÑ ÁÙÀÌ ¸ğµÎ true(Ã¤¿öÁü)ÀÌ¸é
+        if (std::all_of(board[y].begin(), board[y].end(), // í•œ ì¤„ì´ ëª¨ë‘ true(ì±„ì›Œì§)ì´ë©´
             [](bool cell) { return cell; })) {
-            std::fill(board[y].begin(), board[y].end(), false); // ÇöÀç ÁÙÀ» ¸ğµÎ false·Î ¹Ù²Ù°í
-            std::rotate(board.begin(), board.begin() + y, board.begin() + y + 1); // false ÁÙÀ» ¸Ç À§·Î ¿Å±â°í, ¸Ç À§¿¡¼­ 1ÁÙ¾¿ ¾Æ·¡·Î ´ç±è
+            std::fill(board[y].begin(), board[y].end(), false); // í˜„ì¬ ì¤„ì„ ëª¨ë‘ falseë¡œ ë°”ê¾¸ê³ 
+            std::rotate(board.begin(), board.begin() + y, board.begin() + y + 1); // false ì¤„ì„ ë§¨ ìœ„ë¡œ ì˜®ê¸°ê³ , ë§¨ ìœ„ì—ì„œ 1ì¤„ì”© ì•„ë˜ë¡œ ë‹¹ê¹€
             ++count;
         }
     }
@@ -126,7 +126,7 @@ int Tetris::ClearLine()
 void Tetris::AddLine(int num)
 {
     int add_num = 0;
-    // Áö¿öÁø ¶óÀÎ¿¡ µû¶ó Áõ°¡µÇ´Â ¶óÀÎ ¼ö°¡ ´Ù¸§
+    // ì§€ì›Œì§„ ë¼ì¸ì— ë”°ë¼ ì¦ê°€ë˜ëŠ” ë¼ì¸ ìˆ˜ê°€ ë‹¤ë¦„
     switch (num) {
     case 1:
         return;
@@ -146,25 +146,25 @@ void Tetris::AddLine(int num)
 
     int stacked_top_index = -1;
     for (int y = 0; y < BOARD_HEIGHT; ++y){
-        if (std::any_of(board[y].begin(), board[y].end(), [](bool cell){ return cell; })) { // ¹İÈ¯µÇ´Â ¹İº¹ÀÚ°¡ end()°¡ ¾Æ´Ï¶ó¸é Á¸ÀçÇÑ´Ù´Â ¶æ, Áï ÇÏ³ª¶óµµ true¶ó¸é?
-            // Ã³À½À¸·Î ½×¿© ÀÖ´Â ÃşÀ» Ã£À¸¸é, ±× Ãş¿¡ Á¦ÀÏ ³ô°Ô ½×ÀÎ ºí·ÏÀÌ Á¸ÀçÇÏ´Â °Í
+        if (std::any_of(board[y].begin(), board[y].end(), [](bool cell){ return cell; })) { // ë°˜í™˜ë˜ëŠ” ë°˜ë³µìê°€ end()ê°€ ì•„ë‹ˆë¼ë©´ ì¡´ì¬í•œë‹¤ëŠ” ëœ», ì¦‰ í•˜ë‚˜ë¼ë„ trueë¼ë©´?
+            // ì²˜ìŒìœ¼ë¡œ ìŒ“ì—¬ ìˆëŠ” ì¸µì„ ì°¾ìœ¼ë©´, ê·¸ ì¸µì— ì œì¼ ë†’ê²Œ ìŒ“ì¸ ë¸”ë¡ì´ ì¡´ì¬í•˜ëŠ” ê²ƒ
             stacked_top_index = y;
             break;
         }
     }
 
-    if (stacked_top_index < 0) { // ºí·ÏÀÌ ¸Ê¿¡ 1°³µµ ¾øÀ» °æ¿ì
+    if (stacked_top_index < 0) { // ë¸”ë¡ì´ ë§µì— 1ê°œë„ ì—†ì„ ê²½ìš°
         stacked_top_index = BOARD_HEIGHT - 1;
         for (int y = stacked_top_index; y > stacked_top_index - add_num; --y){
             std::fill(board[y].begin(), board[y].end(), true);
             int x = GetRandomX();
             board[y][x] = false;
         }
-        return; // ½×°í ¸®ÅÏ
+        return; // ìŒ“ê³  ë¦¬í„´
     }
 
     if (stacked_top_index - add_num < 0) {
-        // ÀÌ·¯¸é ÀÌ ÇÃ·¹ÀÌ¾î´Â Á×Àº °Í -> ³ªÁß¿¡ ³×Æ®¿öÅ© ÄÚµå Ãß°¡(¹ÂÅØ½ºµµ ³ªÁß¿¡ Ãß°¡ ÇÊ¿ä)
+        // ì´ëŸ¬ë©´ ì´ í”Œë ˆì´ì–´ëŠ” ì£½ì€ ê²ƒ -> ë‚˜ì¤‘ì— ë„¤íŠ¸ì›Œí¬ ì½”ë“œ ì¶”ê°€(ë®¤í…ìŠ¤ë„ ë‚˜ì¤‘ì— ì¶”ê°€ í•„ìš”)
 
         return;
     }
@@ -172,11 +172,11 @@ void Tetris::AddLine(int num)
     else {
         int now_first_index = stacked_top_index;
         int now_end_index = BOARD_HEIGHT - 1;
-        int dst_first_index = stacked_top_index - add_num; // À½¼ö Ã¼Å©´Â À§¿¡¼­ ÇÏ¹Ç·Î out_of_index´Â ¾È³ª¿È
+        int dst_first_index = stacked_top_index - add_num; // ìŒìˆ˜ ì²´í¬ëŠ” ìœ„ì—ì„œ í•˜ë¯€ë¡œ out_of_indexëŠ” ì•ˆë‚˜ì˜´
         int dst_end_index = BOARD_HEIGHT - 1 - add_num;
 
         std::move(board.begin() + now_first_index, board.end(), board.begin() + dst_first_index);
-        for (int y = now_end_index; y > dst_end_index; --y){ // ¿Å°ÜÁø ºÎºĞÀÇ end ÄÁÅ×ÀÌ³Ê´Â À¯È¿ °ªÀ¸·Î Ã¤¿öÁ® ÀÖÀ½(Çò°¥¸®Áö ¸»±â)
+        for (int y = now_end_index; y > dst_end_index; --y){ // ì˜®ê²¨ì§„ ë¶€ë¶„ì˜ end ì»¨í…Œì´ë„ˆëŠ” ìœ íš¨ ê°’ìœ¼ë¡œ ì±„ì›Œì ¸ ìˆìŒ(í—·ê°ˆë¦¬ì§€ ë§ê¸°)
             std::fill(board[y].begin(), board[y].end(), true);
             int x = GetRandomX();
             board[y][x] = false;
@@ -186,13 +186,13 @@ void Tetris::AddLine(int num)
 
 int Tetris::GetRandomX()
 {
-    // OS/ÇÏµå¿ş¾î ¿£Æ®·ÎÇÇ¿¡¼­ ½Ãµå »ı¼º
+    // OS/í•˜ë“œì›¨ì–´ ì—”íŠ¸ë¡œí”¼ì—ì„œ ì‹œë“œ ìƒì„±
     static std::random_device rd;
 
-    // ³Ö¾îÁØ ½Ãµå°ª¿¡ ÀÇÇØ »ı¼ºµÉ ³­¼ö°¡ ÁØºñµÈ´Ù.
+    // ë„£ì–´ì¤€ ì‹œë“œê°’ì— ì˜í•´ ìƒì„±ë  ë‚œìˆ˜ê°€ ì¤€ë¹„ëœë‹¤.
     static std::mt19937 gen(rd());
 
-    // 0~BOARD_WIDTH - 1 ¹üÀ§¿¡¼­ ±Õµî ºĞÆ÷·Î °ª Ãâ·Â
+    // 0~BOARD_WIDTH - 1 ë²”ìœ„ì—ì„œ ê· ë“± ë¶„í¬ë¡œ ê°’ ì¶œë ¥
     static std::uniform_int_distribution<int> dist(0, BOARD_WIDTH - 1);
 
     return dist(gen);
@@ -204,5 +204,6 @@ void Tetris::ClearBoard()
         for (int j = 0; j < BOARD_WIDTH; ++j) {
             board[i][j] = false;
         }
-    } // °¡·Î = WIDTH = x / ¼¼·Î = HEIGHT = y
+    } // ê°€ë¡œ = WIDTH = x / ì„¸ë¡œ = HEIGHT = y
 }
+

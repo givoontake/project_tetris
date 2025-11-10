@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <vector>
 #include <array>
 #include <unordered_map>
@@ -57,5 +57,4 @@ const std::unordered_map<int, std::vector<Tetromino>> TETROMINOS = {
         { Z, 1, 0, 0, {{ {2,0}, {1,1}, {2,1}, {1,2} }} }
     } }
 };
-
 
