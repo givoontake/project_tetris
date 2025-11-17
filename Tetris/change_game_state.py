@@ -190,6 +190,7 @@ class LobbyState(BaseState):
             self.chat_input_box.handle_event(ev)
                 # 어떤 버튼이 눌렸느냐에 따른 동작 추가
 
+        self.chat_input_box.update(dt_ms)
         return self
 
     def draw(self):
