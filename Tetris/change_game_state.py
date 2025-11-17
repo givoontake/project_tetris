@@ -11,6 +11,8 @@ from packet_type import *
 from asset_manager import *
 from typing import Optional
 from network import NetworkWorker
+from chat_window import *
+from room_window import *
 
 class BaseState:
     def __init__(self, screen):
@@ -143,7 +145,11 @@ class LobbyState(BaseState):
 
         self.logo_surface = None
         self.buttons: list[Button] = []
-        self.draw_x, self.draw_y = 0, 0
+        self.room_window = RoomWindow(pygame.Rect(50, 200, 1000, 400))
+        self.chat_window = ChatWindow(50, 600, 1000, 200)
+        input_box_rect = pygame.Rect(50, 810, 1000, 30)
+        self.chat_input_box = InputBox(input_box_rect.x, input_box_rect.y, input_box_rect.w, input_box_rect.h, "채팅을 입력하세요", MAX_CHAT_SIZE, is_password=False, allow_korean=True)
+        self.btn_draw_x, self.btn_draw_y = 0, 0
     
         self.set_layout()
 
@@ -158,15 +164,13 @@ class LobbyState(BaseState):
 
         top_menus_text = ["방만들기", "상점", "설정"]
 
-        logo = Button(self.draw_x, self.draw_y, logo_w, logo_h, None, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
+        logo = Button(self.btn_draw_x, self.btn_draw_y, logo_w, logo_h, None, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
         self.buttons.append(logo)
-        self.draw_x += logo_w
-
-        btn_w, btn_h = 200, 100
+        self.btn_draw_x += logo_w
 
         for btn_text in top_menus_text:
-            self.buttons.append(Button(self.draw_x, self.draw_y, btn_w, btn_h, btn_text))
-            self.draw_x += btn_w
+            self.buttons.append(Button(self.btn_draw_x, self.btn_draw_y, btn_w, btn_h, btn_text))
+            self.btn_draw_x += btn_w
 
     def on_resize(self, w, h, screen):
         self.screen = screen
@@ -180,6 +184,10 @@ class LobbyState(BaseState):
 
             for btn in self.buttons:
                 btn.handle_event(ev)
+
+            self.room_window.handle_event(ev)
+            self.chat_window.handle_event(ev)
+            self.chat_input_box.handle_event(ev)
                 # 어떤 버튼이 눌렸느냐에 따른 동작 추가
 
         return self
@@ -190,6 +198,9 @@ class LobbyState(BaseState):
         for btn in self.buttons:
             btn.draw(self.screen)
 
+        self.room_window.draw(self.screen)
+        self.chat_window.draw(self.screen)
+        self.chat_input_box.draw(self.screen)
 
 class SelectModeState(BaseState):
     def init(self):
