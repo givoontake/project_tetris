@@ -12,13 +12,14 @@ C++ define.h의 #pragma pack(1) 구조체와 1:1로 대응하는 struct 포맷 �
 """
 
 # ---- 길이 상수 ----
-MAX_USER_ID = 48
-MAX_USER_PASSWORD = 48
-MAX_USER_NAME = 48
-MAX_ROOM_NAME = 48
-MAX_ROOM_PASSWORD = 48
-MAX_INPUT_SIZE = 16
-MAX_CHAT_SIZE = 256
+MAX_USER_ID = 16*3
+MAX_USER_PASSWORD = 16*3
+MAX_USER_NAME = 16*3
+MAX_ROOM_NAME = 16*3
+MAX_ROOM_PASSWORD = 16*3
+MAX_INPUT = 16
+MAX_CHAT_INPUT = 256
+MAX_CHAT_BYTES = MAX_CHAT_INPUT*3
 
 # ---- Test Login ----
 
@@ -27,8 +28,8 @@ S2C_LOGIN_PACKET_FMT = "<hbi"
 C2S_LOGIN_PACKET_FMT = f"<hbi{MAX_USER_NAME}s"
 
 # ---- Message ----
-S2C_MESSAGE_PACKET_FMT = "<hbi"
-C2S_MESSAGE_PACKET_FMT = "<hbi"
+S2C_MESSAGE_PACKET_FMT = f"<hbi{MAX_USER_NAME}s{MAX_CHAT_BYTES}s"
+C2S_MESSAGE_PACKET_FMT = f"<hbi{MAX_CHAT_BYTES}s"
 
 # ---- Test (핑/지연 등) ----
 # S2C_TEST_PACKET_FMT = "<hbiq"
@@ -99,6 +100,7 @@ PACK_FIELD_FMT = {
     "room_name":     f"{MAX_ROOM_NAME}s",
     "room_password": f"{MAX_ROOM_PASSWORD}s",
     "name":          f"{MAX_USER_NAME}s",
+    "message":  f"{MAX_CHAT_BYTES}s"
 }
 
 FIELD_SIZE = {
@@ -129,4 +131,5 @@ FIELD_SIZE = {
     "room_name": MAX_ROOM_NAME,
     "room_password": MAX_ROOM_PASSWORD,
     "name": MAX_USER_NAME,
+    "message": MAX_CHAT_BYTES
 }

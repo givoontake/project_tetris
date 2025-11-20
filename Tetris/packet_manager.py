@@ -36,9 +36,9 @@ class PacketManager:
 
             # ---- 문자열(char 배열) 처리 ----
             if fmt.endswith("s"):
-                n = int(fmt[:-1])  
+                field_size = int(fmt[:-1])  
                 val_bytes = str(value).encode("utf-8")
-                val_bytes = val_bytes[:n].ljust(n, b"\x00")
+                val_bytes = val_bytes[:field_size].ljust(field_size, b"\x00")
                 packet_bytes.extend(struct.pack(f"<{fmt}", val_bytes))
 
             # ---- bool, int, short, long long 등 ----
@@ -59,6 +59,11 @@ class PacketManager:
         for field in pkt_struct: #구조체 내 필드 명
             fmt = PACK_FIELD_FMT[field] # 필드 명에 따른 포맷
             field_size = FIELD_SIZE[field] # 필드 명에 따른 필드 크기
+            if field == "message": # 메세지는 가변이라 따로 로직 정의
+                message_len = len(pkt) - (2+1+4+MAX_USER_NAME)
+                fmt = f"{message_len}s"
+                field_size = message_len
+                
             value = struct.unpack_from("<" + fmt, pkt, offset)[0] 
 
             if isinstance(value, (bytes, bytearray)):

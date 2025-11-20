@@ -1,6 +1,7 @@
 # change_game_state.py
 import time
 import pygame
+import struct
 from menu import *
 from tetris_game import TetrisGame
 from define import *
@@ -59,8 +60,8 @@ class LoginState:
         pw_rect = pygame.Rect(center_x, center_y + input_box_h + 20, input_box_w, input_box_h)
         btn_rect = pygame.Rect((sw - 300) // 2, pw_rect.bottom + 28, 300, 100)
 
-        self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디", MAX_INPUT_SIZE)
-        self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", MAX_INPUT_SIZE, is_password=True)
+        self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디", MAX_INPUT)
+        self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", MAX_INPUT, is_password=True)
 
         # 버튼은 폰트 전달 없이 생성됨
         self.btn_login = Button(
@@ -86,9 +87,9 @@ class LoginState:
         except Exception as e:
             print("[LoginState] send_login error:", e)
 
-    def update(self, dt_ms, events, data: Optional[dict] = None):
+    def handle_packet(self, data: Optional[dict]):
         if data:
-            print(", ".join(f"{k}: {v}" for k, v in data.items()))
+            # print(", ".join(f"{k}: {v}" for k, v in data.items()))
             if data.get("id") == -1:
                 pass
                 # 아이디 혹은 비밀번호를 다시 입력하라는 창 추가 필요
@@ -96,9 +97,16 @@ class LoginState:
             else:
                 # 내 세션의 아이디를 설정하는 코드 필요
                 id = data.get("id")
-                nickname = data.get("user_name").replace("\x00", "")
+                nickname = data.get("user_name")
                 my_session = Session(id, nickname)
-                return LobbyState(self.screen, self.am, my_session)
+                return LobbyState(self.screen, self.am, self.net_worker, my_session)
+            
+            return None
+
+    def update(self, dt_ms, events, data: Optional[dict] = None):
+        next_state = self.handle_packet(data)
+        if next_state is not None:
+            return next_state
             
         if self.popup.visible:
             btn_name = self.popup.handle_event(events)
@@ -140,18 +148,18 @@ class LoginState:
 
 
 class LobbyState(BaseState):
-
-    def __init__(self, screen, asset: AssetManager, my_session: Session):
+    def __init__(self, screen, asset: AssetManager, net_worker: NetworkWorker, my_session: Session):
         self.screen = screen
         self.am = asset
         self.my_session = my_session
+        self.net_worker = net_worker
         self.logo_surface = None
         self.buttons: list[Button] = []
         self.room_window = RoomWindow(pygame.Rect(50, 200, 1000, 400))
         self.chat_window = ChatWindow(50, 600, 1000, 200)
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
         self.chat_input_box = InputBox(input_box_rect.x, input_box_rect.y, input_box_rect.w, input_box_rect.h,
-                                        "채팅을 입력하세요", MAX_CHAT_SIZE, is_password=False, allow_korean=True)
+                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
         self.my_info_rect = MyInfo(pygame.Rect(1050, 600, 300, 300), self.my_session)
         self.btn_draw_x, self.btn_draw_y = 0, 0
     
@@ -180,7 +188,39 @@ class LobbyState(BaseState):
         self.screen = screen
         self.set_layout()
 
+    def send_message(self, message: str): # 메세지는 가변이라 문자열 포맷을 크기만큼 만들어 직접 전송
+        type = C2S_MESSAGE
+        id = self.my_session.id
+        message = message.encode("utf-8")
+        message_bytes = len(message)
+        size = 2 + 1 + 4 + message_bytes 
+
+        packet_bytes = struct.pack(
+            f"<hbi{message_bytes}s",
+            size,
+            type,      # or C2S_LOGIN이 아니라 실제 메시지 타입 상수
+            id,
+            message
+        )
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[LoginState] send_login error:", e)
+
+    def handle_packet(self, data: dict):
+        if data:
+            if data.get("type") == S2C_MESSAGE:
+                self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
+
+            return None
+
+
     def update(self, dt_ms, events, data=None):
+        next_state = self.handle_packet(data)
+        if next_state is not None:
+            return next_state
+        
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit()
@@ -191,7 +231,9 @@ class LobbyState(BaseState):
 
             self.room_window.handle_event(ev)
             self.chat_window.handle_event(ev)
-            self.chat_input_box.handle_event(ev)
+            send_input = self.chat_input_box.handle_event(ev)
+            if send_input is not None:
+                self.send_message(send_input)
                 # 어떤 버튼이 눌렸느냐에 따른 동작 추가
 
         self.chat_input_box.update(dt_ms)

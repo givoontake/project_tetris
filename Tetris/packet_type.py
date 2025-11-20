@@ -34,8 +34,8 @@ S2C_LOGIN_PACKET = ["size", "type", "id", "user_name"]
 C2S_LOGIN_PACKET = ["size", "type", "user_id", "user_password"]
 
 # ---- Message ----
-S2C_MESSAGE_PACKET = ["size", "type", "id"]
-C2S_MESSAGE_PACKET = ["size", "type", "id"]
+S2C_MESSAGE_PACKET = ["size", "type", "id", "user_name", "message"]
+C2S_MESSAGE_PACKET = ["size", "type", "id", "message"]
 
 # ---- Disconnect ----
 C2S_DISCONNECT_PACKET = ["size", "type", "id"]

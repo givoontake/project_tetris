@@ -1,7 +1,7 @@
 # menu.py
 import pygame
 from define import *
-from define_format import MAX_INPUT_SIZE
+from define_format import MAX_INPUT
 from asset_manager import *
 
 ORANGE = (255, 165, 0)
@@ -207,6 +207,18 @@ class InputBox:
     def get_text_width(self, text: str) -> int:
         width, _ = self.font.size(text)
         return width
+    
+    def get_total_text(self) -> str:
+        total_text = ""
+        if len(self.text) < self.max_input_len:
+            total_text = self.text + self.editing_text
+        else:
+            total_text = self.text
+        
+        if self.is_password:
+            total_text = "●" * len(total_text)
+
+        return total_text
 
     def get_render_text(self) -> str:
         text_px_len = None
@@ -237,7 +249,7 @@ class InputBox:
                         return ""
 
 
-    def handle_event(self, ev: pygame.event.Event):
+    def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
         # 마우스 클릭으로 포커스 on/off
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             self.active = self.rect.collidepoint(ev.pos)
@@ -263,14 +275,23 @@ class InputBox:
                 self.backspace_pressed = True
 
             elif ev.key == pygame.K_RETURN:
-                # 엔터는 상위(State)에서 처리
-                pass
+                input_text = self.get_total_text()
+                self.text = ""
+                self.editing_text = ""
+                self.backspace_repeat_timer = 0
+                self.backspace_repeat_time1_active = True
+                self.backspace_repeat_time2_active = False
+                self.backspace_pressed = False
+                return input_text
+                
         elif ev.type == pygame.KEYUP:
             if ev.key == pygame.K_BACKSPACE:
                 self.backspace_repeat_timer = 0
                 self.backspace_repeat_time1_active = True
                 self.backspace_repeat_time2_active = False
                 self.backspace_pressed = False
+
+        return None
 
     def update(self, dt_ms: int):
         # 커서 점멸만 유지

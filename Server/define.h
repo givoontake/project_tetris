@@ -47,6 +47,7 @@ struct S2C_MESSAGE_PACKET {
 	short size;
 	char type;
 	int id;
+	char user_name[MAX_USER_NAME];
 };
 
 struct C2S_MESSAGE_PACKET {
