@@ -21,16 +21,17 @@ class Button:
     - 세 타입 키가 모두 None이면 fallback(단색 사각형)으로 렌더한다.
     - handle_event(ev)에서 클릭이 성립하면 True를 반환한다.
 
+    
     사용 전:
-        Button.shared_am = AssetManager(...)        # 외부에서 준비된 에셋 매니저 (이미지 다 들어있음)
         Button.shared_font = pygame.font.Font(... ) # 외부에서 넣어주거나, 없으면 __init__에서 기본 생성
     """
 
-    shared_am: AssetManager | None = None
+    am: AssetManager | None = None
     shared_font: pygame.font.Font | None = None
 
     def __init__(
         self,
+        am: AssetManager,
         x: int,
         y: int,
         w: int,
@@ -45,19 +46,11 @@ class Button:
         self.rect = pygame.Rect(x, y, w, h)
 
         # 상태 플래그
+        self.am = am
         self.text = text
         self.hovered = False
         self.pressed = False
         self._pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
-
-        # AssetManager는 외부에서 반드시 세팅되어 있어야 함
-        if Button.shared_am is None:
-            # 네가 원래 하려던 스타일은 없으면 생성하는 거였는데,
-            # 이제는 "AssetManager가 사이즈까지 맞춰서 들고 있다"가 전제니까
-            # 여기서 새로 만들면 의미가 없음 → 없으면 그냥 에러 내서 바로 잡게 하자.
-            Button.shared_am = AssetManager()
-            Button.shared_am.init()
-        self.am = Button.shared_am
 
         # 폰트 준비 (공용 폰트 없으면 기본 생성)
         if Button.shared_font is None:

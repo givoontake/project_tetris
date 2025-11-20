@@ -21,9 +21,8 @@ class GameLoop:
         self.am = AssetManager()
         self.am.init()
         self.net_worker = NetworkWorker()
-        self.my_session = Session(self.am.block_asset)
         
-        self.state = LoginState(self.screen, net_worker=self.net_worker)
+        self.state = LoginState(self.screen, self.am, net_worker=self.net_worker)
         self.state.connect()
 
         self.prev_time = time.perf_counter()

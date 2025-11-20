@@ -13,9 +13,10 @@ from typing import Optional
 from network import NetworkWorker
 from chat_window import *
 from room_window import *
+from my_info import *
 
 class BaseState:
-    def __init__(self, screen):
+    def __init__(self, screen, asset):
         self.screen = screen
 
     def init(self): 
@@ -33,11 +34,12 @@ class BaseState:
 
 
 class LoginState:
-    def __init__(self, screen, net_worker: Optional[NetworkWorker] = None):
+    def __init__(self, screen, asset: Optional[AssetManager], net_worker: Optional[NetworkWorker]):
         self.screen = screen
         self.net_worker = net_worker
         self.title_font = pygame.font.Font("resource/dodamdodam.ttf", 36)
 
+        self.am = asset
         self.id_box: Optional[InputBox] = None
         self.pw_box: Optional[InputBox] = None
         self.btn_login: Optional[Button] = None
@@ -62,6 +64,7 @@ class LoginState:
 
         # 버튼은 폰트 전달 없이 생성됨
         self.btn_login = Button(
+            self.am,
             x=btn_rect.x,
             y=btn_rect.y,
             w=btn_rect.w,
@@ -92,7 +95,10 @@ class LoginState:
             
             else:
                 # 내 세션의 아이디를 설정하는 코드 필요
-                return LobbyState(self.screen)
+                id = Session(data.get("id"))
+                nickname = Session(data.get("user_name"))
+                my_session = Session(id, nickname)
+                return LobbyState(self.screen, self.am, self.my_session)
             
         if self.popup.visible:
             btn_name = self.popup.handle_event(events)
@@ -134,21 +140,19 @@ class LoginState:
 
 
 class LobbyState(BaseState):
-    shared_am: AssetManager | None = None
 
-    def __init__(self, screen):
+    def __init__(self, screen, asset: AssetManager, my_session: Session):
         self.screen = screen
-        if LobbyState.shared_am is None:
-            LobbyState.shared_am = AssetManager()
-            LobbyState.shared_am.init()
-        self.am = LobbyState.shared_am
-
+        self.am = asset
+        self.my_session = my_session
         self.logo_surface = None
         self.buttons: list[Button] = []
         self.room_window = RoomWindow(pygame.Rect(50, 200, 1000, 400))
         self.chat_window = ChatWindow(50, 600, 1000, 200)
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
-        self.chat_input_box = InputBox(input_box_rect.x, input_box_rect.y, input_box_rect.w, input_box_rect.h, "채팅을 입력하세요", MAX_CHAT_SIZE, is_password=False, allow_korean=True)
+        self.chat_input_box = InputBox(input_box_rect.x, input_box_rect.y, input_box_rect.w, input_box_rect.h,
+                                        "채팅을 입력하세요", MAX_CHAT_SIZE, is_password=False, allow_korean=True)
+        self.my_info_rect = MyInfo(pygame.Rect(1050, 600, 300, 300), self.my_session)
         self.btn_draw_x, self.btn_draw_y = 0, 0
     
         self.set_layout()
@@ -202,6 +206,7 @@ class LobbyState(BaseState):
         self.room_window.draw(self.screen)
         self.chat_window.draw(self.screen)
         self.chat_input_box.draw(self.screen)
+        self.my_info_rect.draw(self.screen)
 
 class SelectModeState(BaseState):
     def init(self):

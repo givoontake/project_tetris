@@ -45,7 +45,7 @@ class AssetManager:
     
     def load_image(self, filename: str, width: int, height: int) -> pygame.Surface:
         """
-        지정된 파일 경로의 이미지를 로드하고,
+        지정된 파일 경로의 이미지를 로드하고
         절대 크기 (width, height)로 스케일링하여 반환한다.
 
         Args:

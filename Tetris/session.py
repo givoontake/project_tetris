@@ -12,11 +12,13 @@ class Session:
     _shared = None
     _lock = threading.Lock()
 
-    def __init__(self, block_asset):
-        self.block_asset = block_asset
-        self.id: Optional[int] = None
+    def __init__(self, id: int, nickname: str):
+        self.id = id
+        self.nickname = nickname
+        self.win = 0
+        self.lose = 0
         self.block_texture = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None}
-        self.update_texture({'I': DEFAULT_RED, 'J': DEFAULT_ORANGE, 'L': DEFAULT_YELLOW, 'O': DEFAULT_GREEN, 'S': DEFAULT_BLUE, 'T': DEFAULT_INDIGO, 'Z': DEFAULT_PURPLE})
+        # self.update_texture({'I': DEFAULT_RED, 'J': DEFAULT_ORANGE, 'L': DEFAULT_YELLOW, 'O': DEFAULT_GREEN, 'S': DEFAULT_BLUE, 'T': DEFAULT_INDIGO, 'Z': DEFAULT_PURPLE})
 
     @classmethod
     def shared(cls) -> "Session":
@@ -25,13 +27,11 @@ class Session:
                 if cls._shared is None:
                     cls._shared = Session()
         return cls._shared
-    
-    def update_texture(self, new_texture: dict):
-        for shape, new_type in new_texture.items():
-            self.block_texture[shape] = self.block_asset[new_type]
 
     def reset(self):
         self.id = None
+        self.win = 0
+        self.lose = 0
 
-    def set_id(self, new_id: int):
-        self.id = int(new_id)
+    # def set_id(self, new_id: int):
+    #     self.id = int(new_id)
