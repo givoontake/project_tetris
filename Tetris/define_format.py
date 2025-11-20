@@ -24,7 +24,7 @@ MAX_CHAT_SIZE = 256
 
 # ---- Login ----
 S2C_LOGIN_PACKET_FMT = "<hbi"
-C2S_LOGIN_PACKET_FMT = "<hbi"
+C2S_LOGIN_PACKET_FMT = f"<hbi{MAX_USER_NAME}s"
 
 # ---- Message ----
 S2C_MESSAGE_PACKET_FMT = "<hbi"

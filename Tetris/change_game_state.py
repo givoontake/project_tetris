@@ -64,12 +64,12 @@ class LoginState:
 
         # 버튼은 폰트 전달 없이 생성됨
         self.btn_login = Button(
-            self.am,
-            x=btn_rect.x,
-            y=btn_rect.y,
-            w=btn_rect.w,
-            h=btn_rect.h,
-            text="로그인"
+            btn_rect.x,
+            btn_rect.y,
+            btn_rect.w,
+            btn_rect.h,
+            "로그인",
+            self.am
         )
 
     def send_login(self):
@@ -95,10 +95,10 @@ class LoginState:
             
             else:
                 # 내 세션의 아이디를 설정하는 코드 필요
-                id = Session(data.get("id"))
-                nickname = Session(data.get("user_name"))
+                id = data.get("id")
+                nickname = data.get("user_name").replace("\x00", "")
                 my_session = Session(id, nickname)
-                return LobbyState(self.screen, self.am, self.my_session)
+                return LobbyState(self.screen, self.am, my_session)
             
         if self.popup.visible:
             btn_name = self.popup.handle_event(events)
@@ -168,7 +168,7 @@ class LobbyState(BaseState):
 
         top_menus_text = ["방만들기", "상점", "설정"]
 
-        logo = Button(self.btn_draw_x, self.btn_draw_y, logo_w, logo_h, None, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
+        logo = Button(self.btn_draw_x, self.btn_draw_y, logo_w, logo_h, None, self.am, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
         self.buttons.append(logo)
         self.btn_draw_x += logo_w
 

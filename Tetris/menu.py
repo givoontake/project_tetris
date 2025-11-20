@@ -25,18 +25,16 @@ class Button:
     사용 전:
         Button.shared_font = pygame.font.Font(... ) # 외부에서 넣어주거나, 없으면 __init__에서 기본 생성
     """
-
-    am: AssetManager | None = None
     shared_font: pygame.font.Font | None = None
 
     def __init__(
         self,
-        am: AssetManager,
         x: int,
         y: int,
         w: int,
         h: int,
         text: str = None,
+        am: Optional[AssetManager] = None,
         idle_btn_type=None,
         hover_btn_type=None,
         press_btn_type=None,
@@ -62,9 +60,15 @@ class Button:
         self.text_rect = self.text_surface.get_rect(center=self.rect.center)
 
         # 상태별 이미지 Surface 직접 참조 (스케일 X, 로드 X)
-        self.idle_img  = self.am.button_asset[idle_btn_type]  if idle_btn_type  is not None else None
-        self.hover_img = self.am.button_asset[hover_btn_type] if hover_btn_type is not None else None
-        self.press_img = self.am.button_asset[press_btn_type] if press_btn_type is not None else None
+        if am == None:
+            self.idle_img = None
+            self.hover_img = None
+            self.press_img = None
+        
+        else:
+            self.idle_img  = self.am.button_asset[idle_btn_type]  if idle_btn_type  is not None else None
+            self.hover_img = self.am.button_asset[hover_btn_type] if hover_btn_type is not None else None
+            self.press_img = self.am.button_asset[press_btn_type] if press_btn_type is not None else None
 
         self.react = react
 

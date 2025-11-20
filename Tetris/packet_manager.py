@@ -60,7 +60,17 @@ class PacketManager:
             fmt = PACK_FIELD_FMT[field] # 필드 명에 따른 포맷
             field_size = FIELD_SIZE[field] # 필드 명에 따른 필드 크기
             value = struct.unpack_from("<" + fmt, pkt, offset)[0] 
-            data[field] = value
+
+            if isinstance(value, (bytes, bytearray)):
+                # C 스타일 널 종료 문자열 기준으로 앞부분만 사용
+                raw = value.split(b"\x00", 1)[0] # 문자열에 null(\x00)이 들어가면 터져버림
+                decoded = raw.decode("utf-8", errors="ignore")
+                data[field] = decoded
+
+            else:
+                # 숫자/불리언 등은 그대로 저장
+                data[field] = value
+
             offset += field_size
 
         return dict(data)
