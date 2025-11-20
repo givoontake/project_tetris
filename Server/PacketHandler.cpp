@@ -21,6 +21,9 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	//static auto& users = server->GetSessionList();
 	//static auto& rooms = server->GetRoomList();
 	PrintPacketType(packet[2]);
+	//short* p_size;
+	//p_size = reinterpret_cast<short*>(packet);
+	//std::cout << "packet_size: " << *p_size << std::endl;
 
 	switch (packet[2]) {
 
@@ -45,15 +48,16 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	case C2S_MESSAGE: { // 테스트는 메세지 가변으로 해놓고 이건 가변으로 안했네;; 뭐했냐 나
 		C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
 		int msg_size = recv_p->size - sizeof(C2S_MESSAGE_PACKET);
-		char* send_p = new char[sizeof(S2C_MESSAGE_PACKET)+msg_size];
+		int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
+		char* send_p = new char[send_p_size];
 		S2C_MESSAGE_PACKET front_p;
-		front_p.size = recv_p->size;
+		front_p.size = send_p_size;
 		front_p.type = S2C_MESSAGE;
 		front_p.id = recv_p->id;
 		memcpy(front_p.user_name, temp_name, MAX_USER_NAME);
 		memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET)); // 구조체 부분 복사
 		memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size); // 가변데이터 복사
-
+		
 		server->BroadCastLobby(send_p);
 
 		delete[] send_p;
