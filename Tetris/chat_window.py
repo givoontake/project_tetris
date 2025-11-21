@@ -5,7 +5,6 @@ CHAT_WINDOW_HEIGHT = 250
 SCROLL_WIDTH = 20
 
 MAX_MESSAGE_LINES = 100   # 저장 가능한 최대 줄 수
-SHOW_MESSAGE_LINES = 10   # 그릴 때 한 번에 보여줄 줄 수
 FONT_SIZE = 20
 LINE_PADDING = 5         # 줄 간 간격 (수직 패딩)
 
@@ -15,7 +14,7 @@ WHITE = (255, 255, 255)  # 전부 흰색
 
 
 class ChatWindow:
-    def __init__(self, x: int, y: int, w: int = CHAT_WINDOW_WIDTH, h: int = CHAT_WINDOW_HEIGHT):
+    def __init__(self, x: int, y: int, w: int, h: int):
         """
         x, y: 채팅창의 좌상단 좌표
         w, h: 채팅창 크기
@@ -35,13 +34,15 @@ class ChatWindow:
         self.scroll_w = self.bg_scroll_w
         self.scroll_h = self.bg_scroll_h
 
-        self.min_h = FONT_SIZE + LINE_PADDING
+        self.line_height = FONT_SIZE + LINE_PADDING 
+        self.show_lines = self.set_show_lines()
+        self.min_h = self.line_height
 
         self.window_rect = pygame.Rect(self.window_x, self.window_y, self.window_w, self.window_h) 
         self.bg_scroll_rect = pygame.Rect(self.bg_scroll_x, self.bg_scroll_y, self.bg_scroll_w, self.bg_scroll_h) 
         self.scroll_rect = pygame.Rect(self.scroll_x, self.scroll_y, self.scroll_w, self.scroll_h) 
 
-        self.max_scrollable_line = MAX_MESSAGE_LINES - SHOW_MESSAGE_LINES
+        self.max_scrollable_line = MAX_MESSAGE_LINES - self.show_lines
         self.scrollable_line = 0
         self.scrollable_px = self.scroll_h - self.min_h
         self.scroll_px = self.scrollable_px / self.max_scrollable_line
@@ -53,107 +54,81 @@ class ChatWindow:
         # 채팅 줄 단위로 누적 저장되는 리스트
         # 각 요소는 {"user_name": str, "text": str} 형태
         # "text"는 실제로 화면에 바로 그릴 문자열 (닉네임 포함 여부까지 반영된 상태)
-        self.texts: list[dict[str, str]] = []
+        self.texts: list[dict[str]] = []
         self.show_start = 0
         self.show_end = 0
 
         # 폰트 준비
         self.font = pygame.font.Font("resource/dodamdodam.ttf", FONT_SIZE)
 
-        # 한 줄의 렌더링 높이 = 글자 높이(20px) + 상하 간격(5px) = 25px 고정
-        self.line_height = FONT_SIZE + LINE_PADDING  # 20 + 5 = 25
+    def set_show_lines(self) -> int:
+        lines = self.window_h // self.line_height
+        if lines < 1: lines = 1
+        return lines
 
-    def get_text_width(self, text: str) -> int:
+    def get_text_px(self, text: str) -> int:
         """현재 폰트로 렌더링했을 때 text의 가로 픽셀 길이를 반환한다."""
         width, _ = self.font.size(text)
         return width
 
     def add_new_message(self, user_name: str, new_message: str):
-        """
-        하나의 (user_name, message) 입력을 화면에 표시 가능한 여러 줄로 자른다.
-        잘라진 결과는 [{'user_name': ..., 'text': ...}, ...] 형태로 반환한다.
+    # 1) 닉네임 + 메시지를 하나로 합침 (핵심!)
+        full_text = f"[{user_name}]: {new_message}"
+        remain = full_text
+        remain_len = len(remain)
 
-        규칙:
-        - 기본은 "user_name: message..." 형태로 첫 줄에 닉네임을 붙인다.
-        - 만약 직전 저장된 라인의 user_name이 동일하면 닉네임을 생략한다.
-        - 폭 초과 시 글자를 잘라 다음 줄로 넘긴다. (단어 단위 아님, 글자 단위 잘라도 허용)
-        - 줄을 자를 때, 폭 검사 인덱스 탐색은 10글자 단위로 증가시키다가 초과 시
-          직전 지점부터 1글자씩 전진하며 정확한 컷 위치를 찾는 방식.
-        """
-        fixed_text = f"[{user_name}]: "
-        #fixed_text_len = len(fixed_text)
-        fixed_text_px_len = self.get_text_width(fixed_text)
+        while remain_len > 0:
 
-        new_message_len = len(new_message)
-        new_message_px_len = self.get_text_width(new_message)
-
-        remainning_text = new_message
-        offset = 0 # 계산을 위해 계속 바뀌는 인덱스
-        prev_offset = 0
-        start_offset = 0 # 첫 문자열 인덱스
-        optimize_flag = True # 트루이면 큰 간격으로 찾음
-        first_process = True # 첫 줄이면 닉네임도 출력해야 함.
-        total_px_len = 0
-
-        while True:
-            if first_process:
-                total_px_len = fixed_text_px_len + self.get_text_width(new_message[start_offset:new_message_len])
-            else:
-                total_px_len = self.get_text_width(new_message[start_offset:new_message_len])
-            
-            if total_px_len <= self.window_w:
-                offset = new_message_len
-                self.texts.append({"user_name": user_name, "message": remainning_text[start_offset:offset]})
+            # 전체가 한 줄에 들어가면 그냥 추가하고 끝
+            if self.get_text_px(remain) <= self.window_w:
+                self.texts.append(remain)
                 break
 
-            if optimize_flag == True:
-                if offset + OPTIMIZED_OFFSET > new_message_len: # out of range 선체크
-                    optimize_flag = False
-                    continue
+            # 2) 한 줄에 들어갈 수 있는 최대 prefix 길이 cut_idx 찾기
+            offset = 0
+            prev_offset = 0
+
+            # --- 2-1. 큰 폭 점프 탐색 ---
+            while True:
+                # 다음 jump가 범위를 넘으면 점프 종료 → 세밀 탐색으로 이동
+                if offset + OPTIMIZED_OFFSET >= remain_len:
+                    break
+
                 prev_offset = offset
                 offset += OPTIMIZED_OFFSET
-                part_px_len = self.get_text_width(new_message[start_offset:offset])
-                if first_process:
-                    if fixed_text_px_len + part_px_len > self.window_w:
-                        optimize_flag = False
-                        offset = prev_offset # 넘지 않았던 인덱스로 돌려야함.
-                else:
-                    if part_px_len > self.window_w:
-                        optimize_flag = False
-                        offset = prev_offset
-            else:
-                prev_offset = offset
-                offset += 1 # 하나씩 증가할 때는 범위 체크 문제없다.
-                    
-                part_px_len = self.get_text_width(new_message[start_offset:offset])
-                total_px_len = 0
-                if first_process:
-                    total_px_len = fixed_text_px_len + part_px_len
-                else:
-                    total_px_len = part_px_len
 
-                if total_px_len > self.window_w:            
-                    self.texts.append({"user_name": user_name, "message": remainning_text[start_offset:prev_offset]})
+                part_px = self.get_text_px(remain[:offset])
+                if part_px > self.window_w:
+                    # 넘었으면 이전 offset으로 되돌리고 세밀 탐색으로 이동
                     offset = prev_offset
-                    if offset == new_message_len: # 로직으로는 == 이 최대, 모든 처리가 끝났다면
-                        break
-                    
+                    break
 
-                elif total_px_len == self.window_w:
-                    self.texts.append({"user_name": user_name, "message": remainning_text[start_offset:offset]})
-                    if offset == new_message_len: # 로직으로는 == 이 최대, 모든 처리가 끝났다면
-                        break
+            # --- 2-2. 세밀 탐색 (1씩 증가) ---
+            while offset < remain_len:
+                part_px = self.get_text_px(remain[:offset + 1])
+                if part_px > self.window_w:
+                    break
+                offset += 1
 
-                first_process = False
-                start_offset = offset
-                optimize_flag = True
+            # 3) offset이 0일 수는 없도록 보호 (너무 좁아도 최소 한 글자)
+            if offset == 0:
+                offset = 1
 
-        if len(self.texts) - SHOW_MESSAGE_LINES > 0:
-            self.scrollable_line = len(self.texts) - SHOW_MESSAGE_LINES
+            # 4) 한 줄 완성 → append
+            self.texts.append(remain[:offset])
+
+            # 5) 남은 문자열로 계속 처리
+            remain = remain[offset:]
+            remain_len = len(remain)
+
+        # 스크롤 갱신
+        if len(self.texts) - self.show_lines > 0:
+            self.scrollable_line = len(self.texts) - self.show_lines
         else:
             self.scrollable_line = 0
-            
+
         self.set_scroll_len()
+
 
 
     def set_scroll_len(self):
@@ -163,7 +138,7 @@ class ChatWindow:
         if self.scrollable_line > 0:
             sum_px = 0
             start_index = 0
-            for i in range(SHOW_MESSAGE_LINES + self.scrollable_line):
+            for i in range(self.show_lines + self.scrollable_line):
                 if self.bg_scroll_y + sum_px < self.scroll_y:
                     sum_px += self.scroll_px    
                     start_index += 1
@@ -263,21 +238,12 @@ class ChatWindow:
         pygame.draw.rect(surface, WHITE, self.scroll_rect)
 
         if self.scrollable_line > 0:
-            self.show_end = self.show_start + SHOW_MESSAGE_LINES
+            self.show_end = self.show_start + self.show_lines
         else:
             self.show_end = len(self.texts)
 
-        prev_name = None
         draw_text_y = self.window_y
         for i in range(self.show_start, self.show_end):
-            user_name = self.texts[i]["user_name"]
-            message = self.texts[i]["message"]
-            fixed_text = f"[{user_name}]: "
-            if prev_name != user_name:
-                text = fixed_text + message
-                prev_name = user_name
-            else:
-                text = message
-            text_surf = self.font.render(text, True, WHITE)
+            text_surf = self.font.render(self.texts[i], True, WHITE)
             surface.blit(text_surf, (self.window_x, draw_text_y))
             draw_text_y += self.line_height
