@@ -2,7 +2,7 @@
 import socket
 import threading
 
-from define import SERVER_HOST, SERVER_PORT, BUF_SIZE
+from define import *
 from packet_manager import PacketManager
 
 class NetworkWorker:

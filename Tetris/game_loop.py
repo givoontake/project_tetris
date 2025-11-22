@@ -2,7 +2,7 @@
 import time
 import pygame
 import queue
-from define import BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT, INITIAL_SCALE, FPS
+from define import *
 from change_game_state import *
 from network import NetworkWorker
 from asset_manager import *

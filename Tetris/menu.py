@@ -1,15 +1,9 @@
 # menu.py
 import pygame
 from define import *
-from define_format import MAX_INPUT
 from asset_manager import *
 
-ORANGE = (255, 165, 0)
-GRAY   = (128, 128, 128)
 PLACEHOLDER = (100, 100, 100)
-WHITE  = (255, 255, 255)
-BLUE = (0, 0, 150)
-BLACK = (0, 0, 0)
 
 class Button:
     """

@@ -14,7 +14,6 @@ import queue
 
 from define_format import *             # 포맷 문자열 모음 (MAX_* 포함)
 from packet_type import *    
-from define import BUF_SIZE           # S2C_LOGIN, ...
 
 MAX_QUEUE_SIZE = 1024
 

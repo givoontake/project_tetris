@@ -1,4 +1,5 @@
 import pygame
+from define import *
 
 CHAT_WINDOW_WIDTH = 1000
 CHAT_WINDOW_HEIGHT = 250
@@ -9,9 +10,6 @@ FONT_SIZE = 20
 LINE_PADDING = 5         # 줄 간 간격 (수직 패딩)
 
 OPTIMIZED_OFFSET = 10
-GRAY = (128, 128, 128)  # 회색 박스
-WHITE = (255, 255, 255)  # 전부 흰색
-
 
 class ChatWindow:
     def __init__(self, x: int, y: int, w: int, h: int):
