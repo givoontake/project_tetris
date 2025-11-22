@@ -271,7 +271,8 @@ class ChatWindow:
         """
         # 배경 박스
         pygame.draw.rect(surface, GRAY, self.bg_scroll_rect)
-        pygame.draw.rect(surface, WHITE, self.scroll_rect)
+        if self.can_drag: pygame.draw.rect(surface, ORANGE, self.scroll_rect)
+        else: pygame.draw.rect(surface, WHITE, self.scroll_rect)
 
         if self.scrollable_line > 0:
             self.show_end = self.show_start + self.show_lines
