@@ -126,6 +126,16 @@ class ChatWindow:
             self.scrollable_line = 0
 
         self.set_scroll_len()
+        if self.can_drag: self.set_show_start_index()
+        else: self.scroll_to_bottom()
+
+    def scroll_to_bottom(self):
+        self.show_start = self.scrollable_line
+        
+        bottom_scroll_y = self.bg_scroll_y + self.bg_scroll_h - self.scroll_h
+        self.scroll_y = bottom_scroll_y
+        self.scroll_rect.y = bottom_scroll_y
+
 
     def set_scroll_len(self):
         # 기존 로직 유지
