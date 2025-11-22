@@ -15,6 +15,7 @@ from network import NetworkWorker
 from chat_window import *
 from room_window import *
 from my_info import *
+from create_room_window import *
 
 class BaseState:
     def __init__(self, screen, asset):
@@ -146,6 +147,8 @@ class LoginState:
         if self.popup.visible:
             self.popup.draw()
 
+LOBBY = 1
+CREATE_ROOM = 2
 
 class LobbyState(BaseState):
     def __init__(self, screen, asset: AssetManager, net_worker: NetworkWorker, my_session: Session):
@@ -162,6 +165,8 @@ class LobbyState(BaseState):
                                         "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
         self.my_info_rect = MyInfo(pygame.Rect(1050, 600, 300, 300), self.my_session)
         self.btn_draw_x, self.btn_draw_y = 0, 0
+
+        self.reactable_screen = LOBBY
     
         self.set_layout()
 
@@ -218,6 +223,7 @@ class LobbyState(BaseState):
 
 
     def update(self, dt_ms, events, data=None):
+
         next_state = self.handle_packet(data)
         if next_state is not None:
             return next_state
@@ -227,17 +233,32 @@ class LobbyState(BaseState):
                 pygame.quit()
                 raise SystemExit
 
-            for btn in self.buttons:
-                btn.handle_event(ev)
+            if self.reactable_screen == LOBBY:
+                for btn in self.buttons:
+                    if btn.handle_event(ev):
+                        if btn.text == "방만들기":
+                            self.room_create_window = RoomCreateWindow(self.screen)
+                            self.room_create_window.open()
+                            self.reactable_screen = CREATE_ROOM
 
-            self.room_window.handle_event(ev)
-            self.chat_window.handle_event(ev)
-            send_input = self.chat_input_box.handle_event(ev)
-            if send_input is not None:
-                self.send_message(send_input)
+                self.room_window.handle_event(ev)
+                self.chat_window.handle_event(ev)
+                send_input = self.chat_input_box.handle_event(ev)
+                if send_input is not None:
+                    self.send_message(send_input)
+
+            elif self.reactable_screen == CREATE_ROOM:
                 # 어떤 버튼이 눌렸느냐에 따른 동작 추가
-
-        self.chat_input_box.update(dt_ms)
+                res = self.room_create_window.handle_event(ev)
+                if res == "취소":
+                    self.reactable_screen = LOBBY
+                elif res == None:
+                    pass
+                else: pass # 딕셔너리 리턴될 경우 방 생성 send 로직 추가 필요 
+                    
+        if self.reactable_screen == LOBBY: self.chat_input_box.update(dt_ms)
+        elif self.reactable_screen == CREATE_ROOM: self.room_create_window.update(dt_ms)
+        
         return self
 
     def draw(self):
@@ -250,6 +271,8 @@ class LobbyState(BaseState):
         self.chat_window.draw(self.screen)
         self.chat_input_box.draw(self.screen)
         self.my_info_rect.draw(self.screen)
+
+        if self.reactable_screen == CREATE_ROOM: self.room_create_window.draw()
 
 class SelectModeState(BaseState):
     def init(self):
