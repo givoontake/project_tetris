@@ -189,6 +189,7 @@ class LobbyState(BaseState):
         self.set_layout()
 
     def send_message(self, message: str): # 메세지는 가변이라 문자열 포맷을 크기만큼 만들어 직접 전송
+        if len(message) == 0: return
         type = C2S_MESSAGE
         id = self.my_session.id
         message = message.encode("utf-8")

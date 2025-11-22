@@ -48,6 +48,7 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	case C2S_MESSAGE: { // 테스트는 메세지 가변으로 해놓고 이건 가변으로 안했네;; 뭐했냐 나
 		C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
 		int msg_size = recv_p->size - sizeof(C2S_MESSAGE_PACKET);
+		if (msg_size == 0) return;
 		int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
 		char* send_p = new char[send_p_size];
 		S2C_MESSAGE_PACKET front_p;
