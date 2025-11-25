@@ -214,6 +214,45 @@ class LobbyState(BaseState):
         except Exception as e:
             print("[LoginState] send_login error:", e)
 
+    def send_create_room(self, data: dict[str]):
+        id = self.my_session.id
+        max_user = data["max_user"]
+        room_name = data["room_name"]
+        room_name = room_name.encode("utf-8")
+        
+        if data["room_password"] == None:
+            size = 2+1+4+1+MAX_ROOM_NAME
+            type = C2S_ADD_LOCK_ROOM
+            packet_bytes = struct.pack(
+                f"<hbib{MAX_ROOM_NAME}s",
+                size,
+                type,
+                id,
+                max_user,
+                room_name
+            )
+            
+        else:
+            size = 2+1+4+1+MAX_ROOM_NAME + MAX_ROOM_PASSWORD
+            type = C2S_ADD_OPEN_ROOM
+            room_password = data["room_password"]
+            room_password = room_password.encode("utf-8")
+
+            packet_bytes = struct.pack(
+                f"<hbib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s",
+                size,
+                type,
+                id,
+                max_user,
+                room_name,
+                room_password
+            )
+        
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[LoginState] send_login error:", e)
+
     def handle_packet(self, data: dict):
         if data:
             if data.get("type") == S2C_MESSAGE:
@@ -249,12 +288,13 @@ class LobbyState(BaseState):
 
             elif self.reactable_screen == CREATE_ROOM:
                 # 어떤 버튼이 눌렸느냐에 따른 동작 추가
-                res = self.room_create_window.handle_event(ev)
-                if res == "취소":
+                data = self.room_create_window.handle_event(ev)
+                if data == "취소":
                     self.reactable_screen = LOBBY
-                elif res == None:
+                elif data == None:
                     pass
-                else: pass # 딕셔너리 리턴될 경우 방 생성 send 로직 추가 필요 
+                else: 
+                    self.send_create_room(data)
                     
         if self.reactable_screen == LOBBY: self.chat_input_box.update(dt_ms)
         elif self.reactable_screen == CREATE_ROOM: self.room_create_window.update(dt_ms)

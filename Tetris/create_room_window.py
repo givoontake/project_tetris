@@ -295,10 +295,9 @@ class RoomCreateWindow:
                 password = pw if pw != "" else None
 
             result = {
-                "title": title,
+                "room_name": title,
                 "max_user": max_user,
-                "is_public": is_public,
-                "password": password,
+                "room_password": password,
             }
             self.close()
             return result
