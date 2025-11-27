@@ -94,12 +94,12 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	}
 
 	case C2S_ADD_OPEN_ROOM: {
-		server->CreateRoom(packet);
+		server->CreateRoom(packet, user_index);
 		break;
 	}
 
 	case C2S_ADD_LOCK_ROOM: {
-		server->CreateRoom(packet);
+		server->CreateRoom(packet, user_index);
 		break;
 	}
 	}

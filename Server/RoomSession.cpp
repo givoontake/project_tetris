@@ -10,9 +10,9 @@ RoomSession::~RoomSession()
 
 }
 
-void RoomSession::SetIsReady(bool param)
+void RoomSession::SetIsReady()
 {
-	is_ready = param;
+	is_ready = !is_ready;
 }
 
 bool RoomSession::SetUse(bool expected, bool desired)

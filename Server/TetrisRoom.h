@@ -33,6 +33,7 @@ public:
 	~TetrisRoom();
 
 	ROOM_STATE GetRoomState() const { return room_state.GetSelf(); }
+	RoomPacketHandler GetRoomPacketHandler() const { return room_handler; }
 
 	void SetRoomId(const int room_index);
 	void SetRoomState(const ROOM_STATE new_state); // 방 상태 변경은 딱히 동시접근할 일이 없어보임
@@ -41,9 +42,9 @@ public:
 	void InitRoom(char* packet, Session* session);
 	void AddUser(Session* new_session);
 	void DeleteUser(const int id);
-	void ReadyUser(const C2S_READY_PACKET& packet);
-	void KickUser(const C2S_KICK_PACKET& packet);
-	void StartGame(const C2S_START_PACKET& packet);
+	void ReadyUser(int id);
+	void KickUser(int id, int kick_user_id);
+	void StartGame(const int id);
 	void Broadcast(char* packet, const HANDLE iocp_handle);
 	void SendToSelf(char* packet, int self_id, const HANDLE iocp_handle);
 

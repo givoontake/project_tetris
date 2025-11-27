@@ -24,7 +24,7 @@ public:
 	bool GetIsReady() const { return is_ready; }
 	Tetris& GetTetris() { return tetris; }
 
-	void SetIsReady(bool param);
+	void SetIsReady();
 	bool SetUse(bool expected, bool desired);
 
 	void InitSession(Session* s);

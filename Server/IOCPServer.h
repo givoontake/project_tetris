@@ -53,8 +53,9 @@ public:
 	void StartServer();
 	void ProcessGQCS();
 	void ProcessPacket(int recv_bytes, int user_index);
+	void RoutePacket(char* packet, int user_index);
 	void BroadCastLobby(char* packet);
 	//void BroadCastRoom(char* packet, int room_id);
 	void SendToSelf(char* packet, int self_index);
-	void CreateRoom(char* packet); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
+	void CreateRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
 };

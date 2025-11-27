@@ -149,13 +149,28 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 		char p_buffer[BUF_SIZE];
 		// 패킷 분리: packet_buffer에 복사 후 처리
 		memcpy(p_buffer, users[user_index]->GetExOver().packet_buf, packet_size);
-		handler.HandlePacket(p_buffer, user_index);
+		RoutePacket(p_buffer, user_index);
 
 		 // 처리한 패킷은 남은 데이터에서 제거
 		users[user_index]->SetRemainDataSize(-packet_size);
 		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
 		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 	}
+}
+
+void IOCPServer::RoutePacket(char* packet, int user_index)
+{
+	switch (users[user_index]->GetState()) {
+	case NONE:
+		return;
+	case LOBBY:
+		handler.HandlePacket(packet, user_index);
+		break;
+	case ROOM:
+		rooms[users[user_index]->GetRoomIndex()]->GetRoomPacketHandler().HandlePacket(packet, user_index);
+		break;
+	}
+
 }
 
 void IOCPServer::BroadCastLobby(char* packet)
@@ -172,7 +187,7 @@ void IOCPServer::SendToSelf(char* packet, int self_index)
 	users[self_index]->SendPacket(packet, iocp_handle);
 }
 
-void IOCPServer::CreateRoom(char* packet)
+void IOCPServer::CreateRoom(char* packet, int user_index)
 {
 	int room_index = GetEmptyRoomIndex();
 	if (room_index == -1) {
@@ -181,7 +196,7 @@ void IOCPServer::CreateRoom(char* packet)
 
 	// 어차피 오픈과 록은 마지막에 비밀번호 필드 차이 유무이므로, 그냥 오픈 구조체로 만들고 id에 접근한다.
 	C2S_ADD_OPEN_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
-	users[p->id]->SetRoomIndex(room_index);
+	users[user_index]->SetRoomIndex(room_index);
 	rooms[room_index]->InitRoom(packet, users[p->id]); // 초기화는 그냥 방 내부에서 처리하기.
 }
 
