@@ -16,7 +16,7 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약
 	case C2S_ADD_OPEN_ROOM: {
 		C2S_ADD_OPEN_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
 		if (!(p->max_user == 1 || p->max_user == 2 || p->max_user == 5)) break;
-		host_id = p->id;
+		host_id = session->GetId();
 		max_user = p->max_user;
 		// resize는 만약 기존 벡터 메모리가 부족할 경우 새 메모리를 할당하고 기존 메모리 내용을 복사하는데, 여기서 아토믹 복사 불가 문제가 발생할 수 있음
 		room_users.reserve(p->max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
@@ -25,6 +25,13 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약
 		}
 		memcpy(room_name, p->room_name, sizeof(room_name));
 		is_password = false;
+		S2C_ADD_OPEN_ROOM_PACKET send_p;
+		send_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
+		send_p.type = S2C_ADD_OPEN_ROOM;
+		send_p.id = p->id;
+		send_p.max_user = p->max_user;
+		memcpy(send_p.room_name, p->room_name, sizeof(room_name));
+		SendToSelf(reinterpret_cast<char*>(&send_p), session->GetId(), server->GetHandle());
 		AddUser(session);
 		break;
 	}
@@ -32,7 +39,7 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약
 	case C2S_ADD_LOCK_ROOM:{
 		C2S_ADD_LOCK_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_LOCK_ROOM_PACKET*>(packet);
 		if (!(p->max_user == 1 || p->max_user == 2 || p->max_user == 5)) break;
-		host_id = p->id;
+		host_id = session->GetId();
 		max_user = p->max_user;
 		room_users.reserve(p->max_user);
 		for (int i = 0; i < p->max_user; ++i) {
@@ -41,6 +48,14 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약
 		memcpy(room_name, p->room_name, sizeof(room_name));
 		is_password = true;
 		memcpy(room_password, p->room_password, sizeof(room_password));
+		S2C_ADD_LOCK_ROOM_PACKET send_p;
+		send_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
+		send_p.type = S2C_ADD_LOCK_ROOM;
+		send_p.id = p->id;
+		send_p.max_user = p->max_user;
+		memcpy(send_p.room_name, p->room_name, sizeof(room_name));
+		memcpy(send_p.room_password, p->room_password, sizeof(room_password));
+		SendToSelf(reinterpret_cast<char*>(&send_p), session->GetId(), server->GetHandle());
 		AddUser(session);
 		break;
 	}
@@ -56,6 +71,7 @@ void TetrisRoom::AddUser(Session* new_session)
 		if (r_user.GetInUse()) continue;
 			
 		else {
+			new_session->SetState(ROOM);
 			r_user.InitSession(new_session);
 			S2C_ADD_USER_PACKET p;
 			p.size = sizeof(S2C_ADD_USER_PACKET);
@@ -87,6 +103,7 @@ void TetrisRoom::DeleteUser(const int id)
 		if (r_user.GetSession()->GetIndex() == id) { // 삭제할 아이디 검색
 			//room_mutex.lock();
 			r_user.SetUse(true, false);
+			r_user.GetSession()->SetState(LOBBY);
 			r_user.ClearSession(); // 해당 아이디 세션 정리
 
 			S2C_DELETE_USER_PACKET p;
@@ -108,13 +125,13 @@ void TetrisRoom::DeleteUser(const int id)
 	}
 }
 
-void TetrisRoom::ReadyUser(const C2S_READY_PACKET& packet)
+void TetrisRoom::ReadyUser(int id)
 {
-	if (host_id == packet.id) return;
+	if (host_id == id) return;
 
 	for (auto& r_user : room_users){
-		if (r_user.GetSession()->GetIndex() == packet.id) { // 레디 상태 변화
-			r_user.SetIsReady(packet.is_ready);
+		if (r_user.GetSession()->GetIndex() == id) { // 레디 상태 변화
+			r_user.SetIsReady();
 
 			S2C_READY_PACKET p;
 			p.size = sizeof(S2C_READY_PACKET);
@@ -129,19 +146,20 @@ void TetrisRoom::ReadyUser(const C2S_READY_PACKET& packet)
 }
 
 
-void TetrisRoom::KickUser(const C2S_KICK_PACKET& packet)
+void TetrisRoom::KickUser(int id, int kick_user_id)
 {
-	if (packet.id != host_id) return;
+	if (id != host_id) return;
 
 	for (auto& r_user : room_users) {
-		if (r_user.GetSession()->GetIndex() == packet.kick_user_id) { // 삭제할 아이디 검색
+		if (r_user.GetSession()->GetIndex() == kick_user_id) { // 삭제할 아이디 검색
 			r_user.SetUse(true, false);
+			r_user.GetSession()->SetState(LOBBY);
 			r_user.ClearSession(); // 해당 아이디 세션 정리
 
 			S2C_KICK_PACKET p;
 			p.size = sizeof(S2C_KICK_PACKET);
 			p.type = S2C_KICK;
-			p.kick_user_id = packet.kick_user_id;
+			p.kick_user_id = kick_user_id;
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
 			break;
@@ -149,9 +167,10 @@ void TetrisRoom::KickUser(const C2S_KICK_PACKET& packet)
 	}
 }
 
-void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
+void TetrisRoom::StartGame(int id)
 {
-	if (packet.id != host_id) return;
+	if (id != host_id) return;
+	if (room_state == PLAY) return;
 
 	int host_index = -1;
 	for (int i = 0; i < max_user; i++){
@@ -181,17 +200,18 @@ void TetrisRoom::StartGame(const C2S_START_PACKET& packet)
 		else ++ready_user_count;
 	}
 
-	if (ready_user_count == 0) { // 방장만 존재하면 당연히 시작 불가
+	if (max_user != 1 && ready_user_count == 0) { // 방장만 존재하면 당연히 시작 불가
 		p.size = sizeof(S2C_START_PACKET);
 		p.type = S2C_START;
 		p.is_start = false;
 
 		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
+		// 보내야 할까? 시작 불가 알림창 정도는  클라에게 맏겨도 될 듯 하다. 잘못 와도 시작만 안하면 되니까
 		return;
 	}
 
 	// 모든 조건 통과->게임 시작
-	room_state = PLAY; 
+	SetRoomState(PLAY);
 
 	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
 	InitGame();
