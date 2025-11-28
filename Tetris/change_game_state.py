@@ -16,6 +16,7 @@ from chat_window import *
 from room_window import *
 from my_info import *
 from create_room_window import *
+from state_single_play import SinglePlayState
 
 class BaseState:
     def __init__(self, screen, asset):
@@ -294,7 +295,8 @@ class LobbyState(BaseState):
                 elif data == None:
                     pass
                 else: 
-                    self.send_create_room(data)
+                    #self.send_create_room(data) ui 완성 전까지는 실행 x
+                    return SinglePlayState(self.screen, self.net_worker, self.my_session)
                     
         if self.reactable_screen == LOBBY: self.chat_input_box.update(dt_ms)
         elif self.reactable_screen == CREATE_ROOM: self.room_create_window.update(dt_ms)
@@ -313,164 +315,3 @@ class LobbyState(BaseState):
         self.my_info_rect.draw(self.screen)
 
         if self.reactable_screen == CREATE_ROOM: self.room_create_window.draw()
-
-class SelectModeState(BaseState):
-    def init(self):
-        self.buttons = [
-            Button(self.screen, (0.4, 0.3,  0.2, 0.1), "Game"),
-            Button(self.screen, (0.4, 0.45, 0.2, 0.1), "Developer"),
-            Button(self.screen, (0.4, 0.6,  0.2, 0.1), "Quit"),
-        ]
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        self.init()
-
-    def update(self, dt_ms, events, data=None):
-        for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit(); raise SystemExit
-            if self.buttons[0].clicked(ev):
-                return SelectPlayState(self.screen, dev_mode=False)
-            if self.buttons[1].clicked(ev):
-                return SelectPlayState(self.screen, dev_mode=True)
-            if self.buttons[2].clicked(ev):
-                pygame.quit(); raise SystemExit
-        return self
-
-    def draw(self):
-        self.screen.fill((0, 0, 0))
-        for b in self.buttons:
-            b.draw(self.screen)
-
-
-class SelectPlayState(BaseState):
-    def __init__(self, screen, dev_mode=False):
-        super().__init__(screen)
-        self.dev_mode = dev_mode
-
-    def init(self):
-        self.buttons = [
-            Button(self.screen, (0.4, 0.3,  0.2, 0.1), "Single"),
-            Button(self.screen, (0.4, 0.45, 0.2, 0.1), "2 Player"),
-            Button(self.screen, (0.4, 0.6,  0.2, 0.1), "5 Player"),
-            Button(self.screen, (0.9, 0.02, 0.08, 0.05), "Back"),
-        ]
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        self.init()
-
-    def update(self, dt_ms, events, data=None):
-        for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit(); raise SystemExit
-
-                return SelectModeState(self.screen)
-        return self
-
-    def draw(self):
-        self.screen.fill((0, 0, 0))
-        for b in self.buttons:
-            b.draw(self.screen)
-
-
-class SinglePlayState(BaseState):
-    def __init__(self, screen, dev_mode=False):
-        super().__init__(screen)
-        self.dev_mode = dev_mode
-        self.tetris: TetrisGame | None = None
-
-    def init(self):
-        ox, oy, scale = self._compute_layout()
-        self.tetris = TetrisGame(self.screen, ox, oy, scale)
-        self.tetris.init()
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        ox, oy, scale = self._compute_layout()
-        if self.tetris:
-            self.tetris.set_layout(ox, oy, scale)
-
-    def update(self, dt_ms, events, data=None):
-        # ✅ 메인 루프에서 받은 dt_ms를 그대로 전달
-        self.tetris.update(dt_ms, events)
-
-        # 필요 시 data 처리
-        # if data: ...
-
-        if self.tetris.game_over:
-            return SelectModeState(self.screen)
-        return self
-
-    def draw(self):
-        self.tetris.draw()
-
-    def _compute_layout(self):
-        sw, sh = self.screen.get_size()
-        design_w = GRID_COLUMNS * CELL_SIZE + PREVIEW_CELL_SIZE + BLANK_WIDTH
-        design_h = GRID_ROWS * CELL_SIZE + BLANK_HEIGHT
-        scale = min(sw / design_w, sh / design_h)
-        offset_x = (sw - design_w * scale) / 2
-        offset_y = (sh - design_h * scale) / 2
-        return (offset_x, offset_y, scale)
-
-
-class MultiPlayState(BaseState):
-    def __init__(self, screen, players):
-        super().__init__(screen)
-        self.players = players
-        self.screens: list[TetrisScreen] = []
-
-    def init(self):
-        self.screens.clear()
-        layout = self._compute_layout()
-        regions = self._regions_2(layout) if self.players == 2 else self._regions_5(layout)
-        for ox, oy, scale in regions:
-            self.screens.append(
-                TetrisScreen(self.screen, ox, oy, scale, TEST_TETROMINOS.copy())
-            )
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        self.init()
-
-    def update(self, dt_ms, events, data=None):
-        # 멀티 보드 렌더만 담당. 로직이 필요하면 여기서 처리
-        return self
-
-    def draw(self):
-        self.screen.fill((0, 0, 0))
-        for ts in self.screens:
-            ts.draw()
-
-    def _compute_layout(self):
-        sw, sh = self.screen.get_size()
-        region_w = GRID_COLUMNS * CELL_SIZE + PREVIEW_CELL_SIZE + BLANK_WIDTH
-        region_h = GRID_ROWS * CELL_SIZE + BLANK_HEIGHT
-        design_w = (2 if self.players > 2 else 1) * region_w
-        design_h = region_h
-        scale = min(sw / design_w, sh / design_h)
-        offset_x = (sw - design_w * scale) / 2
-        offset_y = (sh - design_h * scale) / 2
-        return (offset_x, offset_y, scale)
-
-    def _regions_2(self, layout):
-        ox, oy, scale = layout
-        region_w = (GRID_COLUMNS * CELL_SIZE + PREVIEW_CELL_SIZE + BLANK_WIDTH) * scale
-        return [(ox + i * region_w, oy, scale) for i in range(2)]
-
-    def _regions_5(self, layout):
-        ox, oy, scale = layout
-        region_w = (GRID_COLUMNS * CELL_SIZE + PREVIEW_CELL_SIZE + BLANK_WIDTH) * scale
-        region_h = GRID_ROWS * CELL_SIZE + BLANK_HEIGHT
-        main = (ox, oy, scale)
-        small = scale / 2
-        regions = [main]
-        base_x = ox + region_w
-        for idx in range(4):
-            col, row = idx % 2, idx // 2
-            regions.append(
-                (base_x + col * (region_w / 2), oy + row * (region_h * small), small)
-            )
-        return regions
