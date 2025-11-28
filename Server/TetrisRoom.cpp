@@ -60,6 +60,7 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약
 		break;
 	}
 	}
+	std::cout << "Session id: " << session->GetId() << " Create room. room id(index): " << room_id;
 }
 
 void TetrisRoom::AddUser(Session* new_session)
