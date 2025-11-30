@@ -28,10 +28,10 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약
 		S2C_ADD_OPEN_ROOM_PACKET send_p;
 		send_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		send_p.type = S2C_ADD_OPEN_ROOM;
-		send_p.id = p->id;
-		send_p.max_user = p->max_user;
+		send_p.id = session->GetId();
+		send_p.max_user = max_user;
 		memcpy(send_p.room_name, p->room_name, sizeof(room_name));
-		SendToSelf(reinterpret_cast<char*>(&send_p), session->GetId(), server->GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
 		AddUser(session);
 		break;
 	}
@@ -51,11 +51,11 @@ void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약
 		S2C_ADD_LOCK_ROOM_PACKET send_p;
 		send_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 		send_p.type = S2C_ADD_LOCK_ROOM;
-		send_p.id = p->id;
-		send_p.max_user = p->max_user;
+		send_p.id = session->GetId();
+		send_p.max_user = max_user;
 		memcpy(send_p.room_name, p->room_name, sizeof(room_name));
 		memcpy(send_p.room_password, p->room_password, sizeof(room_password));
-		SendToSelf(reinterpret_cast<char*>(&send_p), session->GetId(), server->GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
 		AddUser(session);
 		break;
 	}
@@ -78,7 +78,7 @@ void TetrisRoom::AddUser(Session* new_session)
 			p.size = sizeof(S2C_ADD_USER_PACKET);
 			p.type = S2C_ADD_USER;
 			// p.name = 세션에 이름 변수 추가 필요
-			p.id = new_session->GetIndex();
+			p.id = new_session->GetId();
 			p.is_add = true;
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
@@ -100,12 +100,13 @@ void TetrisRoom::AddUser(Session* new_session)
 
 void TetrisRoom::DeleteUser(const int id)
 {
+	//std::cout << "delete user id: " << id << std::endl;
 	for (auto& r_user : room_users){
-		if (r_user.GetSession()->GetIndex() == id) { // 삭제할 아이디 검색
+		if (!r_user.GetInUse()) continue;
+		if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
+			std::cout << "delete user id: " << id << std::endl;
 			//room_mutex.lock();
-			r_user.SetUse(true, false);
 			r_user.GetSession()->SetState(LOBBY);
-			r_user.ClearSession(); // 해당 아이디 세션 정리
 
 			S2C_DELETE_USER_PACKET p;
 			p.size = sizeof(S2C_DELETE_USER_PACKET);
@@ -119,6 +120,7 @@ void TetrisRoom::DeleteUser(const int id)
 				p.new_host_id = new_host_id;
 			}
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+			r_user.ClearSession(); // 해당 아이디 세션 정리
 
 			break;
 			//room_mutex.unlock();
@@ -232,14 +234,9 @@ void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 	}
 }
 
-void TetrisRoom::SendToSelf(char* packet, int self_id, const HANDLE iocp_handle)
+void TetrisRoom::SendToSelf(char* packet, Session* session)
 {
-	for (auto& r_user : room_users) {
-		if (r_user.GetInUse() && r_user.GetSession()->GetIndex() == self_id) {
-			r_user.GetSession()->SendPacket(packet, iocp_handle);
-			break;
-		}
-	}
+	// 굳이 필요 없는 함수인 듯 하다..?
 }
 
 void TetrisRoom::InitGame()

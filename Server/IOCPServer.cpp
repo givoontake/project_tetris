@@ -194,10 +194,8 @@ void IOCPServer::CreateRoom(char* packet, int user_index)
 		return;
 	}
 
-	// 어차피 오픈과 록은 마지막에 비밀번호 필드 차이 유무이므로, 그냥 오픈 구조체로 만들고 id에 접근한다.
-	C2S_ADD_OPEN_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
 	users[user_index]->SetRoomIndex(room_index);
-	rooms[room_index]->InitRoom(packet, users[p->id]); // 초기화는 그냥 방 내부에서 처리하기.
+	rooms[room_index]->InitRoom(packet, users[user_index]); // 초기화는 그냥 방 내부에서 처리하기.
 }
 
 int IOCPServer::GetNewUserId()
