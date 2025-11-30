@@ -3,9 +3,7 @@ import time
 import pygame
 import struct
 from menu import *
-from tetris_game import TetrisGame
 from define import *
-from tetris_screen import TetrisScreen
 from session import Session
 from define_format import *
 from packet_type import *
@@ -213,7 +211,7 @@ class LobbyState(BaseState):
         try:
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
-            print("[LoginState] send_login error:", e)
+            print("[LoginState] send_login() error:", e)
 
     def send_create_room(self, data: dict[str]):
         id = self.my_session.id
@@ -221,9 +219,9 @@ class LobbyState(BaseState):
         room_name = data["room_name"]
         room_name = room_name.encode("utf-8")
         
-        if data["room_password"] == None:
+        if data.get("room_password") == None:
             size = 2+1+4+1+MAX_ROOM_NAME
-            type = C2S_ADD_LOCK_ROOM
+            type = C2S_ADD_OPEN_ROOM
             packet_bytes = struct.pack(
                 f"<hbib{MAX_ROOM_NAME}s",
                 size,
@@ -232,10 +230,9 @@ class LobbyState(BaseState):
                 max_user,
                 room_name
             )
-            
         else:
             size = 2+1+4+1+MAX_ROOM_NAME + MAX_ROOM_PASSWORD
-            type = C2S_ADD_OPEN_ROOM
+            type = C2S_ADD_LOCK_ROOM
             room_password = data["room_password"]
             room_password = room_password.encode("utf-8")
 
@@ -248,22 +245,29 @@ class LobbyState(BaseState):
                 room_name,
                 room_password
             )
+            
         
         try:
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
-            print("[LoginState] send_login error:", e)
+            print("[LoginState] send_create_room() error:", e)
 
     def handle_packet(self, data: dict):
         if data:
+            print(f"LobbyState->handle_packet() recv_bytes: {data.get("size")} / recv type: {data.get("type")}")
             if data.get("type") == S2C_MESSAGE:
                 self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
 
-            return None
+            elif data.get("type") == S2C_ADD_OPEN_ROOM:
+                return SinglePlayState(self.screen, self.am, self.net_worker, self.my_session, data.get("room_name"))
+
+            elif data.get("type") == S2C_ADD_LOCK_ROOM:
+                return SinglePlayState(self.screen, self.am, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
+            
+        return None
 
 
     def update(self, dt_ms, events, data=None):
-
         next_state = self.handle_packet(data)
         if next_state is not None:
             return next_state
@@ -295,8 +299,7 @@ class LobbyState(BaseState):
                 elif data == None:
                     pass
                 else: 
-                    #self.send_create_room(data) ui 완성 전까지는 실행 x
-                    return SinglePlayState(self.screen, self.net_worker, self.my_session)
+                    self.send_create_room(data)
                     
         if self.reactable_screen == LOBBY: self.chat_input_box.update(dt_ms)
         elif self.reactable_screen == CREATE_ROOM: self.room_create_window.update(dt_ms)
