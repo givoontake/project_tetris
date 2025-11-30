@@ -29,6 +29,9 @@ S2C_START         = 20
 C2S_KICK          = 21
 S2C_KICK          = 22
 
+C2S_MOVE          = 23
+S2C_MOVE          = 24
+
 # ---- Login ----
 S2C_LOGIN_PACKET = ["size", "type", "id", "user_name"]
 C2S_LOGIN_PACKET = ["size", "type", "user_id", "user_password"]
@@ -54,20 +57,23 @@ C2S_ADD_USER_PACKET = ["size", "type", "id", "room_id", "name"]
 S2C_ADD_USER_PACKET = ["size", "type", "id", "is_add", "name"]
 
 # ---- Delete User ----
-C2S_DELETE_USER_PACKET = ["size", "type", "id"]
+C2S_DELETE_USER_PACKET = ["size", "type"]
 S2C_DELETE_USER_PACKET = ["size", "type", "id", "new_host_id"]
 
 # ---- Ready ----
-C2S_READY_PACKET = ["size", "type", "id", "is_ready"]
+C2S_READY_PACKET = ["size", "type"]
 S2C_READY_PACKET = ["size", "type", "id", "is_ready"]
 
 # ---- Start ----
-C2S_START_PACKET = ["size", "type", "id"]
+C2S_START_PACKET = ["size", "type"]
 S2C_START_PACKET = ["size", "type", "is_start"]
 
 # ---- Kick ----
 C2S_KICK_PACKET = ["size", "type", "id", "kick_user_id"]
 S2C_KICK_PACKET = ["size", "type", "kick_user_id"]
+
+C2S_MOVE_PACKET = ["size", "type", "move_type"]
+S2C_MOVE_PACKET = ["size", "type", "id", "move_type"]
 
 
 # 타입 코드(int) -> 필드 목록(list[str]) 매핑
@@ -111,4 +117,7 @@ PACKET_STRUCT: dict[int, list[str]] = {
     # ---- Kick ----
     S2C_KICK:          S2C_KICK_PACKET,
     C2S_KICK:          C2S_KICK_PACKET,
+
+    C2S_MOVE:          C2S_MOVE_PACKET,
+    S2C_MOVE:          S2C_MOVE_PACKET
 }
