@@ -77,6 +77,7 @@ class PacketManager:
 
             offset += field_size
 
+        print(f"{data.get("size")} / recv type: {data.get("type")}")
         return dict(data)
     # ---- 병합 단계 ----
     def merge_packet(self, pkt: bytes) -> None:
