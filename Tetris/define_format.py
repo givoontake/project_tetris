@@ -52,20 +52,23 @@ C2S_ADD_USER_PACKET_FMT = f"<hbii{MAX_USER_NAME}s"
 S2C_ADD_USER_PACKET_FMT = f"<hbib{MAX_USER_NAME}s"  # bool → signed char(b)
 
 # ---- Delete User ----
-C2S_DELETE_USER_PACKET_FMT = "<hbi"
+C2S_DELETE_USER_PACKET_FMT = "<hb"
 S2C_DELETE_USER_PACKET_FMT = "<hbii"
 
 # ---- Ready ----
-C2S_READY_PACKET_FMT = "<hbib"  # bool → signed char(b)
+C2S_READY_PACKET_FMT = "<hb"  # bool → signed char(b)
 S2C_READY_PACKET_FMT = "<hbib"  # bool → signed char(b)
 
 # ---- Start ----
-C2S_START_PACKET_FMT = "<hbi"
+C2S_START_PACKET_FMT = "<hb"
 S2C_START_PACKET_FMT = "<hbb"  # bool → signed char(b)
 
 # ---- Kick ----
 C2S_KICK_PACKET_FMT = "<hbii"
 S2C_KICK_PACKET_FMT = "<hbi"
+
+C2S_MOVE_PACKET_FMT = "<hbb"
+S2C_MOVE_PACKET_FMT = "<hbib"
 
 
 # =====================================================================
@@ -120,6 +123,7 @@ FIELD_SIZE = {
     "is_add": 1,
     "is_ready": 1,
     "is_start": 1,
+    "move_type": 1,
 
     # 8바이트 정수
     "last_time": 8,
