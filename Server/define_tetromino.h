@@ -3,26 +3,26 @@
 #include <array>
 #include <unordered_map>
 
-constexpr int I = 0;
-constexpr int J = 1;
-constexpr int L = 2;
-constexpr int O = 3;
-constexpr int S = 4;
-constexpr int T = 5;
-constexpr int Z = 6;
+constexpr char I = 0;
+constexpr char J = 1;
+constexpr char L = 2;
+constexpr char O = 3;
+constexpr char S = 4;
+constexpr char T = 5;
+constexpr char Z = 6;
 
 struct Position {
     int x, y;
 };
 
 struct Tetromino {
-    int type;             // I, J, L, O, S, T, Z
-    int shape_index;            // 0 … (각 타입별 회전 상태 개수 − 1)
+    char type;             // I, J, L, O, S, T, Z
+    char shape_index;            // 0 … (각 타입별 회전 상태 개수 − 1)
     int moved_x, moved_y;
     std::array<Position, 4> default_pos;  // 상대 좌표
 };
 
-const std::unordered_map<int, std::vector<Tetromino>> TETROMINOS = {
+const std::unordered_map<char, std::vector<Tetromino>> TETROMINOS = {
     { I, {
         { I, 0, 0, 0, {{ {0,1}, {1,1}, {2,1}, {3,1} }} },
         { I, 1, 0, 0, {{ {2,0}, {2,1}, {2,2}, {2,3} }} }
