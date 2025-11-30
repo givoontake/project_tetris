@@ -46,7 +46,7 @@ public:
 	void KickUser(int id, int kick_user_id);
 	void StartGame(const int id);
 	void Broadcast(char* packet, const HANDLE iocp_handle);
-	void SendToSelf(char* packet, int self_id, const HANDLE iocp_handle);
+	void SendToSelf(char* packet, Session* session);
 
 	void InitGame();
 	//void SendToSelf(char* packet, Session* session);
