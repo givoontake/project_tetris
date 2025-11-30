@@ -104,7 +104,7 @@ void TetrisRoom::DeleteUser(const int id)
 	for (auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue;
 		if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
-			std::cout << "delete user id: " << id << std::endl;
+			//std::cout << "delete user id: " << id << std::endl;
 			//room_mutex.lock();
 			r_user.GetSession()->SetState(LOBBY);
 
@@ -113,9 +113,10 @@ void TetrisRoom::DeleteUser(const int id)
 			p.type = S2C_DELETE_USER;
 			p.id = id;
 			if (p.id == host_id) { // 새 방장 여부에 따른 처리
-				int new_host_id = FindNewHost();
+				int new_host_id = FindNewHost(p.id);
 				if (new_host_id == -1) { // 현재 방에 아무도 없으면
 					SetRoomState(EMPTY);
+					std::cout << "Room index " << room_id << " now empty" << std::endl;
 				}
 				p.new_host_id = new_host_id;
 			}
@@ -258,10 +259,13 @@ void TetrisRoom::SetRoomState(ROOM_STATE new_state)
 	room_state = new_state;
 }
 
-int TetrisRoom::FindNewHost()
+int TetrisRoom::FindNewHost(int delete_id)
 {
-	for (auto& r_user : room_users) {
-		if (r_user.GetInUse()) return r_user.GetSession()->GetIndex();
+	for (auto& r_user : room_users) { 
+		if (r_user.GetInUse()) {
+			if (r_user.GetSession()->GetId() == delete_id) continue;
+			return r_user.GetSession()->GetId();
+		}
 	}
 	return -1;
 }

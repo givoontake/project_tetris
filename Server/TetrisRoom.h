@@ -37,7 +37,7 @@ public:
 
 	void SetRoomId(const int room_index);
 	void SetRoomState(const ROOM_STATE new_state); // 방 상태 변경은 딱히 동시접근할 일이 없어보임
-	int FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
+	int FindNewHost(int delete_id); // 방장이 나갔을 때 새로운 방장 찾기
 
 	void InitRoom(char* packet, Session* session);
 	void AddUser(Session* new_session);
