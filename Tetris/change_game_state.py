@@ -45,6 +45,7 @@ class LoginState:
         self.pw_box: Optional[InputBox] = None
         self.btn_login: Optional[Button] = None
         self.popup = PopupBox(self.screen, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
+        self.popup2 = PopupBox(self.screen, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
         self.set_layout()
 
     def connect(self):
@@ -91,8 +92,7 @@ class LoginState:
         if data:
             # print(", ".join(f"{k}: {v}" for k, v in data.items()))
             if data.get("id") == -1:
-                pass
-                # 아이디 혹은 비밀번호를 다시 입력하라는 창 추가 필요
+                self.popup2.visible = True
             
             else:
                 # 내 세션의 아이디를 설정하는 코드 필요
@@ -112,6 +112,16 @@ class LoginState:
             btn_name = self.popup.handle_event(events)
             if btn_name == "재시도":
                 self.popup.visible = False
+                self.connect()
+            elif btn_name == "종료":
+                pygame.quit(); raise SystemExit
+
+            return self  # 로그인 UI는 건드리지도 않음
+        
+        if self.popup2.visible:
+            btn_name = self.popup2.handle_event(events)
+            if btn_name == "재시도":
+                self.popup2.visible = False
                 self.connect()
             elif btn_name == "종료":
                 pygame.quit(); raise SystemExit
@@ -145,6 +155,8 @@ class LoginState:
         self.btn_login.draw(self.screen)
         if self.popup.visible:
             self.popup.draw()
+        if self.popup2.visible:
+            self.popup2.draw()
 
 LOBBY = 1
 CREATE_ROOM = 2
