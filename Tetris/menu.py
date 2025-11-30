@@ -255,7 +255,7 @@ class InputBox:
         # ===== 한글/영문 조합 중 문자열 (프리뷰) =====
         elif ev.type == pygame.TEXTEDITING:
             # 한글 허용인 필드만 조합 상태 표시
-            if self.active:
+            if self.active and self.allow_korean:
                 self.editing_text = ev.text
 
         # ===== 최종 확정된 문자 입력 =====
