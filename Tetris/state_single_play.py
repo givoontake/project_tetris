@@ -1,0 +1,648 @@
+import pygame
+import struct
+from typing import Optional
+
+from define import SHAPES
+from packet_type import *
+from session import Session
+from my_info import MyInfo
+from menu import Button
+from network import NetworkWorker
+from asset_manager import AssetManager
+
+# -------------------- 상수 --------------------
+CELL_SIZE    = 35
+BOARD_COLS   = 10
+BOARD_ROWS   = 20
+PREVIEW_COLS = 5
+PREVIEW_ROWS = 5
+
+FALLBACK_COLORS = {
+    'I': (0, 240, 240),
+    'J': (0, 0, 240),
+    'L': (240, 160, 0),
+    'O': (240, 240, 0),
+    'S': (0, 240, 0),
+    'T': (160, 0, 240),
+    'Z': (240, 0, 0),
+}
+
+
+# -------------------- 테트로미노 --------------------
+class Tetromino:
+    def __init__(self, shape_key: str, x: int, y: int, rotation: int = 0):
+        self.shape_key = shape_key
+        self.x = x
+        self.y = y
+        self.rotation = rotation
+
+    @property
+    def blocks(self):
+        """현재 회전/위치 기준 블록 4개의 절대 좌표를 반환."""
+        shape = SHAPES[self.shape_key][self.rotation]
+        return [(self.x + cx, self.y + cy) for (cx, cy) in shape]
+
+    def rotated(self, delta: int = 1) -> "Tetromino":
+        """회전이 적용된 새로운 Tetromino 인스턴스를 반환."""
+        max_rot = len(SHAPES[self.shape_key])
+        return Tetromino(
+            self.shape_key,
+            self.x,
+            self.y,
+            (self.rotation + delta) % max_rot,
+        )
+
+
+RIGHT = 0
+LEFT = 1
+DOWN = 2
+ROTATE = 3
+TIMEOUT = 4
+DROP = 5
+
+
+# -------------------- 싱글 플레이 보드 --------------------
+class TetrisBoard:
+    """
+    싱글플레이 테트리스 보드.
+
+    - grid / current / next_shape 를 모두 로컬로 가진다.
+    - 블록 렌더링은 Session.block_texture 를 우선 사용한다.
+    """
+
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        board_rect: pygame.Rect,
+        preview_rect: pygame.Rect,
+        session: Session,
+    ):
+        self.screen = screen
+        self.board_rect = board_rect
+        self.preview_rect = preview_rect
+        self.session = session
+
+        self.cols = BOARD_COLS
+        self.rows = BOARD_ROWS
+
+        # 보드 생성 및 None으로 초기화 (각 칸에는 shape_key('I','J',...) 또는 None)
+        self.grid: list[list[Optional[str]]] = [
+            [None for _ in range(self.cols)] for _ in range(self.rows)
+        ]
+
+        # 상태 플래그
+        self.game_started = False
+        self.game_over = False
+
+        # 현재/다음 블록
+        self.current_tetromino: Optional[Tetromino] = None
+        # next_tetromino는 미리보기용 shape_key(str)
+        self.next_tetromino: Optional[str] = None
+
+        # 보드 내부 개인정보 패널(MyInfo)
+        info_h = self.board_rect.h // 3
+        profile_rect = pygame.Rect(
+            self.board_rect.x + 20,
+            self.board_rect.y + self.board_rect.h // 2 - info_h,
+            self.board_rect.w - 40,
+            info_h,
+        )
+        self.my_info = MyInfo(profile_rect, self.session)
+
+    # ------------ 좌표/충돌 판정 ------------ #
+    def in_bounds(self, x: int, y: int) -> bool:
+        return 0 <= x < self.cols and 0 <= y < self.rows
+
+    def can_place(self, tet: Tetromino) -> bool:
+        """tetromino의 각 블록이 보드 안이고, 이미 고정된 블록과 겹치지 않는지 확인."""
+        for x, y in tet.blocks:
+            if not self.in_bounds(x, y):
+                return False
+            if self.grid[y][x] is not None:
+                return False
+        return True
+
+    # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
+    def lock_piece(self):
+        """현재 블록을 보드에 고정시키고, 라인 삭제까지 처리."""
+        if not self.current_tetromino:
+            return
+
+        # 현재 블록을 grid에 고정
+        for x, y in self.current_tetromino.blocks:
+            if self.in_bounds(x, y):
+                self.grid[y][x] = self.current_tetromino.shape_key
+
+        # 라인 클리어
+        new_rows = [row for row in self.grid if not all(row)]
+        cleared = self.rows - len(new_rows)
+        for _ in range(cleared):
+            new_rows.insert(0, [None for _ in range(self.cols)])
+        self.grid = new_rows
+
+        # 여기서는 서버 주도 게임이라고 가정해서
+        # 새로운 블록 스폰은 서버 패킷 로직에서 처리한다고 보고
+        # current_tetromino만 None으로 두어도 된다.
+        self.current_tetromino = None
+
+    # ------------ 로컬 이동/회전/하드드랍 (델타 기반) ------------ #
+    def move(self, dx: int, dy: int):
+        """현재 테트로미노를 (dx, dy)만큼 이동시키는 내부 함수."""
+        if not self.current_tetromino or not self.game_started or self.game_over:
+            return
+
+        nxt = Tetromino(
+            self.current_tetromino.shape_key,
+            self.current_tetromino.x + dx,
+            self.current_tetromino.y + dy,
+            self.current_tetromino.rotation,
+        )
+        if self.can_place(nxt):
+            self.current_tetromino = nxt
+        else:
+            # 아래로 이동 실패 시 락
+            if dy > 0:
+                self.lock_piece()
+
+    def rotate(self, delta: int = 1):
+        """현재 테트로미노 회전."""
+        if not self.current_tetromino or not self.game_started or self.game_over:
+            return
+        nxt = self.current_tetromino.rotated(delta)
+        if self.can_place(nxt):
+            self.current_tetromino = nxt
+
+    def hard_drop(self):
+        """아래로 가능한 만큼 바로 떨어뜨린 뒤 고정."""
+        if not self.current_tetromino or not self.game_started or self.game_over:
+            return
+
+        while True:
+            nxt = Tetromino(
+                self.current_tetromino.shape_key,
+                self.current_tetromino.x,
+                self.current_tetromino.y + 1,
+                self.current_tetromino.rotation,
+            )
+            if self.can_place(nxt):
+                self.current_tetromino = nxt
+            else:
+                break
+
+        self.lock_piece()
+
+    # ------------ 서버 move_type에 대응하는 진입점 ------------ #
+    def handle_move(self, move_type: int):
+        """
+        서버에서 승인된 move_type을 SinglePlayState가 넘겨주는 함수.
+
+        move_type 값:
+            RIGHT, LEFT, DOWN, ROTATE, DROP (TIMEOUT은 필요시 확장)
+        """
+        if not self.game_started or self.game_over or not self.current_tetromino:
+            return
+
+        if move_type == LEFT:
+            self.move(-1, 0)
+        elif move_type == RIGHT:
+            self.move(1, 0)
+        elif move_type == DOWN:
+            self.move(0, 1)
+        elif move_type == ROTATE:
+            self.rotate(1)
+        elif move_type == DROP:
+            self.hard_drop()
+        # 알 수 없는 command는 무시
+
+    # ------------ 게임 시작/리셋 ------------ #
+    def start_game(self):
+        """게임 시작 버튼이 눌렸을 때 호출."""
+        if self.game_started:
+            return
+
+        self.game_started = True
+        self.game_over = False
+
+        # 보드 리셋
+        for r in range(self.rows):
+            for c in range(self.cols):
+                self.grid[r][c] = None
+
+        # 서버 주도 게임이라면 current_tetromino는
+        # S2C_START 이후/또는 별도 패킷에서 세팅된다고 가정할 수 있음.
+        # 여기서는 일단 None 유지.
+
+    # ------------ 렌더링 ------------ #
+    def draw_board_frame(self):
+        """보드 전체 테두리."""
+        pygame.draw.rect(self.screen, (0, 0, 0), self.board_rect)
+        pygame.draw.rect(self.screen, (255, 255, 255), self.board_rect, 1)
+
+    def draw_cells(self):
+        """보드 위의 고정 블록 + 떨어지는 블록을 그린다.
+
+        색상 대신 Session에 저장된 블록 텍스처 이미지를 우선 사용하고,
+        이미지가 없을 경우 FALLBACK_COLORS를 사용한다.
+        """
+        tex_map = getattr(self.session, "block_texture", {})
+
+        # 고정 블록
+        for r in range(self.rows):
+            for c in range(self.cols):
+                shape_key = self.grid[r][c]
+                if not shape_key:
+                    continue
+
+                sx = self.board_rect.x + c * CELL_SIZE
+                sy = self.board_rect.y + r * CELL_SIZE
+                rect = pygame.Rect(sx, sy, CELL_SIZE, CELL_SIZE)
+
+                tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
+                if isinstance(tex, pygame.Surface):
+                    self.screen.blit(tex, rect)
+                else:
+                    color = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
+                    pygame.draw.rect(self.screen, color, rect)
+
+                # 격자선
+                pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
+
+        # 떨어지는 블록
+        if self.current_tetromino and self.game_started and not self.game_over:
+            shape_key = self.current_tetromino.shape_key
+            tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
+
+            for x, y in self.current_tetromino.blocks:
+                sx = self.board_rect.x + x * CELL_SIZE
+                sy = self.board_rect.y + y * CELL_SIZE
+                rect = pygame.Rect(sx, sy, CELL_SIZE, CELL_SIZE)
+
+                if isinstance(tex, pygame.Surface):
+                    self.screen.blit(tex, rect)
+                else:
+                    color = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
+                    pygame.draw.rect(self.screen, color, rect)
+
+                pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
+
+    def draw_preview(self):
+        """다음에 떨어질 블록(미리보기)을 그린다.
+
+        보드와 동일하게 Session의 블록 텍스처를 우선 사용하고,
+        없으면 FALLBACK_COLORS로 색상을 사용한다.
+        """
+        # 테두리만 흰 실선, 내부는 검정
+        pygame.draw.rect(self.screen, (0, 0, 0), self.preview_rect)
+        pygame.draw.rect(self.screen, (255, 255, 255), self.preview_rect, 1)
+
+        if not self.next_tetromino:
+            return
+
+        shape_key = self.next_tetromino
+        shape = SHAPES[shape_key][0]
+
+        xs = [cx for (cx, _) in shape]
+        ys = [cy for (_, cy) in shape]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+
+        shape_w = (max_x - min_x + 1) * CELL_SIZE
+        shape_h = (max_y - min_y + 1) * CELL_SIZE
+
+        offx = (
+            self.preview_rect.x
+            + (self.preview_rect.w - shape_w) / 2
+            - min_x * CELL_SIZE
+        )
+        offy = (
+            self.preview_rect.y
+            + (self.preview_rect.h - shape_h) / 2
+            - min_y * CELL_SIZE
+        )
+
+        tex_map = getattr(self.session, "block_texture", {})
+        tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
+
+        for cx, cy in shape:
+            px = int(offx + cx * CELL_SIZE)
+            py = int(offy + cy * CELL_SIZE)
+            rect = pygame.Rect(px, py, CELL_SIZE, CELL_SIZE)
+
+            if isinstance(tex, pygame.Surface):
+                self.screen.blit(tex, rect)
+            else:
+                color = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
+                pygame.draw.rect(self.screen, color, rect)
+
+            pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
+
+    def draw(self):
+        # 보드 프레임 & 미리보기는 항상 그림
+        self.draw_board_frame()
+        self.draw_preview()
+
+        if not self.game_started:
+            # 시작 전: 보드 내부에 내 정보
+            self.my_info.draw(self.screen)
+        else:
+            # 게임 중: 로컬 보드/블록 렌더
+            self.draw_cells()
+
+
+# -------------------- 싱글 플레이 상태 --------------------
+class SinglePlayState:
+    """
+    싱글 플레이 상태.
+
+    역할:
+    - 이벤트 감지:
+        - 키 입력 → send_move(ev)로 서버에 move 패킷 전송
+        - 서버에서 승인된 move 패킷 수신 → handle_packet(data)에서 해석
+    - TetrisBoard 제어:
+        - handle_packet(data)에서 어떤 움직임인지 결정한 뒤
+          self.board.move(move_type) 호출
+    - UI:
+        - 중앙의 테트리스 보드/미리보기
+        - 시작 전에는 '게임 시작' 버튼
+        - 화면 좌측 상단에는 '방 제목 / 비밀번호'를 표시하는 버튼 2개
+    """
+
+    def __init__(self, screen: pygame.Surface, asset: AssetManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
+        self.screen = screen
+        self.room_title = room_title
+        self.room_password = room_password
+
+        self.am = asset
+        self.net_worker = net_worker
+        self.my_session = session
+
+        # UI 요소들
+        self.board: Optional[TetrisBoard] = None
+        self.btn_start: Optional[Button] = None
+
+        self.btn_room_title: Optional[Button] = None
+        self.btn_room_password: Optional[Button] = None
+        self.btn_room_exit: Optional[Button] = None
+
+        # 상단 텍스트용 폰트
+        self.header_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
+
+        self.init()
+
+    # ------------ 네트워크 연동용 함수 (키 입력 → C2S_MOVE) ------------ #
+    def send_move(self, ev: pygame.event.Event):
+        size = 2 + 1 + 1
+        type = C2S_MOVE
+        move_type = None
+
+        # 좌우 이동
+        if ev.key == pygame.K_LEFT:
+            move_type = LEFT
+        elif ev.key == pygame.K_RIGHT:
+            move_type = RIGHT
+
+        # 소프트 드랍
+        elif ev.key == pygame.K_DOWN:
+            move_type = DOWN
+
+        # 하드 드랍(스페이스)
+        elif ev.key == pygame.K_SPACE:
+            move_type = DROP
+
+        # 회전(위)
+        elif ev.key == pygame.K_UP:
+            move_type = ROTATE
+
+        else:
+            # 처리하지 않는 키는 바로 리턴
+            return
+
+        packet_bytes = struct.pack(
+            "<hbb",
+            size,
+            type,
+            move_type
+        )
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[SinglePlayState] send_move() error:", e)
+
+    def send_start(self):
+        size = 2 + 1
+        type = C2S_START
+
+        packet_bytes = struct.pack(
+            "<hb",
+            size,
+            type,
+        )
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[SinglePlayState] send_start() error:", e)
+
+    def send_delete_user(self):
+        size = 2 + 1
+        type = C2S_DELETE_USER
+
+        packet_bytes = struct.pack(
+            "<hb",
+            size,
+            type,
+        )
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[SinglePlayState] send_delete_user() error:", e)
+
+    # ------------ 서버 → 클라 패킷 처리 ------------ #
+    def handle_packet(self, data: Optional[dict]):
+        from change_game_state import LobbyState
+        """
+        PacketManager에서 dict로 넘어온 패킷을 해석하는 부분.
+        """
+        if not data:
+            return None
+
+        packet_type = data.get("type")
+
+        if packet_type == S2C_START:
+            # 게임이 시작되었다고 서버가 알려줌
+            if data.get("is_start") is True and self.board:
+                self.board.start_game()
+
+        elif packet_type == S2C_MOVE:
+            # move_type에 따라 보드에 반영
+            move_type = data.get("move_type")
+            if move_type is not None and self.board:
+                self.board.handle_move(move_type)
+
+        elif packet_type == S2C_DELETE_USER:
+            delete_id = data.get("id")
+            if delete_id == self.my_session.id:
+                return LobbyState(self.screen, self.am, self.net_worker, self.my_session)
+
+        # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
+        return None
+
+    # ------------ 레이아웃 초기화 ------------ #
+    def init(self):
+        self._build_layout()
+
+    def _build_layout(self):
+        sw, sh = self.screen.get_size()
+
+        # --- 보드 / 미리보기 배치 ---
+        board_w = BOARD_COLS * CELL_SIZE
+        board_h = BOARD_ROWS * CELL_SIZE
+        preview_w = PREVIEW_COLS * CELL_SIZE
+        preview_h = PREVIEW_ROWS * CELL_SIZE
+
+        total_w = board_w + preview_w
+        total_h = board_h
+
+        offset_x = (sw - total_w) // 2
+        offset_y = (sh - total_h) // 2
+
+        board_rect = pygame.Rect(
+            offset_x,
+            offset_y,
+            board_w,
+            board_h,
+        )
+        preview_rect = pygame.Rect(
+            offset_x + board_w,
+            offset_y,
+            preview_w,
+            preview_h,
+        )
+
+        self.board = TetrisBoard(
+            screen=self.screen,
+            board_rect=board_rect,
+            preview_rect=preview_rect,
+            session=self.my_session,
+        )
+
+        # 게임 시작 버튼 (보드 중앙 아래쪽 정도에 배치)
+        btn_w, btn_h = 200, 100
+        btn_x = board_rect.centerx - btn_w // 2
+        btn_y = board_rect.bottom - 200
+
+        self.btn_start = Button(
+            x=btn_x,
+            y=btn_y,
+            w=btn_w,
+            h=btn_h,
+            text="게임 시작",
+            react=True,
+        )
+
+        # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
+        header_w, header_h = 300, 100
+        header_y = 0
+        title_x = 0
+        pw_x = header_w  # 바로 오른쪽에 붙이기
+
+        # 상호작용 X: react=False, 텍스트는 직접 그릴 것이므로 text=None
+        self.btn_room_title = Button(
+            x=title_x,
+            y=header_y,
+            w=header_w,
+            h=header_h,
+            text=None,
+            react=False,
+        )
+        self.btn_room_password = Button(
+            x=pw_x,
+            y=header_y,
+            w=header_w,
+            h=header_h,
+            text=None,
+            react=False,
+        )
+        exit_w, exit_h = 200, 100
+        exit_x, exit_y = sw - exit_w, 0
+        self.btn_room_exit = Button(
+            x=exit_x,
+            y=exit_y,
+            w=exit_w,
+            h=exit_h,
+            text="나가기",
+            react=True,
+        )
+    # ------------ 상단 방 정보 그리기 ------------ #
+    def draw_room_header(self):
+        """상단의 방 제목 / 비밀번호 영역을 그린다."""
+        if not self.btn_room_title or not self.btn_room_password:
+            return
+
+        # 버튼 사각형만 그리기 (테두리)
+        self.btn_room_title.draw(self.screen)
+        self.btn_room_password.draw(self.screen)
+
+        # 텍스트는 직접 렌더링
+        title_text = f"방 제목: {self.room_title}"
+        pw_text = f"비밀번호: {self.room_password or '없음'}"
+
+        title_surf = self.header_font.render(title_text, True, (255, 255, 255))
+        pw_surf = self.header_font.render(pw_text, True, (255, 255, 255))
+
+        title_rect = title_surf.get_rect(center=self.btn_room_title.rect.center)
+        pw_rect = pw_surf.get_rect(center=self.btn_room_password.rect.center)
+
+        self.screen.blit(title_surf, title_rect)
+        self.screen.blit(pw_surf, pw_rect)
+
+    # ------------ 이벤트 처리 ------------ #
+    def update(self, dt, events, data: Optional[dict] = None):
+        """
+        events: pygame 이벤트 리스트
+        dt: delta time(ms)
+        packet_data: PacketManager에서 올라온 dict (단일 패킷 기준)
+        """
+        # 네트워크 패킷 먼저 처리
+        if data:
+            next_state = self.handle_packet(data)
+            if next_state is not None:
+                return next_state
+
+        for ev in events:
+            if ev.type == pygame.QUIT:
+                # 상위 루프에서 처리
+                continue
+
+            # 키 입력 → C2S_MOVE
+            if ev.type == pygame.KEYDOWN and self.board and self.board.game_started:
+                self.send_move(ev)
+
+            # # 게임 시작 버튼 클릭
+            # elif ev.type == pygame.MOUSEBUTTONDOWN == 1:
+            if self.btn_start and self.btn_start.handle_event(ev):
+                self.send_start()
+
+            if self.btn_room_exit.handle_event(ev):
+                self.send_delete_user()
+
+        return self
+
+    def draw(self):
+        if self.board is None:
+            return
+
+        self.screen.fill((0, 0, 0))
+
+        # 상단 방 제목/비밀번호
+        self.draw_room_header()
+        self.btn_room_exit.draw(self.screen)
+
+        # 보드 및 미리보기/프로필/블록
+        self.board.draw()
+
+        # 게임 시작 버튼 (게임 시작 전)
+        if not self.board.game_started and self.btn_start:
+            self.btn_start.draw(self.screen)
