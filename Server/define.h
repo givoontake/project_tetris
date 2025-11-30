@@ -184,4 +184,17 @@ struct S2C_KICK_PACKET {
 	int kick_user_id;
 };
 
+struct C2S_MOVE_PACKET {
+	short size;
+	char type;
+	char move_type;
+};
+
+struct S2C_MOVE_PACKET {
+	short size;
+	char type;
+	int id;
+	char move_type;
+};
+
 #pragma pack(pop)
