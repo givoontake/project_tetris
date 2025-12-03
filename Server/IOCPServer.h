@@ -48,6 +48,7 @@ public:
 	HANDLE GetHandle() const { return iocp_handle; }
 	Session* GetSession(int user_index) const { return users[user_index]; }
 	long long GetTickCount() const { return tick_count.load(); }
+	TetrisRoom* GetRoom(int room_index) const { return rooms[room_index]; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
 
