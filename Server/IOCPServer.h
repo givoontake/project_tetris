@@ -20,9 +20,10 @@ class IOCPServer
 	WSADATA wsadata;
 	SOCKADDR_IN server_addr;
 	ExOverlapped accept_over;
-	MQueue task_queue;
+	//MQueue task_queue;
 	PacketHandler handler;
 	std::atomic<int> id_generator = -1;
+	std::atomic<long long> tick_count = 0;
 
 	//std::unique_ptr<PacketHandler> packet_handler; // 먼저 선언되어 있다면 해당 변수는 나중에 선언되는 변수에서 사용 가능하다.
 	std::array<Session*, MAX_USER> users;
@@ -46,6 +47,9 @@ public:
 	bool GetRunning() const { return is_running; }
 	HANDLE GetHandle() const { return iocp_handle; }
 	Session* GetSession(int user_index) const { return users[user_index]; }
+	long long GetTickCount() const { return tick_count.load(); }
+
+	void AddTickCount() { tick_count.fetch_add(1); }
 
 	//virtual MQueue& GetTaskQueue() override;
 
