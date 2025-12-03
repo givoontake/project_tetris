@@ -34,6 +34,8 @@ constexpr char S2C_KICK = 22;
 constexpr char C2S_MOVE = 23;
 constexpr char S2C_MOVE = 24;
 
+constexpr char S2C_SPAWN = 25;
+
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
 

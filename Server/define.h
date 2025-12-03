@@ -197,4 +197,10 @@ struct S2C_MOVE_PACKET {
 	char move_type;
 };
 
+struct S2C_SPAWN_PACKET {
+	short size;
+	char type;
+	int id;
+	char tetromino_type;
+};
 #pragma pack(pop)
