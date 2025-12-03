@@ -17,10 +17,16 @@ class Tetris
 {
 	std::array<std::array<bool, BOARD_WIDTH>, TOTAL_HEIGHT> board;
 	Position spawn_pos{ 0, 3 };
+	Tetromino current_tetromino;
+	bool new_spawn = false;
 public:
 	Tetris();
 
-	bool HandleTetrominoKeyInput(Tetromino& tetromino, int move_type);
+	bool GetNewSpawn() const { return new_spawn; }
+	void SetNewSpawn(bool val) { new_spawn = val; }
+
+	void InitNewTetromino(char type);
+	bool HandleTetrominoKeyInput(int move_type);
 	int ClearLine();
 	void AddLine(int num);
 	int GetRandomX();
