@@ -19,16 +19,20 @@ class Tetris
 	Position spawn_pos{ 0, 3 };
 	Tetromino current_tetromino;
 	bool new_spawn = false;
+	bool move_allow = false;
 public:
 	Tetris();
 
 	bool GetNewSpawn() const { return new_spawn; }
 	void SetNewSpawn(bool val) { new_spawn = val; }
+	bool GetMoveAllow() const { return move_allow; }
+	void SetMoveAllow(bool val) { move_allow = val; }
 
 	void InitNewTetromino(char type);
 	bool HandleTetrominoKeyInput(int move_type);
 	int ClearLine();
 	void AddLine(int num);
 	int GetRandomX();
-	void ClearBoard();
+	void Clear();
+	bool CheckGameover();
 };

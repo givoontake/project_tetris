@@ -37,6 +37,11 @@ struct Tasks
 
 	void AddTask(const TaskInfo& task) { pending_queue.EnQ(task); }
 	void SwapTask() { task_queue.Swap(pending_queue); }
+	void Clear() {
+		MQueue<TaskInfo> empty;
+		task_queue.Swap(empty);
+		pending_queue.Swap(empty);
+	}
 };
 
 class TetrisRoom
@@ -63,7 +68,7 @@ public:
 	~TetrisRoom();
 
 	ROOM_STATE GetRoomState() const { return room_state.GetSelf(); }
-	RoomPacketHandler GetRoomPacketHandler() const { return room_handler; }
+	RoomPacketHandler& GetRoomPacketHandler() { return room_handler; }
 	Tasks& GetTasks() { return tasks; }
 
 	void SetRoomId(const int room_index);
@@ -80,8 +85,11 @@ public:
 	void SendToSelf(char* packet, Session* session);
 
 	void InitGame();
+	void ClearGame();
 	void ProcessPlayTasks();
 	void Add7BagTetrominoList();
-	void SetNewTetromino(int id);
+	bool SetNewTetromino(int id);
+	void CheckWinner();
+	void ClearRoom();
 	//void SendToSelf(char* packet, Session* session);
 };

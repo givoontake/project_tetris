@@ -115,7 +115,7 @@ void TetrisRoom::DeleteUser(const int id)
 			if (p.id == host_id) { // 새 방장 여부에 따른 처리
 				int new_host_id = FindNewHost(p.id);
 				if (new_host_id == -1) { // 현재 방에 아무도 없으면
-					SetRoomState(EMPTY);
+					ClearRoom();
 					std::cout << "Room index " << room_id << " now empty" << std::endl;
 				}
 				p.new_host_id = new_host_id;
@@ -134,7 +134,7 @@ void TetrisRoom::ReadyUser(int id)
 	if (host_id == id) return;
 
 	for (auto& r_user : room_users){
-		if (r_user.GetSession()->GetIndex() == id) { // 레디 상태 변화
+		if (r_user.GetSession()->GetId() == id) { // 레디 상태 변화
 			r_user.SetIsReady();
 
 			S2C_READY_PACKET p;
@@ -155,7 +155,7 @@ void TetrisRoom::KickUser(int id, int kick_user_id)
 	if (id != host_id) return;
 
 	for (auto& r_user : room_users) {
-		if (r_user.GetSession()->GetIndex() == kick_user_id) { // 삭제할 아이디 검색
+		if (r_user.GetSession()->GetId() == kick_user_id) { // 삭제할 아이디 검색
 			r_user.SetUse(true, false);
 			r_user.GetSession()->SetState(LOBBY);
 			r_user.ClearSession(); // 해당 아이디 세션 정리
@@ -178,7 +178,7 @@ void TetrisRoom::StartGame(int id)
 
 	int host_index = -1;
 	for (int i = 0; i < max_user; i++){
-		if (room_users[i].GetSession()->GetIndex() == host_id) {
+		if (room_users[i].GetSession()->GetId() == host_id) {
 			host_index = i;
 			break;
 		}
@@ -187,44 +187,59 @@ void TetrisRoom::StartGame(int id)
 	if(host_index == -1) return; // host_id가 논리적으로는 존재해야 하지만.. 버그 예외처리
 
 	int ready_user_count = 0;
-	S2C_START_PACKET p;
+	S2C_START_PACKET start_p;
 
 	for(auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue; // 사용 중이지 않은 인덱스는 건너뜀
 		if (r_user.GetSession()->GetIndex() == host_id) continue; // 방장은 건너뜀
 
 		if (!r_user.GetIsReady()) { // 방에 있는데 레디가 안된 사람이 있으면 시작 불가			
-			p.size = sizeof(S2C_START_PACKET);
-			p.type = S2C_START;
-			p.is_start = false;
+			start_p.size = sizeof(S2C_START_PACKET);
+			start_p.type = S2C_START;
+			start_p.is_start = false;
 
-			room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
+			room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&start_p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
 			return;
 		}
 		else ++ready_user_count;
 	}
 
 	if (max_user != 1 && ready_user_count == 0) { // 방장만 존재하면 당연히 시작 불가
-		p.size = sizeof(S2C_START_PACKET);
-		p.type = S2C_START;
-		p.is_start = false;
+		start_p.size = sizeof(S2C_START_PACKET);
+		start_p.type = S2C_START;
+		start_p.is_start = false;
 
-		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
+		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&start_p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
 		// 보내야 할까? 시작 불가 알림창 정도는  클라에게 맏겨도 될 듯 하다. 잘못 와도 시작만 안하면 되니까
 		return;
 	}
 
 	// 모든 조건 통과->게임 시작
 	Add7BagTetrominoList();
+	for (auto& r_user : room_users){
+		if (!r_user.GetInUse()) continue;
+		r_user.GetTetris().InitNewTetromino(r_user.GetTetrominoIndex());
+	}
 	SetRoomState(PLAY);
 
 	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
 	InitGame();
 
-	p.size = sizeof(S2C_START_PACKET);
-	p.type = S2C_START;
-	p.is_start = true;
-	Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+	start_p.size = sizeof(S2C_START_PACKET);
+	start_p.type = S2C_START;
+	start_p.is_start = true;
+	Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
+	
+	for (auto& r_user : room_users) {
+		if (!r_user.GetInUse()) continue;
+		S2C_SPAWN_PACKET spawn_p;
+		spawn_p.size = sizeof(S2C_SPAWN_PACKET);
+		spawn_p.type = S2C_SPAWN;
+		spawn_p.id = r_user.GetSession()->GetId();
+		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
+	}
+
 }
 
 void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
@@ -245,8 +260,15 @@ void TetrisRoom::InitGame()
 {
 	for (auto& r_user : room_users) { 
 		if (!r_user.GetInUse()) continue;
-		r_user.GetTetris().ClearBoard();
+		r_user.GetTetris().Clear();
 	}
+}
+
+void TetrisRoom::ClearGame()
+{
+	room_state = WAIT;
+	tasks.Clear();
+	tetromino_spawn_list.clear();
 }
 
 void TetrisRoom::ProcessPlayTasks()
@@ -256,20 +278,42 @@ void TetrisRoom::ProcessPlayTasks()
 		TaskInfo task = tasks.GetTask();
 		for (auto& r_user : room_users) {
 			if (!r_user.GetInUse()) continue;
+			if (r_user.GetIsOver()) continue;
 			if (r_user.GetSession()->GetId() == task.id) {
 				// 테트리스 키 입력 처리
 				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) {
+					if (r_user.GetTetris().CheckGameover()) {
+						r_user.SetIsOver(true);
+						S2C_GAMEOVER_PACKET send_p;
+						send_p.size = sizeof(S2C_GAMEOVER_PACKET);
+						send_p.type = S2C_GAMEOVER;
+						send_p.id = task.id;
+						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+						CheckWinner();
+					}
+				}
+
+				if (r_user.GetTetris().GetMoveAllow()) {
 					S2C_MOVE_PACKET send_p;
 					send_p.size = sizeof(S2C_MOVE_PACKET);
 					send_p.type = S2C_MOVE;
 					send_p.id = task.id;
 					send_p.move_type = task.type;
-					r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
+					Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+					r_user.GetTetris().SetMoveAllow(false);
 				}
+			
 				if (r_user.GetTetris().GetNewSpawn()) {
-					if (r_user.GetTetrominoIndex() - 1 == tetromino_spawn_list.size()) { Add7BagTetrominoList(); }
+					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 1) { Add7BagTetrominoList(); }
 					r_user.AddTetrominoIndex();
-					SetNewTetromino(task.id);
+					if (SetNewTetromino(task.id)) {
+						S2C_SPAWN_PACKET send_p;
+						send_p.size = sizeof(S2C_SPAWN_PACKET);
+						send_p.type = S2C_SPAWN;
+						send_p.id = task.id;
+						send_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+					}
 					r_user.GetTetris().SetNewSpawn(false);
 				}
 				break;
@@ -286,24 +330,65 @@ void TetrisRoom::Add7BagTetrominoList()
 	std::vector<int> v = { 0, 1, 2, 3, 4, 5, 6 }; // I, J, L, O, S, T, Z
 
 	std::shuffle(v.begin(), v.end(), gen);
-	tetromino_spawn_list.reserve(v.size());
+	tetromino_spawn_list.reserve(tetromino_spawn_list.size() + v.size());
 	tetromino_spawn_list.insert(tetromino_spawn_list.end(), v.begin(), v.end());
 }
 
-void TetrisRoom::SetNewTetromino(int id)
+bool TetrisRoom::SetNewTetromino(int id)
 {
 	for (auto& r_user : room_users) {
 		if (!r_user.GetInUse()) continue;
 		if (r_user.GetSession()->GetId() == id){
 			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]));
-			S2C_SPAWN_PACKET send_p;
-			send_p.size = sizeof(S2C_SPAWN_PACKET);
-			send_p.type = S2C_SPAWN;
-			send_p.id = id;
-			send_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
+			return true;
 		}
 	}
+
+	return false;
+}
+
+void TetrisRoom::CheckWinner()
+{
+	if (max_user == 1) {
+		//for (auto& r_user : room_users) {
+		//	if (!r_user.GetInUse()) continue;
+		//	if (r_user.GetIsOver()) {
+		//		S2C_GAMEOVER_PACKET send_p;
+		//		send_p.size = sizeof(S2C_GAMEOVER_PACKET);
+		//		send_p.type = S2C_GAMEOVER;
+		//		send_p.id = r_user.GetSession()->GetId();
+		//	}
+		//}
+	}
+	else {
+		int over_count = 0;
+		int player_count = 0;
+		for (auto& r_user : room_users){
+			if (r_user.GetInUse()) ++player_count;
+			if (r_user.GetInUse() && r_user.GetIsOver()) ++over_count;
+		}
+
+		if ((player_count - over_count) > 1) return; // 아직 승자가 결정되지 않음
+		else {
+			for (auto& r_user : room_users) {
+				if (r_user.GetInUse() && !r_user.GetIsOver()) {
+					S2C_GAMEEND_PACKET send_p;
+					send_p.size = sizeof(S2C_GAMEEND_PACKET);
+					send_p.type = S2C_GAMEEND;
+					send_p.winner_id = r_user.GetSession()->GetId();
+					Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+				}
+			}
+		}
+	}
+}
+
+void TetrisRoom::ClearRoom()
+{
+	room_state = EMPTY;
+	tasks.Clear();
+	tetromino_spawn_list.clear();
+	room_users.clear();
 }
 
 

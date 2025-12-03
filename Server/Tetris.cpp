@@ -6,7 +6,7 @@
 
 Tetris::Tetris()
 {
-    ClearBoard();
+    Clear(); // init처럼 쓰는중
 }
 
 void Tetris::InitNewTetromino(char type)
@@ -93,6 +93,7 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
     // DROP 케이스는 충돌이 날 때까지 판정을 해서 쌓아줘야 함.
     if (move_type == DROP) {
         new_spawn = true;
+		move_allow = true;
         while (true) {
             ++if_move_tetromino.moved_y; // 똑같이 1칸 증가시킴
 
@@ -121,6 +122,7 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
         }
     }
 
+	move_allow = true;
     return false;
     // 타임아웃은 그냥 이 함수를 외부에서 호출하기 전에 타임을 초기화하고 인자로 타임아웃 넘기면 된다.
 }
@@ -226,7 +228,7 @@ int Tetris::GetRandomX()
     return dist(gen);
 }
 
-void Tetris::ClearBoard()
+void Tetris::Clear()
 {
     // ✅ 전체 보드(TOTAL_HEIGHT) 초기화
     for (int i = 0; i < TOTAL_HEIGHT; ++i) {
@@ -234,4 +236,19 @@ void Tetris::ClearBoard()
             board[i][j] = false;
         }
     } // 가로 = WIDTH = x / 세로 = HEIGHT = y
+
+	new_spawn = false;
+	move_allow = false;
+}
+
+bool Tetris::CheckGameover()
+{
+    for (int i = 0; i < RESERVE_HEIGHT; i++) {
+        for (int j = 0; j < BOARD_WIDTH; ++j) {
+            if (board[i][j] == true) {
+				return true;
+            }
+        }
+    }
+    return false;
 }

@@ -35,7 +35,9 @@ void RoomSession::InitSession(Session* s)
 	session = s;
 	is_ready = false;
 	in_use = true;
-	tetris.ClearBoard();
+	is_over = false;
+	tetromino_index = 0;
+	tetris.Clear();
 }
 
 void RoomSession::ClearSession()
@@ -43,6 +45,8 @@ void RoomSession::ClearSession()
 	session = nullptr;
 	is_ready = false;
 	in_use = false;
-	tetris.ClearBoard();
+	is_over = false;
+	tetromino_index = 0;
+	tetris.Clear();
 }
 

@@ -12,6 +12,7 @@ class RoomSession
 	// char user_name[MAX_USER_NAME];
 	bool is_ready = false;
 	Atomic<bool> in_use = false; // 룸에서 해당 배열 인덱스가 사용 중인지를 판별하기 위한 변수
+	bool is_over = false;
 	int tetromino_index = 0;
 	long long timer;
 
@@ -25,9 +26,11 @@ public:
 	Tetris& GetTetris() { return tetris; }
 	int GetTetrominoIndex() const { return tetromino_index; }
 	void AddTetrominoIndex() { ++tetromino_index; }
+	bool GetIsOver() const { return is_over; }
 
 	void SetIsReady();
 	bool SetUse(bool expected, bool desired);
+	void SetIsOver(bool val) { is_over = val; }
 
 	void InitSession(Session* s);
 	void ClearSession();
