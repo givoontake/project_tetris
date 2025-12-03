@@ -11,6 +11,34 @@
 
 enum ROOM_STATE {EMPTY, WAIT, PLAY};
 
+struct TaskInfo
+{
+	int type;
+	int id;
+};
+
+//struct TaskQueue
+//{
+//	MQueue<TaskInfo> tasks;
+//	//std::atomic<bool> access = false;
+//};
+
+struct Tasks
+{
+	MQueue<TaskInfo> task_queue;
+	MQueue<TaskInfo> pending_queue;
+
+	Tasks() {
+		//task_queue.access.store(false);
+		//pending_queue.access.store(true);
+	}
+
+	TaskInfo GetTask() { return task_queue.DeQ(); }
+
+	void AddTask(const TaskInfo& task) { pending_queue.EnQ(task); }
+	void SwapTask() { task_queue.Swap(pending_queue); }
+};
+
 class TetrisRoom
 {
 	//std::array<RoomSession*, MAX_USER>& users;
@@ -18,6 +46,8 @@ class TetrisRoom
 	RoomPacketHandler room_handler;
 	IOCPServer* server;
 	Atomic<ROOM_STATE> room_state;
+	Tasks tasks;
+	std::vector<char> tetromino_spawn_list;
 
 	int host_id;
 	int room_id;
@@ -34,6 +64,7 @@ public:
 
 	ROOM_STATE GetRoomState() const { return room_state.GetSelf(); }
 	RoomPacketHandler GetRoomPacketHandler() const { return room_handler; }
+	Tasks& GetTasks() { return tasks; }
 
 	void SetRoomId(const int room_index);
 	void SetRoomState(const ROOM_STATE new_state); // 방 상태 변경은 딱히 동시접근할 일이 없어보임
@@ -49,5 +80,8 @@ public:
 	void SendToSelf(char* packet, Session* session);
 
 	void InitGame();
+	void ProcessPlayTasks();
+	void Add7BagTetrominoList();
+	void SetNewTetromino(int id);
 	//void SendToSelf(char* packet, Session* session);
 };

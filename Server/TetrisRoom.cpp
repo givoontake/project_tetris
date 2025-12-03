@@ -1,5 +1,5 @@
+#include <random>
 #include "TetrisRoom.h"
-
 TetrisRoom::TetrisRoom(IOCPServer* server) : server(server), room_handler(this, server)
 {
 	
@@ -215,6 +215,7 @@ void TetrisRoom::StartGame(int id)
 	}
 
 	// 모든 조건 통과->게임 시작
+	Add7BagTetrominoList();
 	SetRoomState(PLAY);
 
 	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
@@ -245,6 +246,63 @@ void TetrisRoom::InitGame()
 	for (auto& r_user : room_users) { 
 		if (!r_user.GetInUse()) continue;
 		r_user.GetTetris().ClearBoard();
+	}
+}
+
+void TetrisRoom::ProcessPlayTasks()
+{
+	tasks.SwapTask();
+	while(!tasks.task_queue.IsEmpty()){
+		TaskInfo task = tasks.GetTask();
+		for (auto& r_user : room_users) {
+			if (!r_user.GetInUse()) continue;
+			if (r_user.GetSession()->GetId() == task.id) {
+				// 테트리스 키 입력 처리
+				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) {
+					S2C_MOVE_PACKET send_p;
+					send_p.size = sizeof(S2C_MOVE_PACKET);
+					send_p.type = S2C_MOVE;
+					send_p.id = task.id;
+					send_p.move_type = task.type;
+					r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
+				}
+				if (r_user.GetTetris().GetNewSpawn()) {
+					if (r_user.GetTetrominoIndex() - 1 == tetromino_spawn_list.size()) { Add7BagTetrominoList(); }
+					r_user.AddTetrominoIndex();
+					SetNewTetromino(task.id);
+					r_user.GetTetris().SetNewSpawn(false);
+				}
+				break;
+			}
+		}
+	}
+}
+
+void TetrisRoom::Add7BagTetrominoList()
+{
+	std::random_device rd;
+	std::mt19937 gen(rd());
+
+	std::vector<int> v = { 0, 1, 2, 3, 4, 5, 6 }; // I, J, L, O, S, T, Z
+
+	std::shuffle(v.begin(), v.end(), gen);
+	tetromino_spawn_list.reserve(v.size());
+	tetromino_spawn_list.insert(tetromino_spawn_list.end(), v.begin(), v.end());
+}
+
+void TetrisRoom::SetNewTetromino(int id)
+{
+	for (auto& r_user : room_users) {
+		if (!r_user.GetInUse()) continue;
+		if (r_user.GetSession()->GetId() == id){
+			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]));
+			S2C_SPAWN_PACKET send_p;
+			send_p.size = sizeof(S2C_SPAWN_PACKET);
+			send_p.type = S2C_SPAWN;
+			send_p.id = id;
+			send_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
+		}
 	}
 }
 
