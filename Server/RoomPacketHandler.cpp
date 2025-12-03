@@ -42,9 +42,12 @@ void RoomPacketHandler::HandlePacket(char* packet, int user_index)
 	}
 
 	case C2S_MOVE: {
-		//C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
-		// 보류
-			break;
+		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
+		TaskInfo new_task;
+		new_task.id = server->GetSession(user_index)->GetId();
+		new_task.type = recv_p->move_type;
+		room->GetTasks().AddTask(new_task);
+		break;
 	}
 	}
 }
