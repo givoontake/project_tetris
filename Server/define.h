@@ -203,4 +203,16 @@ struct S2C_SPAWN_PACKET {
 	int id;
 	char tetromino_type;
 };
+
+struct S2C_GAMEOVER_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct S2C_GAMEEND_PACKET {
+	short size;
+	char type;
+	int winner_id;
+};
 #pragma pack(pop)
