@@ -32,6 +32,12 @@ S2C_KICK          = 22
 C2S_MOVE          = 23
 S2C_MOVE          = 24
 
+S2C_SPAWN         = 25
+
+S2C_GAMEOVER      = 27
+
+S2C_GAMEEND       = 29
+
 # ---- Login ----
 S2C_LOGIN_PACKET = ["size", "type", "id", "user_name"]
 C2S_LOGIN_PACKET = ["size", "type", "user_id", "user_password"]
@@ -74,6 +80,12 @@ S2C_KICK_PACKET = ["size", "type", "kick_user_id"]
 
 C2S_MOVE_PACKET = ["size", "type", "move_type"]
 S2C_MOVE_PACKET = ["size", "type", "id", "move_type"]
+
+S2C_SPAWN_PACKET = ["size", "type", "id", "tetromino_type"]
+
+S2C_GAMEOVER_PACKET = ["size", "type", "id"]
+
+S2C_GAMEEND_PACKET = ["size", "type", "id"]
 
 
 # 타입 코드(int) -> 필드 목록(list[str]) 매핑
@@ -119,5 +131,11 @@ PACKET_STRUCT: dict[int, list[str]] = {
     C2S_KICK:          C2S_KICK_PACKET,
 
     C2S_MOVE:          C2S_MOVE_PACKET,
-    S2C_MOVE:          S2C_MOVE_PACKET
+    S2C_MOVE:          S2C_MOVE_PACKET,
+
+    S2C_SPAWN:         S2C_SPAWN_PACKET,
+
+    S2C_GAMEOVER:      S2C_GAMEOVER_PACKET,
+
+    S2C_GAMEEND:       S2C_GAMEEND_PACKET
 }

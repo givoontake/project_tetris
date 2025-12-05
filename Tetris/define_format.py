@@ -70,6 +70,11 @@ S2C_KICK_PACKET_FMT = "<hbi"
 C2S_MOVE_PACKET_FMT = "<hbb"
 S2C_MOVE_PACKET_FMT = "<hbib"
 
+S2C_SPAWN_PACKET_FMT = "<hbib"
+
+S2C_GANEOVER_PACKET_FMT = "<hbi"
+
+S2C_GAMEEND_PACKET_FMT = "<hbi"
 
 # =====================================================================
 #  필드 단위: "문자열 → 포맷" 사전 및(옵션) 스키마 샘플
@@ -124,6 +129,7 @@ FIELD_SIZE = {
     "is_ready": 1,
     "is_start": 1,
     "move_type": 1,
+    "tetromino_type": 1,
 
     # 8바이트 정수
     "last_time": 8,
