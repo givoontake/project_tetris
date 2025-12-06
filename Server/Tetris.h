@@ -16,7 +16,6 @@ constexpr int TIMEOUT = 5;
 class Tetris
 {
 	std::array<std::array<bool, BOARD_WIDTH>, TOTAL_HEIGHT> board;
-	Position spawn_pos{ 0, 3 };
 	Tetromino current_tetromino;
 	bool new_spawn = false;
 	bool move_allow = false;
@@ -28,7 +27,7 @@ public:
 	bool GetMoveAllow() const { return move_allow; }
 	void SetMoveAllow(bool val) { move_allow = val; }
 
-	void InitNewTetromino(char type);
+	void InitNewTetromino(char type, Position spawn_pos);
 	bool HandleTetrominoKeyInput(int move_type);
 	int ClearLine();
 	void AddLine(int num);

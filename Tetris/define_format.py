@@ -70,7 +70,7 @@ S2C_KICK_PACKET_FMT = "<hbi"
 C2S_MOVE_PACKET_FMT = "<hbb"
 S2C_MOVE_PACKET_FMT = "<hbib"
 
-S2C_SPAWN_PACKET_FMT = "<hbib"
+S2C_SPAWN_PACKET_FMT = "<hbibbb"
 
 S2C_GANEOVER_PACKET_FMT = "<hbi"
 
@@ -130,6 +130,8 @@ FIELD_SIZE = {
     "is_start": 1,
     "move_type": 1,
     "tetromino_type": 1,
+    "x": 1,
+    "y": 1,
 
     # 8바이트 정수
     "last_time": 8,

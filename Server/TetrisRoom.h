@@ -53,6 +53,7 @@ class TetrisRoom
 	Atomic<ROOM_STATE> room_state;
 	Tasks tasks;
 	std::vector<char> tetromino_spawn_list;
+	Position spawn_pos{ 0, 3 };
 
 	int host_id;
 	int room_id;
