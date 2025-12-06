@@ -218,7 +218,7 @@ void TetrisRoom::StartGame(int id)
 	Add7BagTetrominoList();
 	for (auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue;
-		r_user.GetTetris().InitNewTetromino(r_user.GetTetrominoIndex());
+		r_user.GetTetris().InitNewTetromino(r_user.GetTetrominoIndex(), spawn_pos);
 	}
 	SetRoomState(PLAY);
 
@@ -237,6 +237,8 @@ void TetrisRoom::StartGame(int id)
 		spawn_p.type = S2C_SPAWN;
 		spawn_p.id = r_user.GetSession()->GetId();
 		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+		spawn_p.x = spawn_pos.x;
+		spawn_p.y = spawn_pos.y;
 		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 	}
 
@@ -312,6 +314,8 @@ void TetrisRoom::ProcessPlayTasks()
 						send_p.type = S2C_SPAWN;
 						send_p.id = task.id;
 						send_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+						send_p.x = spawn_pos.x;
+						send_p.y = spawn_pos.y;
 						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
 					}
 					r_user.GetTetris().SetNewSpawn(false);
@@ -339,7 +343,7 @@ bool TetrisRoom::SetNewTetromino(int id)
 	for (auto& r_user : room_users) {
 		if (!r_user.GetInUse()) continue;
 		if (r_user.GetSession()->GetId() == id){
-			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]));
+			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]), spawn_pos);
 			return true;
 		}
 	}

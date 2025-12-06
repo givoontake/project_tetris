@@ -202,6 +202,7 @@ struct S2C_SPAWN_PACKET {
 	char type;
 	int id;
 	char tetromino_type;
+	char x, y;
 };
 
 struct S2C_GAMEOVER_PACKET {

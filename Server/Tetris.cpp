@@ -9,11 +9,11 @@ Tetris::Tetris()
     Clear(); // init처럼 쓰는중
 }
 
-void Tetris::InitNewTetromino(char type)
+void Tetris::InitNewTetromino(char type, Position spawn_pos)
 {
     current_tetromino.type = type;
-    current_tetromino.moved_x = 0;
-	current_tetromino.moved_y = 0;
+    current_tetromino.moved_x = spawn_pos.x;
+	current_tetromino.moved_y = spawn_pos.y;
     current_tetromino.shape_index = 0;
 	current_tetromino.default_pos = TETROMINOS.at(type)[0].default_pos;
 }
