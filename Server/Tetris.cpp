@@ -50,7 +50,7 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
     }
 
     case DROP: {
-        ++if_move_tetromino.moved_y; // 일단 똑같이 1칸 움직였을 때부터 판정 시작
+        // 드랍 판정은 나중에 함
         break;
     }
     }
@@ -70,6 +70,7 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
     // 좌우 이동 및 회전은 착지 계산이 되면 안된다 -> 옆으로 끼워넣는 동작 등이 가능해야 함.
     // 착지(다운, 타임아웃)만 상태 변경이 가능해야 한다.
     for (auto& pos : real_moved_tetromino_pos) { // 아래 충돌 전에 판정을 하고, 충돌 후 바뀐 보드에 대해서 또 판정이 필요
+		if (move_type == DROP) break; // 드랍은 아래에서 따로 판정
         if (pos.x >= BOARD_WIDTH || pos.x < 0)
             return false; // 좌우로 벗어난 상태라면, 원래 위치로 돌아가야 한다.(움직임 인정 x)
 
@@ -80,7 +81,6 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
                 for (auto& p : real_tetromino_pos) {
                     board[p.y][p.x] = true;
                 }
-				new_spawn = true;
                 return true;
             }
             else return false; // 회전인 경우 키 인정 x
@@ -92,8 +92,6 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
 
     // DROP 케이스는 충돌이 날 때까지 판정을 해서 쌓아줘야 함.
     if (move_type == DROP) {
-        new_spawn = true;
-		move_allow = true;
         while (true) {
             ++if_move_tetromino.moved_y; // 똑같이 1칸 증가시킴
 
@@ -127,9 +125,9 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
     // 타임아웃은 그냥 이 함수를 외부에서 호출하기 전에 타임을 초기화하고 인자로 타임아웃 넘기면 된다.
 }
 
-int Tetris::ClearLine()
+std::vector<char> Tetris::ClearLine()
 {
-    int count = 0;
+    std::vector<char> index_lines;
 
     // ✅ 줄 삭제는 "보이는 영역"만: RESERVE_HEIGHT ~ TOTAL_HEIGHT-1
     for (int y = RESERVE_HEIGHT; y < TOTAL_HEIGHT; ++y) {
@@ -141,10 +139,11 @@ int Tetris::ClearLine()
             // (숨겨진 0~RESERVE_HEIGHT-1 줄도 같이 아래로 내려오지만,
             //  줄 삭제 시의 "중력"은 전체 스택을 대상으로 적용)
             std::rotate(board.begin(), board.begin() + y, board.begin() + y + 1);
-            ++count;
+			index_lines.emplace_back(y);
         }
     }
-    return count;
+
+    return index_lines;
 }
 
 void Tetris::AddLine(int num)
@@ -237,7 +236,6 @@ void Tetris::Clear()
         }
     } // 가로 = WIDTH = x / 세로 = HEIGHT = y
 
-	new_spawn = false;
 	move_allow = false;
 }
 

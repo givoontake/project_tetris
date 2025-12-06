@@ -237,8 +237,10 @@ void TetrisRoom::StartGame(int id)
 		spawn_p.type = S2C_SPAWN;
 		spawn_p.id = r_user.GetSession()->GetId();
 		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-		spawn_p.x = spawn_pos.x;
-		spawn_p.y = spawn_pos.y;
+		spawn_p.spawn_x = spawn_pos.x;
+		spawn_p.spawn_y = spawn_pos.y;
+		spawn_p.fixed_x = 0;
+		spawn_p.fixed_y = 0;
 		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 	}
 
@@ -271,6 +273,10 @@ void TetrisRoom::ClearGame()
 	room_state = WAIT;
 	tasks.Clear();
 	tetromino_spawn_list.clear();
+	for (auto& r_user : room_users) {
+		if (!r_user.GetInUse()) continue;
+		r_user.ClearData();
+	}
 }
 
 void TetrisRoom::ProcessPlayTasks()
@@ -283,43 +289,51 @@ void TetrisRoom::ProcessPlayTasks()
 			if (r_user.GetIsOver()) continue;
 			if (r_user.GetSession()->GetId() == task.id) {
 				// 테트리스 키 입력 처리
-				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) {
-					if (r_user.GetTetris().CheckGameover()) {
+				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) { // 착지(고정)에 성공했는가?
+					if (r_user.GetTetris().CheckGameover()) { // 고정에 성공했다면 게임오버 판정
 						r_user.SetIsOver(true);
 						S2C_GAMEOVER_PACKET send_p;
 						send_p.size = sizeof(S2C_GAMEOVER_PACKET);
 						send_p.type = S2C_GAMEOVER;
 						send_p.id = task.id;
 						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
-						CheckWinner();
+						if (max_user > 1 && CheckWinner()) { // 누군가 게임오버였다면, 승자 여부 추가확인
+							ClearGame(); // 승자가 나왔다면 방 상태 정리(클리어는 아님)하고 함수 종료
+							return;
+						}
+					}
+
+					else {
+						std::vector<char> index_lines = r_user.GetTetris().ClearLine();
+						if (!index_lines.empty()) {
+							S2C_CLEARLINE_PACKET clear_line_p;
+							int index_size = index_lines.size();
+							int total_size = sizeof(S2C_CLEARLINE_PACKET) + index_size;
+							char* send_p = new char[total_size];
+							clear_line_p.size = total_size;
+							clear_line_p.type = S2C_CLEARLINE;
+							clear_line_p.id = task.id;
+							memcpy(send_p, reinterpret_cast<char*>(&clear_line_p), sizeof(S2C_CLEARLINE_PACKET));
+							memcpy(send_p + sizeof(S2C_CLEARLINE_PACKET), index_lines.data(), index_size);
+							Broadcast(send_p, server->GetHandle());
+
+							delete[] send_p;
+						}
 					}
 				}
 
-				if (r_user.GetTetris().GetMoveAllow()) {
-					S2C_MOVE_PACKET send_p;
-					send_p.size = sizeof(S2C_MOVE_PACKET);
-					send_p.type = S2C_MOVE;
-					send_p.id = task.id;
-					send_p.move_type = task.type;
-					Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
-					r_user.GetTetris().SetMoveAllow(false);
-				}
-			
-				if (r_user.GetTetris().GetNewSpawn()) {
-					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 1) { Add7BagTetrominoList(); }
-					r_user.AddTetrominoIndex();
-					if (SetNewTetromino(task.id)) {
-						S2C_SPAWN_PACKET send_p;
-						send_p.size = sizeof(S2C_SPAWN_PACKET);
-						send_p.type = S2C_SPAWN;
+				else {
+					if (r_user.GetTetris().GetMoveAllow()) {
+						S2C_MOVE_PACKET send_p;
+						send_p.size = sizeof(S2C_MOVE_PACKET);
+						send_p.type = S2C_MOVE;
 						send_p.id = task.id;
-						send_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-						send_p.x = spawn_pos.x;
-						send_p.y = spawn_pos.y;
+						send_p.move_type = task.type;
 						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+						r_user.GetTetris().SetMoveAllow(false);
 					}
-					r_user.GetTetris().SetNewSpawn(false);
-				}
+				}			
+			
 				break;
 			}
 		}
@@ -351,7 +365,7 @@ bool TetrisRoom::SetNewTetromino(int id)
 	return false;
 }
 
-void TetrisRoom::CheckWinner()
+bool TetrisRoom::CheckWinner()
 {
 	if (max_user == 1) {
 		//for (auto& r_user : room_users) {
@@ -363,6 +377,7 @@ void TetrisRoom::CheckWinner()
 		//		send_p.id = r_user.GetSession()->GetId();
 		//	}
 		//}
+		return false;
 	}
 	else {
 		int over_count = 0;
@@ -372,7 +387,7 @@ void TetrisRoom::CheckWinner()
 			if (r_user.GetInUse() && r_user.GetIsOver()) ++over_count;
 		}
 
-		if ((player_count - over_count) > 1) return; // 아직 승자가 결정되지 않음
+		if ((player_count - over_count) > 1) return false; // 아직 승자가 결정되지 않음
 		else {
 			for (auto& r_user : room_users) {
 				if (r_user.GetInUse() && !r_user.GetIsOver()) {
@@ -383,6 +398,7 @@ void TetrisRoom::CheckWinner()
 					Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
 				}
 			}
+			return true;
 		}
 	}
 }

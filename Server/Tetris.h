@@ -17,19 +17,18 @@ class Tetris
 {
 	std::array<std::array<bool, BOARD_WIDTH>, TOTAL_HEIGHT> board;
 	Tetromino current_tetromino;
-	bool new_spawn = false;
 	bool move_allow = false;
 public:
 	Tetris();
 
-	bool GetNewSpawn() const { return new_spawn; }
-	void SetNewSpawn(bool val) { new_spawn = val; }
+	//bool GetNewSpawn() const { return new_spawn; }
+	//void SetNewSpawn(bool val) { new_spawn = val; }
 	bool GetMoveAllow() const { return move_allow; }
 	void SetMoveAllow(bool val) { move_allow = val; }
 
 	void InitNewTetromino(char type, Position spawn_pos);
 	bool HandleTetrominoKeyInput(int move_type);
-	int ClearLine();
+	std::vector<char> ClearLine();
 	void AddLine(int num);
 	int GetRandomX();
 	void Clear();

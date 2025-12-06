@@ -90,7 +90,7 @@ public:
 	void ProcessPlayTasks();
 	void Add7BagTetrominoList();
 	bool SetNewTetromino(int id);
-	void CheckWinner();
+	bool CheckWinner();
 	void ClearRoom();
 	//void SendToSelf(char* packet, Session* session);
 };

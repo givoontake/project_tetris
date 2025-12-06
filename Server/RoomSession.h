@@ -34,4 +34,10 @@ public:
 
 	void InitSession(Session* s);
 	void ClearSession();
+	void ClearData() {
+		is_ready = false;
+		is_over = false;
+		tetromino_index = 0;
+		tetris.Clear();
+	}
 };

@@ -202,7 +202,15 @@ struct S2C_SPAWN_PACKET {
 	char type;
 	int id;
 	char tetromino_type;
-	char x, y;
+	char fixed_x, fixed_y;
+	char spawn_x, spawn_y;
+};
+
+struct S2C_CLEARLINE_PACKET {
+	short size;
+	char type;
+	int id;
+	// 클리어될 줄의 인덱스 수에 따라 뒤에 가변으로 붙여 보낸다.
 };
 
 struct S2C_GAMEOVER_PACKET {
