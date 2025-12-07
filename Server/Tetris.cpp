@@ -12,8 +12,8 @@ Tetris::Tetris()
 void Tetris::InitNewTetromino(char type, Position spawn_pos)
 {
     current_tetromino.type = type;
-    current_tetromino.moved_x = spawn_pos.x;
-	current_tetromino.moved_y = spawn_pos.y;
+    current_tetromino.moved_pos.x = spawn_pos.x;
+	current_tetromino.moved_pos.x = spawn_pos.y;
     current_tetromino.shape_index = 0;
 	current_tetromino.default_pos = TETROMINOS.at(type)[0].default_pos;
 }
@@ -25,19 +25,19 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
     Tetromino if_move_tetromino = current_tetromino;
     switch (move_type) {
     case RIGHT:
-        ++if_move_tetromino.moved_x;
+        ++if_move_tetromino.moved_pos.x;
         break;
 
     case LEFT:
-        --if_move_tetromino.moved_x;
+        --if_move_tetromino.moved_pos.x;
         break;
 
     case DOWN:
-        ++if_move_tetromino.moved_y;
+        ++if_move_tetromino.moved_pos.y;
         break;
 
     case TIMEOUT:
-        ++if_move_tetromino.moved_y;
+        ++if_move_tetromino.moved_pos.y;
         break;
 
     case ROTATE: {
@@ -57,14 +57,14 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
 
     std::array<Position, 4> real_tetromino_pos;
     for (int i = 0; i < 4; ++i) {
-        real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_x;
-        real_tetromino_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_y;
+        real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_pos.x;
+        real_tetromino_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_pos.y;
     }
 
     std::array<Position, 4> real_moved_tetromino_pos;
     for (int i = 0; i < 4; ++i) {
-        real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_x;
-        real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_y;
+        real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_pos.x;
+        real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_pos.y;
     }
 
     // 좌우 이동 및 회전은 착지 계산이 되면 안된다 -> 옆으로 끼워넣는 동작 등이 가능해야 함.
@@ -93,18 +93,18 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
     // DROP 케이스는 충돌이 날 때까지 판정을 해서 쌓아줘야 함.
     if (move_type == DROP) {
         while (true) {
-            ++if_move_tetromino.moved_y; // 똑같이 1칸 증가시킴
+            ++if_move_tetromino.moved_pos.y; // 똑같이 1칸 증가시킴
 
             // 판정을 위한 좌표 새로 업데이트
             for (int i = 0; i < 4; ++i) {
-                real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_x;
-                real_tetromino_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_y;
+                real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_pos.y;
+                real_tetromino_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_pos.y;
             }
 
             // 판정을 위한 좌표 새로 업데이트2
             for (int i = 0; i < 4; ++i) {
-                real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_x;
-                real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_y;
+                real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_pos.y;
+                real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_pos.y;
             }
 
             for (auto& pos : real_moved_tetromino_pos) {
