@@ -239,8 +239,8 @@ void TetrisRoom::StartGame(int id)
 		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 		spawn_p.spawn_x = spawn_pos.x;
 		spawn_p.spawn_y = spawn_pos.y;
-		spawn_p.fixed_x = 0;
-		spawn_p.fixed_y = 0;
+		spawn_p.fixed_x = -1;
+		spawn_p.fixed_y = -1;
 		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 	}
 
@@ -319,6 +319,23 @@ void TetrisRoom::ProcessPlayTasks()
 
 							delete[] send_p;
 						}
+					}
+
+					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 1) Add7BagTetrominoList(); 
+					Tetromino prev_tetromino = r_user.GetTetris().GetCurrentTetromino();
+					r_user.AddTetrominoIndex();
+
+					if (SetNewTetromino(task.id)) {
+						S2C_SPAWN_PACKET spawn_p;
+						spawn_p.size = sizeof(S2C_SPAWN_PACKET);
+						spawn_p.type = S2C_SPAWN;
+						spawn_p.id = r_user.GetSession()->GetId();
+						spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+						spawn_p.spawn_x = spawn_pos.x;
+						spawn_p.spawn_y = spawn_pos.y;
+						spawn_p.fixed_x = prev_tetromino.moved_pos.x;
+						spawn_p.fixed_y = prev_tetromino.moved_pos.y;
+						Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 					}
 				}
 

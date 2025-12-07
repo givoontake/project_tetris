@@ -23,6 +23,9 @@ public:
 
 	//bool GetNewSpawn() const { return new_spawn; }
 	//void SetNewSpawn(bool val) { new_spawn = val; }
+	Tetromino GetCurrentTetromino() const { return current_tetromino; }
+	Position GetCurrentTetrominoPos() const { return current_tetromino.moved_pos; }
+	
 	bool GetMoveAllow() const { return move_allow; }
 	void SetMoveAllow(bool val) { move_allow = val; }
 
