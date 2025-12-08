@@ -62,6 +62,17 @@ class PacketManager:
                 message_len = len(pkt) - (2+1+4+MAX_USER_NAME)
                 fmt = f"{message_len}s"
                 field_size = message_len
+
+            elif field == "rows":
+                rows = []
+                dynamic_field_len = len(pkt) - (2+1+4)
+                for _ in range (dynamic_field_len):
+                    row_index = struct.unpack_from("<b" + fmt, pkt, offset)[0] 
+                    rows.append(row_index)
+                    offset += 1
+
+                data[field] = rows
+                continue
                 
             value = struct.unpack_from("<" + fmt, pkt, offset)[0] 
 

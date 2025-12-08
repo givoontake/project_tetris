@@ -2,7 +2,7 @@ import pygame
 import struct
 from typing import Optional
 
-from define import SHAPES
+from define import *
 from packet_type import *
 from session import Session
 from my_info import MyInfo
@@ -13,7 +13,7 @@ from asset_manager import AssetManager
 # -------------------- 상수 --------------------
 CELL_SIZE    = 35
 BOARD_COLS   = 10
-BOARD_ROWS   = 20
+BOARD_ROWS   = 20+2
 PREVIEW_COLS = 5
 PREVIEW_ROWS = 5
 
@@ -57,8 +57,8 @@ RIGHT = 0
 LEFT = 1
 DOWN = 2
 ROTATE = 3
-TIMEOUT = 4
-DROP = 5
+DROP = 4
+TIMEOUT = 5
 
 
 # -------------------- 싱글 플레이 보드 --------------------
@@ -109,87 +109,105 @@ class TetrisBoard:
         )
         self.my_info = MyInfo(profile_rect, self.session)
 
-    # ------------ 좌표/충돌 판정 ------------ #
-    def in_bounds(self, x: int, y: int) -> bool:
-        return 0 <= x < self.cols and 0 <= y < self.rows
+    # # ------------ 좌표/충돌 판정 ------------ #
+    # def in_bounds(self, x: int, y: int) -> bool:
+    #     return 0 <= x < self.cols and 0 <= y < self.rows
 
-    def can_place(self, tet: Tetromino) -> bool:
-        """tetromino의 각 블록이 보드 안이고, 이미 고정된 블록과 겹치지 않는지 확인."""
-        for x, y in tet.blocks:
-            if not self.in_bounds(x, y):
-                return False
-            if self.grid[y][x] is not None:
-                return False
-        return True
+    # def can_place(self, tet: Tetromino) -> bool:
+    #     """tetromino의 각 블록이 보드 안이고, 이미 고정된 블록과 겹치지 않는지 확인."""
+    #     for x, y in tet.blocks:
+    #         if not self.in_bounds(x, y):
+    #             return False
+    #         if self.grid[y][x] is not None:
+    #             return False
+    #     return True
 
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
-    def lock_piece(self):
+    def fix(self, fix_x, fix_y):
         """현재 블록을 보드에 고정시키고, 라인 삭제까지 처리."""
         if not self.current_tetromino:
             return
 
+        self.current_tetromino.x = fix_x
+        self.current_tetromino.y = fix_y
         # 현재 블록을 grid에 고정
         for x, y in self.current_tetromino.blocks:
-            if self.in_bounds(x, y):
-                self.grid[y][x] = self.current_tetromino.shape_key
+            self.grid[y][x] = self.current_tetromino.shape_key
 
         # 라인 클리어
-        new_rows = [row for row in self.grid if not all(row)]
-        cleared = self.rows - len(new_rows)
-        for _ in range(cleared):
-            new_rows.insert(0, [None for _ in range(self.cols)])
-        self.grid = new_rows
+        # new_rows = [row for row in self.grid if not all(row)]
+        # cleared = self.rows - len(new_rows)
+        # for _ in range(cleared):
+        #     new_rows.insert(0, [None for _ in range(self.cols)])
+        # self.grid = new_rows
 
         # 여기서는 서버 주도 게임이라고 가정해서
         # 새로운 블록 스폰은 서버 패킷 로직에서 처리한다고 보고
         # current_tetromino만 None으로 두어도 된다.
         self.current_tetromino = None
 
+    def clear_lines(self, row_index: list[int]):
+        del_count = 0
+        for row in row_index:
+            del self.grid[row]
+            del_count += 1
+        
+        for _ in del_count:
+            self.grid.insert(0, [None for _ in range(self.cols)])
+
     # ------------ 로컬 이동/회전/하드드랍 (델타 기반) ------------ #
     def move(self, dx: int, dy: int):
         """현재 테트로미노를 (dx, dy)만큼 이동시키는 내부 함수."""
         if not self.current_tetromino or not self.game_started or self.game_over:
             return
+        
+        self.current_tetromino.x += dx
+        self.current_tetromino.y += dy
 
-        nxt = Tetromino(
-            self.current_tetromino.shape_key,
-            self.current_tetromino.x + dx,
-            self.current_tetromino.y + dy,
-            self.current_tetromino.rotation,
-        )
-        if self.can_place(nxt):
-            self.current_tetromino = nxt
-        else:
-            # 아래로 이동 실패 시 락
-            if dy > 0:
-                self.lock_piece()
+        # nxt = Tetromino(
+        #     self.current_tetromino.shape_key,
+        #     self.current_tetromino.x + dx,
+        #     self.current_tetromino.y + dy,
+        #     self.current_tetromino.rotation,
+        # )
+        # if self.can_place(nxt):
+        #     self.current_tetromino = nxt
+        # else:
+        #     # 아래로 이동 실패 시 락
+        #     if dy > 0:
+        #         self.fix()
 
     def rotate(self, delta: int = 1):
         """현재 테트로미노 회전."""
         if not self.current_tetromino or not self.game_started or self.game_over:
             return
-        nxt = self.current_tetromino.rotated(delta)
-        if self.can_place(nxt):
-            self.current_tetromino = nxt
+        self.current_tetromino = self.current_tetromino.rotated(delta)
+        # if self.can_place(nxt):
+            # self.current_tetromino
 
-    def hard_drop(self):
-        """아래로 가능한 만큼 바로 떨어뜨린 뒤 고정."""
-        if not self.current_tetromino or not self.game_started or self.game_over:
-            return
+    # def hard_drop(self):
+    #     """아래로 가능한 만큼 바로 떨어뜨린 뒤 고정."""
+    #     if not self.current_tetromino or not self.game_started or self.game_over:
+    #         return
 
-        while True:
-            nxt = Tetromino(
-                self.current_tetromino.shape_key,
-                self.current_tetromino.x,
-                self.current_tetromino.y + 1,
-                self.current_tetromino.rotation,
-            )
-            if self.can_place(nxt):
-                self.current_tetromino = nxt
-            else:
-                break
+    #     while True:
+    #         nxt = Tetromino(
+    #             self.current_tetromino.shape_key,
+    #             self.current_tetromino.x,
+    #             self.current_tetromino.y + 1,
+    #             self.current_tetromino.rotation,
+    #         )
+    #         if self.can_place(nxt):
+    #             self.current_tetromino = nxt
+    #         else:
+    #             break
 
-        self.lock_piece()
+    #     self.fix()
+
+    def clear_board(self):
+        for r in range(self.rows):
+            for c in range(self.cols):
+                self.grid[r][c] = None
 
     # ------------ 서버 move_type에 대응하는 진입점 ------------ #
     def handle_move(self, move_type: int):
@@ -210,8 +228,8 @@ class TetrisBoard:
             self.move(0, 1)
         elif move_type == ROTATE:
             self.rotate(1)
-        elif move_type == DROP:
-            self.hard_drop()
+        # elif move_type == DROP:
+        #     self.hard_drop()
         # 알 수 없는 command는 무시
 
     # ------------ 게임 시작/리셋 ------------ #
@@ -224,9 +242,7 @@ class TetrisBoard:
         self.game_over = False
 
         # 보드 리셋
-        for r in range(self.rows):
-            for c in range(self.cols):
-                self.grid[r][c] = None
+        self.clear_board()
 
         # 서버 주도 게임이라면 current_tetromino는
         # S2C_START 이후/또는 별도 패킷에서 세팅된다고 가정할 수 있음.
@@ -485,6 +501,22 @@ class SinglePlayState:
             delete_id = data.get("id")
             if delete_id == self.my_session.id:
                 return LobbyState(self.screen, self.am, self.net_worker, self.my_session)
+            
+        elif packet_type == S2C_SPAWN:
+            if self.my_session.id == data.get("id"):
+                if data.get("fixed_x") < 0 or data.get("fixed_y") < 0:
+                    pass
+                else:
+                    self.board.fix(data.get("fixed_x"), data.get("fixed_y"))
+                self.board.current_tetromino = Tetromino(SHAPES_INDEX[data.get("tetromino_type")],data.get("spawn_x"), data.get("spawn_y"))
+
+        elif packet_type == S2C_CLEARLINE:
+            if self.my_session.id == data.get("id"):
+                self.board.clear_lines(data.get("rows"))
+
+        elif packet_type == S2C_GAMEOVER:
+            self.board.game_over = True
+            self.board.current_tetromino = None
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return None
