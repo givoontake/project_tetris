@@ -152,7 +152,7 @@ class TetrisBoard:
             del self.grid[row]
             del_count += 1
         
-        for _ in del_count:
+        for _ in range(del_count):
             self.grid.insert(0, [None for _ in range(self.cols)])
 
     # ------------ 로컬 이동/회전/하드드랍 (델타 기반) ------------ #
@@ -488,8 +488,9 @@ class SinglePlayState:
 
         if packet_type == S2C_START:
             # 게임이 시작되었다고 서버가 알려줌
-            if data.get("is_start") is True and self.board:
+            if data.get("is_start") and self.board:
                 self.board.start_game()
+                print("Enter packet_type == S2C_START")
 
         elif packet_type == S2C_MOVE:
             # move_type에 따라 보드에 반영

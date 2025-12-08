@@ -266,7 +266,7 @@ class LobbyState(BaseState):
 
     def handle_packet(self, data: dict):
         if data:
-            print(f"LobbyState->handle_packet() recv_bytes: {data.get("size")} / recv type: {data.get("type")}")
+            #print(f"LobbyState->handle_packet() recv_bytes: {data.get("size")} / recv type: {data.get("type")}")
             if data.get("type") == S2C_MESSAGE:
                 self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
 

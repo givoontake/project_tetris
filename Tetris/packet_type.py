@@ -145,3 +145,45 @@ PACKET_STRUCT: dict[int, list[str]] = {
 
     S2C_CLEARLINE:     S2C_CLEARLINE_PACKET
 }
+
+PRINT_TYPE = {
+    1:  "S2C_LOGIN",
+    2:  "C2S_LOGIN",
+    3:  "S2C_MESSAGE",
+    4:  "C2S_MESSAGE",
+
+    7:  "S2C_DISCONNECT",
+    8:  "C2S_DISCONNECT",
+
+    9:  "C2S_ADD_OPEN_ROOM",
+    10: "S2C_ADD_OPEN_ROOM",
+
+    11: "C2S_ADD_LOCK_ROOM",
+    12: "S2C_ADD_LOCK_ROOM",
+
+    13: "C2S_ADD_USER",
+    14: "S2C_ADD_USER",
+
+    15: "C2S_DELETE_USER",
+    16: "S2C_DELETE_USER",
+
+    17: "C2S_READY",
+    18: "S2C_READY",
+
+    19: "C2S_START",
+    20: "S2C_START",
+
+    21: "C2S_KICK",
+    22: "S2C_KICK",
+
+    23: "C2S_MOVE",
+    24: "S2C_MOVE",
+
+    25: "S2C_SPAWN",
+
+    27: "S2C_GAMEOVER",
+
+    29: "S2C_GAMEEND",
+
+    31: "S2C_CLEARLINE",
+}

@@ -99,6 +99,14 @@ PACK_FIELD_FMT = {
     "is_add": "b",        # bool을 1바이트 signed char로 전송
     "is_ready": "b",
     "is_start": "b",
+    "move_type": "b",
+    "tetromino_type": "B",
+    "spawn_x": "b",
+    "spawn_y": "b",
+    "fixed_x": "b",
+    "fixed_y": "b",
+
+    "rows": "b",
 
     # 8바이트 정수
     "last_time": "q",     # long long
