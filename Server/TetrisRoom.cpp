@@ -296,10 +296,13 @@ void TetrisRoom::ProcessPlayTasks()
 						send_p.type = S2C_GAMEOVER;
 						send_p.id = task.id;
 						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
-						if (max_user > 1 && CheckWinner()) { // 누군가 게임오버였다면, 승자 여부 추가확인
-							ClearGame(); // 승자가 나왔다면 방 상태 정리(클리어는 아님)하고 함수 종료
-							return;
+						if (max_user > 1) {
+							if (CheckWinner()) { // 누군가 게임오버였다면, 승자 여부 추가확인
+								ClearGame(); // 승자가 나왔다면 방 상태 정리(클리어는 아님)하고 함수 종료
+								return;
+							}
 						}
+						ClearGame();
 					}
 
 					// fix -> clear line -> spawn 순서로 패킷 전송

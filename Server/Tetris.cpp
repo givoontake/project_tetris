@@ -242,9 +242,9 @@ void Tetris::Clear()
 
 bool Tetris::CheckGameover()
 {
-    for (int i = 0; i < RESERVE_HEIGHT; i++) {
-        for (int j = 0; j < BOARD_WIDTH; ++j) {
-            if (board[i][j] == true) {
+    for (int x = 0; x < BOARD_WIDTH; ++x) {
+        for (int y = 0; y < RESERVE_HEIGHT; ++y) {
+            if (board[y][x] == true) {
 				return true;
             }
         }

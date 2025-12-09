@@ -79,6 +79,7 @@ class TetrisBoard:
     ):
         self.screen = screen
         self.board_rect = board_rect
+        #self.board_vaild_rect = pygame.rect()
         self.preview_rect = preview_rect
         self.session = session
 
@@ -517,6 +518,7 @@ class SinglePlayState:
         elif packet_type == S2C_GAMEOVER:
             self.board.game_over = True
             self.board.current_tetromino = None
+            self.board.game_started = False
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return None
