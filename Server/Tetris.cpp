@@ -253,15 +253,35 @@ bool Tetris::CheckGameover()
 
 void Tetris::DebugPrintBoard()
 {
+    // 현재 테트로미노의 실제 보드 상 위치 계산
+    std::array<Position, 4> real_tetromino_pos;
+    for (int i = 0; i < 4; ++i) {
+        real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_pos.x;
+        real_tetromino_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_pos.y;
+    }
+
     std::cout << "====== Tetris Board (y: 0 ~ " << (TOTAL_HEIGHT - 1) << ") ======\n";
 
     for (int y = 0; y < TOTAL_HEIGHT; ++y) {
         std::cout << "|";
         for (int x = 0; x < BOARD_WIDTH; ++x) {
-            std::cout << (board[y][x] ? "■" : "□");
+
+            bool is_current = false;
+            for (const auto& p : real_tetromino_pos) {
+                if (p.x == x && p.y == y) {
+                    is_current = true;
+                    break;
+                }
+            }
+
+            if (is_current)
+                std::cout << "▣";          // 현재 떨어지는 테트로미노: 빗금 네모
+            else
+                std::cout << (board[y][x] ? "■" : "□");  // 고정된 블록 / 빈 칸
         }
         std::cout << "|\n";
     }
 
     std::cout << "====================================\n";
 }
+
