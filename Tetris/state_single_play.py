@@ -124,7 +124,6 @@ class TetrisBoard:
 
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
     def fix(self, fix_x, fix_y):
-        """현재 블록을 보드에 고정시키고, 라인 삭제까지 처리."""
         if not self.current_tetromino:
             return
 
@@ -504,8 +503,9 @@ class SinglePlayState:
                 return LobbyState(self.screen, self.am, self.net_worker, self.my_session)
             
         elif packet_type == S2C_SPAWN:
+            print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
             if self.my_session.id == data.get("id"):
-                if data.get("fixed_x") < 0 or data.get("fixed_y") < 0:
+                if self.board.current_tetromino == None:
                     pass
                 else:
                     self.board.fix(data.get("fixed_x"), data.get("fixed_y"))

@@ -36,4 +36,5 @@ public:
 	int GetRandomX();
 	void Clear();
 	bool CheckGameover();
+	void DebugPrintBoard();
 };

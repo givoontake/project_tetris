@@ -13,7 +13,7 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 {
     current_tetromino.type = type;
     current_tetromino.moved_pos.x = spawn_pos.x;
-	current_tetromino.moved_pos.x = spawn_pos.y;
+	current_tetromino.moved_pos.y = spawn_pos.y;
     current_tetromino.shape_index = 0;
 	current_tetromino.default_pos = TETROMINOS.at(type)[0].default_pos;
 }
@@ -83,7 +83,7 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
                 }
                 return true;
             }
-            else return false; // 회전인 경우 키 인정 x
+            return false; // 회전인 경우 키 인정 x
         }
     }
 
@@ -97,13 +97,13 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
 
             // 판정을 위한 좌표 새로 업데이트
             for (int i = 0; i < 4; ++i) {
-                real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_pos.y;
+                real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_pos.x;
                 real_tetromino_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_pos.y;
             }
 
             // 판정을 위한 좌표 새로 업데이트2
             for (int i = 0; i < 4; ++i) {
-                real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_pos.y;
+                real_moved_tetromino_pos[i].x = if_move_tetromino.default_pos[i].x + if_move_tetromino.moved_pos.x;
                 real_moved_tetromino_pos[i].y = if_move_tetromino.default_pos[i].y + if_move_tetromino.moved_pos.y;
             }
 
@@ -249,4 +249,19 @@ bool Tetris::CheckGameover()
         }
     }
     return false;
+}
+
+void Tetris::DebugPrintBoard()
+{
+    std::cout << "====== Tetris Board (y: 0 ~ " << (TOTAL_HEIGHT - 1) << ") ======\n";
+
+    for (int y = 0; y < TOTAL_HEIGHT; ++y) {
+        std::cout << "|";
+        for (int x = 0; x < BOARD_WIDTH; ++x) {
+            std::cout << (board[y][x] ? "■" : "□");
+        }
+        std::cout << "|\n";
+    }
+
+    std::cout << "====================================\n";
 }

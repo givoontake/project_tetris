@@ -337,6 +337,7 @@ void TetrisRoom::ProcessPlayTasks()
 						spawn_p.fixed_y = prev_tetromino.moved_pos.y;
 						Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 					}
+
 				}
 
 				else {
@@ -350,7 +351,8 @@ void TetrisRoom::ProcessPlayTasks()
 						r_user.GetTetris().SetMoveAllow(false);
 					}
 				}			
-			
+				r_user.GetTetris().GetCurrentTetromino().PrintInfo();
+				r_user.GetTetris().DebugPrintBoard();
 				break;
 			}
 		}
