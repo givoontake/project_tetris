@@ -70,7 +70,7 @@ S2C_KICK_PACKET_FMT = "<hbi"
 C2S_MOVE_PACKET_FMT = "<hbb"
 S2C_MOVE_PACKET_FMT = "<hbib"
 
-S2C_SPAWN_PACKET_FMT = "<hbibbb"
+S2C_SPAWN_PACKET_FMT = "<hbibbbb"
 
 S2C_GANEOVER_PACKET_FMT = "<hbi"
 
@@ -102,7 +102,8 @@ PACK_FIELD_FMT = {
     "is_ready": "b",
     "is_start": "b",
     "move_type": "b",
-    "tetromino_type": "B",
+    "tetromino_type": "b",
+    "next_tetromino_type": "b",
     "spawn_x": "b",
     "spawn_y": "b",
     "fixed_x": "b",
@@ -142,6 +143,7 @@ FIELD_SIZE = {
     "is_start": 1,
     "move_type": 1,
     "tetromino_type": 1,
+    "next_tetromino_type": 1,
     "spawn_x": 1,
     "spawn_y": 1,
     "fixed_x": 1,

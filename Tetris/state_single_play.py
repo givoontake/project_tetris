@@ -98,7 +98,7 @@ class TetrisBoard:
         # 현재/다음 블록
         self.current_tetromino: Optional[Tetromino] = None
         # next_tetromino는 미리보기용 shape_key(str)
-        self.next_tetromino: Optional[str] = None
+        self.next_tetromino_shape: Optional[str] = None
 
         # 보드 내부 개인정보 패널(MyInfo)
         info_h = self.board_rect.h // 3
@@ -134,16 +134,6 @@ class TetrisBoard:
         for x, y in self.current_tetromino.blocks:
             self.grid[y][x] = self.current_tetromino.shape_key
 
-        # 라인 클리어
-        # new_rows = [row for row in self.grid if not all(row)]
-        # cleared = self.rows - len(new_rows)
-        # for _ in range(cleared):
-        #     new_rows.insert(0, [None for _ in range(self.cols)])
-        # self.grid = new_rows
-
-        # 여기서는 서버 주도 게임이라고 가정해서
-        # 새로운 블록 스폰은 서버 패킷 로직에서 처리한다고 보고
-        # current_tetromino만 None으로 두어도 된다.
         self.current_tetromino = None
 
     def clear_lines(self, row_index: list[int]):
@@ -160,19 +150,6 @@ class TetrisBoard:
         self.current_tetromino.x += dx
         self.current_tetromino.y += dy
 
-        # nxt = Tetromino(
-        #     self.current_tetromino.shape_key,
-        #     self.current_tetromino.x + dx,
-        #     self.current_tetromino.y + dy,
-        #     self.current_tetromino.rotation,
-        # )
-        # if self.can_place(nxt):
-        #     self.current_tetromino = nxt
-        # else:
-        #     # 아래로 이동 실패 시 락
-        #     if dy > 0:
-        #         self.fix()
-
     def rotate(self, delta: int = 1):
         """현재 테트로미노 회전."""
         if not self.current_tetromino or not self.game_started or self.game_over:
@@ -180,25 +157,6 @@ class TetrisBoard:
         self.current_tetromino = self.current_tetromino.rotated(delta)
         # if self.can_place(nxt):
             # self.current_tetromino
-
-    # def hard_drop(self):
-    #     """아래로 가능한 만큼 바로 떨어뜨린 뒤 고정."""
-    #     if not self.current_tetromino or not self.game_started or self.game_over:
-    #         return
-
-    #     while True:
-    #         nxt = Tetromino(
-    #             self.current_tetromino.shape_key,
-    #             self.current_tetromino.x,
-    #             self.current_tetromino.y + 1,
-    #             self.current_tetromino.rotation,
-    #         )
-    #         if self.can_place(nxt):
-    #             self.current_tetromino = nxt
-    #         else:
-    #             break
-
-    #     self.fix()
 
     def clear_board(self):
         for r in range(self.rows):
@@ -307,10 +265,10 @@ class TetrisBoard:
         pygame.draw.rect(self.screen, (0, 0, 0), self.preview_rect)
         pygame.draw.rect(self.screen, (255, 255, 255), self.preview_rect, 1)
 
-        if not self.next_tetromino:
+        if not self.next_tetromino_shape:
             return
 
-        shape_key = self.next_tetromino
+        shape_key = self.next_tetromino_shape
         shape = SHAPES[shape_key][0]
 
         xs = [cx for (cx, _) in shape]
@@ -503,6 +461,7 @@ class SinglePlayState:
             print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
             if self.my_session.id == data.get("id"):
                 self.board.current_tetromino = Tetromino(SHAPES_INDEX[data.get("tetromino_type")],data.get("spawn_x"), data.get("spawn_y"))
+                self.board.next_tetromino_shape = SHAPES_INDEX[data.get("next_tetromino_type")]
 
         elif packet_type == S2C_FIX:
             if self.my_session.id == data.get("id"):

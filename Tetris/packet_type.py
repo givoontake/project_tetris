@@ -85,7 +85,7 @@ S2C_KICK_PACKET = ["size", "type", "kick_user_id"]
 C2S_MOVE_PACKET = ["size", "type", "move_type"]
 S2C_MOVE_PACKET = ["size", "type", "id", "move_type"]
 
-S2C_SPAWN_PACKET = ["size", "type", "id", "tetromino_type", "spawn_x", "spawn_y"]
+S2C_SPAWN_PACKET = ["size", "type", "id", "tetromino_type", "next_tetromino_type","spawn_x", "spawn_y"]
 
 S2C_GAMEOVER_PACKET = ["size", "type", "id"]
 

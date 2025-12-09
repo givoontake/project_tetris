@@ -202,6 +202,7 @@ struct S2C_SPAWN_PACKET {
 	char type;
 	int id;
 	char tetromino_type;
+	char next_tetromino_type;
 	char spawn_x, spawn_y;
 };
 

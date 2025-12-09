@@ -239,6 +239,7 @@ void TetrisRoom::StartGame(int id)
 		spawn_p.type = S2C_SPAWN;
 		spawn_p.id = r_user.GetSession()->GetId();
 		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+		spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 		spawn_p.spawn_x = spawn_pos.x;
 		spawn_p.spawn_y = spawn_pos.y;
 		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
@@ -331,7 +332,7 @@ void TetrisRoom::ProcessPlayTasks()
 						delete[] send_p;
 					}
 
-					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 1) Add7BagTetrominoList(); 
+					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList(); 
 					r_user.AddTetrominoIndex();
 
 					if (SetNewTetromino(task.id)) {
@@ -340,6 +341,7 @@ void TetrisRoom::ProcessPlayTasks()
 						spawn_p.type = S2C_SPAWN;
 						spawn_p.id = r_user.GetSession()->GetId();
 						spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+						spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 						spawn_p.spawn_x = spawn_pos.x;
 						spawn_p.spawn_y = spawn_pos.y;
 						Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
