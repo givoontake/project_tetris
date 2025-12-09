@@ -146,12 +146,8 @@ class TetrisBoard:
         self.current_tetromino = None
 
     def clear_lines(self, row_index: list[int]):
-        del_count = 0
         for row in row_index:
             del self.grid[row]
-            del_count += 1
-        
-        for _ in range(del_count):
             self.grid.insert(0, [None for _ in range(self.cols)])
 
     # ------------ 로컬 이동/회전/하드드랍 (델타 기반) ------------ #
@@ -505,11 +501,14 @@ class SinglePlayState:
         elif packet_type == S2C_SPAWN:
             print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
             if self.my_session.id == data.get("id"):
+                self.board.current_tetromino = Tetromino(SHAPES_INDEX[data.get("tetromino_type")],data.get("spawn_x"), data.get("spawn_y"))
+
+        elif packet_type == S2C_FIX:
+            if self.my_session.id == data.get("id"):
                 if self.board.current_tetromino == None:
                     pass
                 else:
                     self.board.fix(data.get("fixed_x"), data.get("fixed_y"))
-                self.board.current_tetromino = Tetromino(SHAPES_INDEX[data.get("tetromino_type")],data.get("spawn_x"), data.get("spawn_y"))
 
         elif packet_type == S2C_CLEARLINE:
             if self.my_session.id == data.get("id"):

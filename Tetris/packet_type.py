@@ -40,6 +40,8 @@ S2C_GAMEEND       = 29
 
 S2C_CLEARLINE     = 31
 
+S2C_FIX           = 33
+
 # ---- Login ----
 S2C_LOGIN_PACKET = ["size", "type", "id", "user_name"]
 C2S_LOGIN_PACKET = ["size", "type", "user_id", "user_password"]
@@ -83,13 +85,15 @@ S2C_KICK_PACKET = ["size", "type", "kick_user_id"]
 C2S_MOVE_PACKET = ["size", "type", "move_type"]
 S2C_MOVE_PACKET = ["size", "type", "id", "move_type"]
 
-S2C_SPAWN_PACKET = ["size", "type", "id", "tetromino_type", "fixed_x", "fixed_y", "spawn_x", "spawn_y"]
+S2C_SPAWN_PACKET = ["size", "type", "id", "tetromino_type", "spawn_x", "spawn_y"]
 
 S2C_GAMEOVER_PACKET = ["size", "type", "id"]
 
 S2C_GAMEEND_PACKET = ["size", "type", "id"]
 
 S2C_CLEARLINE_PACKET = ["size", "type", "id", "rows"] # 뒤에 클라어될 라인들 인덱스(rows)가 가변 크기로 붙어온다
+
+S2C_FIX_PACKET = ["size", "type", "id", "fixed_x", "fixed_y"]
 
 
 # 타입 코드(int) -> 필드 목록(list[str]) 매핑
@@ -143,7 +147,9 @@ PACKET_STRUCT: dict[int, list[str]] = {
 
     S2C_GAMEEND:       S2C_GAMEEND_PACKET,
 
-    S2C_CLEARLINE:     S2C_CLEARLINE_PACKET
+    S2C_CLEARLINE:     S2C_CLEARLINE_PACKET,
+
+    S2C_FIX:           S2C_FIX_PACKET
 }
 
 PRINT_TYPE = {
@@ -186,4 +192,6 @@ PRINT_TYPE = {
     29: "S2C_GAMEEND",
 
     31: "S2C_CLEARLINE",
+
+    33: "S2C_FIX"
 }

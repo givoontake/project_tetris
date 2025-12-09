@@ -202,8 +202,14 @@ struct S2C_SPAWN_PACKET {
 	char type;
 	int id;
 	char tetromino_type;
-	char fixed_x, fixed_y;
 	char spawn_x, spawn_y;
+};
+
+struct S2C_FIX_PACKET {
+	short size;
+	char type;
+	int id;
+	char fixed_x, fixed_y;
 };
 
 struct S2C_CLEARLINE_PACKET {

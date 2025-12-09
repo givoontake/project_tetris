@@ -240,8 +240,6 @@ void TetrisRoom::StartGame(int id)
 		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 		spawn_p.spawn_x = spawn_pos.x;
 		spawn_p.spawn_y = spawn_pos.y;
-		spawn_p.fixed_x = -1;
-		spawn_p.fixed_y = -1;
 		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 	}
 
@@ -304,26 +302,32 @@ void TetrisRoom::ProcessPlayTasks()
 						}
 					}
 
-					else {
-						std::vector<char> index_lines = r_user.GetTetris().ClearLine();
-						if (!index_lines.empty()) {
-							S2C_CLEARLINE_PACKET clear_line_p;
-							int index_size = index_lines.size();
-							int total_size = sizeof(S2C_CLEARLINE_PACKET) + index_size;
-							char* send_p = new char[total_size];
-							clear_line_p.size = total_size;
-							clear_line_p.type = S2C_CLEARLINE;
-							clear_line_p.id = task.id;
-							memcpy(send_p, reinterpret_cast<char*>(&clear_line_p), sizeof(S2C_CLEARLINE_PACKET));
-							memcpy(send_p + sizeof(S2C_CLEARLINE_PACKET), index_lines.data(), index_size);
-							Broadcast(send_p, server->GetHandle());
+					// fix -> clear line -> spawn 순서로 패킷 전송
+					S2C_FIX_PACKET fix_p;
+					fix_p.size = sizeof(S2C_FIX_PACKET);
+					fix_p.type = S2C_FIX;
+					fix_p.id = r_user.GetSession()->GetId();
+					fix_p.fixed_x = r_user.GetTetris().GetCurrentTetromino().moved_pos.x;
+					fix_p.fixed_y = r_user.GetTetris().GetCurrentTetromino().moved_pos.y;
+					Broadcast(reinterpret_cast<char*>(&fix_p), server->GetHandle());
 
-							delete[] send_p;
-						}
+					std::vector<char> index_lines = r_user.GetTetris().ClearLine();
+					if (!index_lines.empty()) {
+						S2C_CLEARLINE_PACKET clear_line_p;
+						int index_size = index_lines.size();
+						int total_size = sizeof(S2C_CLEARLINE_PACKET) + index_size;
+						char* send_p = new char[total_size];
+						clear_line_p.size = total_size;
+						clear_line_p.type = S2C_CLEARLINE;
+						clear_line_p.id = task.id;
+						memcpy(send_p, reinterpret_cast<char*>(&clear_line_p), sizeof(S2C_CLEARLINE_PACKET));
+						memcpy(send_p + sizeof(S2C_CLEARLINE_PACKET), index_lines.data(), index_size);
+						Broadcast(send_p, server->GetHandle());
+
+						delete[] send_p;
 					}
 
 					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 1) Add7BagTetrominoList(); 
-					Tetromino prev_tetromino = r_user.GetTetris().GetCurrentTetromino();
 					r_user.AddTetrominoIndex();
 
 					if (SetNewTetromino(task.id)) {
@@ -334,8 +338,6 @@ void TetrisRoom::ProcessPlayTasks()
 						spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 						spawn_p.spawn_x = spawn_pos.x;
 						spawn_p.spawn_y = spawn_pos.y;
-						spawn_p.fixed_x = prev_tetromino.moved_pos.x;
-						spawn_p.fixed_y = prev_tetromino.moved_pos.y;
 						Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 					}
 

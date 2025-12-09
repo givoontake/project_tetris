@@ -70,13 +70,15 @@ S2C_KICK_PACKET_FMT = "<hbi"
 C2S_MOVE_PACKET_FMT = "<hbb"
 S2C_MOVE_PACKET_FMT = "<hbib"
 
-S2C_SPAWN_PACKET_FMT = "<hbibbbbb"
+S2C_SPAWN_PACKET_FMT = "<hbibbb"
 
 S2C_GANEOVER_PACKET_FMT = "<hbi"
 
 S2C_GAMEEND_PACKET_FMT = "<hbi"
 
 S2C_CLEARLINE_PACKET_FMT = "<hbi"
+
+S2C_FIX_PACKET_FMT = "<hbibb"
 
 # =====================================================================
 #  필드 단위: "문자열 → 포맷" 사전 및(옵션) 스키마 샘플

@@ -140,6 +140,7 @@ std::vector<char> Tetris::ClearLine()
             //  줄 삭제 시의 "중력"은 전체 스택을 대상으로 적용)
             std::rotate(board.begin(), board.begin() + y, board.begin() + y + 1);
 			index_lines.emplace_back(y);
+			std::cout << "Cleared line index y = " << y << "\n";
         }
     }
 
