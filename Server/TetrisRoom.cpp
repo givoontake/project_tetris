@@ -290,11 +290,12 @@ void TetrisRoom::ProcessPlayTasks()
 			if (!r_user.GetInUse()) continue;
 			if (r_user.GetIsOver()) continue;
 			if (r_user.GetSession()->GetId() == task.id) {
-				// 테트리스 키 입력 처리
+				if (!CheckInputTick(r_user)) break; 
+				r_user.SetInputTick(0);
+				if (task.type == DOWN && DROP) {
+					r_user.SetDownTick(0);
+				}
 				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) { // 착지(고정)에 성공했는가?
-					if (task.type == DOWN && DROP) {
-						r_user.SetSessionTick(0);
-					}
 					if (r_user.GetTetris().CheckGameover()) { // 고정에 성공했다면 게임오버 판정
 						r_user.SetIsOver(true);
 						S2C_GAMEOVER_PACKET send_p;
@@ -447,7 +448,8 @@ void TetrisRoom::UpdateTick()
 {
 	for(auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue;
-		r_user.SetSessionTick(r_user.GetSessionTick() + 1);
+		r_user.SetDownTick(r_user.GetDownTick() + 1);
+		r_user.SetInputTick(r_user.GetInputTick() + 1);
 	}
 }
 
@@ -455,13 +457,20 @@ void TetrisRoom::CheckMoveDownTimeout()
 {
 	for(auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue;
-		if (r_user.GetSessionTick() >= MOVE_DOWN_TIMEOUT_TICK) {
+		if (r_user.GetDownTick() >= MOVE_DOWN_TIMEOUT_TICK) {
 			TaskInfo new_task;
 			new_task.id = r_user.GetSession()->GetId();
 			new_task.type = DOWN;
 			tasks.AddTask(new_task);
-			r_user.SetSessionTick(0);
+			r_user.SetDownTick(0);
 		}
+	}
+}
+
+bool TetrisRoom::CheckInputTick(RoomSession& r_session)
+{
+	if (r_session.GetInputTick() >= INPUT_TICK) {
+		return true;
 	}
 }
 

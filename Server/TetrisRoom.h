@@ -9,7 +9,8 @@
 #include "RoomPacketHandler.h"
 #include "IOCPServer.h"
 
-constexpr long long MOVE_DOWN_TIMEOUT_TICK = FPS / 2;
+constexpr int MOVE_DOWN_TIMEOUT_TICK = FPS / 2;
+constexpr int INPUT_TICK = FPS / 10;
 
 enum ROOM_STATE {EMPTY, WAIT, PLAY};
 
@@ -96,5 +97,6 @@ public:
 	void ClearRoom();
 	void UpdateTick();
 	void CheckMoveDownTimeout();
+	bool CheckInputTick(RoomSession& r_session);
 	//void SendToSelf(char* packet, Session* session);
 };
