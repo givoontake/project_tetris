@@ -9,6 +9,8 @@
 #include "RoomPacketHandler.h"
 #include "IOCPServer.h"
 
+constexpr long long MOVE_DOWN_TIMEOUT_TICK = FPS / 2;
+
 enum ROOM_STATE {EMPTY, WAIT, PLAY};
 
 struct TaskInfo
@@ -92,5 +94,7 @@ public:
 	bool SetNewTetromino(int id);
 	bool CheckWinner();
 	void ClearRoom();
+	void UpdateTick();
+	void CheckMoveDownTimeout();
 	//void SendToSelf(char* packet, Session* session);
 };

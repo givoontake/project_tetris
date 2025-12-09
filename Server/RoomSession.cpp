@@ -37,6 +37,7 @@ void RoomSession::InitSession(Session* s)
 	in_use = true;
 	is_over = false;
 	tetromino_index = 0;
+	tick_counter = 0;
 	tetris.Clear();
 }
 
@@ -45,6 +46,15 @@ void RoomSession::ClearSession()
 	session = nullptr;
 	is_ready = false;
 	in_use = false;
+	is_over = false;
+	tetromino_index = 0;
+	tick_counter = 0;
+	tetris.Clear();
+}
+
+void RoomSession::ClearData()
+{
+	is_ready = false;
 	is_over = false;
 	tetromino_index = 0;
 	tetris.Clear();

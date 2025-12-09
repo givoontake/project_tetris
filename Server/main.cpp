@@ -6,10 +6,6 @@
 #include <condition_variable>
 #include "IOCPServer.h"
 
-constexpr int FPS = 50;
-constexpr int FRAME_TIME = 1000 / FPS; 
-constexpr int MAX_TICK_WORKERS = 4;
-
 IOCPServer iocp_server;
 
 std::mutex              g_tick_mutex;
@@ -44,6 +40,7 @@ void TickWorkerThread(int num)
         for (int i = thread_num; i < MAX_ROOM; i += MAX_TICK_WORKERS){
             if (iocp_server.GetRoom(i)->GetRoomState() != PLAY) continue;
             iocp_server.GetRoom(i)->ProcessPlayTasks();
+			iocp_server.GetRoom(i)->UpdateTick();
         }
 
         last_tick = current_tick;

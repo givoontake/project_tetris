@@ -1,5 +1,9 @@
 #pragma once
 #include <atomic>
+constexpr int FPS = 50;
+constexpr int FRAME_TIME = 1000 / FPS;
+constexpr int MAX_TICK_WORKERS = 4;
+
 constexpr int BUF_SIZE = 10240;
 constexpr int MAX_MESSAGE_SIZE = 512;
 constexpr int PORT_NUM = 12345;
