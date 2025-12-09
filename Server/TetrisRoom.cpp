@@ -112,15 +112,16 @@ void TetrisRoom::DeleteUser(const int id)
 			p.size = sizeof(S2C_DELETE_USER_PACKET);
 			p.type = S2C_DELETE_USER;
 			p.id = id;
+			int new_host_id = -1;
 			if (p.id == host_id) { // 새 방장 여부에 따른 처리
-				int new_host_id = FindNewHost(p.id);
-				if (new_host_id == -1) { // 현재 방에 아무도 없으면
-					ClearRoom();
-					std::cout << "Room index " << room_id << " now empty" << std::endl;
-				}
+				new_host_id = FindNewHost(p.id);
 				p.new_host_id = new_host_id;
 			}
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+			if (new_host_id == -1) { // 현재 방에 아무도 없으면
+				ClearRoom();
+				std::cout << "Room index " << room_id << " now empty" << std::endl;
+			}
 			r_user.ClearSession(); // 해당 아이디 세션 정리
 
 			break;
@@ -218,7 +219,7 @@ void TetrisRoom::StartGame(int id)
 	Add7BagTetrominoList();
 	for (auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue;
-		r_user.GetTetris().InitNewTetromino(r_user.GetTetrominoIndex(), spawn_pos);
+		r_user.GetTetris().InitNewTetromino(tetromino_spawn_list[r_user.GetTetrominoIndex()], spawn_pos);
 	}
 	SetRoomState(PLAY);
 

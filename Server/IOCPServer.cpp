@@ -232,7 +232,7 @@ void IOCPServer::Disconnect(int user_index)
 {
 	if (users[user_index]->GetState() == NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
 
-	if (users[user_index]->GetState() == ROOM) rooms[users[user_index]->GetRoomIndex()]->DeleteUser(user_index);
+	if (users[user_index]->GetState() == ROOM) rooms[users[user_index]->GetRoomIndex()]->DeleteUser(users[user_index]->GetId());
 	
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
