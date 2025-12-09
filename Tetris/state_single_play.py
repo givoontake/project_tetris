@@ -13,7 +13,8 @@ from asset_manager import AssetManager
 # -------------------- 상수 --------------------
 CELL_SIZE    = 35
 BOARD_COLS   = 10
-BOARD_ROWS   = 20+2
+HIDDEN_ROWS  = 2
+BOARD_ROWS   = 20+HIDDEN_ROWS
 PREVIEW_COLS = 5
 PREVIEW_ROWS = 5
 
@@ -74,12 +75,13 @@ class TetrisBoard:
         self,
         screen: pygame.Surface,
         board_rect: pygame.Rect,
+        valid_rect: pygame.Rect,
         preview_rect: pygame.Rect,
         session: Session,
     ):
         self.screen = screen
         self.board_rect = board_rect
-        #self.board_vaild_rect = pygame.rect()
+        self.valid_rect = valid_rect
         self.preview_rect = preview_rect
         self.session = session
 
@@ -205,8 +207,14 @@ class TetrisBoard:
     # ------------ 렌더링 ------------ #
     def draw_board_frame(self):
         """보드 전체 테두리."""
-        pygame.draw.rect(self.screen, (0, 0, 0), self.board_rect)
-        pygame.draw.rect(self.screen, (255, 255, 255), self.board_rect, 1)
+        # pygame.draw.rect(self.screen, (0, 0, 0), self.board_rect)
+        valid_x = self.valid_rect.x
+        valid_y = self.valid_rect.y
+        valid_w = self.valid_rect.w
+        valid_h = self.valid_rect.h
+        pygame.draw.line(self.screen, WHITE, (valid_x,  valid_y), (valid_x, valid_y + valid_h))
+        pygame.draw.line(self.screen, WHITE, (valid_x,  valid_y + valid_h), (valid_x + valid_w, valid_y + valid_h))
+        pygame.draw.line(self.screen, WHITE, (valid_x + valid_w, valid_y + valid_h), (valid_x + valid_w, valid_y))
 
     def draw_cells(self):
         """보드 위의 고정 블록 + 떨어지는 블록을 그린다.
@@ -265,7 +273,7 @@ class TetrisBoard:
         pygame.draw.rect(self.screen, (0, 0, 0), self.preview_rect)
         pygame.draw.rect(self.screen, (255, 255, 255), self.preview_rect, 1)
 
-        if not self.next_tetromino_shape:
+        if self.game_started == False:
             return
 
         shape_key = self.next_tetromino_shape
@@ -492,6 +500,8 @@ class SinglePlayState:
         # --- 보드 / 미리보기 배치 ---
         board_w = BOARD_COLS * CELL_SIZE
         board_h = BOARD_ROWS * CELL_SIZE
+        valid_w = board_w
+        valid_h = (BOARD_ROWS - HIDDEN_ROWS) * CELL_SIZE
         preview_w = PREVIEW_COLS * CELL_SIZE
         preview_h = PREVIEW_ROWS * CELL_SIZE
 
@@ -507,9 +517,17 @@ class SinglePlayState:
             board_w,
             board_h,
         )
+
+        valid_rect = pygame.Rect(
+            offset_x,
+            offset_y + HIDDEN_ROWS*CELL_SIZE,
+            valid_w,
+            valid_h,
+        )
+
         preview_rect = pygame.Rect(
             offset_x + board_w,
-            offset_y,
+            offset_y + HIDDEN_ROWS*CELL_SIZE,
             preview_w,
             preview_h,
         )
@@ -517,6 +535,7 @@ class SinglePlayState:
         self.board = TetrisBoard(
             screen=self.screen,
             board_rect=board_rect,
+            valid_rect=valid_rect,
             preview_rect=preview_rect,
             session=self.my_session,
         )
