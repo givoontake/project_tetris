@@ -273,8 +273,8 @@ class TetrisBoard:
         pygame.draw.rect(self.screen, (0, 0, 0), self.preview_rect)
         pygame.draw.rect(self.screen, (255, 255, 255), self.preview_rect, 1)
 
-        if self.game_started == False:
-            return
+        if self.next_tetromino_shape == None: return
+        if self.game_started == False: return
 
         shape_key = self.next_tetromino_shape
         shape = SHAPES[shape_key][0]
