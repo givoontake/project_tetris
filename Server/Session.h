@@ -36,7 +36,7 @@ public:
 	ExOverlapped& GetExOver() { return recv_over; }
 
 	int GetId() const { return id; }
-	int GetIndex() const { return index; }
+	//int GetIndex() const { return index; }
 	int GetRoomIndex() const { return room_index; }
 	int GetRemainDataSize() const { return remain_data_size; }
 	USER_STATE GetState() const { return state.GetSelf(); }
