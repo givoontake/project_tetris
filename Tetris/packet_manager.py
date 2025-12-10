@@ -65,7 +65,7 @@ class PacketManager:
 
             elif field == "rows":
                 rows = []
-                dynamic_field_len = len(pkt) - (2+1+4)
+                dynamic_field_len = len(pkt) - (2+1+4+4)
                 for _ in range (dynamic_field_len):
                     row_index = struct.unpack_from("<b", pkt, offset)[0] 
                     rows.append(row_index)
