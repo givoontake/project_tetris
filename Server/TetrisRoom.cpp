@@ -463,11 +463,12 @@ void TetrisRoom::CheckMoveDownTimeout()
 {
 	for(auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue;
-		if (r_user.GetDownTick() >= MOVE_DOWN_TIMEOUT_TICK) {
+		if (r_user.GetDownTick() >= r_user.GetDownTimeout()) {
 			TaskInfo new_task;
 			new_task.id = r_user.GetSession()->GetId();
 			new_task.type = DOWN;
 			tasks.AddTask(new_task);
+			ReduceTimeouts(DOWN, r_user);
 			r_user.SetDownTick(0);
 		}
 	}
@@ -479,7 +480,7 @@ void TetrisRoom::CheckAddGarbageLineTimeout()
 		if (!r_user.GetInUse()) continue;
 		if (r_user.GetAddGarbageLineTick() < r_user.GetAddGarbageLineTimeout()) continue;
 		r_user.SetAddGarbageLineTick(0);
-		r_user.SetAddGarbageLineTimeout(ADD_TIMEOUT); // 다음 타임아웃 재설정
+		ReduceTimeouts(ADD_TIMEOUT, r_user); // 다음 타임아웃 재설정
 		std::vector<char> holes = r_user.GetTetris().GetGarbegeLineHoles(2); // 타임아웃 나는건 싱글뿐이라 1칸 추가인 2를 넘김
 		std::vector<char> tasks_from_add_garbege_lines = r_user.GetTetris().AddGarbageLines(holes);
 		if (!tasks_from_add_garbege_lines.empty()) {
@@ -559,7 +560,30 @@ void TetrisRoom::ReduceTimeouts(int type, RoomSession& r_session)
 {
 	switch(type){
 	case DOWN_TIMEOUT:
-		r_session.SetDownTimeout(r_session.GetDownTimeout() - (ADD_GARBAGE_LINE_TICK / 10));
+		if (r_session.GetScore() <= 100) {
+			r_session.SetDownTimeout(25);
+		}
+
+		else if (100 < r_session.GetScore() <= 300) {
+			r_session.SetDownTimeout(24);
+		}
+
+		else if (300 < r_session.GetScore() <= 600) {
+			r_session.SetDownTimeout(23);
+		}
+
+		else if (600 < r_session.GetScore() <= 1000) {
+			r_session.SetDownTimeout(22);
+		}
+
+		else if (1000 < r_session.GetScore() <= 1500) {
+			r_session.SetDownTimeout(21);
+		}
+
+		else if (1500 < r_session.GetScore()) {
+			r_session.SetDownTimeout(20);
+		}
+		
 		break;
 
 	case ADD_TIMEOUT:
