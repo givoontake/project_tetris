@@ -26,6 +26,7 @@ FALLBACK_COLORS = {
     'S': (0, 240, 0),
     'T': (160, 0, 240),
     'Z': (240, 0, 0),
+    'G': GRAY
 }
 
 
@@ -77,12 +78,15 @@ class TetrisBoard:
         board_rect: pygame.Rect,
         valid_rect: pygame.Rect,
         preview_rect: pygame.Rect,
+        score_rect: pygame.Rect,
         session: Session,
     ):
         self.screen = screen
         self.board_rect = board_rect
         self.valid_rect = valid_rect
         self.preview_rect = preview_rect
+        self.score_rect = score_rect
+        self.score = 0
         self.session = session
 
         self.cols = BOARD_COLS
@@ -142,6 +146,12 @@ class TetrisBoard:
         for row in row_index:
             del self.grid[row]
             self.grid.insert(0, [None for _ in range(self.cols)])
+
+    def add_line(self, hole_x: int):
+        new_line = ['G' for _ in range(BOARD_COLS)]
+        new_line[hole_x] = None
+        self.grid.append(new_line)
+        del self.grid[0]
 
     # ------------ 로컬 이동/회전/하드드랍 (델타 기반) ------------ #
     def move(self, dx: int, dy: int):
@@ -314,10 +324,24 @@ class TetrisBoard:
 
             pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
 
+    def draw_score(self):
+        pygame.draw.rect(self.screen, BLACK, self.score_rect)
+        pygame.draw.rect(self.screen, WHITE, self.score_rect, 1)
+
+        # 중앙 정렬을 위해 텍스트 렌더링
+        font = pygame.font.Font("resource/dodamdodam.ttf", 32)
+        text = font.render(f"Score: {self.score}", True, WHITE)
+
+        # 텍스트를 score_rect 중앙에 배치
+        text_rect = text.get_rect(center=self.score_rect.center)
+
+        self.screen.blit(text, text_rect)
+
     def draw(self):
         # 보드 프레임 & 미리보기는 항상 그림
         self.draw_board_frame()
         self.draw_preview()
+        self.draw_score()
 
         if not self.game_started:
             # 시작 전: 보드 내부에 내 정보
@@ -481,6 +505,11 @@ class SinglePlayState:
         elif packet_type == S2C_CLEARLINE:
             if self.my_session.id == data.get("id"):
                 self.board.clear_lines(data.get("rows"))
+                self.board.score = data.get("score")
+
+        elif packet_type == S2C_ADDLINE:
+            if self.my_session.id == data.get("id"):
+                self.board.add_line(data.get("hole_x"))
 
         elif packet_type == S2C_GAMEOVER:
             self.board.game_over = True
@@ -504,6 +533,8 @@ class SinglePlayState:
         valid_h = (BOARD_ROWS - HIDDEN_ROWS) * CELL_SIZE
         preview_w = PREVIEW_COLS * CELL_SIZE
         preview_h = PREVIEW_ROWS * CELL_SIZE
+        score_w = PREVIEW_COLS*CELL_SIZE
+        score_h = PREVIEW_ROWS*CELL_SIZE
 
         total_w = board_w + preview_w
         total_h = board_h
@@ -532,12 +563,20 @@ class SinglePlayState:
             preview_h,
         )
 
+        score_rect = pygame.Rect(
+            offset_x + board_w,
+            offset_y + HIDDEN_ROWS*CELL_SIZE + preview_h,
+            score_w,
+            score_h
+        )
+
         self.board = TetrisBoard(
             screen=self.screen,
             board_rect=board_rect,
             valid_rect=valid_rect,
             preview_rect=preview_rect,
-            session=self.my_session,
+            score_rect=score_rect,
+            session=self.my_session
         )
 
         # 게임 시작 버튼 (보드 중앙 아래쪽 정도에 배치)
@@ -555,7 +594,7 @@ class SinglePlayState:
         )
 
         # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
-        header_w, header_h = 300, 100
+        header_w, header_h = 300, 50
         header_y = 0
         title_x = 0
         pw_x = header_w  # 바로 오른쪽에 붙이기
