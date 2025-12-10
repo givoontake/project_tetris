@@ -224,6 +224,13 @@ struct S2C_CLEARLINE_PACKET {
 	// 클리어될 줄의 인덱스 수에 따라 뒤에 가변으로 붙여 보낸다.
 };
 
+struct S2C_ADDLINE_PACKET {
+	short size;
+	char type;
+	int id;
+	char hole_x;
+};;
+
 struct S2C_GAMEOVER_PACKET {
 	short size;
 	char type;

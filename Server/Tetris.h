@@ -1,16 +1,21 @@
 #pragma once
 #include "define_tetromino.h"
-constexpr int RESERVE_HEIGHT = 2;
+constexpr int HIDDEN_HEIGHT = 2;
 constexpr int BOARD_WIDTH = 10;
 constexpr int BOARD_HEIGHT = 20;
-constexpr int TOTAL_HEIGHT = BOARD_HEIGHT + RESERVE_HEIGHT;
+constexpr int TOTAL_HEIGHT = BOARD_HEIGHT + HIDDEN_HEIGHT;
 
+constexpr char GAMEOVER = -2;
+constexpr char FIX = -1;
+
+// 언젠가 char로 바꿀것
 constexpr int RIGHT = 0;
 constexpr int LEFT = 1;
 constexpr int DOWN = 2;
 constexpr int ROTATE = 3;
 constexpr int DROP = 4;
 constexpr int TIMEOUT = 5;
+constexpr int UP = 6; // 실제로 받지는 않고 처리상 롤백용
 // timeout-> 일정  시간이 지나 자동으로 아래로 한 칸 이동하는 것
 
 class Tetris
@@ -32,8 +37,10 @@ public:
 	void InitNewTetromino(char type, Position spawn_pos);
 	bool HandleTetrominoKeyInput(int move_type);
 	std::vector<char> ClearLine();
-	void AddLine(int num);
-	int GetRandomX();
+	std::vector<char> GetGarbegeLineHoles(int cleard_line_num);
+	std::vector<char> AddGarbageLines(std::vector<char> holes);
+
+	int GetRandomHoleX();
 	void Clear();
 	bool CheckGameover();
 	void DebugPrintBoard();

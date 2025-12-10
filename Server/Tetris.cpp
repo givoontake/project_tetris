@@ -53,6 +53,10 @@ bool Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
         // 드랍 판정은 나중에 함
         break;
     }
+
+	case UP:
+        --current_tetromino.moved_pos.y;
+        break;
     }
 
     std::array<Position, 4> real_tetromino_pos;
@@ -130,7 +134,7 @@ std::vector<char> Tetris::ClearLine()
     std::vector<char> index_lines;
 
     // ✅ 줄 삭제는 "보이는 영역"만: RESERVE_HEIGHT ~ TOTAL_HEIGHT-1
-    for (int y = RESERVE_HEIGHT; y < TOTAL_HEIGHT; ++y) {
+    for (int y = HIDDEN_HEIGHT; y < TOTAL_HEIGHT; ++y) {
         if (std::all_of(board[y].begin(), board[y].end(), // 한 줄이 모두 true(채워짐)이면
             [](bool cell) { return cell; })) {
             std::fill(board[y].begin(), board[y].end(), false); // 현재 줄을 모두 false로 바꾸고
@@ -147,13 +151,14 @@ std::vector<char> Tetris::ClearLine()
     return index_lines;
 }
 
-void Tetris::AddLine(int num)
+std::vector<char> Tetris::GetGarbegeLineHoles(int cleard_line_num)
 {
     int add_num = 0;
     // 지워진 라인에 따라 증가되는 라인 수가 다름
-    switch (num) {
+    switch (cleard_line_num) {
     case 1:
-        return;
+        add_num = 0;
+        break;
 
     case 2:
         add_num = 1;
@@ -166,57 +171,94 @@ void Tetris::AddLine(int num)
     case 4:
         add_num = 4;
         break;
+
+	default:
+		add_num = 0;
     }
 
-    int stacked_top_index = -1;
+    std::vector<char> holes;
+    for (int i = 0; i < add_num; ++i) {
+        int hole_x = GetRandomHoleX();
+        holes.emplace_back(static_cast<int>(hole_x));
+	}
 
-    // ✅ 스택의 최상단은 전체 높이(TOTAL_HEIGHT) 기준으로 판정
-    for (int y = 0; y < TOTAL_HEIGHT; ++y) {
-        if (std::any_of(board[y].begin(), board[y].end(),
-            [](bool cell) { return cell; })) {
-            // 처음으로 쌓여 있는 층을 찾으면, 그 층에 제일 높게 쌓인 블록이 존재하는 것
-            stacked_top_index = y;
-            break;
-        }
-    }
+    return holes;
 
-    // 블록이 맵에 1개도 없을 경우
-    if (stacked_top_index < 0) {
-        stacked_top_index = TOTAL_HEIGHT - 1;
-        for (int y = stacked_top_index; y > stacked_top_index - add_num; --y) {
-            std::fill(board[y].begin(), board[y].end(), true);
-            int x = GetRandomX();
-            board[y][x] = false;
-        }
-        return; // 쌓고 리턴
-    }
+    //int stacked_top_index = -1;
 
-    // ✅ 추가 라인 때문에 맨 위를 뚫으면 사망
-    if (stacked_top_index - add_num < 0) {
-        // 이러면 이 플레이어는 죽은 것 -> 나중에 네트워크 코드 추가(뮤텍스도 나중에 추가 필요)
-        return;
-    }
+    //// ✅ 스택의 최상단은 전체 높이(TOTAL_HEIGHT) 기준으로 판정
+    //for (int y = 0; y < TOTAL_HEIGHT; ++y) {
+    //    if (std::any_of(board[y].begin(), board[y].end(),
+    //        [](bool cell) { return cell; })) {
+    //        // 처음으로 쌓여 있는 층을 찾으면, 그 층에 제일 높게 쌓인 블록이 존재하는 것
+    //        stacked_top_index = y;
+    //        break;
+    //    }
+    //}
 
-    // 기존 스택을 위로 밀어올리고, 아래에 garbage line 추가
-    int now_first_index = stacked_top_index;
-    int now_end_index = TOTAL_HEIGHT - 1;
-    int dst_first_index = stacked_top_index - add_num;          // 음수 체크는 위에서 하므로 out_of_index는 안나옴
-    int dst_end_index = TOTAL_HEIGHT - 1 - add_num;
+    //// 블록이 맵에 1개도 없을 경우
+    //if (stacked_top_index > HIDDEN_HEIGHT) {
+    //    stacked_top_index = TOTAL_HEIGHT - 1;
+    //    for (int y = stacked_top_index; y > stacked_top_index - add_num; --y) {
+    //        std::fill(board[y].begin(), board[y].end(), true);
+    //        int x = GetRandomX();
+    //        board[y][x] = false;
+    //    }
+    //    return; // 쌓고 리턴
+    //}
 
-    std::move(board.begin() + now_first_index,
-        board.begin() + now_end_index + 1,
-        board.begin() + dst_first_index);
+    //else
 
-    for (int y = now_end_index; y > dst_end_index; --y) { // 옮겨진 부분의 end 컨테이너는 유효 값으로 채워져 있음(헷갈리지 말기)
-        std::fill(board[y].begin(), board[y].end(), true);
-        int x = GetRandomX();
-        board[y][x] = false;
-    }
+    //// ✅ 추가 라인 때문에 맨 위를 뚫으면 사망
+    //if (stacked_top_index - add_num < 0) {
+    //    // 이러면 이 플레이어는 죽은 것 -> 나중에 네트워크 코드 추가(뮤텍스도 나중에 추가 필요)
+    //    return;
+    //}
+
+    //// 기존 스택을 위로 밀어올리고, 아래에 garbage line 추가
+    //int now_first_index = stacked_top_index;
+    //int now_end_index = TOTAL_HEIGHT - 1;
+    //int dst_first_index = stacked_top_index - add_num;          // 음수 체크는 위에서 하므로 out_of_index는 안나옴
+    //int dst_end_index = TOTAL_HEIGHT - 1 - add_num;
+
+    //std::move(board.begin() + now_first_index,
+    //    board.begin() + now_end_index + 1,
+    //    board.begin() + dst_first_index);
+
+    //for (int y = now_end_index; y > dst_end_index; --y) { // 옮겨진 부분의 end 컨테이너는 유효 값으로 채워져 있음(헷갈리지 말기)
+    //    std::fill(board[y].begin(), board[y].end(), true);
+    //    int x = GetRandomX();
+    //    board[y][x] = false;
+    //}
 }
 
-int Tetris::GetRandomX()
+std::vector<char> Tetris::AddGarbageLines(std::vector<char> holes)
+{
+	std::vector<char> added_holes;
+
+	if (holes.empty()) return added_holes;
+    for(auto hole_x : holes){
+        if (HandleTetrominoKeyInput(DOWN)) added_holes.emplace_back(FIX);
+        else HandleTetrominoKeyInput(UP);
+		std::rotate(board.begin(), board.begin() + 1, board.end());
+        std::fill(board[TOTAL_HEIGHT-1].begin(), board[TOTAL_HEIGHT-1].end(), true);
+		board[TOTAL_HEIGHT-1][hole_x] = false;
+
+        added_holes.emplace_back(hole_x);
+
+        if (CheckGameover()) {
+            added_holes.emplace_back(GAMEOVER);
+            return added_holes;
+        }
+	}
+    
+    return added_holes;
+}
+
+int Tetris::GetRandomHoleX()
 {
     // OS/하드웨어 엔트로피에서 시드 생성
+    static int prev_x = 0;
     static std::random_device rd;
 
     // 넣어준 시드값에 의해 생성될 난수가 준비된다.
@@ -224,8 +266,14 @@ int Tetris::GetRandomX()
 
     // 0~BOARD_WIDTH - 1 범위에서 균등 분포로 값 출력
     static std::uniform_int_distribution<int> dist(0, BOARD_WIDTH - 1);
+	int random_x;
+    do {
+        random_x = dist(gen);
+    } while (random_x == prev_x);  // 이전과 같은 위치를 피한다
 
-    return dist(gen);
+    prev_x = random_x;
+
+    return random_x;
 }
 
 void Tetris::Clear()
@@ -243,7 +291,7 @@ void Tetris::Clear()
 bool Tetris::CheckGameover()
 {
     for (int x = 0; x < BOARD_WIDTH; ++x) {
-        for (int y = 0; y < RESERVE_HEIGHT; ++y) {
+        for (int y = 0; y < HIDDEN_HEIGHT; ++y) {
             if (board[y][x] == true) {
 				return true;
             }

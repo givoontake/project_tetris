@@ -11,6 +11,7 @@
 
 constexpr int MOVE_DOWN_TIMEOUT_TICK = FPS / 2;
 constexpr int INPUT_TICK = FPS / 10;
+constexpr int ADD_GARBAGE_LINE_TICK = FPS * 10;
 
 enum ROOM_STATE {EMPTY, WAIT, PLAY};
 
@@ -57,6 +58,7 @@ class TetrisRoom
 	Tasks tasks;
 	std::vector<char> tetromino_spawn_list;
 	Position spawn_pos{ 3, 0 };
+	int garbage_line_tick_counter = 0;
 
 	int host_id;
 	int room_id;
@@ -97,6 +99,7 @@ public:
 	void ClearRoom();
 	void UpdateTick();
 	void CheckMoveDownTimeout();
+	void CheckAddGarbageLineTimeout();
 	bool CheckInputTick(RoomSession& r_session);
 	//void SendToSelf(char* packet, Session* session);
 };

@@ -44,6 +44,8 @@ constexpr char S2C_CLEARLINE = 31;
 
 constexpr char S2C_FIX = 33;
 
+constexpr char S2C_ADDLINE = 35;
+
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
 
