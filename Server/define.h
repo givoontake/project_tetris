@@ -4,6 +4,12 @@ constexpr int FPS = 50;
 constexpr int FRAME_TIME = 1000 / FPS;
 constexpr int MAX_TICK_WORKERS = 4;
 
+constexpr int MOVE_DOWN_TIMEOUT_TICK = FPS / 2;
+constexpr int INPUT_TICK = FPS / 10;
+constexpr int ADD_GARBAGE_LINE_TICK = FPS * 10;
+
+constexpr int CLEAR_LINE_SCORE = 10;
+
 constexpr int BUF_SIZE = 10240;
 constexpr int MAX_MESSAGE_SIZE = 512;
 constexpr int PORT_NUM = 12345;
@@ -173,6 +179,7 @@ struct S2C_START_PACKET {
 	short size;
 	char type;
 	bool is_start;
+	int score;
 };
 
 struct C2S_KICK_PACKET {
@@ -221,6 +228,7 @@ struct S2C_CLEARLINE_PACKET {
 	short size;
 	char type;
 	int id;
+	int score;
 	// 클리어될 줄의 인덱스 수에 따라 뒤에 가변으로 붙여 보낸다.
 };
 

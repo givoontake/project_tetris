@@ -9,11 +9,10 @@
 #include "RoomPacketHandler.h"
 #include "IOCPServer.h"
 
-constexpr int MOVE_DOWN_TIMEOUT_TICK = FPS / 2;
-constexpr int INPUT_TICK = FPS / 10;
-constexpr int ADD_GARBAGE_LINE_TICK = FPS * 10;
-
 enum ROOM_STATE {EMPTY, WAIT, PLAY};
+
+constexpr int ADD_TIMEOUT = 1;
+constexpr int DOWN_TIMEOUT = 2;
 
 struct TaskInfo
 {
@@ -58,7 +57,6 @@ class TetrisRoom
 	Tasks tasks;
 	std::vector<char> tetromino_spawn_list;
 	Position spawn_pos{ 3, 0 };
-	int garbage_line_tick_counter = 0;
 
 	int host_id;
 	int room_id;
@@ -101,5 +99,6 @@ public:
 	void CheckMoveDownTimeout();
 	void CheckAddGarbageLineTimeout();
 	bool CheckInputTick(RoomSession& r_session);
+	void ReduceTimeouts(int type, RoomSession& r_session);
 	//void SendToSelf(char* packet, Session* session);
 };
