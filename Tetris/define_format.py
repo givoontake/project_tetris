@@ -61,7 +61,7 @@ S2C_READY_PACKET_FMT = "<hbib"  # bool → signed char(b)
 
 # ---- Start ----
 C2S_START_PACKET_FMT = "<hb"
-S2C_START_PACKET_FMT = "<hbb"  # bool → signed char(b)
+S2C_START_PACKET_FMT = "<hbbi"  # bool → signed char(b)
 
 # ---- Kick ----
 C2S_KICK_PACKET_FMT = "<hbii"
@@ -76,9 +76,11 @@ S2C_GANEOVER_PACKET_FMT = "<hbi"
 
 S2C_GAMEEND_PACKET_FMT = "<hbi"
 
-S2C_CLEARLINE_PACKET_FMT = "<hbi"
+S2C_CLEARLINE_PACKET_FMT = "<hbii"
 
 S2C_FIX_PACKET_FMT = "<hbibb"
+
+S2C_ADDLINE_PACKET_FMT = "<hbib"
 
 # =====================================================================
 #  필드 단위: "문자열 → 포맷" 사전 및(옵션) 스키마 샘플
@@ -95,6 +97,7 @@ PACK_FIELD_FMT = {
     "room_id": "i",
     "new_host_id": "i",
     "kick_user_id": "i",
+    "score": "i",
 
     # 1바이트 값
     "max_user": "b",      # char (signed)
@@ -108,6 +111,7 @@ PACK_FIELD_FMT = {
     "spawn_y": "b",
     "fixed_x": "b",
     "fixed_y": "b",
+    "hole_x": "b",
 
     "rows": "b",
 
@@ -135,6 +139,7 @@ FIELD_SIZE = {
     "room_id": 4,
     "new_host_id": 4,
     "kick_user_id": 4,
+    "score": 4,
 
     # 1바이트 값
     "max_user": 1,
@@ -148,6 +153,7 @@ FIELD_SIZE = {
     "spawn_y": 1,
     "fixed_x": 1,
     "fixed_y": 1,
+    "hole_x": 1,
 
     "rows": 1, # 일단은 1로 해놓고, 실제 처리는 패킷 직렬화에서 따로 함
 
