@@ -293,8 +293,8 @@ void TetrisRoom::ProcessPlayTasks()
 			if (!r_user.GetInUse()) continue;
 			if (r_user.GetIsOver()) continue;
 			if (r_user.GetSession()->GetId() == task.id) {
-				if (!CheckInputTick(r_user)) break; 
-				r_user.SetInputTick(0);
+				//if (!CheckInputTick(r_user)) break; 
+				//r_user.SetInputTick(0);
 				if (task.type == DOWN && DROP) {
 					r_user.SetDownTick(0);
 				}
@@ -370,8 +370,8 @@ void TetrisRoom::ProcessPlayTasks()
 						r_user.GetTetris().SetMoveAllow(false);
 					}
 				}			
-				r_user.GetTetris().GetCurrentTetromino().PrintInfo();
-				r_user.GetTetris().DebugPrintBoard();
+				//r_user.GetTetris().GetCurrentTetromino().PrintInfo();
+				//r_user.GetTetris().DebugPrintBoard();
 				break;
 			}
 		}
@@ -454,7 +454,7 @@ void TetrisRoom::UpdateTick()
 	for(auto& r_user : room_users){
 		if (!r_user.GetInUse()) continue;
 		r_user.SetDownTick(r_user.GetDownTick() + 1);
-		r_user.SetInputTick(r_user.GetInputTick() + 1);
+		//r_user.SetInputTick(r_user.GetInputTick() + 1);
 		r_user.SetAddGarbageLineTick(r_user.GetAddGarbageLineTick() + 1);
 	}
 }
@@ -498,7 +498,7 @@ void TetrisRoom::CheckAddGarbageLineTimeout()
 					fix_p.fixed_y = r_user.GetTetris().GetCurrentTetromino().moved_pos.y;
 					Broadcast(reinterpret_cast<char*>(&fix_p), server->GetHandle());
 					r_user.SetDownTick(0);
-					r_user.SetInputTick(0);
+					//r_user.SetInputTick(0);
 					spawn_flag = true;
 				}
 
@@ -547,14 +547,14 @@ void TetrisRoom::CheckAddGarbageLineTimeout()
 	}
 }
 
-bool TetrisRoom::CheckInputTick(RoomSession& r_session)
-{
-	if (r_session.GetInputTick() >= INPUT_TICK) {
-		return true;
-	}
-
-	return false;
-}
+//bool TetrisRoom::CheckInputTick(RoomSession& r_session)
+//{
+//	if (r_session.GetInputTick() >= INPUT_TICK) {
+//		return true;
+//	}
+//
+//	return false;
+//}
 
 void TetrisRoom::ReduceTimeouts(int type, RoomSession& r_session)
 {

@@ -16,11 +16,11 @@ class RoomSession
 
 	int tetromino_index = 0;
 	int down_tick_counter = 0;
-	int input_tick_counter = 0;
+	//int input_tick_counter = 0;
 	int add_garbage_line_tick_counter = 0;
 
 	int down_timeout_tick = MOVE_DOWN_TIMEOUT_TICK;
-	int input_tick = INPUT_TICK;
+	//int input_tick = INPUT_TICK;
 	int add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	int score = 0;
@@ -37,10 +37,10 @@ public:
 	void AddTetrominoIndex() { ++tetromino_index; }
 	bool GetIsOver() const { return is_over; }
 	int GetDownTick() const { return down_tick_counter; }
-	int GetInputTick() const { return input_tick_counter; }
+	//int GetInputTick() const { return input_tick_counter; }
 	int GetAddGarbageLineTick() const { return add_garbage_line_tick_counter; }
 	int GetDownTimeout() const { return down_timeout_tick; }
-	int GetInputTimeout() const { return input_tick; }
+	//int GetInputTimeout() const { return input_tick; }
 	int GetAddGarbageLineTimeout() const { return add_garbage_line_tick; }
 	int GetScore() const { return score; }
 
@@ -48,7 +48,7 @@ public:
 	bool SetUse(bool expected, bool desired);
 	void SetIsOver(bool val) { is_over = val; }
 	void SetDownTick(int val) { down_tick_counter = val; }
-	void SetInputTick(int val) { input_tick_counter = val; }
+	//void SetInputTick(int val) { input_tick_counter = val; }
 	void SetAddGarbageLineTick(int val) { add_garbage_line_tick_counter = val; }
 	void SetDownTimeout(int val) { down_timeout_tick = val; }
 	//void SetInputTick(int val) { input_tick = val; }

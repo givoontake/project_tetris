@@ -5,7 +5,7 @@ constexpr int FRAME_TIME = 1000 / FPS;
 constexpr int MAX_TICK_WORKERS = 4;
 
 constexpr int MOVE_DOWN_TIMEOUT_TICK = FPS / 2;
-constexpr int INPUT_TICK = FPS / 10;
+//constexpr int INPUT_TICK = FPS / 25;
 constexpr int ADD_GARBAGE_LINE_TICK = FPS * 10;
 
 constexpr int CLEAR_LINE_SCORE = 10;

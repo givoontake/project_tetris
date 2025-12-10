@@ -41,11 +41,11 @@ void RoomSession::InitSession(Session* s)
 	tetromino_index = 0;
 
 	down_tick_counter = 0;
-	input_tick_counter = 0;
+	//input_tick_counter = 0;
 	add_garbage_line_tick_counter = 0;
 
 	down_timeout_tick = MOVE_DOWN_TIMEOUT_TICK;
-	input_tick = INPUT_TICK;
+	//input_tick = INPUT_TICK;
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
@@ -61,11 +61,11 @@ void RoomSession::ClearSession()
 	tetromino_index = 0;
 
 	down_tick_counter = 0;
-	input_tick_counter = 0;
+	//input_tick_counter = 0;
 	add_garbage_line_tick_counter = 0;
 
 	down_timeout_tick = MOVE_DOWN_TIMEOUT_TICK;
-	input_tick = INPUT_TICK;
+	//input_tick = INPUT_TICK;
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
@@ -79,11 +79,11 @@ void RoomSession::ClearData()
 	tetromino_index = 0;
 
 	down_tick_counter = 0;
-	input_tick_counter = 0;
+	//input_tick_counter = 0;
 	add_garbage_line_tick_counter = 0;
 
 	down_timeout_tick = MOVE_DOWN_TIMEOUT_TICK;
-	input_tick = INPUT_TICK;
+	//input_tick = INPUT_TICK;
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;

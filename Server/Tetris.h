@@ -17,6 +17,31 @@ constexpr int DROP = 4;
 constexpr int TIMEOUT = 5;
 constexpr int UP = 6; // 실제로 받지는 않고 처리상 롤백용
 // timeout-> 일정  시간이 지나 자동으로 아래로 한 칸 이동하는 것
+inline void PrintMoveType(int type)
+{
+	switch (type)
+	{
+	case RIGHT:
+		std::cout << "RIGHT\n";
+		break;
+	case LEFT:
+		std::cout << "LEFT\n";
+		break;
+	case DOWN:
+		//std::cout << "DOWN\n";
+		break;
+	case ROTATE:
+		std::cout << "ROTATE\n";
+		break;
+	case DROP:
+		std::cout << "DROP\n";
+		break;
+	case TIMEOUT:
+		std::cout << "TIMEOUT\n";
+		break;
+	}
+}
+
 
 class Tetris
 {

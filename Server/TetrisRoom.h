@@ -98,7 +98,7 @@ public:
 	void UpdateTick();
 	void CheckMoveDownTimeout();
 	void CheckAddGarbageLineTimeout();
-	bool CheckInputTick(RoomSession& r_session);
+	//bool CheckInputTick(RoomSession& r_session);
 	void ReduceTimeouts(int type, RoomSession& r_session);
 	//void SendToSelf(char* packet, Session* session);
 };
