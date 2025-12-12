@@ -93,7 +93,7 @@ S2C_GAMEOVER_PACKET = ["size", "type", "id"]
 
 S2C_GAMEEND_PACKET = ["size", "type", "id"]
 
-S2C_CLEARLINE_PACKET = ["size", "type", "id", "score", "rows"] # 뒤에 클라어될 라인들 인덱스(rows)가 가변 크기로 붙어온다
+S2C_CLEARLINE_PACKET = ["size", "type", "id", "line_index", "score"] # 뒤에 클라어될 라인들 인덱스(rows)가 가변 크기로 붙어온다
 
 S2C_FIX_PACKET = ["size", "type", "id", "fixed_x", "fixed_y"]
 

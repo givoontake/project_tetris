@@ -142,10 +142,9 @@ class TetrisBoard:
 
         self.current_tetromino = None
 
-    def clear_lines(self, row_index: list[int]):
-        for row in row_index:
-            del self.grid[row]
-            self.grid.insert(0, [None for _ in range(self.cols)])
+    def clear_lines(self, row_index: int):
+        del self.grid[row_index]
+        self.grid.insert(0, [None for _ in range(self.cols)])
 
     def add_line(self, hole_x: int):
         new_line = ['G' for _ in range(BOARD_COLS)]
@@ -504,7 +503,7 @@ class SinglePlayState:
 
         elif packet_type == S2C_CLEARLINE:
             if self.my_session.id == data.get("id"):
-                self.board.clear_lines(data.get("rows"))
+                self.board.clear_lines(data.get("line_index"))
                 self.board.score = data.get("score")
 
         elif packet_type == S2C_ADDLINE:

@@ -228,6 +228,7 @@ struct S2C_CLEARLINE_PACKET {
 	short size;
 	char type;
 	int id;
+	char line_index;
 	int score;
 	// 클리어될 줄의 인덱스 수에 따라 뒤에 가변으로 붙여 보낸다.
 };

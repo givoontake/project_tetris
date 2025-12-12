@@ -76,7 +76,7 @@ S2C_GANEOVER_PACKET_FMT = "<hbi"
 
 S2C_GAMEEND_PACKET_FMT = "<hbi"
 
-S2C_CLEARLINE_PACKET_FMT = "<hbii"
+S2C_CLEARLINE_PACKET_FMT = "<hbibi"
 
 S2C_FIX_PACKET_FMT = "<hbibb"
 
@@ -111,9 +111,8 @@ PACK_FIELD_FMT = {
     "spawn_y": "b",
     "fixed_x": "b",
     "fixed_y": "b",
+    "line_index": "b",
     "hole_x": "b",
-
-    "rows": "b",
 
     # 8바이트 정수
     "last_time": "q",     # long long
@@ -153,9 +152,8 @@ FIELD_SIZE = {
     "spawn_y": 1,
     "fixed_x": 1,
     "fixed_y": 1,
+    "line_index": 1,
     "hole_x": 1,
-
-    "rows": 1, # 일단은 1로 해놓고, 실제 처리는 패킷 직렬화에서 따로 함
 
     # 8바이트 정수
     "last_time": 8,
