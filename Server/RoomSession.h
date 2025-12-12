@@ -8,6 +8,8 @@ class RoomSession
 {
 	Session* session = nullptr; // 상속으로 하면 세션을 받아올 수가 없음
 	Tetris tetris;
+	char send_buf[BUF_SIZE];
+	int send_data_size = 0;
 	// std::string user_name; // 방 생성할 때 만들도록 일단 하고, 나중에 회원가입 - DB 연동으로 session 클래스에 포함해보자.
 	// char user_name[MAX_USER_NAME];
 	bool is_ready = false;
@@ -58,5 +60,7 @@ public:
 	void InitSession(Session* s);
 	void ClearSession();
 	void ClearData();
-	
+	void AddToSendBuffer(const char* data, int data_size);
+	void SendTickBatch(HANDLE iocp_handle);
+	void ClearSendBuf();
 };

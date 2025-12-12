@@ -5,7 +5,8 @@ constexpr int BOARD_WIDTH = 10;
 constexpr int BOARD_HEIGHT = 20;
 constexpr int TOTAL_HEIGHT = BOARD_HEIGHT + HIDDEN_HEIGHT;
 
-constexpr char GAMEOVER = -2;
+constexpr char GAMEOVER = -3;
+constexpr char SPAWN = -2;
 constexpr char FIX = -1;
 
 // 언젠가 char로 바꿀것

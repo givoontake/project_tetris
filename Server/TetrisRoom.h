@@ -85,6 +85,8 @@ public:
 	void ReadyUser(int id);
 	void KickUser(int id, int kick_user_id);
 	void StartGame(const int id);
+	void BuildBroadcastData(const char* data, int data_size);
+	void BroadcastTickData();
 	void Broadcast(char* packet, const HANDLE iocp_handle);
 	void SendToSelf(char* packet, Session* session);
 

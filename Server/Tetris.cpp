@@ -236,10 +236,14 @@ std::vector<char> Tetris::GetGarbegeLineHoles(int cleard_line_num)
 std::vector<char> Tetris::AddGarbageLines(std::vector<char> holes)
 {
 	std::vector<char> added_holes;
+    bool spqwn_flag = false;
 
 	if (holes.empty()) return added_holes;
     for(auto hole_x : holes){
-        if (HandleTetrominoKeyInput(DOWN)) added_holes.emplace_back(FIX);
+        if (HandleTetrominoKeyInput(DOWN)) {
+            added_holes.emplace_back(FIX);
+            spqwn_flag = true;
+        }
         else HandleTetrominoKeyInput(UP);
 		std::rotate(board.begin(), board.begin() + 1, board.end());
         std::fill(board[TOTAL_HEIGHT-1].begin(), board[TOTAL_HEIGHT-1].end(), true);
@@ -252,6 +256,7 @@ std::vector<char> Tetris::AddGarbageLines(std::vector<char> holes)
             return added_holes;
         }
 	}
+    if (spqwn_flag)  added_holes.emplace_back(SPAWN);
     
     return added_holes;
 }

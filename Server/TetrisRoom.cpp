@@ -246,7 +246,22 @@ void TetrisRoom::StartGame(int id)
 		spawn_p.spawn_y = spawn_pos.y;
 		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 	}
+}
 
+void TetrisRoom::BuildBroadcastData(const char* data, int data_size)
+{
+	for (auto& r_user : room_users) {
+		if (!r_user.GetInUse()) continue;
+		r_user.AddToSendBuffer(data, data_size);
+	}
+}
+
+void TetrisRoom::BroadcastTickData()
+{
+	for (auto& r_user : room_users) {
+		if (!r_user.GetInUse()) continue;
+		r_user.SendTickBatch(server->GetHandle());
+	}
 }
 
 void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
@@ -305,7 +320,7 @@ void TetrisRoom::ProcessPlayTasks()
 						send_p.size = sizeof(S2C_GAMEOVER_PACKET);
 						send_p.type = S2C_GAMEOVER;
 						send_p.id = task.id;
-						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+						BuildBroadcastData(reinterpret_cast<char*>(&send_p), send_p.size);
 						if (max_user > 1) {
 							if (CheckWinner()) { // 누군가 게임오버였다면, 승자 여부 추가확인
 								ClearGame(); // 승자가 나왔다면 방 상태 정리(클리어는 아님)하고 함수 종료
@@ -322,24 +337,20 @@ void TetrisRoom::ProcessPlayTasks()
 					fix_p.id = r_user.GetSession()->GetId();
 					fix_p.fixed_x = r_user.GetTetris().GetCurrentTetromino().moved_pos.x;
 					fix_p.fixed_y = r_user.GetTetris().GetCurrentTetromino().moved_pos.y;
-					Broadcast(reinterpret_cast<char*>(&fix_p), server->GetHandle());
+					BuildBroadcastData(reinterpret_cast<char*>(&fix_p), fix_p.size);
 
 					std::vector<char> index_lines = r_user.GetTetris().ClearLine();
 					if (!index_lines.empty()) {
 						r_user.SetScore(r_user.GetScore() + (CLEAR_LINE_SCORE * index_lines.size()*index_lines.size()));
-						S2C_CLEARLINE_PACKET clear_line_p;
-						int index_size = index_lines.size();
-						int total_size = sizeof(S2C_CLEARLINE_PACKET) + index_size;
-						char* send_p = new char[total_size];
-						clear_line_p.size = total_size;
-						clear_line_p.type = S2C_CLEARLINE;
-						clear_line_p.id = task.id;
-						clear_line_p.score = r_user.GetScore();
-						memcpy(send_p, reinterpret_cast<char*>(&clear_line_p), sizeof(S2C_CLEARLINE_PACKET));
-						memcpy(send_p + sizeof(S2C_CLEARLINE_PACKET), index_lines.data(), index_size);
-						Broadcast(send_p, server->GetHandle());
-
-						delete[] send_p;
+						for (int i = 0; i < index_lines.size(); i++){
+							S2C_CLEARLINE_PACKET clear_line_p;
+							clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
+							clear_line_p.type = S2C_CLEARLINE;
+							clear_line_p.id = task.id;
+							clear_line_p.score = r_user.GetScore();
+							clear_line_p.line_index = index_lines[i];
+							BuildBroadcastData(reinterpret_cast<char*>(&clear_line_p), clear_line_p.size);
+						}
 					}
 
 					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList(); 
@@ -354,19 +365,18 @@ void TetrisRoom::ProcessPlayTasks()
 						spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 						spawn_p.spawn_x = spawn_pos.x;
 						spawn_p.spawn_y = spawn_pos.y;
-						Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
+						BuildBroadcastData(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
 					}
 
 				}
 
 				else {
 					if (r_user.GetTetris().GetMoveAllow()) {
-						S2C_MOVE_PACKET send_p;
-						send_p.size = sizeof(S2C_MOVE_PACKET);
-						send_p.type = S2C_MOVE;
-						send_p.id = task.id;
-						send_p.move_type = task.type;
-						Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+						S2C_MOVE_PACKET move_p;
+						move_p.size = sizeof(S2C_MOVE_PACKET);
+						move_p.type = S2C_MOVE;
+						move_p.id = task.id;
+						move_p.move_type = task.type;
 						r_user.GetTetris().SetMoveAllow(false);
 					}
 				}			
@@ -376,6 +386,7 @@ void TetrisRoom::ProcessPlayTasks()
 			}
 		}
 	}
+	BroadcastTickData();
 }
 
 void TetrisRoom::Add7BagTetrominoList()
@@ -429,11 +440,11 @@ bool TetrisRoom::CheckWinner()
 		else {
 			for (auto& r_user : room_users) {
 				if (r_user.GetInUse() && !r_user.GetIsOver()) {
-					S2C_GAMEEND_PACKET send_p;
-					send_p.size = sizeof(S2C_GAMEEND_PACKET);
-					send_p.type = S2C_GAMEEND;
-					send_p.winner_id = r_user.GetSession()->GetId();
-					Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
+					S2C_GAMEEND_PACKET gameend_p;
+					gameend_p.size = sizeof(S2C_GAMEEND_PACKET);
+					gameend_p.type = S2C_GAMEEND;
+					gameend_p.winner_id = r_user.GetSession()->GetId();
+					BuildBroadcastData(reinterpret_cast<char*>(&gameend_p), gameend_p.size);
 				}
 			}
 			return true;
@@ -485,63 +496,49 @@ void TetrisRoom::CheckAddGarbageLineTimeout()
 		std::vector<char> tasks_from_add_garbege_lines = r_user.GetTetris().AddGarbageLines(holes);
 		if (!tasks_from_add_garbege_lines.empty()) {
 			std::vector<char> garbage_line_holes;
-			bool spawn_flag = false;
-			bool gameover_flag = false;
 			for (auto& task_type : tasks_from_add_garbege_lines) {
-				// 패킷 전달 순서는 fix -> addline -> gameover or spawn, 작업 자체가 이 순서로 넘어옴
-				if (task_type == FIX) {
+				// 패킷 전달 순서는 이전 함수에서 작업 순서대로 등록함. 그냥 작업타입 받아서 패킷 전송 준비만 하면 된다.
+
+				if (task_type >= 0) {
+					S2C_ADDLINE_PACKET add_line_p;
+					add_line_p.size = sizeof(S2C_ADDLINE_PACKET);
+					add_line_p.type = S2C_ADDLINE;
+					add_line_p.id = r_user.GetSession()->GetId();
+					add_line_p.hole_x = task_type;
+					BuildBroadcastData(reinterpret_cast<char*>(&add_line_p), add_line_p.size);
+				}
+
+				else if (task_type == FIX) {
 					S2C_FIX_PACKET fix_p;
 					fix_p.size = sizeof(S2C_FIX_PACKET);
 					fix_p.type = S2C_FIX;
 					fix_p.id = r_user.GetSession()->GetId();
 					fix_p.fixed_x = r_user.GetTetris().GetCurrentTetromino().moved_pos.x;
 					fix_p.fixed_y = r_user.GetTetris().GetCurrentTetromino().moved_pos.y;
-					Broadcast(reinterpret_cast<char*>(&fix_p), server->GetHandle());
+					BuildBroadcastData(reinterpret_cast<char*>(&fix_p), fix_p.size);
 					r_user.SetDownTick(0);
 					//r_user.SetInputTick(0);
-					spawn_flag = true;
+				}
+
+				else if (task_type == SPAWN) {
+					S2C_SPAWN_PACKET spawn_p;
+					spawn_p.size = sizeof(S2C_SPAWN_PACKET);
+					spawn_p.type = S2C_SPAWN;
+					spawn_p.id = r_user.GetSession()->GetId();
+					spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+					spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
+					spawn_p.spawn_x = spawn_pos.x;
+					spawn_p.spawn_y = spawn_pos.y;
+					BuildBroadcastData(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
 				}
 
 				else if (task_type == GAMEOVER) {
-					spawn_flag = false;
-					gameover_flag = true;
+					S2C_GAMEOVER_PACKET gameover_p;
+					gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
+					gameover_p.type = S2C_GAMEOVER;
+					gameover_p.id = r_user.GetSession()->GetId();
+					BuildBroadcastData(reinterpret_cast<char*>(&gameover_p), gameover_p.size);
 				}
-
-				else if (task_type >= 0) {
-					garbage_line_holes.emplace_back(task_type);
-				}
-			}
-
-			if (!garbage_line_holes.empty()) {
-				for (auto& hole : garbage_line_holes) {
-					S2C_ADDLINE_PACKET add_line_p;
-					add_line_p.size = sizeof(S2C_ADDLINE_PACKET);
-					add_line_p.type = S2C_ADDLINE;
-					add_line_p.id = r_user.GetSession()->GetId();
-					add_line_p.hole_x = hole;
-					Broadcast(reinterpret_cast<char*>(&add_line_p), server->GetHandle());
-				}
-			}
-
-			if (spawn_flag) {
-				S2C_SPAWN_PACKET spawn_p;
-				spawn_p.size = sizeof(S2C_SPAWN_PACKET);
-				spawn_p.type = S2C_SPAWN;
-				spawn_p.id = r_user.GetSession()->GetId();
-				spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-				spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
-				spawn_p.spawn_x = spawn_pos.x;
-				spawn_p.spawn_y = spawn_pos.y;
-				Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
-			}
-
-			if (gameover_flag) {
-				S2C_GAMEOVER_PACKET send_p;
-				send_p.size = sizeof(S2C_GAMEOVER_PACKET);
-				send_p.type = S2C_GAMEOVER;
-				send_p.id = r_user.GetSession()->GetId();
-				Broadcast(reinterpret_cast<char*>(&send_p), server->GetHandle());
-				continue;
 			}
 		}
 	}

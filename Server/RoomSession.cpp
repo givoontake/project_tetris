@@ -49,6 +49,7 @@ void RoomSession::InitSession(Session* s)
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
+	send_data_size = 0;
 }
 
 void RoomSession::ClearSession()
@@ -69,6 +70,7 @@ void RoomSession::ClearSession()
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
+	send_data_size = 0;
 }
 
 void RoomSession::ClearData()
@@ -87,5 +89,22 @@ void RoomSession::ClearData()
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
+	send_data_size = 0;
+}
+
+void RoomSession::AddToSendBuffer(const char* data, int data_size)
+{
+	memcpy(send_buf + send_data_size, data, data_size);
+	send_data_size += data_size;
+}
+
+void RoomSession::SendTickBatch(HANDLE iocp_handle)
+{
+	session->SendPacket(send_buf, iocp_handle);
+}
+
+void RoomSession::ClearSendBuf()
+{
+	send_data_size = 0;
 }
 
