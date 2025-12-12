@@ -154,6 +154,7 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 		 // 처리한 패킷은 남은 데이터에서 제거
 		users[user_index]->SetRemainDataSize(-packet_size);
 		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
+		if (users[user_index]->GetRemainDataSize() >= sizeof(short)) break;
 		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 	}
 }
