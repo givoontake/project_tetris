@@ -32,7 +32,6 @@ bool RoomSession::SetUse(bool expected, bool desired)
 
 void RoomSession::InitSession(Session* s)
 {
-
 	session = s;
 	tetris.Clear();
 	is_ready = false;
@@ -49,7 +48,7 @@ void RoomSession::InitSession(Session* s)
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
-	send_data_size = 0;
+	ClearSendBuf();
 }
 
 void RoomSession::ClearSession()
@@ -70,7 +69,7 @@ void RoomSession::ClearSession()
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
-	send_data_size = 0;
+	ClearSendBuf();
 }
 
 void RoomSession::ClearData()
@@ -89,7 +88,7 @@ void RoomSession::ClearData()
 	add_garbage_line_tick = ADD_GARBAGE_LINE_TICK;
 
 	score = 0;
-	send_data_size = 0;
+	ClearSendBuf();
 }
 
 void RoomSession::AddToSendBuffer(const char* data, int data_size)
@@ -100,11 +99,14 @@ void RoomSession::AddToSendBuffer(const char* data, int data_size)
 
 void RoomSession::SendTickBatch(HANDLE iocp_handle)
 {
-	session->SendPacket(send_buf, iocp_handle);
+	if (send_data_size >= 3) {
+		session->SendBoundPacket(send_buf, send_data_size, iocp_handle);
+	}
 }
 
 void RoomSession::ClearSendBuf()
 {
 	send_data_size = 0;
+	ZeroMemory(send_buf, sizeof(send_buf));
 }
 

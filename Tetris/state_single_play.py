@@ -475,7 +475,6 @@ class SinglePlayState:
             # 게임이 시작되었다고 서버가 알려줌
             if data.get("is_start") and self.board:
                 self.board.start_game()
-                print("Enter packet_type == S2C_START")
 
         elif packet_type == S2C_MOVE:
             # move_type에 따라 보드에 반영

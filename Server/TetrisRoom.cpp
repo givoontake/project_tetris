@@ -310,7 +310,7 @@ void TetrisRoom::ProcessPlayTasks()
 			if (r_user.GetSession()->GetId() == task.id) {
 				//if (!CheckInputTick(r_user)) break; 
 				//r_user.SetInputTick(0);
-				if (task.type == DOWN && DROP) {
+				if (task.type == DOWN && task.type == DROP) {
 					r_user.SetDownTick(0);
 				}
 				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) { // 착지(고정)에 성공했는가?
@@ -378,10 +378,11 @@ void TetrisRoom::ProcessPlayTasks()
 						move_p.id = task.id;
 						move_p.move_type = task.type;
 						r_user.GetTetris().SetMoveAllow(false);
-					}
+						BuildBroadcastData(reinterpret_cast<char*>(&move_p), move_p.size);
+					}	
 				}			
 				//r_user.GetTetris().GetCurrentTetromino().PrintInfo();
-				//r_user.GetTetris().DebugPrintBoard();
+				r_user.GetTetris().DebugPrintBoard();
 				break;
 			}
 		}

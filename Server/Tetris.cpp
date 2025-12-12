@@ -245,6 +245,7 @@ std::vector<char> Tetris::AddGarbageLines(std::vector<char> holes)
             spqwn_flag = true;
         }
         else HandleTetrominoKeyInput(UP);
+        move_allow = false;
 		std::rotate(board.begin(), board.begin() + 1, board.end());
         std::fill(board[TOTAL_HEIGHT-1].begin(), board[TOTAL_HEIGHT-1].end(), true);
 		board[TOTAL_HEIGHT-1][hole_x] = false;

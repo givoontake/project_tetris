@@ -34,6 +34,21 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 	}
 }
 
+void Session::SendBoundPacket(char* packet, int data_size, const HANDLE iocp_handle)
+{
+	if (state == NONE) return;
+	ExOverlapped* send_over = new ExOverlapped;
+	send_over->SetOperationType(SEND);
+	send_over->SetOperationId(id);
+	memcpy(send_over->packet_buf, packet, data_size);
+	send_over->wsabuf.len = data_size;
+	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
+		std::cout << id << " Session::SendBoundPacket() WSASend error, PGCS\n";
+	}
+}
+
 void Session::RecvPacket(const HANDLE iocp_handle)
 {
 	if (state == NONE) return;

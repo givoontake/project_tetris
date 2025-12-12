@@ -27,6 +27,7 @@ public:
 
 	void InitSession(int new_index, int new_id, SOCKET new_socket);
 	void SendPacket(char* packet, const HANDLE iocp_handle);
+	void SendBoundPacket(char* packet, int data_size, const HANDLE iocp_handle);
 	void RecvPacket(const HANDLE iocp_handle);
 	
 	short GetPacketSize(char* packet);
