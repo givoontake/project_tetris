@@ -308,12 +308,32 @@ void TetrisRoom::ProcessPlayTasks()
 			if (!r_user.GetInUse()) continue;
 			if (r_user.GetIsOver()) continue;
 			if (r_user.GetSession()->GetId() == task.id) {
-				//if (!CheckInputTick(r_user)) break; 
-				//r_user.SetInputTick(0);
-				if (task.type == DOWN || task.type == DROP) {
+
+				int input_res = r_user.GetTetris().HandleTetrominoKeyInput(task.type);
+				switch (input_res) {
+				case -1: 
+					break;
+
+				case RIGHT:
+					MakeMovePacketData(task.id, input_res);
+					break;
+
+				case LEFT:
+					MakeMovePacketData(task.id, input_res);
+					break;
+
+				case DOWN:
 					r_user.SetDownTick(0);
-				}
-				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) { // 착지(고정)에 성공했는가?
+					MakeMovePacketData(task.id, input_res);
+					break;
+
+				case ROTATE:
+					MakeMovePacketData(task.id, input_res);
+					break;
+
+				case DROP:
+					r_user.GetTetris().FixTetromino();
+					r_user.SetDownTick(0);
 					if (r_user.GetTetris().CheckGameover()) { // 고정에 성공했다면 게임오버 판정
 						r_user.SetIsOver(true);
 						S2C_GAMEOVER_PACKET send_p;
@@ -330,7 +350,6 @@ void TetrisRoom::ProcessPlayTasks()
 						ClearGame();
 					}
 
-					// fix -> clear line -> spawn 순서로 패킷 전송
 					S2C_FIX_PACKET fix_p;
 					fix_p.size = sizeof(S2C_FIX_PACKET);
 					fix_p.type = S2C_FIX;
@@ -341,8 +360,8 @@ void TetrisRoom::ProcessPlayTasks()
 
 					std::vector<char> index_lines = r_user.GetTetris().ClearLine();
 					if (!index_lines.empty()) {
-						r_user.SetScore(r_user.GetScore() + (CLEAR_LINE_SCORE * index_lines.size()*index_lines.size()));
-						for (int i = 0; i < index_lines.size(); i++){
+						r_user.SetScore(r_user.GetScore() + (CLEAR_LINE_SCORE * index_lines.size() * index_lines.size()));
+						for (int i = 0; i < index_lines.size(); i++) {
 							S2C_CLEARLINE_PACKET clear_line_p;
 							clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
 							clear_line_p.type = S2C_CLEARLINE;
@@ -353,7 +372,7 @@ void TetrisRoom::ProcessPlayTasks()
 						}
 					}
 
-					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList(); 
+					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList();
 					r_user.AddTetrominoIndex();
 
 					if (SetNewTetromino(task.id)) {
@@ -367,21 +386,9 @@ void TetrisRoom::ProcessPlayTasks()
 						spawn_p.spawn_y = spawn_pos.y;
 						BuildBroadcastData(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
 					}
-
+					break;
 				}
-
-				else {
-					if (r_user.GetTetris().GetMoveAllow()) {
-						S2C_MOVE_PACKET move_p;
-						move_p.size = sizeof(S2C_MOVE_PACKET);
-						move_p.type = S2C_MOVE;
-						move_p.id = task.id;
-						move_p.move_type = task.type;
-						r_user.GetTetris().SetMoveAllow(false);
-						BuildBroadcastData(reinterpret_cast<char*>(&move_p), move_p.size);
-					}	
-				}			
-				//r_user.GetTetris().GetCurrentTetromino().PrintInfo();
+				
 				r_user.GetTetris().DebugPrintBoard();
 				break;
 			}
@@ -588,6 +595,16 @@ void TetrisRoom::ReduceTimeouts(int type, RoomSession& r_session)
 		r_session.SetAddGarbageLineTimeout(r_session.GetAddGarbageLineTimeout() - 1);
 		break;
 	}
+}
+
+void TetrisRoom::MakeMovePacketData(int id, int move_type)
+{
+	S2C_MOVE_PACKET move_p;
+	move_p.size = sizeof(S2C_MOVE_PACKET);
+	move_p.type = S2C_MOVE;
+	move_p.id = id;
+	move_p.move_type = static_cast<char>(move_type);
+	BuildBroadcastData(reinterpret_cast<char*>(&move_p), move_p.size);
 }
 
 

@@ -9,7 +9,6 @@ constexpr char GAMEOVER = -3;
 constexpr char SPAWN = -2;
 constexpr char FIX = -1;
 
-// 언젠가 char로 바꿀것
 constexpr int RIGHT = 0;
 constexpr int LEFT = 1;
 constexpr int DOWN = 2;
@@ -29,7 +28,7 @@ inline void PrintMoveType(int type)
 		std::cout << "LEFT\n";
 		break;
 	case DOWN:
-		//std::cout << "DOWN\n";
+		std::cout << "DOWN\n";
 		break;
 	case ROTATE:
 		std::cout << "ROTATE\n";
@@ -48,7 +47,6 @@ class Tetris
 {
 	std::array<std::array<bool, BOARD_WIDTH>, TOTAL_HEIGHT> board;
 	Tetromino current_tetromino;
-	bool move_allow = false;
 public:
 	Tetris();
 
@@ -56,12 +54,11 @@ public:
 	//void SetNewSpawn(bool val) { new_spawn = val; }
 	Tetromino GetCurrentTetromino() const { return current_tetromino; }
 	Position GetCurrentTetrominoPos() const { return current_tetromino.moved_pos; }
-	
-	bool GetMoveAllow() const { return move_allow; }
-	void SetMoveAllow(bool val) { move_allow = val; }
 
 	void InitNewTetromino(char type, Position spawn_pos);
-	bool HandleTetrominoKeyInput(int move_type);
+	int HandleTetrominoKeyInput(int move_type);
+	bool IsValidPosition(const Tetromino& t); // 이건 움직였다고 가정한 값을 넘김
+	void FixTetromino();
 	std::vector<char> ClearLine();
 	std::vector<char> GetGarbegeLineHoles(int cleard_line_num);
 	std::vector<char> AddGarbageLines(std::vector<char> holes);

@@ -103,4 +103,6 @@ public:
 	//bool CheckInputTick(RoomSession& r_session);
 	void ReduceTimeouts(int type, RoomSession& r_session);
 	//void SendToSelf(char* packet, Session* session);
+
+	void MakeMovePacketData(int id, int move_type);
 };
