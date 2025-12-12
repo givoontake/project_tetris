@@ -310,7 +310,7 @@ void TetrisRoom::ProcessPlayTasks()
 			if (r_user.GetSession()->GetId() == task.id) {
 				//if (!CheckInputTick(r_user)) break; 
 				//r_user.SetInputTick(0);
-				if (task.type == DOWN && task.type == DROP) {
+				if (task.type == DOWN || task.type == DROP) {
 					r_user.SetDownTick(0);
 				}
 				if (r_user.GetTetris().HandleTetrominoKeyInput(task.type)) { // 착지(고정)에 성공했는가?

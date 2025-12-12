@@ -101,7 +101,9 @@ void RoomSession::SendTickBatch(HANDLE iocp_handle)
 {
 	if (send_data_size >= 3) {
 		session->SendBoundPacket(send_buf, send_data_size, iocp_handle);
+		ClearSendBuf();
 	}
+	
 }
 
 void RoomSession::ClearSendBuf()
