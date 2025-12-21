@@ -165,53 +165,6 @@ std::vector<char> Tetris::GetGarbegeLineHoles(int cleard_line_num)
 	}
 
     return holes;
-
-    //int stacked_top_index = -1;
-
-    //// ✅ 스택의 최상단은 전체 높이(TOTAL_HEIGHT) 기준으로 판정
-    //for (int y = 0; y < TOTAL_HEIGHT; ++y) {
-    //    if (std::any_of(board[y].begin(), board[y].end(),
-    //        [](bool cell) { return cell; })) {
-    //        // 처음으로 쌓여 있는 층을 찾으면, 그 층에 제일 높게 쌓인 블록이 존재하는 것
-    //        stacked_top_index = y;
-    //        break;
-    //    }
-    //}
-
-    //// 블록이 맵에 1개도 없을 경우
-    //if (stacked_top_index > HIDDEN_HEIGHT) {
-    //    stacked_top_index = TOTAL_HEIGHT - 1;
-    //    for (int y = stacked_top_index; y > stacked_top_index - add_num; --y) {
-    //        std::fill(board[y].begin(), board[y].end(), true);
-    //        int x = GetRandomX();
-    //        board[y][x] = false;
-    //    }
-    //    return; // 쌓고 리턴
-    //}
-
-    //else
-
-    //// ✅ 추가 라인 때문에 맨 위를 뚫으면 사망
-    //if (stacked_top_index - add_num < 0) {
-    //    // 이러면 이 플레이어는 죽은 것 -> 나중에 네트워크 코드 추가(뮤텍스도 나중에 추가 필요)
-    //    return;
-    //}
-
-    //// 기존 스택을 위로 밀어올리고, 아래에 garbage line 추가
-    //int now_first_index = stacked_top_index;
-    //int now_end_index = TOTAL_HEIGHT - 1;
-    //int dst_first_index = stacked_top_index - add_num;          // 음수 체크는 위에서 하므로 out_of_index는 안나옴
-    //int dst_end_index = TOTAL_HEIGHT - 1 - add_num;
-
-    //std::move(board.begin() + now_first_index,
-    //    board.begin() + now_end_index + 1,
-    //    board.begin() + dst_first_index);
-
-    //for (int y = now_end_index; y > dst_end_index; --y) { // 옮겨진 부분의 end 컨테이너는 유효 값으로 채워져 있음(헷갈리지 말기)
-    //    std::fill(board[y].begin(), board[y].end(), true);
-    //    int x = GetRandomX();
-    //    board[y][x] = false;
-    //}
 }
 
 std::vector<char> Tetris::AddGarbageLines(std::vector<char> holes)
@@ -237,7 +190,7 @@ std::vector<char> Tetris::AddGarbageLines(std::vector<char> holes)
             return added_holes;
         }
 	}
-    if (spqwn_flag)  added_holes.emplace_back(SPAWN);
+    if (spqwn_flag) added_holes.emplace_back(SPAWN);
     
     return added_holes;
 }
@@ -271,6 +224,8 @@ void Tetris::Clear()
             board[i][j] = false;
         }
     } // 가로 = WIDTH = x / 세로 = HEIGHT = y
+
+	pending_moves.fill(false);
 }
 
 bool Tetris::CheckGameover()
@@ -318,4 +273,19 @@ void Tetris::DebugPrintBoard()
 
     std::cout << "====================================\n";
 }
+
+std::vector<char> Tetris::ProcessPendingMoves()
+{
+	std::vector<char> successful_moves;
+    for (int i = 0; i < MOVE_TYPE_NUM; ++i) {
+        if (pending_moves[i]) {
+            int res = HandleTetrominoKeyInput(i);
+            if (res != -1) successful_moves.emplace_back(res);
+            pending_moves[i] = false;
+        }
+    }
+
+	return successful_moves;
+}
+
 

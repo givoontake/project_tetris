@@ -69,7 +69,7 @@ void TetrisRoom::AddUser(Session* new_session)
 
 	bool b_send = false;
 	for(auto& r_user : room_users){
-		if (r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
 			
 		else {
 			new_session->SetState(ROOM);
@@ -102,7 +102,7 @@ void TetrisRoom::DeleteUser(const int id)
 {
 	//std::cout << "delete user id: " << id << std::endl;
 	for (auto& r_user : room_users){
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
 			//std::cout << "delete user id: " << id << std::endl;
 			//room_mutex.lock();
@@ -137,13 +137,15 @@ void TetrisRoom::ReadyUser(int id)
 
 	for (auto& r_user : room_users){
 		if (r_user.GetSession()->GetId() == id) { // 레디 상태 변화
-			r_user.SetIsReady();
+			r_user.SetRoomUserState(ROOM_USER_STATE::READY);
 
 			S2C_READY_PACKET p;
 			p.size = sizeof(S2C_READY_PACKET);
 			p.type = S2C_READY;
 			p.id = r_user.GetSession()->GetId();
-			p.is_ready = r_user.GetIsReady();
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::READY) p.is_ready = true;				
+			else p.is_ready = false;
+				
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 			break;
 		}
@@ -158,9 +160,9 @@ void TetrisRoom::KickUser(int id, int kick_user_id)
 
 	for (auto& r_user : room_users) {
 		if (r_user.GetSession()->GetId() == kick_user_id) { // 삭제할 아이디 검색
-			r_user.SetUse(true, false);
-			r_user.GetSession()->SetState(LOBBY);
 			r_user.ClearSession(); // 해당 아이디 세션 정리
+			r_user.SetRoomUserState(ROOM_USER_STATE::EMPTY);
+			r_user.GetSession()->SetState(LOBBY);
 
 			S2C_KICK_PACKET p;
 			p.size = sizeof(S2C_KICK_PACKET);
@@ -192,10 +194,10 @@ void TetrisRoom::StartGame(int id)
 	S2C_START_PACKET start_p;
 
 	for(auto& r_user : room_users){
-		if (!r_user.GetInUse()) continue; // 사용 중이지 않은 인덱스는 건너뜀
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue; // 사용 중이지 않은 인덱스는 건너뜀
 		if (r_user.GetSession()->GetId() == host_id) continue; // 방장은 건너뜀
 
-		if (!r_user.GetIsReady()) { // 방에 있는데 레디가 안된 사람이 있으면 시작 불가			
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::WAIT) { // 방에 있는데 레디가 안된 사람이 있으면 시작 불가			
 			start_p.size = sizeof(S2C_START_PACKET);
 			start_p.type = S2C_START;
 			start_p.is_start = false;
@@ -216,14 +218,15 @@ void TetrisRoom::StartGame(int id)
 		// 보내야 할까? 시작 불가 알림창 정도는  클라에게 맏겨도 될 듯 하다. 잘못 와도 시작만 안하면 되니까
 		return;
 	}
+	SetRoomState(PLAY);
 
 	// 모든 조건 통과->게임 시작
 	Add7BagTetrominoList();
 	for (auto& r_user : room_users){
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		r_user.SetRoomUserState(ROOM_USER_STATE::PLAY);
 		r_user.GetTetris().InitNewTetromino(tetromino_spawn_list[r_user.GetTetrominoIndex()], spawn_pos);
 	}
-	SetRoomState(PLAY);
 
 	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
 	InitGame();
@@ -235,7 +238,7 @@ void TetrisRoom::StartGame(int id)
 	Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
 	
 	for (auto& r_user : room_users) {
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		S2C_SPAWN_PACKET spawn_p;
 		spawn_p.size = sizeof(S2C_SPAWN_PACKET);
 		spawn_p.type = S2C_SPAWN;
@@ -251,7 +254,7 @@ void TetrisRoom::StartGame(int id)
 void TetrisRoom::BuildBroadcastData(const char* data, int data_size)
 {
 	for (auto& r_user : room_users) {
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		r_user.AddToSendBuffer(data, data_size);
 	}
 }
@@ -259,7 +262,7 @@ void TetrisRoom::BuildBroadcastData(const char* data, int data_size)
 void TetrisRoom::BroadcastTickData()
 {
 	for (auto& r_user : room_users) {
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		r_user.SendTickBatch(server->GetHandle());
 	}
 }
@@ -267,9 +270,8 @@ void TetrisRoom::BroadcastTickData()
 void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 {
 	for (auto& r_user : room_users) {
-		if (r_user.GetInUse()) {
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			r_user.GetSession()->SendPacket(packet, iocp_handle);
-		}
 	}
 }
 
@@ -281,7 +283,7 @@ void TetrisRoom::SendToSelf(char* packet, Session* session)
 void TetrisRoom::InitGame()
 {
 	for (auto& r_user : room_users) { 
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		r_user.GetTetris().Clear();
 	}
 }
@@ -292,7 +294,7 @@ void TetrisRoom::ClearGame()
 	tasks.Clear();
 	tetromino_spawn_list.clear();
 	for (auto& r_user : room_users) {
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		r_user.ClearData();
 	}
 }
@@ -305,91 +307,99 @@ void TetrisRoom::ProcessPlayTasks()
 	while(!tasks.task_queue.IsEmpty()){
 		TaskInfo task = tasks.GetTask();
 		for (auto& r_user : room_users) {
-			if (!r_user.GetInUse()) continue;
-			if (r_user.GetIsOver()) continue;
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			if (r_user.GetSession()->GetId() == task.id) {
-
-				int input_res = r_user.GetTetris().HandleTetrominoKeyInput(task.type);
-				switch (input_res) {
-				case -1: 
-					break;
-
-				case RIGHT:
-					MakeMovePacketData(task.id, input_res);
-					break;
-
-				case LEFT:
-					MakeMovePacketData(task.id, input_res);
-					break;
-
-				case DOWN:
-					r_user.SetDownTick(0);
-					MakeMovePacketData(task.id, input_res);
-					break;
-
-				case ROTATE:
-					MakeMovePacketData(task.id, input_res);
-					break;
-
-				case DROP:
-					r_user.GetTetris().FixTetromino();
-					r_user.SetDownTick(0);
-					if (r_user.GetTetris().CheckGameover()) { // 고정에 성공했다면 게임오버 판정
-						r_user.SetIsOver(true);
-						S2C_GAMEOVER_PACKET send_p;
-						send_p.size = sizeof(S2C_GAMEOVER_PACKET);
-						send_p.type = S2C_GAMEOVER;
-						send_p.id = task.id;
-						BuildBroadcastData(reinterpret_cast<char*>(&send_p), send_p.size);
-						if (max_user > 1) {
-							if (CheckWinner()) { // 누군가 게임오버였다면, 승자 여부 추가확인
-								ClearGame(); // 승자가 나왔다면 방 상태 정리(클리어는 아님)하고 함수 종료
-								return;
-							}
-						}
-						ClearGame();
-					}
-
-					S2C_FIX_PACKET fix_p;
-					fix_p.size = sizeof(S2C_FIX_PACKET);
-					fix_p.type = S2C_FIX;
-					fix_p.id = r_user.GetSession()->GetId();
-					fix_p.fixed_x = r_user.GetTetris().GetCurrentTetromino().moved_pos.x;
-					fix_p.fixed_y = r_user.GetTetris().GetCurrentTetromino().moved_pos.y;
-					BuildBroadcastData(reinterpret_cast<char*>(&fix_p), fix_p.size);
-
-					std::vector<char> index_lines = r_user.GetTetris().ClearLine();
-					if (!index_lines.empty()) {
-						r_user.SetScore(r_user.GetScore() + (CLEAR_LINE_SCORE * index_lines.size() * index_lines.size()));
-						for (int i = 0; i < index_lines.size(); i++) {
-							S2C_CLEARLINE_PACKET clear_line_p;
-							clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
-							clear_line_p.type = S2C_CLEARLINE;
-							clear_line_p.id = task.id;
-							clear_line_p.score = r_user.GetScore();
-							clear_line_p.line_index = index_lines[i];
-							BuildBroadcastData(reinterpret_cast<char*>(&clear_line_p), clear_line_p.size);
-						}
-					}
-
-					if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList();
-					r_user.AddTetrominoIndex();
-
-					if (SetNewTetromino(task.id)) {
-						S2C_SPAWN_PACKET spawn_p;
-						spawn_p.size = sizeof(S2C_SPAWN_PACKET);
-						spawn_p.type = S2C_SPAWN;
-						spawn_p.id = r_user.GetSession()->GetId();
-						spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-						spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
-						spawn_p.spawn_x = spawn_pos.x;
-						spawn_p.spawn_y = spawn_pos.y;
-						BuildBroadcastData(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
-					}
-					break;
-				}
+				r_user.GetTetris().SetPendingMove(task.type);
 				
-				r_user.GetTetris().DebugPrintBoard();
+				//r_user.GetTetris().DebugPrintBoard();
+				break;
+			}
+		}
+	}
+
+	for(auto& r_user : room_users){
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		std::vector<char> send_tasks = r_user.GetTetris().ProcessPendingMoves();
+		
+		for (auto& type : send_tasks) {
+			switch (type) {
+			case -1:
+				break;
+
+			case RIGHT:
+				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+				break;
+
+			case LEFT:
+				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+				break;
+
+			case DOWN:
+				r_user.SetDownTick(0);
+				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+				break;
+
+			case ROTATE:
+				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+				break;
+
+			case DROP:
+				r_user.GetTetris().FixTetromino();
+				r_user.SetDownTick(0);
+				if (r_user.GetTetris().CheckGameover()) { // 고정에 성공했다면 게임오버 판정
+					if (max_user > 1) {
+						if (CheckWinner()) { // 누군가 게임오버였다면, 승자 여부 추가확인
+							ClearGame(); // 승자가 나왔다면 방 상태 정리(클리어는 아님)하고 함수 종료
+							return;
+						}
+						r_user.SetRoomUserState(ROOM_USER_STATE::GAMEOVER);
+					}
+					r_user.SetRoomUserState(ROOM_USER_STATE::WAIT);
+					S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
+					send_p.size = sizeof(S2C_GAMEOVER_PACKET);
+					send_p.type = S2C_GAMEOVER;
+					send_p.id = r_user.GetSession()->GetId();
+					BuildBroadcastData(reinterpret_cast<char*>(&send_p), send_p.size);
+
+					ClearGame();
+				}
+
+				S2C_FIX_PACKET fix_p;
+				fix_p.size = sizeof(S2C_FIX_PACKET);
+				fix_p.type = S2C_FIX;
+				fix_p.id = r_user.GetSession()->GetId();
+				fix_p.fixed_x = r_user.GetTetris().GetCurrentTetromino().moved_pos.x;
+				fix_p.fixed_y = r_user.GetTetris().GetCurrentTetromino().moved_pos.y;
+				BuildBroadcastData(reinterpret_cast<char*>(&fix_p), fix_p.size);
+
+				std::vector<char> index_lines = r_user.GetTetris().ClearLine();
+				if (!index_lines.empty()) {
+					r_user.SetScore(r_user.GetScore() + (CLEAR_LINE_SCORE * index_lines.size() * index_lines.size()));
+					for (int i = 0; i < index_lines.size(); i++) {
+						S2C_CLEARLINE_PACKET clear_line_p;
+						clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
+						clear_line_p.type = S2C_CLEARLINE;
+						clear_line_p.id = r_user.GetSession()->GetId();
+						clear_line_p.score = r_user.GetScore();
+						clear_line_p.line_index = index_lines[i];
+						BuildBroadcastData(reinterpret_cast<char*>(&clear_line_p), clear_line_p.size);
+					}
+				}
+
+				if (r_user.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList();
+				r_user.AddTetrominoIndex();
+
+				if (SetNewTetromino(r_user.GetSession()->GetId())) {
+					S2C_SPAWN_PACKET spawn_p;
+					spawn_p.size = sizeof(S2C_SPAWN_PACKET);
+					spawn_p.type = S2C_SPAWN;
+					spawn_p.id = r_user.GetSession()->GetId();
+					spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+					spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
+					spawn_p.spawn_x = spawn_pos.x;
+					spawn_p.spawn_y = spawn_pos.y;
+					BuildBroadcastData(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
+				}
 				break;
 			}
 		}
@@ -412,7 +422,7 @@ void TetrisRoom::Add7BagTetrominoList()
 bool TetrisRoom::SetNewTetromino(int id)
 {
 	for (auto& r_user : room_users) {
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		if (r_user.GetSession()->GetId() == id){
 			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]), spawn_pos);
 			return true;
@@ -440,14 +450,14 @@ bool TetrisRoom::CheckWinner()
 		int over_count = 0;
 		int player_count = 0;
 		for (auto& r_user : room_users){
-			if (r_user.GetInUse()) ++player_count;
-			if (r_user.GetInUse() && r_user.GetIsOver()) ++over_count;
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::PLAY) ++player_count;
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::GAMEOVER) ++over_count;
 		}
 
 		if ((player_count - over_count) > 1) return false; // 아직 승자가 결정되지 않음
 		else {
 			for (auto& r_user : room_users) {
-				if (r_user.GetInUse() && !r_user.GetIsOver()) {
+				if (r_user.GetRoomUserState() == ROOM_USER_STATE::GAMEOVER) {
 					S2C_GAMEEND_PACKET gameend_p;
 					gameend_p.size = sizeof(S2C_GAMEEND_PACKET);
 					gameend_p.type = S2C_GAMEEND;
@@ -471,7 +481,7 @@ void TetrisRoom::ClearRoom()
 void TetrisRoom::UpdateTick()
 {
 	for(auto& r_user : room_users){
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		r_user.SetDownTick(r_user.GetDownTick() + 1);
 		//r_user.SetInputTick(r_user.GetInputTick() + 1);
 		r_user.SetAddGarbageLineTick(r_user.GetAddGarbageLineTick() + 1);
@@ -481,7 +491,7 @@ void TetrisRoom::UpdateTick()
 void TetrisRoom::CheckMoveDownTimeout()
 {
 	for(auto& r_user : room_users){
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		if (r_user.GetDownTick() >= r_user.GetDownTimeout()) {
 			TaskInfo new_task;
 			new_task.id = r_user.GetSession()->GetId();
@@ -496,7 +506,7 @@ void TetrisRoom::CheckMoveDownTimeout()
 void TetrisRoom::CheckAddGarbageLineTimeout()
 {
 	for (auto& r_user : room_users) {
-		if (!r_user.GetInUse()) continue;
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		if (r_user.GetAddGarbageLineTick() < r_user.GetAddGarbageLineTimeout()) continue;
 		r_user.SetAddGarbageLineTick(0);
 		ReduceTimeouts(ADD_TIMEOUT, r_user); // 다음 타임아웃 재설정
@@ -569,19 +579,19 @@ void TetrisRoom::ReduceTimeouts(int type, RoomSession& r_session)
 			r_session.SetDownTimeout(25);
 		}
 
-		else if (100 < r_session.GetScore() <= 300) {
+		else if (100 < r_session.GetScore() && r_session.GetScore() <= 300) {
 			r_session.SetDownTimeout(24);
 		}
 
-		else if (300 < r_session.GetScore() <= 600) {
+		else if (300 < r_session.GetScore() && r_session.GetScore() <= 600) {
 			r_session.SetDownTimeout(23);
 		}
 
-		else if (600 < r_session.GetScore() <= 1000) {
+		else if (600 < r_session.GetScore() && r_session.GetScore() <= 1000) {
 			r_session.SetDownTimeout(22);
 		}
 
-		else if (1000 < r_session.GetScore() <= 1500) {
+		else if (1000 < r_session.GetScore() && r_session.GetScore() <= 1500) {
 			r_session.SetDownTimeout(21);
 		}
 
@@ -621,7 +631,7 @@ void TetrisRoom::SetRoomState(ROOM_STATE new_state)
 int TetrisRoom::FindNewHost(int delete_id)
 {
 	for (auto& r_user : room_users) { 
-		if (r_user.GetInUse()) {
+		if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) {
 			if (r_user.GetSession()->GetId() == delete_id) continue;
 			return r_user.GetSession()->GetId();
 		}

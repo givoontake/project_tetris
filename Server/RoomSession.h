@@ -1,8 +1,11 @@
 #pragma once
 #include <string>
+#include <array>
 #include "Tetris.h"
 #include "define.h"
 #include "Session.h"
+
+enum class ROOM_USER_STATE { EMPTY, WAIT, READY, PLAY, GAMEOVER };
 
 class RoomSession
 {
@@ -12,9 +15,7 @@ class RoomSession
 	int send_data_size = 0;
 	// std::string user_name; // 방 생성할 때 만들도록 일단 하고, 나중에 회원가입 - DB 연동으로 session 클래스에 포함해보자.
 	// char user_name[MAX_USER_NAME];
-	bool is_ready = false;
-	Atomic<bool> in_use = false; // 룸에서 해당 배열 인덱스가 사용 중인지를 판별하기 위한 변수
-	bool is_over = false;
+	Atomic<ROOM_USER_STATE> r_user_state;
 
 	int tetromino_index = 0;
 	int down_tick_counter = 0;
@@ -32,12 +33,10 @@ public:
 	~RoomSession();
 
 	Session* GetSession() const { return session; }
-	bool GetInUse() const { return in_use.GetSelf(); }
-	bool GetIsReady() const { return is_ready; }
+	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.Load(); }
 	Tetris& GetTetris() { return tetris; }
 	int GetTetrominoIndex() const { return tetromino_index; }
 	void AddTetrominoIndex() { ++tetromino_index; }
-	bool GetIsOver() const { return is_over; }
 	int GetDownTick() const { return down_tick_counter; }
 	//int GetInputTick() const { return input_tick_counter; }
 	int GetAddGarbageLineTick() const { return add_garbage_line_tick_counter; }
@@ -46,9 +45,7 @@ public:
 	int GetAddGarbageLineTimeout() const { return add_garbage_line_tick; }
 	int GetScore() const { return score; }
 
-	void SetIsReady();
-	bool SetUse(bool expected, bool desired);
-	void SetIsOver(bool val) { is_over = val; }
+	void SetRoomUserState(ROOM_USER_STATE new_state) { return r_user_state.Store(new_state); }
 	void SetDownTick(int val) { down_tick_counter = val; }
 	//void SetInputTick(int val) { input_tick_counter = val; }
 	void SetAddGarbageLineTick(int val) { add_garbage_line_tick_counter = val; }

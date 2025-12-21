@@ -16,6 +16,8 @@ constexpr int ROTATE = 3;
 constexpr int DROP = 4;
 constexpr int TIMEOUT = 5;
 constexpr int UP = 6; // 실제로 받지는 않고 처리상 롤백용
+
+constexpr int MOVE_TYPE_NUM = 7;
 // timeout-> 일정  시간이 지나 자동으로 아래로 한 칸 이동하는 것
 inline void PrintMoveType(int type)
 {
@@ -46,6 +48,7 @@ inline void PrintMoveType(int type)
 class Tetris
 {
 	std::array<std::array<bool, BOARD_WIDTH>, TOTAL_HEIGHT> board;
+	std::array<bool, MOVE_TYPE_NUM> pending_moves; // 1틱에 여러 입력이 들어오는 것을 방지하기 위한 컨테이너
 	Tetromino current_tetromino;
 public:
 	Tetris();
@@ -67,4 +70,6 @@ public:
 	void Clear();
 	bool CheckGameover();
 	void DebugPrintBoard();
+	void SetPendingMove(int move_type) { pending_moves[move_type] = true; }
+	std::vector<char> ProcessPendingMoves();
 };

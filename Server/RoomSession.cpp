@@ -2,7 +2,7 @@
 
 RoomSession::RoomSession()
 {
-
+	r_user_state.Store(ROOM_USER_STATE::EMPTY);
 }
 
 RoomSession::~RoomSession()
@@ -10,33 +10,11 @@ RoomSession::~RoomSession()
 
 }
 
-void RoomSession::SetIsReady()
-{
-	is_ready = !is_ready;
-}
-
-bool RoomSession::SetUse(bool expected, bool desired)
-{
-	// false -> true
-	if (desired == true) {
-		if (in_use.Compare_exchange_strong(expected, desired)) return true;
-		else return false;
-	}
-
-	// true -> false
-	else {
-		if (in_use.Compare_exchange_strong(expected, desired)) return true;
-		else return false;
-	}
-}
-
 void RoomSession::InitSession(Session* s)
 {
 	session = s;
 	tetris.Clear();
-	is_ready = false;
-	in_use = true;
-	is_over = false;
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
 	tetromino_index = 0;
 
 	down_tick_counter = 0;
@@ -55,9 +33,7 @@ void RoomSession::ClearSession()
 {
 	session = nullptr;
 	tetris.Clear();
-	is_ready = false;
-	in_use = false;
-	is_over = false;
+	r_user_state.Store(ROOM_USER_STATE::EMPTY);
 	tetromino_index = 0;
 
 	down_tick_counter = 0;
@@ -75,8 +51,7 @@ void RoomSession::ClearSession()
 void RoomSession::ClearData()
 {
 	tetris.Clear();
-	is_ready = false;
-	is_over = false;
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
 	tetromino_index = 0;
 
 	down_tick_counter = 0;
