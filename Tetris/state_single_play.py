@@ -425,6 +425,10 @@ class SinglePlayState:
             move_type
         )
 
+        MOVE_NAME = {LEFT: "LEFT", RIGHT: "RIGHT", DOWN: "DOWN", DROP: "DROP", ROTATE: "ROTATE"}
+        print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(move_type, move_type))
+
+
         try:
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
