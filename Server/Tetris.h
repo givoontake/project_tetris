@@ -1,5 +1,6 @@
 #pragma once
-#include "define_tetromino.h"
+#include "Tetromino.h"
+#include "TetrisTickData.h"
 constexpr int HIDDEN_HEIGHT = 2;
 constexpr int BOARD_WIDTH = 10;
 constexpr int BOARD_HEIGHT = 20;
@@ -50,6 +51,7 @@ class Tetris
 	std::array<std::array<bool, BOARD_WIDTH>, TOTAL_HEIGHT> board;
 	std::array<bool, MOVE_TYPE_NUM> pending_moves; // 1틱에 여러 입력이 들어오는 것을 방지하기 위한 컨테이너
 	Tetromino current_tetromino;
+	TetrisTickData tick_data;
 public:
 	Tetris();
 
@@ -57,6 +59,7 @@ public:
 	//void SetNewSpawn(bool val) { new_spawn = val; }
 	Tetromino GetCurrentTetromino() const { return current_tetromino; }
 	Position GetCurrentTetrominoPos() const { return current_tetromino.moved_pos; }
+	TetrisTickData& GetTickData() { return tick_data; }
 
 	void InitNewTetromino(char type, Position spawn_pos);
 	int HandleTetrominoKeyInput(int move_type);
@@ -72,4 +75,5 @@ public:
 	void DebugPrintBoard();
 	void SetPendingMove(int move_type) { pending_moves[move_type] = true; }
 	std::vector<char> ProcessPendingMoves();
+	bool CheckInputAllow(int move_type);
 };

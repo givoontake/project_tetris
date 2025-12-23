@@ -21,21 +21,21 @@
   <ItemGroup>
     <ClCompile Include="IOCPServer.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MQueue.cpp" />
     <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="RoomPacketHandler.cpp" />
     <ClCompile Include="RoomSession.cpp" />
     <ClCompile Include="Session.cpp" />
     <ClCompile Include="Tetris.cpp" />
     <ClCompile Include="TetrisRoom.cpp" />
+    <ClCompile Include="TetrisTickData.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Atomic.h" />
     <ClInclude Include="define.h" />
-    <ClInclude Include="define_tetromino.h" />
+    <ClInclude Include="settings.h" />
+    <ClInclude Include="Tetromino.h" />
     <ClInclude Include="ExOverlapped.h" />
     <ClInclude Include="IOCPServer.h" />
-    <ClInclude Include="Interface.h" />
     <ClInclude Include="MQueue.h" />
     <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="packetType.h" />
@@ -44,6 +44,7 @@
     <ClInclude Include="Session.h" />
     <ClInclude Include="Tetris.h" />
     <ClInclude Include="TetrisRoom.h" />
+    <ClInclude Include="TetrisTickData.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -328,24 +328,29 @@ void TetrisRoom::ProcessPlayTasks()
 
 			case RIGHT:
 				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+				r_user.GetTetris().GetTickData().SetRightTick(0);
 				break;
 
 			case LEFT:
 				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+				r_user.GetTetris().GetTickData().SetLeftTick(0);
 				break;
 
 			case DOWN:
-				r_user.SetDownTick(0);
-				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+					MakeMovePacketData(r_user.GetSession()->GetId(), type);
+					r_user.GetTetris().GetTickData().SetDownTick(0);
 				break;
 
 			case ROTATE:
 				MakeMovePacketData(r_user.GetSession()->GetId(), type);
+				r_user.GetTetris().GetTickData().SetRotateTick(0);
 				break;
 
 			case DROP:
 				r_user.GetTetris().FixTetromino();
-				r_user.SetDownTick(0);
+				r_user.GetTetris().GetTickData().SetDownTick(0);
+				r_user.GetTetris().GetTickData().SetDropTick(0);
+
 				if (r_user.GetTetris().CheckGameover()) { // 고정에 성공했다면 게임오버 판정
 					if (max_user > 1) {
 						if (CheckWinner()) { // 누군가 게임오버였다면, 승자 여부 추가확인
@@ -404,6 +409,7 @@ void TetrisRoom::ProcessPlayTasks()
 			}
 		}
 	}
+
 	BroadcastTickData();
 }
 
@@ -482,9 +488,7 @@ void TetrisRoom::UpdateTick()
 {
 	for(auto& r_user : room_users){
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		r_user.SetDownTick(r_user.GetDownTick() + 1);
-		//r_user.SetInputTick(r_user.GetInputTick() + 1);
-		r_user.SetAddGarbageLineTick(r_user.GetAddGarbageLineTick() + 1);
+		r_user.GetTetris().GetTickData().UpdateTickData();
 	}
 }
 
@@ -492,13 +496,14 @@ void TetrisRoom::CheckMoveDownTimeout()
 {
 	for(auto& r_user : room_users){
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		if (r_user.GetDownTick() >= r_user.GetDownTimeout()) {
+		if (r_user.GetTetris().GetTickData().GetDownTick() >= r_user.GetTetris().GetTickData().GetDownTimeout()) {
 			TaskInfo new_task;
 			new_task.id = r_user.GetSession()->GetId();
 			new_task.type = DOWN;
 			tasks.AddTask(new_task);
 			ReduceTimeouts(DOWN, r_user);
-			r_user.SetDownTick(0);
+			//r_user.GetTickData().SetDownTick(0);
+			//r_user.GetTickData().SetDownTimeoutTick(0);
 		}
 	}
 }
@@ -507,8 +512,8 @@ void TetrisRoom::CheckAddGarbageLineTimeout()
 {
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		if (r_user.GetAddGarbageLineTick() < r_user.GetAddGarbageLineTimeout()) continue;
-		r_user.SetAddGarbageLineTick(0);
+		if (r_user.GetTetris().GetTickData().GetGarbageLineTick() < GARBAGE_LINE_TIMEOUT_TICK) continue;
+		r_user.GetTetris().GetTickData().SetGarbageLineTick(0);
 		ReduceTimeouts(ADD_TIMEOUT, r_user); // 다음 타임아웃 재설정
 		std::vector<char> holes = r_user.GetTetris().GetGarbegeLineHoles(2); // 타임아웃 나는건 싱글뿐이라 1칸 추가인 2를 넘김
 		std::vector<char> tasks_from_add_garbege_lines = r_user.GetTetris().AddGarbageLines(holes);
@@ -534,7 +539,7 @@ void TetrisRoom::CheckAddGarbageLineTimeout()
 					fix_p.fixed_x = r_user.GetTetris().GetCurrentTetromino().moved_pos.x;
 					fix_p.fixed_y = r_user.GetTetris().GetCurrentTetromino().moved_pos.y;
 					BuildBroadcastData(reinterpret_cast<char*>(&fix_p), fix_p.size);
-					r_user.SetDownTick(0);
+					r_user.GetTetris().GetTickData().SetDownTick(0);
 					//r_user.SetInputTick(0);
 				}
 
@@ -576,33 +581,37 @@ void TetrisRoom::ReduceTimeouts(int type, RoomSession& r_session)
 	switch(type){
 	case DOWN_TIMEOUT:
 		if (r_session.GetScore() <= 100) {
-			r_session.SetDownTimeout(25);
+			r_session.GetTetris().GetTickData().SetDownTimeout(25);
 		}
 
 		else if (100 < r_session.GetScore() && r_session.GetScore() <= 300) {
-			r_session.SetDownTimeout(24);
+			r_session.GetTetris().GetTickData().SetDownTimeout(24);
 		}
 
 		else if (300 < r_session.GetScore() && r_session.GetScore() <= 600) {
-			r_session.SetDownTimeout(23);
+			r_session.GetTetris().GetTickData().SetDownTimeout(23);
 		}
 
 		else if (600 < r_session.GetScore() && r_session.GetScore() <= 1000) {
-			r_session.SetDownTimeout(22);
+			r_session.GetTetris().GetTickData().SetDownTimeout(22);
 		}
 
 		else if (1000 < r_session.GetScore() && r_session.GetScore() <= 1500) {
-			r_session.SetDownTimeout(21);
+			r_session.GetTetris().GetTickData().SetDownTimeout(21);
 		}
 
 		else if (1500 < r_session.GetScore()) {
-			r_session.SetDownTimeout(20);
+			r_session.GetTetris().GetTickData().SetDownTimeout(20);
 		}
 		
 		break;
 
 	case ADD_TIMEOUT:
-		r_session.SetAddGarbageLineTimeout(r_session.GetAddGarbageLineTimeout() - 1);
+		if (r_session.GetTetris().GetTickData().GetGarbageLineTimeout() > 500)
+		r_session.GetTetris().GetTickData().SetGarbageLineTimeout(r_session.GetTetris().GetTickData().GetGarbageLineTimeout() - 5);
+		break;
+
+	default:
 		break;
 	}
 }
@@ -616,7 +625,6 @@ void TetrisRoom::MakeMovePacketData(int id, int move_type)
 	move_p.move_type = static_cast<char>(move_type);
 	BuildBroadcastData(reinterpret_cast<char*>(&move_p), move_p.size);
 }
-
 
 void TetrisRoom::SetRoomId(int room_index)
 {

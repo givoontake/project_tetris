@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <random>
 #include "Tetris.h"
-#include "define_tetromino.h"
 
 Tetris::Tetris()
 {
@@ -24,6 +23,7 @@ int Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성�
 {
     PrintMoveType(move_type);
     Tetromino if_move_tetromino = current_tetromino;
+	if(!CheckInputAllow(move_type)) return -1;
     switch (move_type) {
     case RIGHT:
         ++if_move_tetromino.moved_pos.x;
@@ -226,6 +226,7 @@ void Tetris::Clear()
     } // 가로 = WIDTH = x / 세로 = HEIGHT = y
 
 	pending_moves.fill(false);
+	tick_data.InitTickData();
 }
 
 bool Tetris::CheckGameover()
@@ -286,6 +287,36 @@ std::vector<char> Tetris::ProcessPendingMoves()
     }
 
 	return successful_moves;
+}
+
+bool Tetris::CheckInputAllow(int move_type)
+{
+    switch (move_type)
+    {
+    case LEFT:
+        if (tick_data.GetLeftTick() >= MOVE_TIMEOUT_TICK) return true;
+        return false;
+
+    case RIGHT:
+        if (tick_data.GetRightTick() >= MOVE_TIMEOUT_TICK) return true;
+        return false;
+
+    case DOWN:
+        if (tick_data.GetDownTick() >= MOVE_TIMEOUT_TICK) return true;
+        return false;
+
+    case ROTATE:
+        if (tick_data.GetRotateTick() >= ROTATE_TIMEOUT_TICK) return true;
+        return false;
+
+    case DROP:
+        if (tick_data.GetDropTick() >= DROP_TIMEOUT_TICK) return true;
+        return false;
+
+    default:
+        return false;
+    }
+    return false;
 }
 
 
