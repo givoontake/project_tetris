@@ -3,7 +3,6 @@
 #include <MSWSock.h>
 #include <mutex>
 #include "ExOverlapped.h"
-#include "Interface.h"
 #include "Atomic.h"
 
 enum USER_STATE {NONE, LOBBY, ROOM};
