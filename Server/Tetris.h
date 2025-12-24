@@ -1,7 +1,7 @@
 #pragma once
 #include "Tetromino.h"
 #include "TetrisTickData.h"
-constexpr int HIDDEN_HEIGHT = 2;
+constexpr int HIDDEN_HEIGHT = 5;
 constexpr int BOARD_WIDTH = 10;
 constexpr int BOARD_HEIGHT = 20;
 constexpr int TOTAL_HEIGHT = BOARD_HEIGHT + HIDDEN_HEIGHT;

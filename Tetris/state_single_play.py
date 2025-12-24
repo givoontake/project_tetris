@@ -11,9 +11,9 @@ from network import NetworkWorker
 from asset_manager import AssetManager
 
 # -------------------- 상수 --------------------
-CELL_SIZE    = 35
+CELL_SIZE    = 30
 BOARD_COLS   = 10
-HIDDEN_ROWS  = 2
+HIDDEN_ROWS  = 5
 BOARD_ROWS   = 20+HIDDEN_ROWS
 PREVIEW_COLS = 5
 PREVIEW_ROWS = 5
@@ -393,6 +393,24 @@ class SinglePlayState:
         self.down_first_move = False
 
         self.init()
+        self.clear()
+
+    def clear(self):
+        self.left_pressed = False
+        self.right_pressed = False
+        self.down_pressed = False
+        self.rotate_pressed = False
+        self.drop_pressed = False
+
+        self.left_elapsed_time = 0
+        self.left_first_over = False
+        self.left_first_move = False
+        self.right_elapsed_time = 0
+        self.right_first_over = False
+        self.right_first_move = False
+        self.down_elapsed_time = 0
+        self.down_first_over = False
+        self.down_first_move = False
 
     def handle_event(self, ev):
         if ev.key == pygame.K_LEFT:
@@ -514,7 +532,7 @@ class SinglePlayState:
         )
 
         MOVE_NAME = {LEFT: "LEFT", RIGHT: "RIGHT", DOWN: "DOWN", DROP: "DROP", ROTATE: "ROTATE"}
-        print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(self.move_type, self.move_type))
+        # print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(self.move_type, self.move_type))
 
         try:
             self.net_worker.send_packet(packet_bytes)
@@ -599,6 +617,8 @@ class SinglePlayState:
             self.board.game_over = True
             self.board.current_tetromino = None
             self.board.game_started = False
+            self.init()
+            self.clear()
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self

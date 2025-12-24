@@ -365,6 +365,8 @@ void TetrisRoom::ProcessPlayTasks()
 					send_p.type = S2C_GAMEOVER;
 					send_p.id = r_user.GetSession()->GetId();
 					BuildBroadcastData(reinterpret_cast<char*>(&send_p), send_p.size);
+					r_user.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
+					std::cout << "Game Over. Session id: " << r_user.GetSession()->GetId() << std::endl;
 
 					ClearGame();
 				}
