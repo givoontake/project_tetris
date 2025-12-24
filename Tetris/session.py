@@ -1,7 +1,7 @@
 # session.py
 from typing import Optional
 import threading
-from asset_manager import *
+from resource_manager import *
 
 class Session:
     """

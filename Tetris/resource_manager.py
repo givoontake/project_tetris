@@ -7,15 +7,22 @@ from define import *
 #     type: Optional[int] # int이거나 None
 #     image: Optional[pygame.Surface] # pygame.Surface 이거나 None
 
-class AssetManager:
+class ResourceManager:
     def __init__(self):
         self.block_asset = {}
         self.button_asset = {}
-        pass
+
+        # sounds
+        self.bgm = pygame.mixer.music.load("resource/sounds/bgm_ingame.mp3")
+        self.button_sound = pygame.mixer.Sound("resource/sounds/sound_effect_button.mp3")
+        self.move_sound = pygame.mixer.Sound("resource/sounds/sound_effect_move.mp3")
+        self.fix_sound = pygame.mixer.Sound("resource/sounds/sound_effect_fix.mp3")
+        self.clearline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_clearline.mp3")
+        self.addline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_addline.mp3")
 
     def init(self):
         self.block_asset = {
-    # --- Default Blocks ---
+        # --- Default Blocks ---
         DEFAULT_RED:     self.load_image("resource/blocks/default/default_red.png", CELL_SIZE, CELL_SIZE),
         DEFAULT_ORANGE:  self.load_image("resource/blocks/default/default_orange.png", CELL_SIZE, CELL_SIZE),
         DEFAULT_YELLOW:  self.load_image("resource/blocks/default/default_yellow.png", CELL_SIZE, CELL_SIZE),
@@ -42,6 +49,12 @@ class AssetManager:
         BUTTON_LOGO_HOVER: self.load_image("resource/button/tetris_logo.png", 500, 100),
         BUTTON_LOGO_PRESS: self.load_image("resource/button/tetris_logo.png", 500, 100)
         }
+
+        self.button_sound.set_volume(0.8)
+        self.move_sound.set_volume(0.8)
+        self.fix_sound.set_volume(0.8)
+        self.clearline_sound.set_volume(0.8)
+        self.addline_sound.set_volume(0.8)
     
     def load_image(self, filename: str, width: int, height: int) -> pygame.Surface:
         """

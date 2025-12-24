@@ -1,7 +1,7 @@
 # menu.py
 import pygame
 from define import *
-from asset_manager import *
+from resource_manager import *
 
 PLACEHOLDER = (100, 100, 100)
 
@@ -28,7 +28,7 @@ class Button:
         w: int,
         h: int,
         text: str = None,
-        am: Optional[AssetManager] = None,
+        am: Optional[ResourceManager] = None,
         idle_btn_type=None,
         hover_btn_type=None,
         press_btn_type=None,
