@@ -352,22 +352,6 @@ class TetrisBoard:
 
 # -------------------- 싱글 플레이 상태 --------------------
 class SinglePlayState:
-    """
-    싱글 플레이 상태.
-
-    역할:
-    - 이벤트 감지:
-        - 키 입력 → send_move(ev)로 서버에 move 패킷 전송
-        - 서버에서 승인된 move 패킷 수신 → handle_packet(data)에서 해석
-    - TetrisBoard 제어:
-        - handle_packet(data)에서 어떤 움직임인지 결정한 뒤
-          self.board.move(move_type) 호출
-    - UI:
-        - 중앙의 테트리스 보드/미리보기
-        - 시작 전에는 '게임 시작' 버튼
-        - 화면 좌측 상단에는 '방 제목 / 비밀번호'를 표시하는 버튼 2개
-    """
-
     def __init__(self, screen: pygame.Surface, asset: AssetManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
         self.screen = screen
         self.room_title = room_title
@@ -395,24 +379,52 @@ class SinglePlayState:
         self.rotate_pressed = False
         self.drop_pressed = False
 
+        self.first_delay_ms = 300
+        self.delay_ms = 50
+
+        self.left_elapsed_time = 0
+        self.left_first_over = False
+        self.left_first_move = False
+        self.right_elapsed_time = 0
+        self.right_first_over = False
+        self.right_first_move = False
+        self.down_elapsed_time = 0
+        self.down_first_over = False
+        self.down_first_move = False
+
         self.init()
 
     def handle_event(self, ev):
         if ev.key == pygame.K_LEFT:
             # move_type = LEFT
-            if ev.type == pygame.KEYDOWN: self.left_pressed = True
-            elif ev.type == pygame.KEYUP: self.left_pressed = False
+            if ev.type == pygame.KEYDOWN: 
+                self.left_pressed = True
+            elif ev.type == pygame.KEYUP: 
+                self.left_pressed = False
+                self.left_first_over = False
+                self.left_first_move = False
+                self.left_elapsed_time = 0
 
         elif ev.key == pygame.K_RIGHT:
             # move_type = RIGHT
-            if ev.type == pygame.KEYDOWN: self.right_pressed = True
-            elif ev.type == pygame.KEYUP: self.right_pressed = False
+            if ev.type == pygame.KEYDOWN: 
+                self.right_pressed = True
+            elif ev.type == pygame.KEYUP: 
+                self.right_pressed = False
+                self.right_first_over = False
+                self.right_first_move = False
+                self.right_elapsed_time = 0
 
         # 소프트 드랍
         elif ev.key == pygame.K_DOWN:
             # move_type = DOWN
-            if ev.type == pygame.KEYDOWN: self.down_pressed = True
-            elif ev.type == pygame.KEYUP: self.down_pressed = False
+            if ev.type == pygame.KEYDOWN:
+                self.down_pressed = True
+            elif ev.type == pygame.KEYUP:
+                self.down_pressed = False
+                self.down_first_over = False
+                self.down_first_move = False
+                self.down_elapsed_time = 0
 
         # 하드 드랍(스페이스)
         elif ev.key == pygame.K_SPACE:
@@ -429,13 +441,53 @@ class SinglePlayState:
 
     def send_move_handler(self):
         if self.left_pressed:
-            self.send_move(LEFT)
+            if self.left_first_over == False:
+                if self.left_first_move == False:
+                    self.send_move(LEFT)
+                    self.left_first_move = True
+                    
+                if self.left_elapsed_time >= self.first_delay_ms:
+                    self.send_move(LEFT)
+                    self.left_first_over = True
+                    self.left_elapsed_time = 0
+
+            else:
+                if self.left_elapsed_time >= self.delay_ms:
+                    self.send_move(LEFT)
+                    self.left_elapsed_time = 0
+            
 
         if self.right_pressed:
-            self.send_move(RIGHT)
+            if self.right_first_over == False:
+                if self.right_first_move == False:
+                    self.send_move(RIGHT)
+                    self.right_first_move = True
+
+                if self.right_elapsed_time >= self.first_delay_ms:
+                    self.send_move(RIGHT)
+                    self.right_first_over = True
+                    self.right_elapsed_time = 0
+
+            else:
+                if self.right_elapsed_time >= self.delay_ms:
+                    self.send_move(RIGHT)
+                    self.right_elapsed_time = 0
+
         # 소프트 드랍
         if self.down_pressed:
-            self.send_move(DOWN)
+            if self.down_first_over == False:
+                if self.down_first_move == False:
+                    self.send_move(DOWN)
+                    self.down_first_move = True
+                if self.down_elapsed_time >= self.first_delay_ms:
+                    self.send_move(DOWN)
+                    self.down_first_over = True
+                    self.down_elapsed_time = 0
+
+            else:
+                if self.down_elapsed_time >= self.delay_ms:
+                    self.send_move(DOWN)
+                    self.down_elapsed_time = 0
         # 하드 드랍(스페이스)
         if self.rotate_pressed:
             self.send_move(ROTATE)
@@ -448,7 +500,6 @@ class SinglePlayState:
             self.down_pressed = False
             self.rotate_pressed = False
             self.drop_pressed = False
-
 
     def send_move(self, move_type):
         size = 2 + 1 + 1
@@ -683,7 +734,7 @@ class SinglePlayState:
         self.screen.blit(pw_surf, pw_rect)
 
     # ------------ 이벤트 처리 ------------ #
-    def update(self, dt, events):
+    def update(self, dt_ms, events):
         for ev in events:
             if ev.type == pygame.QUIT:
                 # 상위 루프에서 처리
@@ -699,6 +750,10 @@ class SinglePlayState:
 
             if self.btn_room_exit.handle_event(ev):
                 self.send_delete_user()
+                
+        if self.left_pressed: self.left_elapsed_time += dt_ms
+        if self.right_pressed: self.right_elapsed_time += dt_ms
+        if self.down_pressed: self.down_elapsed_time += dt_ms
 
         if self.board and self.board.game_started:
             self.send_move_handler()
