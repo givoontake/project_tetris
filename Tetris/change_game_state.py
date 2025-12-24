@@ -7,7 +7,7 @@ from define import *
 from session import Session
 from define_format import *
 from packet_type import *
-from asset_manager import *
+from resource_manager import *
 from typing import Optional
 from network import NetworkWorker
 from chat_window import *
@@ -35,7 +35,7 @@ from state_single_play import SinglePlayState
 
 
 class LoginState:
-    def __init__(self, screen, asset: Optional[AssetManager], net_worker: Optional[NetworkWorker]):
+    def __init__(self, screen, asset: Optional[ResourceManager], net_worker: Optional[NetworkWorker]):
         self.screen = screen
         self.net_worker = net_worker
         self.title_font = pygame.font.Font("resource/dodamdodam.ttf", 36)
@@ -107,9 +107,11 @@ class LoginState:
         if self.popup.visible:
             btn_name = self.popup.handle_event(events)
             if btn_name == "재시도":
+                self.am.button_sound.play()
                 self.popup.visible = False
                 self.connect()
             elif btn_name == "종료":
+                self.am.button_sound.play()
                 pygame.quit(); raise SystemExit
 
             return self  # 로그인 UI는 건드리지도 않음
@@ -117,9 +119,11 @@ class LoginState:
         if self.popup2.visible:
             btn_name = self.popup2.handle_event(events)
             if btn_name == "재시도":
+                self.am.button_sound.play()
                 self.popup2.visible = False
                 self.connect()
             elif btn_name == "종료":
+                self.am.button_sound.play()
                 pygame.quit(); raise SystemExit
 
             return self  # 로그인 UI는 건드리지도 않음
@@ -158,7 +162,7 @@ LOBBY = 1
 CREATE_ROOM = 2
 
 class LobbyState:
-    def __init__(self, screen, asset: AssetManager, net_worker: NetworkWorker, my_session: Session):
+    def __init__(self, screen, asset: ResourceManager, net_worker: NetworkWorker, my_session: Session):
         self.screen = screen
         self.am = asset
         self.my_session = my_session
@@ -285,6 +289,7 @@ class LobbyState:
                 for btn in self.buttons:
                     if btn.handle_event(ev):
                         if btn.text == "방만들기":
+                            self.am.button_sound.play()
                             self.room_create_window = RoomCreateWindow(self.screen)
                             self.room_create_window.open()
                             self.reactable_screen = CREATE_ROOM
@@ -299,6 +304,7 @@ class LobbyState:
                 # 어떤 버튼이 눌렸느냐에 따른 동작 추가
                 data = self.room_create_window.handle_event(ev)
                 if data == "취소":
+                    self.am.button_sound.play()
                     self.reactable_screen = LOBBY
                 elif data == None:
                     pass

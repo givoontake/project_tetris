@@ -5,11 +5,13 @@ import queue
 from define import *
 from change_game_state import *
 from network import NetworkWorker
-from asset_manager import *
+from resource_manager import *
 
 class GameLoop:
     def __init__(self):
         pygame.init()
+        pygame.mixer.init()
+        pygame.mixer.music.set_volume(0.3)
 
         # 초기 화면 생성
         w = int(BASE_SCREEN_WIDTH * INITIAL_SCALE)
@@ -18,7 +20,7 @@ class GameLoop:
         pygame.display.set_caption("Tetris")
         pygame.key.start_text_input()
 
-        self.am = AssetManager()
+        self.am = ResourceManager()
         self.am.init()
         self.net_worker = NetworkWorker()
         

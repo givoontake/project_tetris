@@ -8,7 +8,7 @@ from session import Session
 from my_info import MyInfo
 from menu import Button
 from network import NetworkWorker
-from asset_manager import AssetManager
+from resource_manager import ResourceManager
 
 # -------------------- 상수 --------------------
 CELL_SIZE    = 30
@@ -193,6 +193,7 @@ class TetrisBoard:
             self.move(0, 1)
         elif move_type == ROTATE:
             self.rotate(1)
+
         # elif move_type == DROP:
         #     self.hard_drop()
         # 알 수 없는 command는 무시
@@ -352,7 +353,7 @@ class TetrisBoard:
 
 # -------------------- 싱글 플레이 상태 --------------------
 class SinglePlayState:
-    def __init__(self, screen: pygame.Surface, asset: AssetManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
+    def __init__(self, screen: pygame.Surface, asset: ResourceManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
         self.screen = screen
         self.room_title = room_title
         self.room_password = room_password
@@ -579,16 +580,20 @@ class SinglePlayState:
             # 게임이 시작되었다고 서버가 알려줌
             if data.get("is_start") and self.board:
                 self.board.start_game()
+                pygame.mixer.music.play(-1)
 
         elif packet_type == S2C_MOVE:
             # move_type에 따라 보드에 반영
             move_type = data.get("move_type")
             if move_type is not None and self.board:
                 self.board.handle_move(move_type)
+                if move_type != DOWN:
+                    self.am.move_sound.play()
 
         elif packet_type == S2C_DELETE_USER:
             delete_id = data.get("id")
             if delete_id == self.my_session.id:
+                pygame.mixer.music.stop()
                 return LobbyState(self.screen, self.am, self.net_worker, self.my_session)
             
         elif packet_type == S2C_SPAWN:
@@ -603,14 +608,17 @@ class SinglePlayState:
                     pass
                 else:
                     self.board.fix(data.get("fixed_x"), data.get("fixed_y"))
+                    self.am.fix_sound.play()
 
         elif packet_type == S2C_CLEARLINE:
             if self.my_session.id == data.get("id"):
                 self.board.clear_lines(data.get("line_index"))
+                self.am.clearline_sound.play()
                 self.board.score = data.get("score")
 
         elif packet_type == S2C_ADDLINE:
             if self.my_session.id == data.get("id"):
+                self.am.addline_sound.play()
                 self.board.add_line(data.get("hole_x"))
 
         elif packet_type == S2C_GAMEOVER:
@@ -619,6 +627,7 @@ class SinglePlayState:
             self.board.game_started = False
             self.init()
             self.clear()
+            pygame.mixer.music.stop()
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self
@@ -766,9 +775,11 @@ class SinglePlayState:
             # # 게임 시작 버튼 클릭
             # elif ev.type == pygame.MOUSEBUTTONDOWN == 1:
             if self.btn_start and self.btn_start.handle_event(ev):
+                self.am.button_sound.play()
                 self.send_start()
 
             if self.btn_room_exit.handle_event(ev):
+                self.am.button_sound.play()
                 self.send_delete_user()
                 
         if self.left_pressed: self.left_elapsed_time += dt_ms
