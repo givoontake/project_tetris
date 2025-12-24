@@ -32,15 +32,8 @@ class GameLoop:
         self.cpu_idle_time = 0.001 
 
     def handle_events(self):
-        """공통 이벤트 처리(리사이즈/종료 등)."""
+        # 공통 이벤트만 우선 거르기
         events = pygame.event.get()
-
-        # # 🔍 [디버그 출력: 현재 상태 + 마우스 다운만]
-        # for ev in events:
-        #     if ev.type == pygame.MOUSEBUTTONDOWN:
-        #         btn_name = {1: "L", 2: "M", 3: "R"}.get(ev.button, ev.button)
-        #         print(f"  DOWN → button={btn_name}, pos={getattr(ev, 'pos', None)}")
-        #         print(f"\n[STATE] {type(self.state).__name__}")
 
         for ev in events:
             if ev.type == pygame.QUIT:
@@ -52,34 +45,27 @@ class GameLoop:
                     self.state.on_resize(ev.w, ev.h, self.screen)
 
         return events
-
-    def update(self, dt_ms, events):
-        """
-        메인 루프에서 ms 단위 dt를 받아 상태로 전달.
-        네트워크 패킷 큐를 드레인하면서 state.update(dt_ms, events, data)를 호출.
-        """
+    
+    def drain_packets(self):
         q = self.net_worker._pm.queue
-        max_process = 30
-        process_count = 0
 
-        # --- 패킷 큐 드레인 (없으면 data=None으로 한 번만 업데이트) ---
-        while process_count < max_process:
+        while not q.empty():
             try:
                 data = q.get_nowait()
             except queue.Empty:
                 data = None
 
-            next_state = self.state.update(dt_ms, events, data)  # ✅ dt 전달
+            next_state = self.state.handle_packet(data)            
             if next_state is not self.state:
                 self.state = next_state
-                if hasattr(self.state, "init"):
-                    self.state.init()
-                # 상태가 변경되면 해당 프레임에서 처리 끝 (하나의 이벤트 스냅샷은 하나의 상태에 쓰이도록)
-                break
 
-            process_count += 1
             if data is None:
                 break
+
+    def update(self, dt_ms, events):
+        self.state.update(dt_ms, events) 
+        # if hasattr(self.state, "init"):
+        #     self.state.init()
 
     def draw(self):
         self.state.draw()
@@ -89,6 +75,7 @@ class GameLoop:
         while True:
             now = time.perf_counter()
             dt = now - self.prev_time  # 초 단위
+            self.drain_packets()
             if dt > self.frame_time:
                 dt_ms = dt * 1000.0      # ✅ ms 단위로 변환
                 events = self.handle_events()

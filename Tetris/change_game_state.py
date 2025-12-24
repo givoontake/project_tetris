@@ -16,22 +16,22 @@ from my_info import *
 from create_room_window import *
 from state_single_play import SinglePlayState
 
-class BaseState:
-    def __init__(self, screen, asset):
-        self.screen = screen
+# class BaseState:
+#     def __init__(self, screen, asset):
+#         self.screen = screen
 
-    def init(self): 
-        pass
+#     def init(self): 
+#         pass
 
-    def update(self, dt_ms, events, data=None):
-        """메인 루프에서 계산된 dt(ms)를 전달받아 갱신."""
-        return self
+#     def update(self, dt_ms, events, data=None):
+#         """메인 루프에서 계산된 dt(ms)를 전달받아 갱신."""
+#         return self
 
-    def draw(self):
-        pass
+#     def draw(self):
+#         pass
 
-    def on_resize(self, w, h, screen):
-        self.screen = screen
+#     def on_resize(self, w, h, screen):
+#         self.screen = screen
 
 
 class LoginState:
@@ -101,13 +101,9 @@ class LoginState:
                 my_session = Session(id, nickname)
                 return LobbyState(self.screen, self.am, self.net_worker, my_session)
             
-            return None
+            return self
 
-    def update(self, dt_ms, events, data: Optional[dict] = None):
-        next_state = self.handle_packet(data)
-        if next_state is not None:
-            return next_state
-            
+    def update(self, dt_ms, events):            
         if self.popup.visible:
             btn_name = self.popup.handle_event(events)
             if btn_name == "재시도":
@@ -161,7 +157,7 @@ class LoginState:
 LOBBY = 1
 CREATE_ROOM = 2
 
-class LobbyState(BaseState):
+class LobbyState:
     def __init__(self, screen, asset: AssetManager, net_worker: NetworkWorker, my_session: Session):
         self.screen = screen
         self.am = asset
@@ -276,14 +272,10 @@ class LobbyState(BaseState):
             elif data.get("type") == S2C_ADD_LOCK_ROOM:
                 return SinglePlayState(self.screen, self.am, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
             
-        return None
+        return self
 
 
-    def update(self, dt_ms, events, data=None):
-        next_state = self.handle_packet(data)
-        if next_state is not None:
-            return next_state
-        
+    def update(self, dt_ms, events):
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit()

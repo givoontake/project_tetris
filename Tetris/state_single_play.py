@@ -388,46 +388,82 @@ class SinglePlayState:
         # 상단 텍스트용 폰트
         self.header_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
 
+        # 연속 전송용 변수
+        self.left_pressed = False
+        self.right_pressed = False
+        self.down_pressed = False
+        self.rotate_pressed = False
+        self.drop_pressed = False
+
         self.init()
 
-    # ------------ 네트워크 연동용 함수 (키 입력 → C2S_MOVE) ------------ #
-    def send_move(self, ev: pygame.event.Event):
-        size = 2 + 1 + 1
-        type = C2S_MOVE
-        move_type = None
-
-        # 좌우 이동
+    def handle_event(self, ev):
         if ev.key == pygame.K_LEFT:
-            move_type = LEFT
+            # move_type = LEFT
+            if ev.type == pygame.KEYDOWN: self.left_pressed = True
+            elif ev.type == pygame.KEYUP: self.left_pressed = False
+
         elif ev.key == pygame.K_RIGHT:
-            move_type = RIGHT
+            # move_type = RIGHT
+            if ev.type == pygame.KEYDOWN: self.right_pressed = True
+            elif ev.type == pygame.KEYUP: self.right_pressed = False
 
         # 소프트 드랍
         elif ev.key == pygame.K_DOWN:
-            move_type = DOWN
+            # move_type = DOWN
+            if ev.type == pygame.KEYDOWN: self.down_pressed = True
+            elif ev.type == pygame.KEYUP: self.down_pressed = False
 
         # 하드 드랍(스페이스)
         elif ev.key == pygame.K_SPACE:
-            move_type = DROP
+            if ev.type == pygame.KEYDOWN: self.drop_pressed = True
+            elif ev.type == pygame.KEYUP: self.drop_pressed = False
+            # move_type = DROP
 
         # 회전(위)
         elif ev.key == pygame.K_UP:
-            move_type = ROTATE
+            if ev.type == pygame.KEYDOWN: self.rotate_pressed = True
+            elif ev.type == pygame.KEYUP: self.rotate_pressed = False
 
-        else:
-            # 처리하지 않는 키는 바로 리턴
-            return
+    # ------------ 네트워크 연동용 함수 (키 입력 → C2S_MOVE) ------------ # 
+
+    def send_move_handler(self):
+        if self.left_pressed:
+            self.send_move(LEFT)
+
+        if self.right_pressed:
+            self.send_move(RIGHT)
+        # 소프트 드랍
+        if self.down_pressed:
+            self.send_move(DOWN)
+        # 하드 드랍(스페이스)
+        if self.rotate_pressed:
+            self.send_move(ROTATE)
+            self.rotate_pressed = False
+        # 회전(위)
+        if self.drop_pressed:
+            self.send_move(DROP)
+            self.left_pressed = False
+            self.right_pressed = False
+            self.down_pressed = False
+            self.rotate_pressed = False
+            self.drop_pressed = False
+
+
+    def send_move(self, move_type):
+        size = 2 + 1 + 1
+        type = C2S_MOVE
+        self.move_type = move_type
 
         packet_bytes = struct.pack(
             "<hbb",
             size,
             type,
-            move_type
+            self.move_type
         )
 
         MOVE_NAME = {LEFT: "LEFT", RIGHT: "RIGHT", DOWN: "DOWN", DROP: "DROP", ROTATE: "ROTATE"}
-        print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(move_type, move_type))
-
+        print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(self.move_type, self.move_type))
 
         try:
             self.net_worker.send_packet(packet_bytes)
@@ -467,11 +503,6 @@ class SinglePlayState:
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: Optional[dict]):
         from change_game_state import LobbyState
-        """
-        PacketManager에서 dict로 넘어온 패킷을 해석하는 부분.
-        """
-        if not data:
-            return None
 
         packet_type = data.get("type")
 
@@ -519,7 +550,7 @@ class SinglePlayState:
             self.board.game_started = False
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
-        return None
+        return self
 
     # ------------ 레이아웃 초기화 ------------ #
     def init(self):
@@ -652,26 +683,14 @@ class SinglePlayState:
         self.screen.blit(pw_surf, pw_rect)
 
     # ------------ 이벤트 처리 ------------ #
-    def update(self, dt, events, data: Optional[dict] = None):
-        """
-        events: pygame 이벤트 리스트
-        dt: delta time(ms)
-        packet_data: PacketManager에서 올라온 dict (단일 패킷 기준)
-        """
-        # 네트워크 패킷 먼저 처리
-        if data:
-            next_state = self.handle_packet(data)
-            if next_state is not None:
-                return next_state
-
+    def update(self, dt, events):
         for ev in events:
             if ev.type == pygame.QUIT:
                 # 상위 루프에서 처리
                 continue
 
-            # 키 입력 → C2S_MOVE
-            if ev.type == pygame.KEYDOWN and self.board and self.board.game_started:
-                self.send_move(ev)
+            if (ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP) and self.board and self.board.game_started:
+                self.handle_event(ev)
 
             # # 게임 시작 버튼 클릭
             # elif ev.type == pygame.MOUSEBUTTONDOWN == 1:
@@ -680,6 +699,9 @@ class SinglePlayState:
 
             if self.btn_room_exit.handle_event(ev):
                 self.send_delete_user()
+
+        if self.board and self.board.game_started:
+            self.send_move_handler()
 
         return self
 
