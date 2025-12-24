@@ -20,8 +20,8 @@ constexpr int MAX_USER_ID = 48;
 constexpr int MAX_USER_PASSWORD = 48;
 constexpr int MAX_USER_NAME = 48;
 
-constexpr int MOVE_TIMEOUT_TICK = FPS / 10; // 0.1s
-constexpr int ROTATE_TIMEOUT_TICK = FPS / 25; // 0.1s
-constexpr int DOWN_TIMEOUT_TICK = FPS / 2; // 0.5s
-constexpr int DROP_TIMEOUT_TICK = FPS / 10; // 0.1s
-constexpr int GARBAGE_LINE_TIMEOUT_TICK = FPS * 10; // 10s
+constexpr int MOVE_TIMEOUT_TICK = static_cast<int>(FPS*0.15); // 0.1s
+constexpr int ROTATE_TIMEOUT_TICK = static_cast<int>(FPS * 0.15); // 0.1s
+constexpr int DOWN_TIMEOUT_TICK = static_cast<int>(FPS * 0.5); // 0.5s
+constexpr int DROP_TIMEOUT_TICK = static_cast<int>(FPS * 0.15);; // 0.1s
+constexpr int GARBAGE_LINE_TIMEOUT_TICK = static_cast<int>(FPS * 10);; // 10s
