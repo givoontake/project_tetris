@@ -20,11 +20,11 @@ class GameLoop:
         pygame.display.set_caption("Tetris")
         pygame.key.start_text_input()
 
-        self.am = ResourceManager()
-        self.am.init()
+        self.rm = ResourceManager()
+        self.rm.init()
         self.net_worker = NetworkWorker()
         
-        self.state = LoginState(self.screen, self.am, net_worker=self.net_worker)
+        self.state = LoginState(self.screen, self.rm, net_worker=self.net_worker)
         self.state.connect()
 
         self.prev_time = time.perf_counter()

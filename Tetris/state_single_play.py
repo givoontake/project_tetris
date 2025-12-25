@@ -353,12 +353,12 @@ class TetrisBoard:
 
 # -------------------- 싱글 플레이 상태 --------------------
 class SinglePlayState:
-    def __init__(self, screen: pygame.Surface, asset: ResourceManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
         self.screen = screen
         self.room_title = room_title
         self.room_password = room_password
 
-        self.am = asset
+        self.rm = rm
         self.net_worker = net_worker
         self.my_session = session
 
@@ -588,13 +588,13 @@ class SinglePlayState:
             if move_type is not None and self.board:
                 self.board.handle_move(move_type)
                 if move_type != DOWN:
-                    self.am.move_sound.play()
+                    self.rm.move_sound.play()
 
         elif packet_type == S2C_DELETE_USER:
             delete_id = data.get("id")
             if delete_id == self.my_session.id:
                 pygame.mixer.music.stop()
-                return LobbyState(self.screen, self.am, self.net_worker, self.my_session)
+                return LobbyState(self.screen, self.rm, self.net_worker, self.my_session)
             
         elif packet_type == S2C_SPAWN:
             print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
@@ -608,17 +608,17 @@ class SinglePlayState:
                     pass
                 else:
                     self.board.fix(data.get("fixed_x"), data.get("fixed_y"))
-                    self.am.fix_sound.play()
+                    self.rm.fix_sound.play()
 
         elif packet_type == S2C_CLEARLINE:
             if self.my_session.id == data.get("id"):
                 self.board.clear_lines(data.get("line_index"))
-                self.am.clearline_sound.play()
+                self.rm.clearline_sound.play()
                 self.board.score = data.get("score")
 
         elif packet_type == S2C_ADDLINE:
             if self.my_session.id == data.get("id"):
-                self.am.addline_sound.play()
+                self.rm.addline_sound.play()
                 self.board.add_line(data.get("hole_x"))
 
         elif packet_type == S2C_GAMEOVER:
@@ -703,7 +703,7 @@ class SinglePlayState:
             w=btn_w,
             h=btn_h,
             text="게임 시작",
-            am=self.am,
+            rm=self.rm,
             react=True,
         )
 
@@ -720,7 +720,7 @@ class SinglePlayState:
             w=header_w,
             h=header_h,
             text=None,
-            am=self.am,
+            rm=self.rm,
             react=False,
         )
         self.btn_room_password = Button(
@@ -729,7 +729,7 @@ class SinglePlayState:
             w=header_w,
             h=header_h,
             text=None,
-            am=self.am,
+            rm=self.rm,
             react=False,
         )
         exit_w, exit_h = 200, 100
@@ -740,7 +740,7 @@ class SinglePlayState:
             w=exit_w,
             h=exit_h,
             text="나가기",
-            am=self.am,
+            rm=self.rm,
             react=True,
         )
     # ------------ 상단 방 정보 그리기 ------------ #

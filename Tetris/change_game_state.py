@@ -35,17 +35,17 @@ from state_single_play import SinglePlayState
 
 
 class LoginState:
-    def __init__(self, screen, asset: Optional[ResourceManager], net_worker: Optional[NetworkWorker]):
+    def __init__(self, screen, rm: Optional[ResourceManager], net_worker: Optional[NetworkWorker]):
         self.screen = screen
         self.net_worker = net_worker
         self.title_font = pygame.font.Font("resource/dodamdodam.ttf", 36)
 
-        self.am = asset
+        self.rm = rm
         self.id_box: Optional[InputBox] = None
         self.pw_box: Optional[InputBox] = None
         self.btn_login: Optional[Button] = None
-        self.popup = PopupBox(self.screen, self.am, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
-        self.popup2 = PopupBox(self.screen, self.am, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
+        self.popup = PopupBox(self.screen, self.rm, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
+        self.popup2 = PopupBox(self.screen, self.rm, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
         self.set_layout()
 
     def connect(self):
@@ -71,7 +71,7 @@ class LoginState:
             btn_rect.w,
             btn_rect.h,
             "로그인",
-            self.am
+            self.rm
         )
 
     def send_login(self):
@@ -99,7 +99,7 @@ class LoginState:
                 id = data.get("id")
                 nickname = data.get("user_name")
                 my_session = Session(id, nickname)
-                return LobbyState(self.screen, self.am, self.net_worker, my_session)
+                return LobbyState(self.screen, self.rm, self.net_worker, my_session)
             
             return self
 
@@ -158,9 +158,9 @@ LOBBY = 1
 CREATE_ROOM = 2
 
 class LobbyState:
-    def __init__(self, screen, asset: ResourceManager, net_worker: NetworkWorker, my_session: Session):
+    def __init__(self, screen, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session):
         self.screen = screen
-        self.am = asset
+        self.rm = rm
         self.my_session = my_session
         self.net_worker = net_worker
         self.logo_surface = None
@@ -180,7 +180,7 @@ class LobbyState:
     def set_layout(self):
         sw, sh = self.screen.get_size()
 
-        self.logo_surface = self.am.button_asset[BUTTON_LOGO_IDLE]
+        self.logo_surface = self.rm.button_images[BUTTON_LOGO_IDLE]
         logo_w, logo_h = self.logo_surface.get_size()
 
         btn_w, btn_h = 200, 100
@@ -188,12 +188,12 @@ class LobbyState:
 
         top_menus_text = ["방만들기", "상점", "설정"]
 
-        logo = Button(self.btn_draw_x, self.btn_draw_y, logo_w, logo_h, None, self.am, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
+        logo = Button(self.btn_draw_x, self.btn_draw_y, logo_w, logo_h, None, self.rm, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
         self.buttons.append(logo)
         self.btn_draw_x += logo_w
 
         for btn_text in top_menus_text:
-            self.buttons.append(Button(self.btn_draw_x, self.btn_draw_y, btn_w, btn_h, btn_text, self.am))
+            self.buttons.append(Button(self.btn_draw_x, self.btn_draw_y, btn_w, btn_h, btn_text, self.rm))
             self.btn_draw_x += btn_w
 
     def on_resize(self, w, h, screen):
@@ -267,10 +267,10 @@ class LobbyState:
                 self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
 
             elif data.get("type") == S2C_ADD_OPEN_ROOM:
-                return SinglePlayState(self.screen, self.am, self.net_worker, self.my_session, data.get("room_name"))
+                return SinglePlayState(self.screen, self.rm, self.net_worker, self.my_session, data.get("room_name"))
 
             elif data.get("type") == S2C_ADD_LOCK_ROOM:
-                return SinglePlayState(self.screen, self.am, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
+                return SinglePlayState(self.screen, self.rm, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
             
         return self
 
@@ -285,7 +285,7 @@ class LobbyState:
                 for btn in self.buttons:
                     if btn.handle_event(ev):
                         if btn.text == "방만들기":
-                            self.room_create_window = RoomCreateWindow(self.screen, self.am)
+                            self.room_create_window = RoomCreateWindow(self.screen, self.rm)
                             self.room_create_window.open()
                             self.reactable_screen = CREATE_ROOM
 

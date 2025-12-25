@@ -9,8 +9,8 @@ from define import *
 
 class ResourceManager:
     def __init__(self):
-        self.block_asset = {}
-        self.button_asset = {}
+        self.block_images = {}
+        self.button_images = {}
 
         # sounds
         self.bgm = pygame.mixer.music.load("resource/sounds/bgm_ingame.mp3")
@@ -22,7 +22,7 @@ class ResourceManager:
         self.addline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_addline.mp3")
 
     def init(self):
-        self.block_asset = {
+        self.block_images = {
         # --- Default Blocks ---
         DEFAULT_RED:     self.load_image("resource/blocks/default/default_red.png", CELL_SIZE, CELL_SIZE),
         DEFAULT_ORANGE:  self.load_image("resource/blocks/default/default_orange.png", CELL_SIZE, CELL_SIZE),
@@ -42,7 +42,7 @@ class ResourceManager:
         CANDY_PURPLE:    self.load_image("resource/blocks/candy/candy_purple.png", CELL_SIZE, CELL_SIZE),
         }
 
-        self.button_asset = {
+        self.button_images = {
         BUTTON_LOGIN_IDLE: self.load_image("resource/button/button_login_idle.png", 300, 100),
         BUTTON_LOGIN_HOVER: self.load_image("resource/button/button_login_hover.png", 300, 100),
         BUTTON_LOGIN_PRESS: self.load_image("resource/button/button_login_press.png", 300, 100),

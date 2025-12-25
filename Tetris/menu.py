@@ -28,7 +28,7 @@ class Button:
         w: int,
         h: int,
         text: str = None,
-        am: ResourceManager = None,
+        rm: ResourceManager = None,
         idle_btn_type=None,
         hover_btn_type=None,
         press_btn_type=None,
@@ -38,7 +38,7 @@ class Button:
         self.rect = pygame.Rect(x, y, w, h)
 
         # 상태 플래그
-        self.am = am
+        self.rm = rm
         self.text = text
         self.hovered = False
         self.pressed = False
@@ -55,15 +55,15 @@ class Button:
         self.text_rect = self.text_surface.get_rect(center=self.rect.center)
 
         # 상태별 이미지 Surface 직접 참조 (스케일 X, 로드 X)
-        if am == None:
+        if rm == None:
             self.idle_img = None
             self.hover_img = None
             self.press_img = None
         
         else:
-            self.idle_img  = self.am.button_asset[idle_btn_type]  if idle_btn_type  is not None else None
-            self.hover_img = self.am.button_asset[hover_btn_type] if hover_btn_type is not None else None
-            self.press_img = self.am.button_asset[press_btn_type] if press_btn_type is not None else None
+            self.idle_img  = self.rm.button_images[idle_btn_type]  if idle_btn_type  is not None else None
+            self.hover_img = self.rm.button_images[hover_btn_type] if hover_btn_type is not None else None
+            self.press_img = self.rm.button_images[press_btn_type] if press_btn_type is not None else None
 
         self.react = react
 
@@ -82,14 +82,14 @@ class Button:
             if self.hovered:
                 if self.hover_sound_printed == False:
                     self.hover_sound_printed = True
-                    self.am.button_sound_hover.play()
+                    self.rm.button_sound_hover.play()
             else: self.hover_sound_printed = False
 
         elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             if self.rect.collidepoint(ev.pos):
                 self.pressed = True
                 self._pressed_inside = True
-                self.am.button_sound_press.play()
+                self.rm.button_sound_press.play()
             else:
                 self.pressed = False
                 self._pressed_inside = False
@@ -349,7 +349,7 @@ class InputBox:
 
 
 class PopupBox:
-    def __init__(self, screen: pygame.Surface, asset: ResourceManager, message: str,
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, message: str,
                  left_text: str = "확인", right_text: str = "취소"):
         """
         screen : 현재 게임 화면 surface
@@ -361,7 +361,7 @@ class PopupBox:
         self.visible = False
         self.left_button_text = left_text
         self.right_button_text = right_text
-        self.am = asset
+        self.am = rm
 
         # 색 / 스타일
         self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
