@@ -28,7 +28,7 @@ class Button:
         w: int,
         h: int,
         text: str = None,
-        am: Optional[ResourceManager] = None,
+        am: ResourceManager = None,
         idle_btn_type=None,
         hover_btn_type=None,
         press_btn_type=None,
@@ -43,6 +43,7 @@ class Button:
         self.hovered = False
         self.pressed = False
         self._pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
+        self.hover_sound_printed = False
 
         # 폰트 준비 (공용 폰트 없으면 기본 생성)
         if Button.shared_font is None:
@@ -76,14 +77,19 @@ class Button:
         - '버튼 안에서 눌렀고 버튼 안에서 뗀 경우'만 True 반환
         """
         clicked = False
-
         if ev.type == pygame.MOUSEMOTION:
             self.hovered = self.rect.collidepoint(ev.pos)
+            if self.hovered:
+                if self.hover_sound_printed == False:
+                    self.hover_sound_printed = True
+                    self.am.button_sound_hover.play()
+            else: self.hover_sound_printed = False
 
         elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             if self.rect.collidepoint(ev.pos):
                 self.pressed = True
                 self._pressed_inside = True
+                self.am.button_sound_press.play()
             else:
                 self.pressed = False
                 self._pressed_inside = False
@@ -343,7 +349,7 @@ class InputBox:
 
 
 class PopupBox:
-    def __init__(self, screen: pygame.Surface, message: str,
+    def __init__(self, screen: pygame.Surface, asset: ResourceManager, message: str,
                  left_text: str = "확인", right_text: str = "취소"):
         """
         screen : 현재 게임 화면 surface
@@ -355,6 +361,7 @@ class PopupBox:
         self.visible = False
         self.left_button_text = left_text
         self.right_button_text = right_text
+        self.am = asset
 
         # 색 / 스타일
         self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
@@ -383,8 +390,8 @@ class PopupBox:
         left_x  = self.win_x
         right_x = self.win_x + btn_w
 
-        self.left_button = Button(left_x,  btn_y, btn_w, btn_h, self.left_button_text)
-        self.right_button= Button(right_x, btn_y, btn_w, btn_h, self.right_button_text)
+        self.left_button = Button(left_x,  btn_y, btn_w, btn_h, self.left_button_text, self.am)
+        self.right_button= Button(right_x, btn_y, btn_w, btn_h, self.right_button_text, self.am)
 
     def _recalc_layout(self):
         """현재 screen 사이즈를 기준으로 팝업 사각형을 다시 계산한다."""

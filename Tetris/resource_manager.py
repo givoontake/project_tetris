@@ -14,7 +14,8 @@ class ResourceManager:
 
         # sounds
         self.bgm = pygame.mixer.music.load("resource/sounds/bgm_ingame.mp3")
-        self.button_sound = pygame.mixer.Sound("resource/sounds/sound_effect_button.mp3")
+        self.button_sound_hover = pygame.mixer.Sound("resource/sounds/button_hover.mp3")
+        self.button_sound_press = pygame.mixer.Sound("resource/sounds/button_press.mp3")
         self.move_sound = pygame.mixer.Sound("resource/sounds/sound_effect_move.mp3")
         self.fix_sound = pygame.mixer.Sound("resource/sounds/sound_effect_fix.mp3")
         self.clearline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_clearline.mp3")
@@ -50,7 +51,8 @@ class ResourceManager:
         BUTTON_LOGO_PRESS: self.load_image("resource/button/tetris_logo.png", 500, 100)
         }
 
-        self.button_sound.set_volume(0.8)
+        self.button_sound_hover.set_volume(0.8)
+        self.button_sound_press.set_volume(0.8)
         self.move_sound.set_volume(0.8)
         self.fix_sound.set_volume(0.8)
         self.clearline_sound.set_volume(0.8)

@@ -703,6 +703,7 @@ class SinglePlayState:
             w=btn_w,
             h=btn_h,
             text="게임 시작",
+            am=self.am,
             react=True,
         )
 
@@ -719,6 +720,7 @@ class SinglePlayState:
             w=header_w,
             h=header_h,
             text=None,
+            am=self.am,
             react=False,
         )
         self.btn_room_password = Button(
@@ -727,6 +729,7 @@ class SinglePlayState:
             w=header_w,
             h=header_h,
             text=None,
+            am=self.am,
             react=False,
         )
         exit_w, exit_h = 200, 100
@@ -737,6 +740,7 @@ class SinglePlayState:
             w=exit_w,
             h=exit_h,
             text="나가기",
+            am=self.am,
             react=True,
         )
     # ------------ 상단 방 정보 그리기 ------------ #
@@ -775,11 +779,9 @@ class SinglePlayState:
             # # 게임 시작 버튼 클릭
             # elif ev.type == pygame.MOUSEBUTTONDOWN == 1:
             if self.btn_start and self.btn_start.handle_event(ev):
-                self.am.button_sound.play()
                 self.send_start()
 
             if self.btn_room_exit.handle_event(ev):
-                self.am.button_sound.play()
                 self.send_delete_user()
                 
         if self.left_pressed: self.left_elapsed_time += dt_ms

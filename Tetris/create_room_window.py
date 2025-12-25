@@ -3,11 +3,12 @@ from typing import Optional
 from menu import Button, InputBox
 from define import *
 from define_format import *
-
+from resource_manager import *
 
 class ToggleButton:
     """활성/비활성 상태를 가지는 작은 토글 버튼."""
-    def __init__(self, rect: pygame.Rect, text: str):
+    def __init__(self, rm: ResourceManager, rect: pygame.Rect, text: str):
+        self.rm = rm
         self.rect = rect
         self.text = text
         self.active = False
@@ -15,6 +16,7 @@ class ToggleButton:
         self.hovered = False
         self.pressed = False
         self._pressed_inside = False
+        self.hover_sound_printed = False
 
         if Button.shared_font is None:
             Button.shared_font = pygame.font.Font("resource/dodamdodam.ttf", 20)
@@ -28,6 +30,11 @@ class ToggleButton:
 
         if ev.type == pygame.MOUSEMOTION:
             self.hovered = self.rect.collidepoint(ev.pos)
+            if self.hovered:
+                if self.hover_sound_printed == False:
+                    self.hover_sound_printed = True
+                    self.rm.button_sound_hover.play()
+            else: self.hover_sound_printed = False
 
         elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             if self.rect.collidepoint(ev.pos):
@@ -36,6 +43,7 @@ class ToggleButton:
             else:
                 self.pressed = False
                 self._pressed_inside = False
+                self.rm.button_sound_press.play()
 
         elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
             if self.pressed and self._pressed_inside and self.rect.collidepoint(ev.pos):
@@ -83,9 +91,10 @@ class RoomCreateWindow:
     LEFT_PADDING = 20
     RIGHT_PADDING = 20
 
-    def __init__(self, screen: pygame.Surface):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         self.screen = screen
         self.visible = False
+        self.rm = rm
 
         # 선택 상태
         self.selected_max_user = 2   # 1 / 2 / 5
@@ -179,9 +188,9 @@ class RoomCreateWindow:
 
         if not self.count_buttons:
             self.count_buttons = [
-                ToggleButton(pygame.Rect(x1, y_btn, btn_w, btn_h), "1인"),
-                ToggleButton(pygame.Rect(x2, y_btn, btn_w, btn_h), "2인"),
-                ToggleButton(pygame.Rect(x3, y_btn, btn_w, btn_h), "5인"),
+                ToggleButton(self.rm, pygame.Rect(x1, y_btn, btn_w, btn_h), "1인"),
+                ToggleButton(self.rm, pygame.Rect(x2, y_btn, btn_w, btn_h), "2인"),
+                ToggleButton(self.rm, pygame.Rect(x3, y_btn, btn_w, btn_h), "5인"),
             ]
         else:
             self.count_buttons[0].rect.update(x1, y_btn, btn_w, btn_h)
@@ -199,8 +208,8 @@ class RoomCreateWindow:
 
         if not self.vis_buttons:
             self.vis_buttons = [
-                ToggleButton(pygame.Rect(x1v, yv, btn_w2, btn_h), "공개"),
-                ToggleButton(pygame.Rect(x2v, yv, btn_w2, btn_h), "비공개"),
+                ToggleButton(self.rm, pygame.Rect(x1v, yv, btn_w2, btn_h), "공개"),
+                ToggleButton(self.rm, pygame.Rect(x2v, yv, btn_w2, btn_h), "비공개"),
             ]
         else:
             self.vis_buttons[0].rect.update(x1v, yv, btn_w2, btn_h)
@@ -235,8 +244,8 @@ class RoomCreateWindow:
         y_bottom = btn_row_rect.y
 
         if self.btn_create is None:
-            self.btn_create = Button(x_left, y_bottom, btn_w_bottom, btn_h_bottom, "방 만들기")
-            self.btn_cancel = Button(x_right, y_bottom, btn_w_bottom, btn_h_bottom, "취소")
+            self.btn_create = Button(x_left, y_bottom, btn_w_bottom, btn_h_bottom, "방 만들기", self.rm)
+            self.btn_cancel = Button(x_right, y_bottom, btn_w_bottom, btn_h_bottom, "취소", self.rm)
         else:
             self.btn_create.rect.update(x_left, y_bottom, btn_w_bottom, btn_h_bottom)
             self.btn_cancel.rect.update(x_right, y_bottom, btn_w_bottom, btn_h_bottom)
