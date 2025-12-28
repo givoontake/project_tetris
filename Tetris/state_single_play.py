@@ -169,6 +169,29 @@ class TetrisBoard:
         # if self.can_place(nxt):
             # self.current_tetromino
 
+    def make_landing_tetromino(self) -> Optional[Tetromino]:
+        if not self.current_tetromino or not self.game_started or self.game_over:
+            return None
+
+        landing = Tetromino(
+            self.current_tetromino.shape_key,
+            self.current_tetromino.x,
+            self.current_tetromino.y,
+            self.current_tetromino.rotation,
+        )
+
+        while True:
+            # 1칸 더 내려가 보자
+            moved = Tetromino(landing.shape_key, landing.x, landing.y + 1, landing.rotation)
+
+            for x, y in moved.blocks:
+                if x < 0 or x >= self.cols or y < 0 or y >= self.rows:
+                    return landing
+                if self.grid[y][x] is not None:
+                    return landing
+
+            landing = moved
+
     def clear_board(self):
         for r in range(self.rows):
             for c in range(self.cols):
@@ -324,6 +347,39 @@ class TetrisBoard:
 
             pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
 
+    def draw_landing_blocks(self):
+        LANDING_ALPHA = 50
+        landing = self.make_landing_tetromino()
+        if not landing or not self.game_started or self.game_over:
+            return
+        if not self.current_tetromino:
+            return
+        if landing.y == self.current_tetromino.y:
+            return
+
+        tex_map = getattr(self.session, "block_texture", {})
+
+        shape_key = landing.shape_key
+        tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
+
+        for x, y in landing.blocks:
+            sx = self.board_rect.x + x * CELL_SIZE
+            sy = self.board_rect.y + y * CELL_SIZE
+            rect = pygame.Rect(sx, sy, CELL_SIZE, CELL_SIZE)
+
+            if isinstance(tex, pygame.Surface):
+                landing_tex = tex.copy()          # ✅ 원본 보호
+                landing_tex.set_alpha(LANDING_ALPHA)
+                self.screen.blit(landing_tex, rect)
+            else:
+                r, g, b = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
+                surf = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
+                surf.fill((r, g, b, LANDING_ALPHA))
+                self.screen.blit(surf, rect)
+
+            pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
+
+
     def draw_score(self):
         pygame.draw.rect(self.screen, BLACK, self.score_rect)
         pygame.draw.rect(self.screen, WHITE, self.score_rect, 1)
@@ -349,6 +405,7 @@ class TetrisBoard:
         else:
             # 게임 중: 로컬 보드/블록 렌더
             self.draw_cells()
+            self.draw_landing_blocks()
 
 
 # -------------------- 싱글 플레이 상태 --------------------
