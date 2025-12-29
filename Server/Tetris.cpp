@@ -204,7 +204,7 @@ void Tetris::AddGarbageLines(int line_num, std::vector<TaskType>& send_pending_t
 
         // 테트로미노와 겹치면 안겹치게 테트로미노 위로 올리기
         if (!IsValidPosition(current_tetromino)) {
-            ++current_tetromino.moved_pos.y;
+            --current_tetromino.moved_pos.y;
             TaskType up_task;
             up_task.event_type = EVENT_TYPE::MOVE;
             up_task.task = TaskMove{EVENT_TYPE::UP};

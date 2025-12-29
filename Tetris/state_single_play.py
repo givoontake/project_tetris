@@ -60,7 +60,7 @@ LEFT = 1
 ROTATE = 2
 DOWN = 3
 DROP = 4
-TIMEOUT = 5
+UP = 5
 
 
 # -------------------- 싱글 플레이 보드 --------------------
@@ -216,6 +216,8 @@ class TetrisBoard:
             self.move(0, 1)
         elif move_type == ROTATE:
             self.rotate(1)
+        elif move_type == UP:
+            self.move(0, -1)
 
         # elif move_type == DROP:
         #     self.hard_drop()
