@@ -226,6 +226,7 @@ struct S2C_GAMEOVER_PACKET {
 struct S2C_GAMEEND_PACKET {
 	short size;
 	char type;
-	int winner_id;
+	int id;
+	bool is_winner;
 };
 #pragma pack(pop)

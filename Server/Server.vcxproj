@@ -33,6 +33,7 @@
     <ClInclude Include="Atomic.h" />
     <ClInclude Include="define.h" />
     <ClInclude Include="settings.h" />
+    <ClInclude Include="task_type.h" />
     <ClInclude Include="Tetromino.h" />
     <ClInclude Include="ExOverlapped.h" />
     <ClInclude Include="IOCPServer.h" />

@@ -10,7 +10,7 @@ void TetrisTickData::InitTickData()
 	down_timeout_tick_counter = 0; 
 	garbage_line_tick_counter = 0;
 
-	down_timeout = MOVE_TIMEOUT_TICK;
+	down_timeout = DOWN_TIMEOUT_TICK;
 	garbage_line_timeout = GARBAGE_LINE_TIMEOUT_TICK;
 }
 

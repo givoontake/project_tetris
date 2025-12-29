@@ -57,8 +57,8 @@ class Tetromino:
 
 RIGHT = 0
 LEFT = 1
-DOWN = 2
-ROTATE = 3
+ROTATE = 2
+DOWN = 3
 DROP = 4
 TIMEOUT = 5
 

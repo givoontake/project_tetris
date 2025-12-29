@@ -16,7 +16,7 @@ constexpr int DOWN_TIMEOUT = 2;
 
 struct TaskInfo
 {
-	int type;
+	EVENT_TYPE type;
 	int id;
 };
 
@@ -85,7 +85,7 @@ public:
 	void ReadyUser(int id);
 	void KickUser(int id, int kick_user_id);
 	void StartGame(const int id);
-	void BuildBroadcastData(const char* data, int data_size);
+	void BuildBroadcastData(RoomSession& r_session, std::vector<TaskType>& tasks);
 	void BroadcastTickData();
 	void Broadcast(char* packet, const HANDLE iocp_handle);
 	void SendToSelf(char* packet, Session* session);
@@ -98,11 +98,10 @@ public:
 	bool CheckWinner();
 	void ClearRoom();
 	void UpdateTick();
-	void CheckMoveDownTimeout();
-	void CheckAddGarbageLineTimeout();
 	//bool CheckInputTick(RoomSession& r_session);
 	void ReduceTimeouts(int type, RoomSession& r_session);
 	//void SendToSelf(char* packet, Session* session);
 
-	void MakeMovePacketData(int id, int move_type);
+	void MakeMovePacketData(RoomSession& r_session, int move_type);
+	void ClearEventsInTick();
 };

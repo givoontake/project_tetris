@@ -1,6 +1,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <variant>
 #include "Tetris.h"
 
 Tetris::Tetris()
@@ -19,65 +20,76 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 
 // 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
 // 그러면 회전된 테트로미노 관리가 수월해진다.
-int Tetris::HandleTetrominoKeyInput(int move_type) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
+EVENT_TYPE Tetris::HandleTetrominoKeyInput(EVENT_TYPE move_type, std::vector<TaskType>& send_pending_tasks) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
 {
     PrintMoveType(move_type);
     Tetromino if_move_tetromino = current_tetromino;
-	if(!CheckInputAllow(move_type)) return -1;
+	if(!CheckInputAllow(move_type)) return EVENT_TYPE::NONE;
     switch (move_type) {
-    case RIGHT:
+    case EVENT_TYPE::RIGHT:
         ++if_move_tetromino.moved_pos.x;
-        break;
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::RIGHT} });
+			tick_data.SetRightTick(0);
+            return EVENT_TYPE::RIGHT;
+        }
+        return EVENT_TYPE::NONE;
 
-    case LEFT:
+    case EVENT_TYPE::LEFT:
         --if_move_tetromino.moved_pos.x;
-        break;
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::LEFT} });
+			tick_data.SetLeftTick(0);
+            return EVENT_TYPE::LEFT;
+        }
+        return EVENT_TYPE::NONE;
 
-    case DOWN:
+    case EVENT_TYPE::DOWN:
         ++if_move_tetromino.moved_pos.y;
-        break;
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::DOWN} });
+			tick_data.SetDownTick(0);
+			tick_data.SetDownTimeoutTick(0);
+            return EVENT_TYPE::DOWN;
+        }
+        else {
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::FIX, TaskFix{} });
+            return EVENT_TYPE::FIX;
+        }
 
-    case TIMEOUT:
-        ++if_move_tetromino.moved_pos.y;
-        break;
-
-    case ROTATE: {
+    case EVENT_TYPE::ROTATE: {
         const std::vector<Tetromino>& shapes = TETROMINOS.at(if_move_tetromino.type);
         if (if_move_tetromino.shape_index + 1 < shapes.size()) ++if_move_tetromino.shape_index; // 다음 인덱스가 존재하면
         else if_move_tetromino.shape_index = 0; // 다음 인덱스가 없다면
 
         if_move_tetromino.default_pos = shapes[if_move_tetromino.shape_index].default_pos; // 회전된 인덱스로 테트로미노 변경
-        break;
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::ROTATE} });
+			tick_data.SetRotateTick(0);
+            return EVENT_TYPE::ROTATE;
+        }
+        return EVENT_TYPE::NONE;
     }
 
-    case DROP: {
+    case EVENT_TYPE::DROP: {
         while (true) {
             if (IsValidPosition(if_move_tetromino)) {
                 current_tetromino = if_move_tetromino;
                 ++if_move_tetromino.moved_pos.y;
             }
-            else return DROP;
+            else {
+                send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::FIX, TaskFix{} });
+				tick_data.SetDropTick(0);
+                return EVENT_TYPE::FIX;
+            }
         }
-        break;
     }
-
-	case UP:
-        --current_tetromino.moved_pos.y;
-        return -1;
-        break;
-
-    default:
-        return -1;
     }
-
-    if (IsValidPosition(if_move_tetromino)) {
-        current_tetromino = if_move_tetromino;
-        return move_type;
-    }
-    else {
-        if (move_type == DOWN) return DROP;
-        return -1;
-    }
+	return EVENT_TYPE::NONE;
 }
 
 bool Tetris::IsValidPosition(const Tetromino& t)
@@ -167,32 +179,38 @@ std::vector<char> Tetris::GetGarbegeLineHoles(int cleard_line_num)
     return holes;
 }
 
-std::vector<char> Tetris::AddGarbageLines(std::vector<char> holes)
+void Tetris::AddGarbageLines(int line_num, std::vector<TaskType>& send_pending_tasks)
 {
-	std::vector<char> added_holes;
-    bool spqwn_flag = false;
+	Tetromino copy_tetromino = current_tetromino;
 
-	if (holes.empty()) return added_holes;
-    for(auto hole_x : holes){
-        if (HandleTetrominoKeyInput(DOWN) == DROP) {
-            added_holes.emplace_back(FIX);
-            spqwn_flag = true;
-        }
-        else HandleTetrominoKeyInput(UP);
-		std::rotate(board.begin(), board.begin() + 1, board.end());
-        std::fill(board[TOTAL_HEIGHT-1].begin(), board[TOTAL_HEIGHT-1].end(), true);
-		board[TOTAL_HEIGHT-1][hole_x] = false;
+    // 줄 추가작업
+    for (size_t i = 0; i < line_num; i++){
+        std::rotate(board.begin(), board.begin() + 1, board.end());
+        std::fill(board[TOTAL_HEIGHT - 1].begin(), board[TOTAL_HEIGHT - 1].end(), true);
+        int hole_x = GetRandomHoleX();
+        board[TOTAL_HEIGHT - 1][hole_x] = false;
 
-        added_holes.emplace_back(hole_x);
+		TaskType add_line;
+		add_line.event_type = EVENT_TYPE::ADDLINE;
+        add_line.task = TaskAddLine{ .hole_x = hole_x };
+        send_pending_tasks.emplace_back(add_line);
 
         if (CheckGameover()) {
-            added_holes.emplace_back(GAMEOVER);
-            return added_holes;
+            TaskType gameover;
+            gameover.event_type = EVENT_TYPE::GAMEOVER;
+			gameover.task = TaskGameover{};
+			return;
         }
-	}
-    if (spqwn_flag) added_holes.emplace_back(SPAWN);
-    
-    return added_holes;
+
+        // 테트로미노와 겹치면 안겹치게 테트로미노 위로 올리기
+        if (!IsValidPosition(current_tetromino)) {
+            ++current_tetromino.moved_pos.y;
+            TaskType up_task;
+            up_task.event_type = EVENT_TYPE::MOVE;
+            up_task.task = TaskMove{EVENT_TYPE::UP};
+            send_pending_tasks.emplace_back(up_task);
+        }
+    }
 }
 
 int Tetris::GetRandomHoleX()
@@ -275,48 +293,82 @@ void Tetris::DebugPrintBoard()
     std::cout << "====================================\n";
 }
 
-std::vector<char> Tetris::ProcessPendingMoves()
-{
-	std::vector<char> successful_moves;
-    for (int i = 0; i < MOVE_TYPE_NUM; ++i) {
-        if (pending_moves[i]) {
-            int res = HandleTetrominoKeyInput(i);
-            if (res != -1) successful_moves.emplace_back(res);
-            pending_moves[i] = false;
-        }
-    }
-
-	return successful_moves;
-}
-
-bool Tetris::CheckInputAllow(int move_type)
+bool Tetris::CheckInputAllow(EVENT_TYPE move_type)
 {
     switch (move_type)
     {
-    case LEFT:
+    case EVENT_TYPE::LEFT:
         if (tick_data.GetLeftTick() >= MOVE_TIMEOUT_TICK) return true;
         return false;
 
-    case RIGHT:
+    case EVENT_TYPE::RIGHT:
         if (tick_data.GetRightTick() >= MOVE_TIMEOUT_TICK) return true;
         return false;
 
-    case DOWN:
+    case EVENT_TYPE::DOWN:
         if (tick_data.GetDownTick() >= MOVE_TIMEOUT_TICK) return true;
         return false;
 
-    case ROTATE:
+    case EVENT_TYPE::ROTATE:
         if (tick_data.GetRotateTick() >= ROTATE_TIMEOUT_TICK) return true;
         return false;
 
-    case DROP:
+    case EVENT_TYPE::DROP:
         if (tick_data.GetDropTick() >= DROP_TIMEOUT_TICK) return true;
         return false;
 
     default:
         return false;
     }
-    return false;
 }
 
+std::vector<TaskType> Tetris::TickProcess()
+{
+    std::vector<TaskType> send_pending_tasks;
+
+    // 첫 번째로 줄 추가 처리
+    if (tick_data.GetGarbageLineTick() >= tick_data.GetGarbageLineTimeout()) {
+        tick_data.SetGarbageLineTick(0);
+        AddGarbageLines(1, send_pending_tasks);
+        for (auto& t : send_pending_tasks) {
+            if (t.event_type == EVENT_TYPE::GAMEOVER) {
+                return send_pending_tasks;
+            }
+        }
+    }
+
+    // 두 번째로 쌓인 입력 처리
+    // 먼저 다운 타임아웃 이벤트 처리
+    if (tick_data.GetDownTimeoutTick() >= tick_data.GetDownTimeout()) {
+		tick_data.SetDownTimeoutTick(0);
+        input_tasks.emplace_back(EVENT_TYPE::DOWN);
+    }
+
+    // 중복되는 이벤트 합치기
+    for (auto& type : input_tasks) {
+        int t = static_cast<int>(type);
+        if (t < 0 || t >= INPUT_TYPE_NUM) {
+            std::cout << "Tetris::TickProcess() - Invalid input task type: " << t << "\n";
+            continue;
+        }
+        pending_moves[static_cast<int>(t)] = true;
+    }
+
+    // 합쳐진 이벤트들 처리
+    for (int i = static_cast<int>(EVENT_TYPE::DROP); i >= static_cast<int>(EVENT_TYPE::RIGHT); --i) {
+        if (pending_moves[i] == true) {
+            EVENT_TYPE t = static_cast<EVENT_TYPE>(i);
+			EVENT_TYPE result = HandleTetrominoKeyInput(t, send_pending_tasks);
+            if (result == EVENT_TYPE::NONE) {
+                continue;
+            }
+            else if (result == EVENT_TYPE::FIX){
+				return send_pending_tasks;
+            }
+        }
+    }
+
+    
+	return send_pending_tasks;
+}
 

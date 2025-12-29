@@ -4,14 +4,16 @@
 
 class TetrisTickData
 {
+	// 인풋
 	int left_tick_counter = 0;
 	int right_tick_counter = 0;
-	int down_tick_counter = 0;
+	int down_tick_counter = 0; 
 	int rotate_tick_counter = 0;
 	int drop_tick_counter = 0;
+	// 자동 하강
 	int down_timeout_tick_counter = 0;
 	int garbage_line_tick_counter = 0;
-
+	// 타임아웃 틱
 	int down_timeout = DOWN_TIMEOUT_TICK;
 	int garbage_line_timeout = GARBAGE_LINE_TIMEOUT_TICK;
 
