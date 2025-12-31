@@ -31,6 +31,7 @@ class ResourceManager:
         DEFAULT_BLUE:    self.load_image("resource/blocks/default/default_blue.png", CELL_SIZE, CELL_SIZE),
         DEFAULT_INDIGO:  self.load_image("resource/blocks/default/default_indigo.png", CELL_SIZE, CELL_SIZE),
         DEFAULT_PURPLE:  self.load_image("resource/blocks/default/default_purple.png", CELL_SIZE, CELL_SIZE),
+        DEFAULT_GRAY:  self.load_image("resource/blocks/default/default_gray.png", CELL_SIZE, CELL_SIZE),
 
         # --- Candy Blocks ---
         CANDY_RED:       self.load_image("resource/blocks/candy/candy_red.png", CELL_SIZE, CELL_SIZE),
@@ -85,6 +86,7 @@ DEFAULT_GREEN = 4
 DEFAULT_BLUE = 5
 DEFAULT_INDIGO = 6
 DEFAULT_PURPLE = 7
+DEFAULT_GRAY = 15
 
 CANDY_RED = 8
 CANDY_ORANGE = 9

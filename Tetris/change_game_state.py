@@ -99,6 +99,7 @@ class LoginState:
                 id = data.get("id")
                 nickname = data.get("user_name")
                 my_session = Session(id, nickname)
+                my_session.load_texture(self.rm)
                 return LobbyState(self.screen, self.rm, self.net_worker, my_session)
             
             return self

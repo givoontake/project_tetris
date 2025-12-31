@@ -17,7 +17,7 @@ class Session:
         self.nickname = nickname
         self.win = 0
         self.lose = 0
-        self.block_texture = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None}
+        self.block_texture = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None, 'G': None}
         # self.update_texture({'I': DEFAULT_RED, 'J': DEFAULT_ORANGE, 'L': DEFAULT_YELLOW, 'O': DEFAULT_GREEN, 'S': DEFAULT_BLUE, 'T': DEFAULT_INDIGO, 'Z': DEFAULT_PURPLE})
 
     @classmethod
@@ -33,5 +33,16 @@ class Session:
         self.win = 0
         self.lose = 0
 
+    def load_texture(self, rm: ResourceManager):
+       self.block_texture = {
+        'Z': rm.block_images[DEFAULT_RED],      
+        'L': rm.block_images[DEFAULT_ORANGE],  
+        'O': rm.block_images[DEFAULT_YELLOW],
+        'S': rm.block_images[DEFAULT_GREEN], 
+        'J': rm.block_images[DEFAULT_BLUE],   
+        'I': rm.block_images[DEFAULT_INDIGO],  
+        'T': rm.block_images[DEFAULT_PURPLE],
+        'G': rm.block_images[DEFAULT_GRAY],
+    }
     # def set_id(self, new_id: int):
     #     self.id = int(new_id)

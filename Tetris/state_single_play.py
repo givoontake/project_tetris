@@ -10,8 +10,6 @@ from menu import Button
 from network import NetworkWorker
 from resource_manager import ResourceManager
 
-# -------------------- 상수 --------------------
-CELL_SIZE    = 30
 BOARD_COLS   = 10
 HIDDEN_ROWS  = 5
 BOARD_ROWS   = 20+HIDDEN_ROWS
@@ -30,7 +28,6 @@ FALLBACK_COLORS = {
 }
 
 
-# -------------------- 테트로미노 --------------------
 class Tetromino:
     def __init__(self, shape_key: str, x: int, y: int, rotation: int = 0):
         self.shape_key = shape_key
@@ -252,67 +249,56 @@ class TetrisBoard:
         pygame.draw.line(self.screen, WHITE, (valid_x + valid_w, valid_y + valid_h), (valid_x + valid_w, valid_y))
 
     def draw_cells(self):
-        """보드 위의 고정 블록 + 떨어지는 블록을 그린다.
+        tex_map = self.session.block_texture
 
-        색상 대신 Session에 저장된 블록 텍스처 이미지를 우선 사용하고,
-        이미지가 없을 경우 FALLBACK_COLORS를 사용한다.
-        """
-        tex_map = getattr(self.session, "block_texture", {})
+        # 현재 테트로미노 좌표 (grid 렌더에서 제외)
+        falling_cells = set()
+        if self.current_tetromino and self.game_started and not self.game_over:
+            for x, y in self.current_tetromino.blocks:
+                falling_cells.add((x, y))
 
-        # 고정 블록
+        bx = self.board_rect.x
+        by = self.board_rect.y
+
+        # 1) grid에 고정된 블록 렌더 (25칸 전체)
         for r in range(self.rows):
             for c in range(self.cols):
+                if (c, r) in falling_cells:
+                    continue
+
                 shape_key = self.grid[r][c]
                 if not shape_key:
                     continue
 
-                sx = self.board_rect.x + c * CELL_SIZE
-                sy = self.board_rect.y + r * CELL_SIZE
-                rect = pygame.Rect(sx, sy, CELL_SIZE, CELL_SIZE)
+                tex = tex_map[shape_key]
 
-                tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
-                if isinstance(tex, pygame.Surface):
-                    self.screen.blit(tex, rect)
-                else:
-                    color = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
-                    pygame.draw.rect(self.screen, color, rect)
+                px = bx + c * CELL_SIZE
+                py = by + r * CELL_SIZE
+                self.screen.blit(tex, (px, py))
 
-                # 격자선
-                pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
-
-        # 떨어지는 블록
+        # 2) 현재 테트로미노 렌더 (여기서만 1번)
         if self.current_tetromino and self.game_started and not self.game_over:
-            shape_key = self.current_tetromino.shape_key
-            tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
+            tex = tex_map[self.current_tetromino.shape_key]
 
             for x, y in self.current_tetromino.blocks:
-                sx = self.board_rect.x + x * CELL_SIZE
-                sy = self.board_rect.y + y * CELL_SIZE
-                rect = pygame.Rect(sx, sy, CELL_SIZE, CELL_SIZE)
+                px = bx + x * CELL_SIZE
+                py = by + y * CELL_SIZE
+                self.screen.blit(tex, (px, py))
 
-                if isinstance(tex, pygame.Surface):
-                    self.screen.blit(tex, rect)
-                else:
-                    color = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
-                    pygame.draw.rect(self.screen, color, rect)
 
-                pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
 
     def draw_preview(self):
-        """다음에 떨어질 블록(미리보기)을 그린다.
-
-        보드와 동일하게 Session의 블록 텍스처를 우선 사용하고,
-        없으면 FALLBACK_COLORS로 색상을 사용한다.
-        """
-        # 테두리만 흰 실선, 내부는 검정
         pygame.draw.rect(self.screen, (0, 0, 0), self.preview_rect)
         pygame.draw.rect(self.screen, (255, 255, 255), self.preview_rect, 1)
 
-        if self.next_tetromino_shape == None: return
-        if self.game_started == False: return
+        if self.next_tetromino_shape is None:
+            return
+        if not self.game_started:
+            return
 
         shape_key = self.next_tetromino_shape
         shape = SHAPES[shape_key][0]
+        tex = self.session.block_texture[shape_key]
 
         xs = [cx for (cx, _) in shape]
         ys = [cy for (_, cy) in shape]
@@ -333,21 +319,11 @@ class TetrisBoard:
             - min_y * CELL_SIZE
         )
 
-        tex_map = getattr(self.session, "block_texture", {})
-        tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
-
         for cx, cy in shape:
             px = int(offx + cx * CELL_SIZE)
             py = int(offy + cy * CELL_SIZE)
-            rect = pygame.Rect(px, py, CELL_SIZE, CELL_SIZE)
+            self.screen.blit(tex, (px, py))
 
-            if isinstance(tex, pygame.Surface):
-                self.screen.blit(tex, rect)
-            else:
-                color = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
-                pygame.draw.rect(self.screen, color, rect)
-
-            pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
 
     def draw_landing_blocks(self):
         LANDING_ALPHA = 50
@@ -359,27 +335,19 @@ class TetrisBoard:
         if landing.y == self.current_tetromino.y:
             return
 
-        tex_map = getattr(self.session, "block_texture", {})
+        tex = self.session.block_texture[landing.shape_key]
 
-        shape_key = landing.shape_key
-        tex = tex_map.get(shape_key) if isinstance(tex_map, dict) else None
+        bx = self.board_rect.x
+        by = self.board_rect.y
 
         for x, y in landing.blocks:
-            sx = self.board_rect.x + x * CELL_SIZE
-            sy = self.board_rect.y + y * CELL_SIZE
-            rect = pygame.Rect(sx, sy, CELL_SIZE, CELL_SIZE)
+            px = bx + x * CELL_SIZE
+            py = by + y * CELL_SIZE
 
-            if isinstance(tex, pygame.Surface):
-                landing_tex = tex.copy()          # ✅ 원본 보호
-                landing_tex.set_alpha(LANDING_ALPHA)
-                self.screen.blit(landing_tex, rect)
-            else:
-                r, g, b = FALLBACK_COLORS.get(shape_key, (255, 255, 255))
-                surf = pygame.Surface((CELL_SIZE, CELL_SIZE), pygame.SRCALPHA)
-                surf.fill((r, g, b, LANDING_ALPHA))
-                self.screen.blit(surf, rect)
+            ghost = tex.copy()
+            ghost.set_alpha(LANDING_ALPHA)
+            self.screen.blit(ghost, (px, py))
 
-            pygame.draw.rect(self.screen, (0, 0, 0), rect, 1)
 
 
     def draw_score(self):
