@@ -2,8 +2,7 @@
 #include <WinSock2.h>
 #include <MSWSock.h>
 #include "define.h"
-
-enum OP_TYPE { SEND, RECV, ACCEPT};
+#include "enum_class.h"
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;

@@ -9,8 +9,6 @@
 #include "RoomPacketHandler.h"
 #include "IOCPServer.h"
 
-enum ROOM_STATE {EMPTY, WAIT, PLAY};
-
 constexpr int ADD_TIMEOUT = 1;
 constexpr int DOWN_TIMEOUT = 2;
 

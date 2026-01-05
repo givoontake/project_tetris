@@ -5,8 +5,6 @@
 #include "define.h"
 #include "Session.h"
 
-enum class ROOM_USER_STATE { EMPTY, WAIT, READY, PLAY, GAMEOVER };
-
 class RoomSession
 {
 	Session* session = nullptr; // 상속으로 하면 세션을 받아올 수가 없음

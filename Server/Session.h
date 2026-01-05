@@ -5,8 +5,6 @@
 #include "ExOverlapped.h"
 #include "Atomic.h"
 
-enum USER_STATE {NONE, LOBBY, ROOM};
-
 class Session
 {
 	SOCKET socket;

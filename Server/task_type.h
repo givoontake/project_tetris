@@ -1,9 +1,8 @@
 #pragma once
 #include <variant>
+#include "enum_class.h"
 
 constexpr int INPUT_TYPE_NUM = 5; // RIGHT, LEFT, DOWN, ROTATE, DROP
-
-enum class EVENT_TYPE{ NONE = -1, RIGHT, LEFT, ROTATE, DOWN, DROP, UP, MOVE, FIX, CLEARLINE, ADDLINE, GAMEOVER};
 
 struct TaskMove {
 	EVENT_TYPE move_type;
