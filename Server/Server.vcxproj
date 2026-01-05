@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Database.cpp" />
     <ClCompile Include="IOCPServer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PacketHandler.cpp" />
@@ -31,7 +32,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Atomic.h" />
+    <ClInclude Include="Database.h" />
     <ClInclude Include="define.h" />
+    <ClInclude Include="enum_class.h" />
     <ClInclude Include="settings.h" />
     <ClInclude Include="task_type.h" />
     <ClInclude Include="Tetromino.h" />
