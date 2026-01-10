@@ -12,9 +12,9 @@ PacketHandler::PacketHandler(IOCPServer* server) : server(server)
 // IServer 가상함수로 만들고 업캐스팅을 하는 작업은..불필요하게 복잡해지는 느낌이 있다.
 // IOCP의 맴버 함수로 만들면 편하긴 한데.. switch로 만들꺼라 너무 길어길 것 같아 걱정이다.. 어떻게 해야할까?
 
-char temp_id[MAX_USER_ID] = "master";
-char temp_password[MAX_USER_PASSWORD] = "1234";
-char temp_name[MAX_USER_NAME] = "master";
+//char temp_id[MAX_USER_ID] = "master";
+//char temp_password[MAX_USER_PASSWORD] = "1234";
+//char temp_name[MAX_USER_NAME] = "master";
 
 void PacketHandler::HandlePacket(char* packet, int user_index)
 {
@@ -29,18 +29,29 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 
 	case C2S_LOGIN: {
 		C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
+		int id = server->GetSession(user_index)->GetId();
+		int index = server->GetSession(user_index)->GetIndex();
+		// null은 있을수도, 없을수도 있음. 그래서 일단 전체를 받아야함. strnlen(buf, max_size) -> null 직전까지 길이 반환, 안만나면 최대길이 반환
+		std::string login_id(recv_p->user_id, strnlen(recv_p->user_id, sizeof(recv_p->user_id))); 
+		std::string password(recv_p->user_password, strnlen(recv_p->user_password, sizeof(recv_p->user_password)));
+		Database& db = server->GetDB();
+		auto task_login = [&db, id, index, login_id, password]() {
+			db.ExecuteLogin(id, index, login_id, password);
+			};
+		
+		db.Enqueue(task_login);
+		//server->GetDB().Enqueue
+		//// 우선은 연결 요청이 들어오는 즉시 세션을 사용하도록 함. -> 나중에 반드시 바꿔야함
+		//S2C_LOGIN_PACKET send_p;
+		//send_p.size = sizeof(S2C_LOGIN_PACKET);
+		//send_p.type = S2C_LOGIN;
+		//memcpy(send_p.user_name, temp_name, MAX_USER_NAME);
+		//if (!memcmp(temp_id, recv_p->user_id, MAX_USER_ID) && !memcmp(temp_password, recv_p->user_password, MAX_USER_PASSWORD)) send_p.id = server->GetSession(user_index)->GetId();	
+		//else send_p.id = -1;
 
-		// 우선은 연결 요청이 들어오는 즉시 세션을 사용하도록 함. -> 나중에 반드시 바꿔야함
-		S2C_LOGIN_PACKET send_p;
-		send_p.size = sizeof(S2C_LOGIN_PACKET);
-		send_p.type = S2C_LOGIN;
-		memcpy(send_p.user_name, temp_name, MAX_USER_NAME);
-		if (!memcmp(temp_id, recv_p->user_id, MAX_USER_ID) && !memcmp(temp_password, recv_p->user_password, MAX_USER_PASSWORD)) send_p.id = server->GetSession(user_index)->GetId();	
-		else send_p.id = -1;
+		//std::cout << "size: " << recv_p->size << ", type: " << (int)recv_p->type << ", id: " << recv_p->user_id << ", pw: " << recv_p->user_password << std::endl;
 
-		std::cout << "size: " << recv_p->size << ", type: " << (int)recv_p->type << ", id: " << recv_p->user_id << ", pw: " << recv_p->user_password << std::endl;
-
-		server->SendToSelf((char*)&send_p, user_index);
+		//server->SendToSelf((char*)&send_p, user_index);
 
 		break;
 	}
@@ -55,7 +66,7 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 		front_p.size = send_p_size;
 		front_p.type = S2C_MESSAGE;
 		front_p.id = recv_p->id;
-		memcpy(front_p.user_name, temp_name, MAX_USER_NAME);
+		memcpy(front_p.user_name, server->GetSession(user_index)->GetInfo().user_name, MAX_USER_NAME);
 		memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET)); // 구조체 부분 복사
 		memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size); // 가변데이터 복사
 		

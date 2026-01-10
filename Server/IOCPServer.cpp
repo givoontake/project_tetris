@@ -34,6 +34,7 @@ IOCPServer::~IOCPServer()
 {
 	closesocket(listen_socket);
 	closesocket(client_socket);
+	db.SetRunning(false);
 	WSACleanup();
 }
 
@@ -44,7 +45,7 @@ void IOCPServer::StartServer()
 	iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
 	CreateIoCompletionPort(reinterpret_cast<HANDLE>(listen_socket), iocp_handle, 9999, 0);
 	int addr_size = sizeof(SOCKADDR_IN);
-	AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.over);
+	AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.ex_over.over);
 }
 
 void IOCPServer::ProcessGQCS()
@@ -80,6 +81,7 @@ void IOCPServer::ProcessGQCS()
 
 		switch (ex_over->op_type) {
 		case ACCEPT: {
+			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 			int new_index = GetEmptyUserIndex();
 			if (new_index != -1) {
 				users[new_index]->InitSession(new_index, GetNewUserId(), client_socket);
@@ -102,14 +104,15 @@ void IOCPServer::ProcessGQCS()
 			}
 			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 
-			ZeroMemory(&accept_over.over, sizeof(accept_over.over));
+			ZeroMemory(&accept_over.ex_over.over, sizeof(accept_over.ex_over.over));
 			int addr_size = sizeof(SOCKADDR_IN);
-			AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.over);
+			AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.ex_over.over);
 			break;
 		}
 
 		case RECV: {
-			if (ex_over->operation_id == users[key]->GetId()) {
+			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
+			if (io_over->ex_over.operation_id == users[key]->GetId()) {
 				ProcessPacket(transferred_bytes, key);
 				users[key]->RecvPacket(iocp_handle);
 			}
@@ -118,10 +121,14 @@ void IOCPServer::ProcessGQCS()
 		}
 
 		case SEND: {
-			delete ex_over;
+			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
+			delete io_over;
 
 			break;
 		}
+		case DB:
+			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
+			ProcessDB(db_over, key);
 		}
 	}
 }
@@ -154,7 +161,7 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 		 // 처리한 패킷은 남은 데이터에서 제거
 		users[user_index]->SetRemainDataSize(-packet_size);
 		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
-		if (users[user_index]->GetRemainDataSize() >= sizeof(short)) break;
+		if (users[user_index]->GetRemainDataSize() <= sizeof(short)) break;
 		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
 	}
 }
@@ -164,6 +171,9 @@ void IOCPServer::RoutePacket(char* packet, int user_index)
 	switch (users[user_index]->GetState()) {
 	case NONE:
 		return;
+	case LOGIN:
+		handler.HandlePacket(packet, user_index);
+		break;
 	case LOBBY:
 		handler.HandlePacket(packet, user_index);
 		break;
@@ -208,7 +218,7 @@ int IOCPServer::GetEmptyUserIndex()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		if (!users[i]->GetState()) {
-			if (users[i]->SetState(NONE, LOBBY)) {
+			if (users[i]->SetState(NONE, LOGIN)) {
 				return i;
 			}
 		}
@@ -242,4 +252,33 @@ void IOCPServer::Disconnect(int user_index)
 	closesocket(users[user_index]->GetSocket()); // closesocket 이후 이전 소켓에 대한 iocp 완료(실패로) 통지가 언제 올지 불분명해서 다음에 연결된 소켓이 받을 경우 영향이 갈 수 있다고 하는데..
 	users[user_index]->SetState(NONE);
 	std::cout << "Session[" << user_index << "] disconnect/Id: " << id_generator << std::endl;
+}
+
+void IOCPServer::ProcessDB(DBOverlapped* db_over, int user_index)
+{
+	switch (db_over->type) {
+	case DBOperationType::LOGIN: {
+		S2C_LOGIN_PACKET login_p;
+		login_p.size = sizeof(S2C_LOGIN_PACKET);
+		login_p.type = S2C_LOGIN;
+		if (db_over->ok) {
+			if (db_over->info) { // nullptr이 아니면, 즉 포인터가 존재하면
+				users[user_index]->InitDBInfo(db_over->info);
+				users[user_index]->SetState(LOBBY);
+				login_p.id = users[user_index]->GetId();
+				login_p.info = users[user_index]->GetInfo();
+			}
+			else {
+				login_p.id = -1;
+			}
+		}
+		users[user_index]->SendPacket(reinterpret_cast<char*>(&login_p), iocp_handle);
+		break;
+	}
+
+	}
+	if (db_over->info) {
+		delete db_over->info;
+	}
+	delete db_over;
 }

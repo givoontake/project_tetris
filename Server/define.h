@@ -16,11 +16,18 @@ struct C2S_TEST_LOGIN_PACKET {
 	int temp_id;
 };
 
+struct DBInfo {
+	int single_score;
+	int win_count;
+	int lose_count;
+	char user_name[MAX_USER_NAME];
+};
+
 struct S2C_LOGIN_PACKET {
 	short size;
 	char type;
 	int id;
-	char user_name[MAX_USER_NAME];
+	DBInfo info;
 };
 
 struct C2S_LOGIN_PACKET {

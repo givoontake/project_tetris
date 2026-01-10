@@ -10,6 +10,7 @@
 #include "MQueue.h"
 #include "TetrisRoom.h"
 #include "Atomic.h"
+#include "Database.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -19,7 +20,8 @@ class IOCPServer
 	SOCKET listen_socket, client_socket;
 	WSADATA wsadata;
 	SOCKADDR_IN server_addr;
-	ExOverlapped accept_over;
+	IOOverlapped accept_over;
+	Database db;
 	//MQueue task_queue;
 	PacketHandler handler;
 	std::atomic<int> id_generator = -1;
@@ -49,6 +51,7 @@ public:
 	Session* GetSession(int user_index) const { return users[user_index]; }
 	long long GetTickCount() const { return tick_count.load(); }
 	TetrisRoom* GetRoom(int room_index) const { return rooms[room_index]; }
+	Database& GetDB() { return db; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
 
@@ -63,4 +66,5 @@ public:
 	//void BroadCastRoom(char* packet, int room_id);
 	void SendToSelf(char* packet, int self_index);
 	void CreateRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
+	void ProcessDB(DBOverlapped* db_over, int user_index);
 };

@@ -6,30 +6,50 @@
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;
+	int operation_id; // 세션 id와 같다.
+	OP_TYPE op_type;
+
+	ExOverlapped() {
+		ZeroMemory(&over, sizeof(over));
+		operation_id = -1;
+	}
+};
+
+struct IOOverlapped {
+	ExOverlapped ex_over;
 	WSABUF wsabuf;
 	char packet_buf[BUF_SIZE];
-	OP_TYPE op_type;
-	int operation_id; // 세션의 id와 같음
 
-	ExOverlapped()
+	IOOverlapped()
 	{
-		ZeroMemory(&over, sizeof(over));
 		wsabuf.len = BUF_SIZE;
 		wsabuf.buf = packet_buf;
-		operation_id = -1;
 	}
 
 	void SetOperationType(OP_TYPE type) {
-		op_type = type;
+		ex_over.op_type = type;
 	}
 
 	void SetOperationId(int id) {
-		operation_id = id;
+		ex_over.operation_id = id;
 	}
 
 	//void SetExOverlapped(OP_TYPE type, char* packet) {
 	//	memcpy(socket_buf, packet, packet[0]);
 	//	op_type = type;
 	//}
+};
+
+struct DBOverlapped
+{
+	ExOverlapped ex_over;
+	DBOperationType type{};
+	bool ok;
+	DBInfo* info;
+
+	DBOverlapped() {
+		ok = false;
+		info = nullptr;
+	}
 };
 

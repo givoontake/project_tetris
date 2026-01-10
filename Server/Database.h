@@ -21,16 +21,16 @@
 #include <jdbc/cppconn/resultset.h>
 #include <jdbc/cppconn/exception.h>
 
+#include "ExOverlapped.h"
 #include "enum_class.h"
+#include "define.h"
 
-struct DBOverlapped
-{
-    WSAOVERLAPPED over{};             // 반드시 첫 멤버(캐스팅 편의)
-    OP_TYPE op_type;
-    DBOperationType type{};
-    int opration_id{ -1 };            // (오타 유지) 완료 처리에서 식별용으로 사용
-    bool ok{ false };
-};
+// 반환형은 void, 실행 시 인자를 받지 않는다.
+// 실제로는 callable 객체(std::function)이며, 람다(closure object)를 담아 사용한다.
+// 람다는 “함수처럼 호출 가능한 객체”이므로 std::function으로 감쌀 수 있고, 값으로 복사되어 큐에 보관된다.
+// 캡처는 함수 인자가 아니라 객체의 멤버 상태이며, 객체 복사 시 캡처된 값도 함께 복사된다.
+// DBSession은 DB 스레드 내부에서만 관리되며, 작업 실행 시 Database 내부에서 접근한다.
+using Task = std::function<void()>; // std::function은 컨테이너가 아니다. 지정된 반환형과 인자와 동일한 함수를 감싸주는 래퍼일 뿐이다. 즉 함수를 객체처럼 사용할 수 있게 해주는 것!
 
 class Database
 {
@@ -47,15 +47,7 @@ class Database
     };
 
 private:
-    // 반환형은 void, 실행 시 인자를 받지 않는다.
-    // 실제로는 callable 객체(std::function)이며, 람다(closure object)를 담아 사용한다.
-    // 람다는 “함수처럼 호출 가능한 객체”이므로 std::function으로 감쌀 수 있고, 값으로 복사되어 큐에 보관된다.
-    // 캡처는 함수 인자가 아니라 객체의 멤버 상태이며, 객체 복사 시 캡처된 값도 함께 복사된다.
-    // DBSession은 DB 스레드 내부에서만 관리되며, 작업 실행 시 Database 내부에서 접근한다.
-    using Task = std::function<void()>;
-
-private:
-    HANDLE iocp{ nullptr };
+    HANDLE iocp_handle;
 
     // ---- DB 설정(생성자에서 파일로부터 읽어 초기화) ----
     std::string db_host;
@@ -80,11 +72,17 @@ public:
 
 public:
     // 생성자에서 DB 설정 파일을 읽어 멤버(db_host/db_port/...)를 초기화한다.
-    explicit Database(HANDLE iocp_handle);
+   /* explicit Database(HANDLE iocp_handle);*/
+    Database();
     ~Database();
 
-    Database(const Database&) = delete;
-    Database& operator=(const Database&) = delete;
+    bool GetRunning() const { return running.load(); }
+    void SetRunning(bool val) { running.store(val); }
+
+    void init(HANDLE iocp);
+    void Run();
+    //Database(const Database&) = delete;
+    //Database& operator=(const Database&) = delete;
 
     // ---- 외부에서 작업을 큐에 넣는 API ----
     // 외부에서 람다를 만들어 그대로 큐에 넣는다.
@@ -95,8 +93,8 @@ public:
     // ⚠️ 이 함수들은 "DB 스레드에서만" 호출되어야 한다.
     // 외부는 보통 아래처럼 람다에 넣어 Enqueue 한다:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
-    void ExecuteLogin(int session_id, const std::string& login_id, const std::string& password);
-    void ExecuteUpdateScore(int session_id, const std::string& login_id, int32_t new_score);
+    void ExecuteLogin(int session_id, int session_index, const std::string& login_id, const std::string& password);
+    void ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int32_t new_score);
 
 private:
     // ---- 설정 파일 로드 ----
@@ -104,7 +102,6 @@ private:
     bool LoadDBConfigFromFile(const std::string& file_path);
 
 private:
-    void Run();
     bool Connect();
     void Disconnect();
 };
