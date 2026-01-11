@@ -25,7 +25,7 @@ MAX_CHAT_BYTES = MAX_CHAT_INPUT*3
 
 # ---- Login ----
 S2C_LOGIN_PACKET_FMT = "<hbi"
-C2S_LOGIN_PACKET_FMT = f"<hbi{MAX_USER_NAME}s"
+C2S_LOGIN_PACKET_FMT = f"<hbiiii{MAX_USER_NAME}s"
 
 # ---- Message ----
 S2C_MESSAGE_PACKET_FMT = f"<hbi{MAX_USER_NAME}s{MAX_CHAT_BYTES}s"
@@ -92,13 +92,16 @@ S2C_ADDLINE_PACKET_FMT = "<hbib"
 PACK_FIELD_FMT = {
     "size": "h",
     "type": "b",
+
     "id": "i",            # int
     "temp_id": "i",
     "room_id": "i",
     "new_host_id": "i",
     "kick_user_id": "i",
-    "score": "i",
-
+    #"score": "i",
+    "single_score": "i",
+    "win_count": "i",
+    "lose_count": "i",
     # 1바이트 값
     "max_user": "b",      # char (signed)
     "is_add": "b",        # bool을 1바이트 signed char로 전송
@@ -138,7 +141,9 @@ FIELD_SIZE = {
     "room_id": 4,
     "new_host_id": 4,
     "kick_user_id": 4,
-    "score": 4,
+    "single_score": 4,
+    "win_count": 4,
+    "lose_count": 4,
 
     # 1바이트 값
     "max_user": 1,

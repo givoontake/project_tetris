@@ -96,10 +96,17 @@ class LoginState:
             
             else:
                 # 내 세션의 아이디를 설정하는 코드 필요
+                my_session = Session()
                 id = data.get("id")
+                my_session.id = id
                 nickname = data.get("user_name")
-                my_session = Session(id, nickname)
+                my_session.nickname = nickname
+                win = data.get("win_count")
+                my_session.win = win
+                lose = data.get("lose_count")
+                my_session.lose = lose
                 my_session.load_texture(self.rm)
+                print(f"id={id}, nickname={nickname}, win={win}, lose={lose}")
                 return LobbyState(self.screen, self.rm, self.net_worker, my_session)
             
             return self

@@ -267,6 +267,7 @@ void IOCPServer::ProcessDB(DBOverlapped* db_over, int user_index)
 				users[user_index]->SetState(LOBBY);
 				login_p.id = users[user_index]->GetId();
 				login_p.info = users[user_index]->GetInfo();
+				std::cout << "score=" << login_p.info.single_score << ", win=" << login_p.info.win_count << ", lose=" << login_p.info.lose_count << ", name=" << login_p.info.user_name << '\n';
 			}
 			else {
 				login_p.id = -1;
