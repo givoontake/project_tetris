@@ -17,7 +17,7 @@ class Session:
         self.nickname = ""
         self.win = 0
         self.lose = 0
-        self.single_score = 0
+        self.max_score = 0
         self.block_texture = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None, 'G': None}
         # self.update_texture({'I': DEFAULT_RED, 'J': DEFAULT_ORANGE, 'L': DEFAULT_YELLOW, 'O': DEFAULT_GREEN, 'S': DEFAULT_BLUE, 'T': DEFAULT_INDIGO, 'Z': DEFAULT_PURPLE})
 

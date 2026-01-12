@@ -105,6 +105,8 @@ class LoginState:
                 my_session.win = win
                 lose = data.get("lose_count")
                 my_session.lose = lose
+                max_score = data.get("max_score")
+                my_session.max_score = max_score
                 my_session.load_texture(self.rm)
                 print(f"id={id}, nickname={nickname}, win={win}, lose={lose}")
                 return LobbyState(self.screen, self.rm, self.net_worker, my_session)
