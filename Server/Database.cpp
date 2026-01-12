@@ -8,6 +8,7 @@
 #include <jdbc/cppconn/driver.h>
 #include <jdbc/cppconn/metadata.h>
 #include "Database.h"
+#include "DBResult.h"
 
 #undef min
 
@@ -215,10 +216,9 @@ void Database::ExecuteLogin(int session_id, int session_index, const std::string
     {
         try
         {
-            // 1) LoginInfo 동적 할당
-            auto* info = new DBInfo{};
+            db_over->result_data = std::make_unique<DBResultLogin>(); // 동적할당 및 객체 수명관리 시작
+            DBResultLogin* p = static_cast<DBResultLogin*>(db_over->result_data.get()); // 값 조작용 raw 포인터
 
-            // 2) PreparedStatement 확보 (세션 정보 로드)
             auto* info_stmt = caches.GetStmt(DBOperationType::LOAD_SESSION_INFO); // LOAD_SESSION_INFO는 캐시에만 활용
             if (!info_stmt)
             {
@@ -234,37 +234,30 @@ void Database::ExecuteLogin(int session_id, int session_index, const std::string
                 info_stmt = caches.GetStmt(DBOperationType::LOAD_SESSION_INFO);
                 if (!info_stmt)
                 {
-                    delete info;
                     db_over->ok = false;
                 }
             }
 
             if (db_over->ok)
             {
-                // 3) 바인딩
                 info_stmt->setString(1, login_id);
-
-                // 4) 실행
                 std::unique_ptr<sql::ResultSet> info_rs(info_stmt->executeQuery());
 
-                // 5) 결과 파싱
                 if (info_rs && info_rs->next()) // 가져온 결과(행)이 있는지 판별
                 {
-                    const std::string nickname = info_rs->getString(1);
-                    info->single_score = info_rs->getInt(2);
-                    info->win_count = info_rs->getInt(3);
-                    info->lose_count = info_rs->getInt(4);
-                    
-                    int copy_len = std::min(nickname.size(), sizeof(info->user_name));
-                    ZeroMemory(info->user_name, sizeof(info->user_name)); // 메모리 0으로 초기화(NULL), 파이썬 클라이언트에서 고정 문자열은 뒤에 null을 제거하고 사용, null을 안채우면 그 값도 사용해 이상해짐
-                    std::memcpy(info->user_name, nickname.data(), copy_len);
+                    p->login_id = login_id;
+                    p->nickname = info_rs->getString(1);
+                    p->max_score = info_rs->getInt(2);
+                    p->win_count = info_rs->getInt(3);
+                    p->lose_count = info_rs->getInt(4);        
 
-                    // 6) DBOverlapped에 결과 연결
-                    db_over->info = info;
+                    std::cout << "로그인 성공. " << std::endl;
+                    std::cout << "id: " << login_id << std::endl;
+                    std::cout << "pw: " << password << std::endl;
+                    std::cout << "nickname: " << p->nickname << std::endl;
                 }
                 else
                 {
-                    delete info;
                     db_over->ok = false;
                 }
             }
@@ -272,8 +265,7 @@ void Database::ExecuteLogin(int session_id, int session_index, const std::string
         catch (const sql::SQLException& e)
         {
             PrintErrorLog(__func__, e);
-            delete db_over->info;
-            db_over->info = nullptr;
+            db_over->result_data = nullptr;
             db_over->ok = false;
         }
     }
@@ -281,7 +273,7 @@ void Database::ExecuteLogin(int session_id, int session_index, const std::string
     PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int32_t new_score)
+void Database::ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int new_score)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = DB;
@@ -309,13 +301,23 @@ void Database::ExecuteUpdateScore(int session_id, int session_index, const std::
         // 바인딩
         stmt->setInt(1, new_score);
         stmt->setString(2, login_id);
+        std::cout << "ExecuteUpdateScore() login_id: " << login_id << std::endl;
 
         // 실행
         const int affected = stmt->executeUpdate();
-        if (affected > 0) // 1이면 업데이트 성공
+        if (affected > 0) {
+            // 1이면 업데이트 성공
+            std::cout << "score update success!, new score: " << new_score << std::endl;
             db_over->ok = true;
-        else
+            db_over->result_data = std::make_unique<DBResultUpdateScore>();
+            DBResultUpdateScore* p = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
+            p->max_score = new_score;
+        }
+        
+        else {
             db_over->ok = false;
+            std::cout << "score update fail!, new score: " << new_score << std::endl;
+        }
     }
     catch (const sql::SQLException& e)
     {

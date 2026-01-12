@@ -16,25 +16,21 @@ struct C2S_TEST_LOGIN_PACKET {
 	int temp_id;
 };
 
-struct DBInfo {
-	int single_score;
-	int win_count;
-	int lose_count;
-	char user_name[MAX_USER_NAME];
-};
-
 struct S2C_LOGIN_PACKET {
 	short size;
 	char type;
 	int id;
-	DBInfo info;
+	int max_score;
+	int win_count;
+	int lose_count;
+	char nickname[MAX_USER_NAME];
 };
 
 struct C2S_LOGIN_PACKET {
 	short size;
 	char type;
-	char user_id[MAX_USER_ID];
-	char user_password[MAX_USER_PASSWORD];
+	char login_id[MAX_USER_ID];
+	char login_password[MAX_USER_PASSWORD];
 };
 
 struct S2C_MESSAGE_PACKET {
@@ -235,5 +231,12 @@ struct S2C_GAMEEND_PACKET {
 	char type;
 	int id;
 	bool is_winner;
+};
+
+struct S2C_UPDATE_SCORE_PACKET {
+	short size;
+	char type;
+	int id;
+	int max_score;
 };
 #pragma pack(pop)

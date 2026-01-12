@@ -1,5 +1,8 @@
 #include <iostream>
+#include <algorithm>
 #include "IOCPServer.h"
+
+#undef min
 
 IOCPServer::IOCPServer() : handler(this)
 {
@@ -259,27 +262,53 @@ void IOCPServer::ProcessDB(DBOverlapped* db_over, int user_index)
 	switch (db_over->type) {
 	case DBOperationType::LOGIN: {
 		S2C_LOGIN_PACKET login_p;
+		ZeroMemory(&login_p, sizeof(login_p));
 		login_p.size = sizeof(S2C_LOGIN_PACKET);
 		login_p.type = S2C_LOGIN;
 		if (db_over->ok) {
-			if (db_over->info) { // nullptr이 아니면, 즉 포인터가 존재하면
-				users[user_index]->InitDBInfo(db_over->info);
+			if (db_over->result_data) { // nullptr이 아니면, 즉 포인터가 존재하면
+				users[user_index]->InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
 				users[user_index]->SetState(LOBBY);
 				login_p.id = users[user_index]->GetId();
-				login_p.info = users[user_index]->GetInfo();
-				std::cout << "score=" << login_p.info.single_score << ", win=" << login_p.info.win_count << ", lose=" << login_p.info.lose_count << ", name=" << login_p.info.user_name << '\n';
+				login_p.max_score = users[user_index]->GetInfo().max_score;
+				login_p.win_count = users[user_index]->GetInfo().win_count;
+				login_p.lose_count = users[user_index]->GetInfo().lose_count;
+				StringToCharBuf(users[user_index]->GetInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
 			}
-			else {
-				login_p.id = -1;
-			}
+		}
+		else {
+			login_p.id = -1; // 근데 로그인 실패일경우 나머지 패킷도 다같이 가는건 낭비같은데.. 결국 로그인 성공과 세션 데이터 전송은 분리 해야할듯
 		}
 		users[user_index]->SendPacket(reinterpret_cast<char*>(&login_p), iocp_handle);
 		break;
 	}
-
-	}
-	if (db_over->info) {
-		delete db_over->info;
+	case DBOperationType::SCORE_UPDATE:
+		if (db_over->ok) {
+			// void*는 사용할 때 타입을 명시해야함(컴파일러가 알아들을 수 있도록)
+			// 보이드 유니크 포인터인 db_over->info를 get 함수로 raw 포인터를 가져와 사용할 포인터로 static_cast, void* <-> T* 간에는 static_cast가 허용되고, void*에는 T*를 대입할 수 있다.
+			DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
+			users[user_index]->GetInfo().max_score = res->max_score;
+			S2C_UPDATE_SCORE_PACKET us_p;
+			us_p.size = sizeof(S2C_UPDATE_SCORE_PACKET);
+			us_p.type = S2C_UPDATE_SCORE;
+			us_p.max_score = res->max_score;
+			users[user_index]->SendPacket(reinterpret_cast<char*>(&us_p), iocp_handle);
+		} 
 	}
 	delete db_over;
 }
+
+void IOCPServer::StringToCharBuf(const std::string& str, char* buf, int buf_size)
+{
+	ZeroMemory(buf, buf_size);
+	int copy_size = std::min(str.size(), static_cast<size_t>(buf_size));
+	memcpy(buf, str.data(), copy_size);
+}
+
+std::string IOCPServer::CharBufToString(const char* buf, int buf_size)
+{
+	int copy_size = strnlen(buf, buf_size);
+	std::string str(buf, copy_size);
+	return str;
+}
+

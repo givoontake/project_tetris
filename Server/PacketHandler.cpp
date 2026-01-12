@@ -32,8 +32,8 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 		int id = server->GetSession(user_index)->GetId();
 		int index = server->GetSession(user_index)->GetIndex();
 		// null은 있을수도, 없을수도 있음. 그래서 일단 전체를 받아야함. strnlen(buf, max_size) -> null 직전까지 길이 반환, 안만나면 최대길이 반환
-		std::string login_id(recv_p->user_id, strnlen(recv_p->user_id, sizeof(recv_p->user_id))); 
-		std::string password(recv_p->user_password, strnlen(recv_p->user_password, sizeof(recv_p->user_password)));
+		std::string login_id = server->CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
+		std::string password = server->CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
 		Database& db = server->GetDB();
 		auto task_login = [&db, id, index, login_id, password]() {
 			db.ExecuteLogin(id, index, login_id, password);
@@ -66,7 +66,7 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 		front_p.size = send_p_size;
 		front_p.type = S2C_MESSAGE;
 		front_p.id = recv_p->id;
-		memcpy(front_p.user_name, server->GetSession(user_index)->GetInfo().user_name, MAX_USER_NAME);
+		server->StringToCharBuf(server->GetSession(user_index)->GetInfo().nickname, front_p.user_name, sizeof(front_p.user_name));
 		memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET)); // 구조체 부분 복사
 		memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size); // 가변데이터 복사
 		

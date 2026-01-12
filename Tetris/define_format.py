@@ -82,6 +82,8 @@ S2C_FIX_PACKET_FMT = "<hbibb"
 
 S2C_ADDLINE_PACKET_FMT = "<hbib"
 
+S2C_UPDATE_SCORE_PACKET_FMT = "hbi"
+
 # =====================================================================
 #  필드 단위: "문자열 → 포맷" 사전 및(옵션) 스키마 샘플
 #  - 엔디언 접두는 붙이지 않습니다(필드 단위 포맷이므로). 호출부에서 '<' 등을 결합하세요.
@@ -98,10 +100,10 @@ PACK_FIELD_FMT = {
     "room_id": "i",
     "new_host_id": "i",
     "kick_user_id": "i",
-    #"score": "i",
-    "single_score": "i",
+    "score": "i",
     "win_count": "i",
     "lose_count": "i",
+    "max_score": "i",
     # 1바이트 값
     "max_user": "b",      # char (signed)
     "is_add": "b",        # bool을 1바이트 signed char로 전송
@@ -141,9 +143,10 @@ FIELD_SIZE = {
     "room_id": 4,
     "new_host_id": 4,
     "kick_user_id": 4,
-    "single_score": 4,
+    "score": 4,
     "win_count": 4,
     "lose_count": 4,
+    "max_score": 4,
 
     # 1바이트 값
     "max_user": 1,

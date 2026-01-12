@@ -3,6 +3,7 @@
 #include <MSWSock.h>
 #include "define.h"
 #include "enum_class.h"
+#include "DBResult.h"
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;
@@ -45,11 +46,11 @@ struct DBOverlapped
 	ExOverlapped ex_over;
 	DBOperationType type{};
 	bool ok;
-	DBInfo* info;
+	std::unique_ptr<DBResultDefault> result_data;
 
 	DBOverlapped() {
 		ok = false;
-		info = nullptr;
+		result_data = nullptr;
 	}
 };
 

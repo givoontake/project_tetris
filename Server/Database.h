@@ -24,6 +24,7 @@
 #include "ExOverlapped.h"
 #include "enum_class.h"
 #include "define.h"
+#include "DBResult.h"
 
 // 반환형은 void, 실행 시 인자를 받지 않는다.
 // 실제로는 callable 객체(std::function)이며, 람다(closure object)를 담아 사용한다.
@@ -94,7 +95,7 @@ public:
     // 외부는 보통 아래처럼 람다에 넣어 Enqueue 한다:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
     void ExecuteLogin(int session_id, int session_index, const std::string& login_id, const std::string& password);
-    void ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int32_t new_score);
+    void ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int new_score);
 
 private:
     // ---- 설정 파일 로드 ----

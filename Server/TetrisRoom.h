@@ -102,4 +102,5 @@ public:
 
 	void MakeMovePacketData(RoomSession& r_session, int move_type);
 	void ClearEventsInTick();
+	void RequestUpdateScore(RoomSession& r_session);
 };

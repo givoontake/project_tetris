@@ -67,4 +67,6 @@ public:
 	void SendToSelf(char* packet, int self_index);
 	void CreateRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
 	void ProcessDB(DBOverlapped* db_over, int user_index);
+	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
+	std::string CharBufToString(const char* buf, int buf_size);
 };

@@ -271,14 +271,16 @@ void TetrisRoom::BuildBroadcastData(RoomSession& r_session, std::vector<TaskType
 
 			// 줄 추가시 게임 오버가 될 수도 있지만 블록 고정시에도 게임 오버가 될 수 있다. 이것 역시 fix와 동반되는 과정이다.
 			if (r_session.GetTetris().CheckGameover()) {
-				r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
-				S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
-				send_p.size = sizeof(S2C_GAMEOVER_PACKET);
-				send_p.type = S2C_GAMEOVER;
-				send_p.id = r_session.GetSession()->GetId();
-				r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
-				r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
 				if (max_user == 1) {
+					// 일단 종료 패킷을 보냄
+					r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
+					S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
+					send_p.size = sizeof(S2C_GAMEOVER_PACKET);
+					send_p.type = S2C_GAMEOVER;
+					send_p.id = r_session.GetSession()->GetId();
+					r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
+					r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
+					RequestUpdateScore(r_session);
 					ClearGame();
 				}
 				else {
@@ -342,18 +344,20 @@ void TetrisRoom::BuildBroadcastData(RoomSession& r_session, std::vector<TaskType
 		}
 
 		case EVENT_TYPE::GAMEOVER: {
-			r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
-			S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
-			send_p.size = sizeof(S2C_GAMEOVER_PACKET);
-			send_p.type = S2C_GAMEOVER;
-			send_p.id = r_session.GetSession()->GetId();
-			r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
-			r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
 			if (max_user == 1) {
+				// 일단 종료 패킷을 보냄
+				r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
+				S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
+				send_p.size = sizeof(S2C_GAMEOVER_PACKET);
+				send_p.type = S2C_GAMEOVER;
+				send_p.id = r_session.GetSession()->GetId();
+				r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
+				r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
+				RequestUpdateScore(r_session);
 				ClearGame();
 			}
 			else {
-				if(CheckWinner()) {
+				if(CheckWinner()) { // 나중에 승패 추가
 					ClearGame();
 				}
 			}
@@ -563,6 +567,21 @@ void TetrisRoom::ClearEventsInTick()
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		r_user.GetTetris().ClearPendingMoves();
 		r_user.GetTetris().ClearTasks();
+	}
+}
+
+void TetrisRoom::RequestUpdateScore(RoomSession& r_session)
+{
+	if (r_session.GetSession()->GetInfo().max_score < r_session.GetScore()) {
+		int id = r_session.GetSession()->GetId();
+		int index = r_session.GetSession()->GetIndex();
+		std::string login_id = r_session.GetSession()->GetInfo().login_id;
+		int new_score = r_session.GetScore();
+		Database& db = server->GetDB();
+		auto task_update_score = [id, index, login_id, new_score, &db] {
+			db.ExecuteUpdateScore(id, index, login_id, new_score);
+			};
+		server->GetDB().Enqueue(task_update_score);
 	}
 }
 

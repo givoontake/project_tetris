@@ -15,12 +15,18 @@ void Session::InitSession(int new_index, int new_id, SOCKET new_socket)
 	socket = new_socket;
 	remain_data_size = 0; // 얘 기준으로 버퍼에 쓰니까 굳이 버퍼 자체를 초기화할 필요는 없어 보임.
 	room_index = -1;
+	info.clear();
+	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
 }
 
-void Session::InitDBInfo(DBInfo* db_info)
+void Session::InitDBInfo(DBResultLogin* db_info)
 {
-	memcpy(&info, db_info, sizeof(info));
+	info.login_id = db_info->login_id;
+	info.nickname = db_info->nickname;
+	info.lose_count = db_info->lose_count;
+	info.win_count = db_info->win_count;
+	info.max_score = db_info->max_score;
 }
 
 void Session::SendPacket(char* packet, const HANDLE iocp_handle)

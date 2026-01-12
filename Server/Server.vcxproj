@@ -33,6 +33,7 @@
   <ItemGroup>
     <ClInclude Include="Atomic.h" />
     <ClInclude Include="Database.h" />
+    <ClInclude Include="DBResult.h" />
     <ClInclude Include="define.h" />
     <ClInclude Include="enum_class.h" />
     <ClInclude Include="settings.h" />

@@ -656,6 +656,9 @@ class SinglePlayState:
             self.clear()
             pygame.mixer.music.stop()
 
+        elif packet_type == S2C_UPDATE_SCORE:
+            self.my_session.single_score = data.get("max_score")
+
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self
 

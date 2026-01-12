@@ -44,8 +44,9 @@ S2C_FIX           = 33
 
 S2C_ADDLINE       = 35
 
+S2C_UPDATE_SCORE  = 37
 # ---- Login ----
-S2C_LOGIN_PACKET = ["size", "type", "id", "single_score", "win_count", "lose_count", "user_name"]
+S2C_LOGIN_PACKET = ["size", "type", "id", "max_score", "win_count", "lose_count", "user_name"]
 C2S_LOGIN_PACKET = ["size", "type", "user_id", "user_password"]
 
 # ---- Message ----
@@ -98,6 +99,8 @@ S2C_CLEARLINE_PACKET = ["size", "type", "id", "line_index", "score"] # 뒤에 �
 S2C_FIX_PACKET = ["size", "type", "id", "fixed_x", "fixed_y"]
 
 S2C_ADDLINE_PACKET = ["size", "type", "id", "hole_x"]
+
+S2C_UPDATE_SCORE_PACKET = ["size", "type", "max_score"]
 
 # 타입 코드(int) -> 필드 목록(list[str]) 매핑
 PACKET_STRUCT: dict[int, list[str]] = {
@@ -154,7 +157,9 @@ PACKET_STRUCT: dict[int, list[str]] = {
 
     S2C_FIX:           S2C_FIX_PACKET,
 
-    S2C_ADDLINE:       S2C_ADDLINE_PACKET
+    S2C_ADDLINE:       S2C_ADDLINE_PACKET,
+
+    S2C_UPDATE_SCORE:  S2C_UPDATE_SCORE_PACKET
 }
 
 PRINT_TYPE = {
@@ -200,5 +205,7 @@ PRINT_TYPE = {
 
     33: "S2C_FIX",
 
-    35: "S2C_ADDLINE"
+    35: "S2C_ADDLINE",
+
+    37: "S2C_UPDATE_SCORE"
 }
