@@ -149,7 +149,7 @@ bool Database::LoadDBConfigFromFile(const std::string& file_path)
 void Database::ExecuteLogin(int session_id, int session_index, const std::string& login_id, const std::string& password)
 {
     auto* db_over = new DBOverlapped{};
-    db_over->ex_over.op_type = DB;
+    db_over->ex_over.op_type = OP_TYPE::DB;
     db_over->type = DBOperationType::LOGIN;
     db_over->ex_over.operation_id = session_id;
     db_over->ok = false; // 기본 실패로 두고, 성공 조건에서만 true
@@ -172,7 +172,7 @@ void Database::ExecuteLogin(int session_id, int session_index, const std::string
             if (!stmt)
             {
                 db_over->ok = false;
-                PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -270,13 +270,13 @@ void Database::ExecuteLogin(int session_id, int session_index, const std::string
         }
     }
 
-    PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int new_score)
 {
     auto* db_over = new DBOverlapped{};
-    db_over->ex_over.op_type = DB;
+    db_over->ex_over.op_type = OP_TYPE::DB;
     db_over->type = DBOperationType::SCORE_UPDATE;
     db_over->ex_over.operation_id = session_id;
     db_over->ok = false;
@@ -293,7 +293,7 @@ void Database::ExecuteUpdateScore(int session_id, int session_index, const std::
             stmt = caches.GetStmt(DBOperationType::SCORE_UPDATE);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트느 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트느 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
                 return;
             }
         }
@@ -325,7 +325,7 @@ void Database::ExecuteUpdateScore(int session_id, int session_index, const std::
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 // ---- DB 스레드 루프 ----

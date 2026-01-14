@@ -6,6 +6,7 @@
 #include "Atomic.h"
 #include "define.h"
 #include "DBResult.h"
+#include "enum_class.h"
 
 class Session
 {
@@ -19,7 +20,7 @@ class Session
 	int remain_data_size = 0;
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
-	Atomic<USER_STATE> state = NONE;
+	Atomic<USER_STATE> state = USER_STATE::NONE;
 	DBResultLogin info;
 public:
 

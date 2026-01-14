@@ -29,7 +29,7 @@ IOCPServer::IOCPServer() : handler(this)
 	server_addr.sin_port = htons(PORT_NUM);
 	server_addr.sin_addr.S_un.S_addr = INADDR_ANY;
 
-	accept_over.SetOperationType(ACCEPT);
+	accept_over.SetOperationType(OP_TYPE::ACCEPT);
 
 }
 
@@ -67,23 +67,23 @@ void IOCPServer::ProcessGQCS()
 		ExOverlapped* ex_over = reinterpret_cast<ExOverlapped*>(over);
 
 		if (!result){
-			if (ex_over->op_type == ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
+			if (ex_over->op_type == OP_TYPE::ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
 			else { // 클라이언트 강제 종료일 경우
 				Disconnect(static_cast<int>(key));
-				if (ex_over->op_type == SEND) delete ex_over;
+				if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
 			}
 			continue;
 		}
 
 		// 클라이언트 정상 종료일 경우
-		if (transferred_bytes == 0 && ex_over->op_type != ACCEPT) {
+		if (transferred_bytes == 0 && ex_over->op_type != OP_TYPE::ACCEPT) {
 			Disconnect(static_cast<int>(key));
-			if (ex_over->op_type == SEND) delete ex_over;
+			if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
 			continue;
 		}
 
 		switch (ex_over->op_type) {
-		case ACCEPT: {
+		case OP_TYPE::ACCEPT: {
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 			int new_index = GetEmptyUserIndex();
 			if (new_index != -1) {
@@ -113,7 +113,7 @@ void IOCPServer::ProcessGQCS()
 			break;
 		}
 
-		case RECV: {
+		case OP_TYPE::RECV: {
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 			if (io_over->ex_over.operation_id == users[key]->GetId()) {
 				ProcessPacket(transferred_bytes, key);
@@ -123,13 +123,13 @@ void IOCPServer::ProcessGQCS()
 			break;
 		}
 
-		case SEND: {
+		case OP_TYPE::SEND: {
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 			delete io_over;
 
 			break;
 		}
-		case DB:
+		case OP_TYPE::DB:
 			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
 			ProcessDB(db_over, key);
 		}
@@ -138,7 +138,7 @@ void IOCPServer::ProcessGQCS()
 
 void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 {
-	if (users[user_index]->GetState() == NONE) {
+	if (users[user_index]->GetState() == USER_STATE::NONE) {
 		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
 		return;
 	}
@@ -172,15 +172,15 @@ void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
 void IOCPServer::RoutePacket(char* packet, int user_index)
 {
 	switch (users[user_index]->GetState()) {
-	case NONE:
+	case USER_STATE::NONE:
 		return;
-	case LOGIN:
+	case USER_STATE::LOGIN:
 		handler.HandlePacket(packet, user_index);
 		break;
-	case LOBBY:
+	case USER_STATE::LOBBY:
 		handler.HandlePacket(packet, user_index);
 		break;
-	case ROOM:
+	case USER_STATE::ROOM:
 		rooms[users[user_index]->GetRoomIndex()]->GetRoomPacketHandler().HandlePacket(packet, user_index);
 		break;
 	}
@@ -190,7 +190,7 @@ void IOCPServer::RoutePacket(char* packet, int user_index)
 void IOCPServer::BroadCastLobby(char* packet)
 {
 	for (auto& user : users) {
-		if (user->GetState() == LOBBY) {// 현재 이 상태는 서버에 연결되어 있는 상태이므로, 나중에 로비, 방에 따라 구분 필요
+		if (user->GetState() == USER_STATE::LOBBY) {// 현재 이 상태는 서버에 연결되어 있는 상태이므로, 나중에 로비, 방에 따라 구분 필요
 			user->SendPacket(packet, iocp_handle);
 		}
 	}
@@ -220,8 +220,8 @@ int IOCPServer::GetNewUserId()
 int IOCPServer::GetEmptyUserIndex()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
-		if (!users[i]->GetState()) {
-			if (users[i]->SetState(NONE, LOGIN)) {
+		if (users[i]->GetState() == USER_STATE::NONE) {
+			if (users[i]->SetState(USER_STATE::NONE, USER_STATE::LOGIN)) {
 				return i;
 			}
 		}
@@ -233,8 +233,8 @@ int IOCPServer::GetEmptyUserIndex()
 int IOCPServer::GetEmptyRoomIndex()
 {
 	for (int i = 0; i < MAX_ROOM; ++i) {
-		if (rooms[i]->GetRoomState() == EMPTY) {
-			rooms[i]->SetRoomState(WAIT);
+		if (rooms[i]->GetRoomState() == ROOM_STATE::EMPTY) {
+			rooms[i]->SetRoomState(ROOM_STATE::WAIT);
 			return i;
 		}
 	}
@@ -244,16 +244,16 @@ int IOCPServer::GetEmptyRoomIndex()
 
 void IOCPServer::Disconnect(int user_index)
 {
-	if (users[user_index]->GetState() == NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
+	if (users[user_index]->GetState() == USER_STATE::NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
 
-	if (users[user_index]->GetState() == ROOM) rooms[users[user_index]->GetRoomIndex()]->DeleteUser(users[user_index]->GetId());
+	if (users[user_index]->GetState() == USER_STATE::ROOM) rooms[users[user_index]->GetRoomIndex()]->DeleteUser(users[user_index]->GetId());
 	
 	S2C_DISCONNECT_PACKET p;
 	p.size = sizeof(S2C_DISCONNECT_PACKET);
 	p.type = S2C_DISCONNECT;
 	//SendToSelf(reinterpret_cast<char*>(&p), user_index);
 	closesocket(users[user_index]->GetSocket()); // closesocket 이후 이전 소켓에 대한 iocp 완료(실패로) 통지가 언제 올지 불분명해서 다음에 연결된 소켓이 받을 경우 영향이 갈 수 있다고 하는데..
-	users[user_index]->SetState(NONE);
+	users[user_index]->SetState(USER_STATE::NONE);
 	std::cout << "Session[" << user_index << "] disconnect/Id: " << id_generator << std::endl;
 }
 
@@ -268,7 +268,7 @@ void IOCPServer::ProcessDB(DBOverlapped* db_over, int user_index)
 		if (db_over->ok) {
 			if (db_over->result_data) { // nullptr이 아니면, 즉 포인터가 존재하면
 				users[user_index]->InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
-				users[user_index]->SetState(LOBBY);
+				users[user_index]->SetState(USER_STATE::LOBBY);
 				login_p.id = users[user_index]->GetId();
 				login_p.max_score = users[user_index]->GetInfo().max_score;
 				login_p.win_count = users[user_index]->GetInfo().win_count;

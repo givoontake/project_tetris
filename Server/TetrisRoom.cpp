@@ -72,7 +72,7 @@ void TetrisRoom::AddUser(Session* new_session)
 		if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
 			
 		else {
-			new_session->SetState(ROOM);
+			new_session->SetState(USER_STATE::ROOM);
 			r_user.InitSession(new_session);
 			S2C_ADD_USER_PACKET p;
 			p.size = sizeof(S2C_ADD_USER_PACKET);
@@ -106,7 +106,7 @@ void TetrisRoom::DeleteUser(const int id)
 		if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
 			//std::cout << "delete user id: " << id << std::endl;
 			//room_mutex.lock();
-			r_user.GetSession()->SetState(LOBBY);
+			r_user.GetSession()->SetState(USER_STATE::LOBBY);
 
 			S2C_DELETE_USER_PACKET p;
 			p.size = sizeof(S2C_DELETE_USER_PACKET);
@@ -162,7 +162,7 @@ void TetrisRoom::KickUser(int id, int kick_user_id)
 		if (r_user.GetSession()->GetId() == kick_user_id) { // 삭제할 아이디 검색
 			r_user.ClearSession(); // 해당 아이디 세션 정리
 			r_user.SetRoomUserState(ROOM_USER_STATE::EMPTY);
-			r_user.GetSession()->SetState(LOBBY);
+			r_user.GetSession()->SetState(USER_STATE::LOBBY);
 
 			S2C_KICK_PACKET p;
 			p.size = sizeof(S2C_KICK_PACKET);
@@ -178,7 +178,7 @@ void TetrisRoom::KickUser(int id, int kick_user_id)
 void TetrisRoom::StartGame(int id)
 {
 	if (id != host_id) return;
-	if (room_state == PLAY) return;
+	if (room_state == ROOM_STATE::PLAY) return;
 
 	int host_index = -1;
 	for (int i = 0; i < max_user; i++){
@@ -218,7 +218,7 @@ void TetrisRoom::StartGame(int id)
 		// 보내야 할까? 시작 불가 알림창 정도는  클라에게 맏겨도 될 듯 하다. 잘못 와도 시작만 안하면 되니까
 		return;
 	}
-	SetRoomState(PLAY);
+	SetRoomState(ROOM_STATE::PLAY);
 
 	// 모든 조건 통과->게임 시작
 	Add7BagTetrominoList();
@@ -398,7 +398,7 @@ void TetrisRoom::InitGame()
 
 void TetrisRoom::ClearGame()
 {
-	room_state = WAIT;
+	room_state = ROOM_STATE::WAIT;
 	tasks.Clear();
 	tetromino_spawn_list.clear();
 	for (auto& r_user : room_users) {
@@ -497,7 +497,7 @@ bool TetrisRoom::CheckWinner()
 
 void TetrisRoom::ClearRoom()
 {
-	room_state = EMPTY;
+	room_state = ROOM_STATE::EMPTY;
 	tasks.Clear();
 	tetromino_spawn_list.clear();
 	room_users.clear();

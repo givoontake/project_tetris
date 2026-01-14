@@ -38,7 +38,7 @@ void TickWorkerThread(int num)
         lock.unlock();
 
         for (int i = thread_num; i < MAX_ROOM; i += MAX_TICK_WORKERS) {
-            if (iocp_server.GetRoom(i)->GetRoomState() != PLAY) continue;
+            if (iocp_server.GetRoom(i)->GetRoomState() != ROOM_STATE::PLAY) continue;
             iocp_server.GetRoom(i)->ProcessPlayTasks();
             iocp_server.GetRoom(i)->UpdateTick();
         }

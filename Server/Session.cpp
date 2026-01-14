@@ -4,7 +4,7 @@
 
 Session::Session()
 {
-	recv_over.SetOperationType(RECV);
+	recv_over.SetOperationType(OP_TYPE::RECV);
 }
 
 void Session::InitSession(int new_index, int new_id, SOCKET new_socket)
@@ -31,9 +31,9 @@ void Session::InitDBInfo(DBResultLogin* db_info)
 
 void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 {
-	if (state == NONE) return;
+	if (state == USER_STATE::NONE) return;
 	IOOverlapped* send_over = new IOOverlapped;
-	send_over->SetOperationType(SEND);
+	send_over->SetOperationType(OP_TYPE::SEND);
 	send_over->SetOperationId(id);
 	short packet_size = GetPacketSize(packet);
 	memcpy(send_over->packet_buf, packet, packet_size);
@@ -47,9 +47,9 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 
 void Session::SendBoundPacket(char* packet, int data_size, const HANDLE iocp_handle)
 {
-	if (state == NONE) return;
+	if (state == USER_STATE::NONE) return;
 	IOOverlapped* send_over = new IOOverlapped;
-	send_over->SetOperationType(SEND);
+	send_over->SetOperationType(OP_TYPE::SEND);
 	send_over->SetOperationId(id);
 	memcpy(send_over->packet_buf, packet, data_size);
 	send_over->wsabuf.len = data_size;
@@ -62,7 +62,7 @@ void Session::SendBoundPacket(char* packet, int data_size, const HANDLE iocp_han
 
 void Session::RecvPacket(const HANDLE iocp_handle)
 {
-	if (state == NONE) return;
+	if (state == USER_STATE::NONE) return;
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over.ex_over.over, sizeof(recv_over.ex_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
 	recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
