@@ -1,11 +1,11 @@
-# game_loop.py
 import time
-import pygame
 import queue
+import pygame
+
 from define import *
-from change_game_state import *
+from login_state import LoginState
 from network import NetworkWorker
-from resource_manager import *
+from resource_manager import ResourceManager
 
 class GameLoop:
     def __init__(self):

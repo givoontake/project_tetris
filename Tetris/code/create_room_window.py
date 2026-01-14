@@ -1,6 +1,7 @@
 import pygame
 from typing import Optional
-from menu import Button, InputBox
+from button import Button
+from inputbox import InputBox
 from define import *
 from define_format import *
 from resource_manager import *

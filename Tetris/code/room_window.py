@@ -3,7 +3,7 @@ import pygame
 from typing import Optional, Iterable
 
 # 기존 버튼 색/폰트 규칙을 그대로 활용
-from menu import Button, ORANGE, GRAY, WHITE, BLACK
+from button import Button, ORANGE, GRAY, WHITE, BLACK
 
 # 행 하나(방 하나)를 표현하는 뷰-오브젝트
 class RoomInfo:
