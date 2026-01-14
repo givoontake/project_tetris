@@ -1,0 +1,3871 @@
+===== FILE BEGIN: Atomic.h =====
+#pragma once
+#include <atomic>
+#include <type_traits>
+
+// 보통 템플릿인 외부에서 인자로 타입을 넣어주지만, 최근에는 자동 추론도 해준다고 한다.
+template <class T>
+class Atomic {
+    static_assert(std::is_trivially_copyable_v<T>,
+        "AtomicField<T> requires trivially copyable T.");
+
+private:
+    std::atomic<T> value;
+
+public:
+    using value_type = T; 
+    // 템플릿 클래스는 외부에서 어떤 타입으로 동작하는지 바로 알 수 없으므로,
+    // 내부에서 다루는 실제 타입을 value_type이라는 이름으로 노출한다.
+    // 이 타입은 템플릿이 특수화될 때(예: Box<int>) 결정된다.
+    // C++17 이후에는 타입을 지정하지 않아도 자동 추론해준다.
+    
+    // <제네릭 프로그래밍>에서는 컨테이너의 원소 타입을 외부에서 공통된 규칙(value_type)으로 접근할 수 있어야 한다.
+    // 따라서 STL 컨테이너와의 호환성이나 범용 알고리즘과 함께 쓰려면 꼭 필요하다.
+    
+    // ※ 제네릭 프로그래밍은 자료형에 의존하지 않고 여러 자료형으로 재사용 가능하도록 작성하는 프로그래밍을 말한다.
+    // 즉 여러 자료형을 넣어도 다 사용 가능한 코드를 말한다.
+
+    constexpr Atomic() noexcept : value{} {} // 기본 생성자 -> std::atomic의 기본 생성자를 호출함
+    constexpr Atomic(T init) noexcept : value(init) {} // 오버로드된 생성자
+
+    // 복사/이동 생성자 -> 사실 사용하지는 않을 예정이지만, vector에 들어가려면 필요
+    Atomic(const Atomic& other) noexcept {
+        value.store(other.value.load());
+    }
+    Atomic(Atomic&& other) noexcept {
+        value.store(other.value.load());
+    }
+
+    Atomic& operator=(const T& desired) noexcept {
+        value.store(desired);
+        return *this;
+    }
+
+    bool operator==(const T& desired) noexcept {
+		return value.load() == desired;
+    }
+    // const T&은 임시 객체를 받을 수 있다. 임시 객체는 a = 1에서 1을 의미하는데, 잠시만 생성되었다가 삭제되는 값이다. 일반 T&은 임시 객체를 받을 수 없는데, 임시 객체가 삭제되어 
+	// 참조가 끊어질 수 있고,댕글링 참조를 수정할 가능성이 있기 때문이다. const가 붙으면 수정할 일이 없고, 임시 객체를 참조중인 메모리가 사라질 때 까지 유지된다.
+    // 즉 위의 const T& desired의 desired가 임시 객체라면 return 후 소멸한다.
+
+    //Atomic& operator=(const Atomic& other) noexcept {
+    //    if (this != &other)
+    //        value.store(other.value.load());
+    //    return *this;
+    //}
+
+    //Atomic& operator=(Atomic&& other) noexcept {
+    //    if (this != &other)
+    //        value.store(other.value.load());
+    //    return *this;
+    //}
+
+    T Load() const noexcept {
+        return value.load();
+    }
+    void Store(T desired) noexcept {
+        value.store(desired);
+    }
+
+
+    bool Compare_exchange_weak(T& expected, T desired) noexcept {
+        return value.compare_exchange_weak(expected, desired);
+    }
+    bool Compare_exchange_strong(T& expected, T desired) noexcept {
+        return value.compare_exchange_strong(expected, desired);
+    }
+
+    T GetSelf() const noexcept {
+        return value.load();
+    }
+};
+
+
+===== FILE END: Atomic.h =====
+
+===== FILE BEGIN: Database.cpp =====
+// Database.cpp
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <cctype>
+#include <botan/bcrypt.h>
+#include <jdbc/cppconn/connection.h>
+#include <jdbc/cppconn/driver.h>
+#include <jdbc/cppconn/metadata.h>
+#include "Database.h"
+#include "DBResult.h"
+
+#undef min
+
+// -------------------- 유틸(로컬) --------------------
+static inline void Trim(std::string& s)
+{
+    auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
+
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
+    s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
+}
+
+static inline void PrintDBConnectionInfo(sql::Connection* conn)
+{
+    if (!conn)
+    {
+        std::cout << "[DB] Connection is null\n";
+        return;
+    }
+
+    std::cout << "===== DB Connection Info =====\n";
+    std::cout << "Connected        : " << (conn->isValid() ? "YES" : "NO") << '\n';
+    std::cout << "Server Version   : " << conn->getMetaData()->getDatabaseProductVersion() << '\n';
+    std::cout << "Server Name      : " << conn->getMetaData()->getDatabaseProductName() << '\n';
+    std::cout << "User Name        : " << conn->getMetaData()->getUserName() << '\n';
+    std::cout << "Current Schema   : " << conn->getSchema() << '\n';
+    std::cout << "Auto Commit      : " << (conn->getAutoCommit() ? "ON" : "OFF") << '\n';
+    std::cout << "===============================\n";
+}
+
+namespace
+{
+    void PrintErrorLog(const char* func_name, const std::exception& e)
+    {
+        std::cerr << "[ERROR] in " << func_name << "\n"
+            << "  type: " << typeid(e).name() << "\n"
+            << "  what(): " << e.what() << std::endl;
+    }
+
+    void PrintErrorLog(const char* func_name, const sql::SQLException& e)
+    {
+        std::cerr << "[DB][SQLException] in " << func_name << "\n"
+            << "  what(): " << e.what() << "\n"
+            << "  errorCode: " << e.getErrorCode() << "\n"
+            << "  SQLState: " << e.getSQLState() << std::endl;
+    }
+
+    void PrintErrorLog(const char* func_name)
+    {
+        std::cerr << "[ERROR] in " << func_name
+            << "  (unknown exception)" << std::endl;
+    }
+}
+
+// -------------------- Database --------------------
+
+Database::Database()
+{
+    LoadDBConfigFromFile("db_config.txt");
+}
+
+Database::~Database()
+{
+}
+
+void Database::init(HANDLE iocp)
+{
+    iocp_handle = iocp;
+}
+
+void Database::Enqueue(Task job)
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        pending_db_tasks.push(std::move(job));
+    }
+    cv.notify_one();
+}
+
+bool Database::LoadDBConfigFromFile(const std::string& file_path)
+{
+    std::ifstream file(file_path);
+    if (!file.is_open())
+        return false;
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        // CR 제거(윈도우 \r\n 대응)
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        // 주석은 남겨둔다.
+        Trim(line);
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        auto pos = line.find('=');
+        if (pos == std::string::npos)
+            continue;
+
+        std::string key = line.substr(0, pos);
+        std::string val = line.substr(pos + 1);
+        Trim(key);
+        Trim(val);
+
+        if (key == "host")
+            db_host = val;
+        else if (key == "port")
+        {
+            try
+            {
+                int p = std::stoi(val); // 문자열을 그대로 정수 변환, 예외를 던질 수 있음
+                // 포트 범위 예외 처리
+                if (p < 0) p = 0;
+                if (p > 65535) p = 65535;
+                db_port = static_cast<uint16_t>(p);
+            }
+            catch (...)
+            {
+                db_port = 0;
+                PrintErrorLog(__func__);
+            }
+        }
+        else if (key == "user")
+            db_id = val;
+        else if (key == "password")
+            db_password = val;
+        //else if (key == "schema") schema = val;
+    }
+
+    return true;
+}
+
+// ---- DB 스레드에서 실행될 "실제 DB 작업" ----
+// 외부는 보통 아래처럼 람다로 감싸 Enqueue:
+//   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
+void Database::ExecuteLogin(int session_id, int session_index, const std::string& login_id, const std::string& password)
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = DB;
+    db_over->type = DBOperationType::LOGIN;
+    db_over->ex_over.operation_id = session_id;
+    db_over->ok = false; // 기본 실패로 두고, 성공 조건에서만 true
+
+    try
+    {
+        // 1) PreparedStatement 확보 (캐시 없으면 준비)
+        auto* stmt = caches.GetStmt(DBOperationType::LOGIN);
+        if (!stmt) // 캐시가 없으면 캐시를 만들고 다시 캐시를 가져오고, 그래도 없으면 실패 처리
+        {
+            // EXISTS: 항상 1행 1컬럼(0/1) 반환
+            const char* SQL_LOGIN =
+                "SELECT password_hash "
+                "FROM users "
+                "WHERE login_id=? "
+                "LIMIT 1";
+
+            caches.stmt_cache[DBOperationType::LOGIN].reset(caches.conn->prepareStatement(SQL_LOGIN));
+            stmt = caches.GetStmt(DBOperationType::LOGIN);
+            if (!stmt)
+            {
+                db_over->ok = false;
+                PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                return;
+            }
+        }
+
+        // 2) 바인딩
+        stmt->setString(1, login_id);
+
+        // 3) 실행
+        std::unique_ptr<sql::ResultSet> rs(stmt->executeQuery()); // 요청한 쿼리에 대한 결과 집합 객체
+
+        // 4) 결과
+        if (rs && rs->next()) // rs는 결과 집합 객체가 존재하는지, rs->next()는 첫 번째 결과가 존재하는지, 논리상 해시된 비밀번호를 가져오므로 rs->next()는 반드시 존재
+        {
+            // 그래서 첫 결과가 존재한다면, 값을 읽어 실제 존재 여부를 판정
+            const std::string password_hash = rs->getString(1);
+            if (Botan::check_bcrypt(password, password_hash))
+            {
+                db_over->ok = true;
+            }
+            else
+            {
+                std::cerr << "잘못된 비밀번호입니다. " << std::endl;
+                std::cerr << "id: " << login_id << std::endl;
+                std::cerr << "pw: " << password << std::endl;
+                db_over->ok = false;
+            }
+        }
+        else
+        {
+            std::cerr << "일치하는 아이디가 없습니다. id: " << login_id << std::endl;
+            db_over->ok = false;
+        }
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+
+    if (db_over->ok)
+    {
+        try
+        {
+            db_over->result_data = std::make_unique<DBResultLogin>(); // 동적할당 및 객체 수명관리 시작
+            DBResultLogin* p = static_cast<DBResultLogin*>(db_over->result_data.get()); // 값 조작용 raw 포인터
+
+            auto* info_stmt = caches.GetStmt(DBOperationType::LOAD_SESSION_INFO); // LOAD_SESSION_INFO는 캐시에만 활용
+            if (!info_stmt)
+            {
+                const char* SQL_LOAD_INFO =
+                    "SELECT nickname, single_score, win, lose "
+                    "FROM users "
+                    "WHERE login_id=? "
+                    "LIMIT 1";
+
+                caches.stmt_cache[DBOperationType::LOAD_SESSION_INFO]
+                    .reset(caches.conn->prepareStatement(SQL_LOAD_INFO));
+
+                info_stmt = caches.GetStmt(DBOperationType::LOAD_SESSION_INFO);
+                if (!info_stmt)
+                {
+                    db_over->ok = false;
+                }
+            }
+
+            if (db_over->ok)
+            {
+                info_stmt->setString(1, login_id);
+                std::unique_ptr<sql::ResultSet> info_rs(info_stmt->executeQuery());
+
+                if (info_rs && info_rs->next()) // 가져온 결과(행)이 있는지 판별
+                {
+                    p->login_id = login_id;
+                    p->nickname = info_rs->getString(1);
+                    p->max_score = info_rs->getInt(2);
+                    p->win_count = info_rs->getInt(3);
+                    p->lose_count = info_rs->getInt(4);        
+
+                    std::cout << "로그인 성공. " << std::endl;
+                    std::cout << "id: " << login_id << std::endl;
+                    std::cout << "pw: " << password << std::endl;
+                    std::cout << "nickname: " << p->nickname << std::endl;
+                }
+                else
+                {
+                    db_over->ok = false;
+                }
+            }
+        }
+        catch (const sql::SQLException& e)
+        {
+            PrintErrorLog(__func__, e);
+            db_over->result_data = nullptr;
+            db_over->ok = false;
+        }
+    }
+
+    PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
+void Database::ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int new_score)
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = DB;
+    db_over->type = DBOperationType::SCORE_UPDATE;
+    db_over->ex_over.operation_id = session_id;
+    db_over->ok = false;
+
+    try
+    {
+        auto* stmt = caches.GetStmt(DBOperationType::SCORE_UPDATE);
+        if (!stmt)
+        {
+            const char* SQL_UPDATE_SCORE =
+                "UPDATE users SET single_score=? WHERE login_id=?";
+
+            caches.stmt_cache[DBOperationType::SCORE_UPDATE].reset(caches.conn->prepareStatement(SQL_UPDATE_SCORE));
+            stmt = caches.GetStmt(DBOperationType::SCORE_UPDATE);
+            if (!stmt)
+            {
+                PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트느 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
+                return;
+            }
+        }
+
+        // 바인딩
+        stmt->setInt(1, new_score);
+        stmt->setString(2, login_id);
+        std::cout << "ExecuteUpdateScore() login_id: " << login_id << std::endl;
+
+        // 실행
+        const int affected = stmt->executeUpdate();
+        if (affected > 0) {
+            // 1이면 업데이트 성공
+            std::cout << "score update success!, new score: " << new_score << std::endl;
+            db_over->ok = true;
+            db_over->result_data = std::make_unique<DBResultUpdateScore>();
+            DBResultUpdateScore* p = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
+            p->max_score = new_score;
+        }
+        
+        else {
+            db_over->ok = false;
+            std::cout << "score update fail!, new score: " << new_score << std::endl;
+        }
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+
+    PostQueuedCompletionStatus(iocp_handle, DB, session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
+// ---- DB 스레드 루프 ----
+void Database::Run()
+{
+    // 1) 커넥션 오픈 + stmt 캐시 eager 준비
+    // 실패 시에도 루프는 돌되, 작업 수행은 stmt nullptr로 실패 처리될 것.
+    if (!Connect())
+    {
+        std::cerr << "[DB] Failed to connect to database." << std::endl;
+        return;
+    }
+
+    running = true;
+
+    while (true)
+    {
+        Task job;
+
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            // 잠자고 있는 상태에서는 깨우는 신호가 오면 다시 조건을 검사한다.
+            cv.wait(lock, [this]() {
+                return !pending_db_tasks.empty() || !running.load(std::memory_order_acquire); // 조건이 참이 되어야 깨어나므로 running = false이면 깨어나도록 해야함
+                });
+
+            if (!running.load(std::memory_order_acquire) &&
+                pending_db_tasks.empty())
+                break;
+
+            job = std::move(pending_db_tasks.front());
+            pending_db_tasks.pop();
+        }
+
+        // 2) 작업 실행 (DB 실행은 락 없이)
+        job();
+    }
+
+    // 3) 정리
+    Disconnect();
+}
+
+bool Database::Connect()
+{
+    try
+    {
+        sql::mysql::MySQL_Driver* driver =
+            sql::mysql::get_mysql_driver_instance();
+
+        // Connector/C++ legacy는 보통 tcp://host:port
+        const std::string url =
+            "tcp://" + db_host + ":" + std::to_string(db_port);
+
+        caches.conn.reset(driver->connect(url, db_id, db_password));
+        caches.conn->setSchema("tetris");
+
+        PrintDBConnectionInfo(caches.conn.get());
+
+        return true;
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        return false;
+    }
+}
+
+void Database::Disconnect()
+{
+    caches.stmt_cache.clear();
+
+    if (caches.conn)
+    {
+        try { caches.conn->close(); }
+        catch (...) {}
+        caches.conn.reset();
+    }
+}
+
+===== FILE END: Database.cpp =====
+
+===== FILE BEGIN: Database.h =====
+// Database.h
+#pragma once
+#include <WinSock2.h>
+#include <MSWSock.h>
+
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <mutex>
+#include <queue>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <memory>
+
+// MySQL Connector/C++ (legacy)
+#include <jdbc/mysql_driver.h>
+#include <jdbc/mysql_connection.h>
+#include <jdbc/cppconn/prepared_statement.h>
+#include <jdbc/cppconn/resultset.h>
+#include <jdbc/cppconn/exception.h>
+
+#include "ExOverlapped.h"
+#include "enum_class.h"
+#include "define.h"
+#include "DBResult.h"
+
+// 반환형은 void, 실행 시 인자를 받지 않는다.
+// 실제로는 callable 객체(std::function)이며, 람다(closure object)를 담아 사용한다.
+// 람다는 “함수처럼 호출 가능한 객체”이므로 std::function으로 감쌀 수 있고, 값으로 복사되어 큐에 보관된다.
+// 캡처는 함수 인자가 아니라 객체의 멤버 상태이며, 객체 복사 시 캡처된 값도 함께 복사된다.
+// DBSession은 DB 스레드 내부에서만 관리되며, 작업 실행 시 Database 내부에서 접근한다.
+using Task = std::function<void()>; // std::function은 컨테이너가 아니다. 지정된 반환형과 인자와 동일한 함수를 감싸주는 래퍼일 뿐이다. 즉 함수를 객체처럼 사용할 수 있게 해주는 것!
+
+class Database
+{
+    struct DBCaches
+    {
+        std::unique_ptr<sql::Connection> conn;
+        std::unordered_map<DBOperationType, std::unique_ptr<sql::PreparedStatement>> stmt_cache;
+
+        sql::PreparedStatement* GetStmt(DBOperationType id)
+        {
+            auto it = stmt_cache.find(id);
+            return (it == stmt_cache.end()) ? nullptr : it->second.get();
+        }
+    };
+
+private:
+    HANDLE iocp_handle;
+
+    // ---- DB 설정(생성자에서 파일로부터 읽어 초기화) ----
+    std::string db_host;
+    uint16_t db_port{ 0 };
+    std::string db_id;
+    std::string db_password;
+    std::string schema;
+
+    std::atomic<bool> running{ false };
+
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::queue<Task> pending_db_tasks;
+
+    // ---- DB 스레드 전용 컨텍스트 접근용 ----
+    // ThreadLoop에서만 세팅/사용 (외부 노출 X)
+    DBCaches caches;
+
+public:
+    // IOCP 완료 통지에 사용할 completion key (서버에서 이 키로 DB 완료인지 분기)
+    static constexpr ULONG_PTR DB_COMPLETION_KEY = 0xDBDBDBDB;
+
+public:
+    // 생성자에서 DB 설정 파일을 읽어 멤버(db_host/db_port/...)를 초기화한다.
+   /* explicit Database(HANDLE iocp_handle);*/
+    Database();
+    ~Database();
+
+    bool GetRunning() const { return running.load(); }
+    void SetRunning(bool val) { running.store(val); }
+
+    void init(HANDLE iocp);
+    void Run();
+    //Database(const Database&) = delete;
+    //Database& operator=(const Database&) = delete;
+
+    // ---- 외부에서 작업을 큐에 넣는 API ----
+    // 외부에서 람다를 만들어 그대로 큐에 넣는다.
+    // (람다 내부에서 실제 쿼리 실행 함수(ExecuteXXX)를 호출하는 방식)
+    void Enqueue(Task job);
+
+    // ---- DB 스레드에서 실행될 "실제 DB 작업" 함수들 ----
+    // ⚠️ 이 함수들은 "DB 스레드에서만" 호출되어야 한다.
+    // 외부는 보통 아래처럼 람다에 넣어 Enqueue 한다:
+    //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
+    void ExecuteLogin(int session_id, int session_index, const std::string& login_id, const std::string& password);
+    void ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int new_score);
+
+private:
+    // ---- 설정 파일 로드 ----
+    // 파일에서 host/port/user/pass/schema를 읽어 멤버에 저장
+    bool LoadDBConfigFromFile(const std::string& file_path);
+
+private:
+    bool Connect();
+    void Disconnect();
+};
+
+===== FILE END: Database.h =====
+
+===== FILE BEGIN: DBResult.h =====
+#pragma once
+#include <string>
+#include "define.h"
+
+struct DBResultDefault {
+	// 유니크 포인터용 껍데기 구조체
+	// void*는 삭제가 불가능하므로, 삭제가 가능한 껍데기 구조체로 관리
+
+	// 부모 클래스에 1번 선언된 가상함수는 자식 함수에서 모두 가상함수(소멸자, 일반 함수 모두 마찬가지, virtual / override를 쓰는 것은 가상함수 정의 의도를 표현하는 것, 자식에서 안써도 가상함수로 잘 동작한다.)
+	virtual ~DBResultDefault() = default;
+};
+
+struct DBResultLogin : public DBResultDefault {
+	int max_score;
+	int win_count;
+	int lose_count;
+	std::string nickname;
+	std::string login_id; // 데이터베이스 접속 시 우선 키로 활용
+
+	void clear()
+	{
+		max_score = 0;
+		win_count = 0;
+		lose_count = 0;
+		nickname.clear();
+		login_id.clear();
+	}
+};
+
+struct DBResultUpdateScore : public DBResultDefault {
+	int max_score;
+};
+===== FILE END: DBResult.h =====
+
+===== FILE BEGIN: define.h =====
+#pragma once
+#include <atomic>
+#include "settings.h"
+
+#pragma pack(push, 1)
+
+struct S2C_TEST_LOGIN_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct C2S_TEST_LOGIN_PACKET {
+	short size;
+	char type;
+	int temp_id;
+};
+
+struct S2C_LOGIN_PACKET {
+	short size;
+	char type;
+	int id;
+	int max_score;
+	int win_count;
+	int lose_count;
+	char nickname[MAX_USER_NAME];
+};
+
+struct C2S_LOGIN_PACKET {
+	short size;
+	char type;
+	char login_id[MAX_USER_ID];
+	char login_password[MAX_USER_PASSWORD];
+};
+
+struct S2C_MESSAGE_PACKET {
+	short size;
+	char type;
+	int id;
+	char user_name[MAX_USER_NAME];
+};
+
+struct C2S_MESSAGE_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct S2C_TEST_PACKET {
+	short size;
+	char type;
+	int id;
+	long long last_time;
+};
+
+struct C2S_TEST_PACKET {
+	short size;
+	char type;
+	int id; // 테스트 프로그램도 다중 클라이언트를 관리중이므로 필요
+	long long last_time;
+};
+
+struct C2S_DISCONNECT_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct S2C_DISCONNECT_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct C2S_ADD_OPEN_ROOM_PACKET {
+	short size; // 나중에 방, 게임 등으로 메세지 패킷과 분리한다면 char로 바꿀 수도 있지 않을까..?
+	char type;
+	int id;
+	char max_user;
+	char room_name[MAX_ROOM_NAME];
+};
+
+struct S2C_ADD_OPEN_ROOM_PACKET {
+	short size;
+	char type;
+	int id;
+	char max_user;
+	char room_name[MAX_ROOM_NAME];
+};
+
+struct C2S_ADD_LOCK_ROOM_PACKET {
+	short size; 
+	char type;
+	int id;
+	char max_user;
+	char room_name[MAX_ROOM_NAME];
+	char room_password[MAX_ROOM_PASSWORD];
+};
+
+struct S2C_ADD_LOCK_ROOM_PACKET {
+	short size; 
+	char type;
+	int id;
+	char max_user;
+	char room_name[MAX_ROOM_NAME];
+	char room_password[MAX_ROOM_PASSWORD];
+};
+
+struct C2S_ADD_USER_PACKET {
+	short size;
+	char type;
+	int id;
+	int room_id;
+	char name[MAX_USER_NAME];
+};
+
+struct S2C_ADD_USER_PACKET {
+	short size;
+	char type;
+	int id;
+	bool is_add;
+	char name[MAX_USER_NAME];
+};
+
+struct C2S_DELETE_USER_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct S2C_DELETE_USER_PACKET {
+	short size;
+	char type;
+	int id;
+	int new_host_id;
+};
+
+struct C2S_READY_PACKET {
+	short size;
+	char type;
+	int id;
+	bool is_ready;
+};
+
+struct S2C_READY_PACKET {
+	short size;
+	char type;
+	int id;
+	bool is_ready;
+};
+
+struct C2S_START_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct S2C_START_PACKET {
+	short size;
+	char type;
+	bool is_start;
+	int score;
+};
+
+struct C2S_KICK_PACKET {
+	short size;
+	char type;
+	int id;
+	int kick_user_id;
+};
+
+struct S2C_KICK_PACKET {
+	short size;
+	char type;
+	int kick_user_id;
+};
+
+struct C2S_MOVE_PACKET {
+	short size;
+	char type;
+	char move_type;
+};
+
+struct S2C_MOVE_PACKET {
+	short size;
+	char type;
+	int id;
+	char move_type;
+};
+
+struct S2C_SPAWN_PACKET {
+	short size;
+	char type;
+	int id;
+	char tetromino_type;
+	char next_tetromino_type;
+	char spawn_x, spawn_y;
+};
+
+struct S2C_FIX_PACKET {
+	short size;
+	char type;
+	int id;
+	char fixed_x, fixed_y;
+};
+
+struct S2C_CLEARLINE_PACKET {
+	short size;
+	char type;
+	int id;
+	char line_index;
+	int score;
+	// 클리어될 줄의 인덱스 수에 따라 뒤에 가변으로 붙여 보낸다.
+};
+
+struct S2C_ADDLINE_PACKET {
+	short size;
+	char type;
+	int id;
+	char hole_x;
+};;
+
+struct S2C_GAMEOVER_PACKET {
+	short size;
+	char type;
+	int id;
+};
+
+struct S2C_GAMEEND_PACKET {
+	short size;
+	char type;
+	int id;
+	bool is_winner;
+};
+
+struct S2C_UPDATE_SCORE_PACKET {
+	short size;
+	char type;
+	int id;
+	int max_score;
+};
+#pragma pack(pop)
+
+===== FILE END: define.h =====
+
+===== FILE BEGIN: enum_class.h =====
+#pragma once
+
+enum OP_TYPE { SEND, RECV, ACCEPT, DB };
+
+enum class DBOperationType { LOGIN, LOAD_SESSION_INFO, SCORE_UPDATE, DB_ERROR };
+
+enum class ROOM_USER_STATE { EMPTY, WAIT, READY, PLAY, GAMEOVER };
+
+enum ROOM_STATE { EMPTY, WAIT, PLAY };
+
+enum USER_STATE { NONE, LOGIN, LOBBY, ROOM };
+
+enum class EVENT_TYPE { NONE = -1, RIGHT, LEFT, ROTATE, DOWN, DROP, UP, MOVE, FIX, CLEARLINE, ADDLINE, GAMEOVER };
+===== FILE END: enum_class.h =====
+
+===== FILE BEGIN: ExOverlapped.h =====
+#pragma once
+#include <WinSock2.h>
+#include <MSWSock.h>
+#include "define.h"
+#include "enum_class.h"
+#include "DBResult.h"
+
+struct ExOverlapped {
+	WSAOVERLAPPED over;
+	int operation_id; // 세션 id와 같다.
+	OP_TYPE op_type;
+
+	ExOverlapped() {
+		ZeroMemory(&over, sizeof(over));
+		operation_id = -1;
+	}
+};
+
+struct IOOverlapped {
+	ExOverlapped ex_over;
+	WSABUF wsabuf;
+	char packet_buf[BUF_SIZE];
+
+	IOOverlapped()
+	{
+		wsabuf.len = BUF_SIZE;
+		wsabuf.buf = packet_buf;
+	}
+
+	void SetOperationType(OP_TYPE type) {
+		ex_over.op_type = type;
+	}
+
+	void SetOperationId(int id) {
+		ex_over.operation_id = id;
+	}
+
+	//void SetExOverlapped(OP_TYPE type, char* packet) {
+	//	memcpy(socket_buf, packet, packet[0]);
+	//	op_type = type;
+	//}
+};
+
+struct DBOverlapped
+{
+	ExOverlapped ex_over;
+	DBOperationType type{};
+	bool ok;
+	std::unique_ptr<DBResultDefault> result_data;
+
+	DBOverlapped() {
+		ok = false;
+		result_data = nullptr;
+	}
+};
+
+
+===== FILE END: ExOverlapped.h =====
+
+===== FILE BEGIN: IOCPServer.cpp =====
+#include <iostream>
+#include <algorithm>
+#include "IOCPServer.h"
+
+#undef min
+
+IOCPServer::IOCPServer() : handler(this)
+{
+	for (int i = 0; i < MAX_USER; ++i) {
+		users[i] = new Session();
+	}
+
+	for (int i = 0; i < MAX_ROOM; ++i){
+		rooms[i] = new TetrisRoom(this);
+		rooms[i]->SetRoomId(i); // 방 아이디를 정해줄 부분이 마땅치 않아 서버 생성 시 만들기로 했다..
+	}
+
+	//packet_handler = std::make_unique<PacketHandler>(this);
+	//for (auto& user : users) {
+	//	user = std::make_unique<Session>(packet_handler.get()); // packet_handler는 unique_ptr이므로 get()을 이용해 raw ptr을 넘긴다.
+	//}
+
+	WSAStartup(MAKEWORD(2, 2), &wsadata);
+
+	listen_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(PORT_NUM);
+	server_addr.sin_addr.S_un.S_addr = INADDR_ANY;
+
+	accept_over.SetOperationType(ACCEPT);
+
+}
+
+IOCPServer::~IOCPServer()
+{
+	closesocket(listen_socket);
+	closesocket(client_socket);
+	db.SetRunning(false);
+	WSACleanup();
+}
+
+void IOCPServer::StartServer()
+{
+	bind(listen_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
+	listen(listen_socket, SOMAXCONN);
+	iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+	CreateIoCompletionPort(reinterpret_cast<HANDLE>(listen_socket), iocp_handle, 9999, 0);
+	int addr_size = sizeof(SOCKADDR_IN);
+	AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.ex_over.over);
+}
+
+void IOCPServer::ProcessGQCS()
+{
+	while (is_running){
+		DWORD transferred_bytes = 0;
+		ULONG_PTR key = 0;
+		WSAOVERLAPPED* over = nullptr;
+		BOOL result = GetQueuedCompletionStatus( // 인자로 넘긴 주소 변수의 값을 채워준다.
+			iocp_handle,
+			&transferred_bytes,
+			&key,
+			&over,
+			INFINITE);
+
+		ExOverlapped* ex_over = reinterpret_cast<ExOverlapped*>(over);
+
+		if (!result){
+			if (ex_over->op_type == ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
+			else { // 클라이언트 강제 종료일 경우
+				Disconnect(static_cast<int>(key));
+				if (ex_over->op_type == SEND) delete ex_over;
+			}
+			continue;
+		}
+
+		// 클라이언트 정상 종료일 경우
+		if (transferred_bytes == 0 && ex_over->op_type != ACCEPT) {
+			Disconnect(static_cast<int>(key));
+			if (ex_over->op_type == SEND) delete ex_over;
+			continue;
+		}
+
+		switch (ex_over->op_type) {
+		case ACCEPT: {
+			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
+			int new_index = GetEmptyUserIndex();
+			if (new_index != -1) {
+				users[new_index]->InitSession(new_index, GetNewUserId(), client_socket);
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
+				users[new_index]->RecvPacket(iocp_handle);
+				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+				std::cout << "Session[" << new_index << "] connect/Id: " << users[new_index]->GetId() << std::endl;
+
+				//S2C_TEST_LOGIN_PACKET send_p;
+				//send_p.size = sizeof(S2C_TEST_LOGIN_PACKET);
+				//send_p.type = S2C_TEST_LOGIN;
+				//send_p.id = users[new_index]->GetId();
+				//SendToSelf((char*)&send_p, new_index);
+
+				//S2C_LOGIN_PACKET send_p;
+				//send_p.size = sizeof(S2C_LOGIN_PACKET);
+				//send_p.type = S2C_LOGIN;
+				//send_p.id = users[new_index]->GetId();
+				//SendToSelf((char*)&send_p, new_index);
+			}
+			else std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
+
+			ZeroMemory(&accept_over.ex_over.over, sizeof(accept_over.ex_over.over));
+			int addr_size = sizeof(SOCKADDR_IN);
+			AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.ex_over.over);
+			break;
+		}
+
+		case RECV: {
+			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
+			if (io_over->ex_over.operation_id == users[key]->GetId()) {
+				ProcessPacket(transferred_bytes, key);
+				users[key]->RecvPacket(iocp_handle);
+			}
+			
+			break;
+		}
+
+		case SEND: {
+			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
+			delete io_over;
+
+			break;
+		}
+		case DB:
+			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
+			ProcessDB(db_over, key);
+		}
+	}
+}
+
+void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
+{
+	if (users[user_index]->GetState() == NONE) {
+		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
+		return;
+	}
+
+	if (recv_bytes + users[user_index]->GetRemainDataSize() > BUF_SIZE) {
+		Disconnect(user_index);
+		return;
+	}
+
+	else users[user_index]->SetRemainDataSize(recv_bytes);
+
+	if (users[user_index]->GetRemainDataSize() < sizeof(short)) return;
+
+	short packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
+
+	while (users[user_index]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
+	{
+		char p_buffer[BUF_SIZE];
+		// 패킷 분리: packet_buffer에 복사 후 처리
+		memcpy(p_buffer, users[user_index]->GetExOver().packet_buf, packet_size);
+		RoutePacket(p_buffer, user_index);
+
+		 // 처리한 패킷은 남은 데이터에서 제거
+		users[user_index]->SetRemainDataSize(-packet_size);
+		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
+		if (users[user_index]->GetRemainDataSize() <= sizeof(short)) break;
+		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
+	}
+}
+
+void IOCPServer::RoutePacket(char* packet, int user_index)
+{
+	switch (users[user_index]->GetState()) {
+	case NONE:
+		return;
+	case LOGIN:
+		handler.HandlePacket(packet, user_index);
+		break;
+	case LOBBY:
+		handler.HandlePacket(packet, user_index);
+		break;
+	case ROOM:
+		rooms[users[user_index]->GetRoomIndex()]->GetRoomPacketHandler().HandlePacket(packet, user_index);
+		break;
+	}
+
+}
+
+void IOCPServer::BroadCastLobby(char* packet)
+{
+	for (auto& user : users) {
+		if (user->GetState() == LOBBY) {// 현재 이 상태는 서버에 연결되어 있는 상태이므로, 나중에 로비, 방에 따라 구분 필요
+			user->SendPacket(packet, iocp_handle);
+		}
+	}
+}
+
+void IOCPServer::SendToSelf(char* packet, int self_index)
+{
+	users[self_index]->SendPacket(packet, iocp_handle);
+}
+
+void IOCPServer::CreateRoom(char* packet, int user_index)
+{
+	int room_index = GetEmptyRoomIndex();
+	if (room_index == -1) {
+		return;
+	}
+
+	users[user_index]->SetRoomIndex(room_index);
+	rooms[room_index]->InitRoom(packet, users[user_index]); // 초기화는 그냥 방 내부에서 처리하기.
+}
+
+int IOCPServer::GetNewUserId()
+{
+	return id_generator.fetch_add(1) + 1; // fetch_add는 값을 실제로 원자적으로 증가시키지만, 반환하는 것은 증가 이전의 값
+}
+
+int IOCPServer::GetEmptyUserIndex()
+{
+	for (int i = 0; i < MAX_USER; ++i) {
+		if (!users[i]->GetState()) {
+			if (users[i]->SetState(NONE, LOGIN)) {
+				return i;
+			}
+		}
+	}
+
+	return -1;
+}
+
+int IOCPServer::GetEmptyRoomIndex()
+{
+	for (int i = 0; i < MAX_ROOM; ++i) {
+		if (rooms[i]->GetRoomState() == EMPTY) {
+			rooms[i]->SetRoomState(WAIT);
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+void IOCPServer::Disconnect(int user_index)
+{
+	if (users[user_index]->GetState() == NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
+
+	if (users[user_index]->GetState() == ROOM) rooms[users[user_index]->GetRoomIndex()]->DeleteUser(users[user_index]->GetId());
+	
+	S2C_DISCONNECT_PACKET p;
+	p.size = sizeof(S2C_DISCONNECT_PACKET);
+	p.type = S2C_DISCONNECT;
+	//SendToSelf(reinterpret_cast<char*>(&p), user_index);
+	closesocket(users[user_index]->GetSocket()); // closesocket 이후 이전 소켓에 대한 iocp 완료(실패로) 통지가 언제 올지 불분명해서 다음에 연결된 소켓이 받을 경우 영향이 갈 수 있다고 하는데..
+	users[user_index]->SetState(NONE);
+	std::cout << "Session[" << user_index << "] disconnect/Id: " << id_generator << std::endl;
+}
+
+void IOCPServer::ProcessDB(DBOverlapped* db_over, int user_index)
+{
+	switch (db_over->type) {
+	case DBOperationType::LOGIN: {
+		S2C_LOGIN_PACKET login_p;
+		ZeroMemory(&login_p, sizeof(login_p));
+		login_p.size = sizeof(S2C_LOGIN_PACKET);
+		login_p.type = S2C_LOGIN;
+		if (db_over->ok) {
+			if (db_over->result_data) { // nullptr이 아니면, 즉 포인터가 존재하면
+				users[user_index]->InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
+				users[user_index]->SetState(LOBBY);
+				login_p.id = users[user_index]->GetId();
+				login_p.max_score = users[user_index]->GetInfo().max_score;
+				login_p.win_count = users[user_index]->GetInfo().win_count;
+				login_p.lose_count = users[user_index]->GetInfo().lose_count;
+				StringToCharBuf(users[user_index]->GetInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
+			}
+		}
+		else {
+			login_p.id = -1; // 근데 로그인 실패일경우 나머지 패킷도 다같이 가는건 낭비같은데.. 결국 로그인 성공과 세션 데이터 전송은 분리 해야할듯
+		}
+		users[user_index]->SendPacket(reinterpret_cast<char*>(&login_p), iocp_handle);
+		break;
+	}
+	case DBOperationType::SCORE_UPDATE:
+		if (db_over->ok) {
+			// void*는 사용할 때 타입을 명시해야함(컴파일러가 알아들을 수 있도록)
+			// 보이드 유니크 포인터인 db_over->info를 get 함수로 raw 포인터를 가져와 사용할 포인터로 static_cast, void* <-> T* 간에는 static_cast가 허용되고, void*에는 T*를 대입할 수 있다.
+			DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
+			users[user_index]->GetInfo().max_score = res->max_score;
+			S2C_UPDATE_SCORE_PACKET us_p;
+			us_p.size = sizeof(S2C_UPDATE_SCORE_PACKET);
+			us_p.type = S2C_UPDATE_SCORE;
+			us_p.max_score = res->max_score;
+			users[user_index]->SendPacket(reinterpret_cast<char*>(&us_p), iocp_handle);
+		} 
+	}
+	delete db_over;
+}
+
+void IOCPServer::StringToCharBuf(const std::string& str, char* buf, int buf_size)
+{
+	ZeroMemory(buf, buf_size);
+	int copy_size = std::min(str.size(), static_cast<size_t>(buf_size));
+	memcpy(buf, str.data(), copy_size);
+}
+
+std::string IOCPServer::CharBufToString(const char* buf, int buf_size)
+{
+	int copy_size = strnlen(buf, buf_size);
+	std::string str(buf, copy_size);
+	return str;
+}
+
+
+===== FILE END: IOCPServer.cpp =====
+
+===== FILE BEGIN: IOCPServer.h =====
+#pragma once
+#include <WinSock2.h>
+#include <MSWSock.h>
+#include <array>
+#include <atomic>
+#include <memory>
+#include "ExOverlapped.h"
+#include "Session.h"
+#include "PacketHandler.h"
+#include "MQueue.h"
+#include "TetrisRoom.h"
+#include "Atomic.h"
+#include "Database.h"
+#pragma comment(lib, "MSWSock.lib")
+#pragma comment(lib, "Ws2_32.lib")
+
+class IOCPServer
+{
+	HANDLE iocp_handle;
+	SOCKET listen_socket, client_socket;
+	WSADATA wsadata;
+	SOCKADDR_IN server_addr;
+	IOOverlapped accept_over;
+	Database db;
+	//MQueue task_queue;
+	PacketHandler handler;
+	std::atomic<int> id_generator = -1;
+	std::atomic<long long> tick_count = 0;
+
+	//std::unique_ptr<PacketHandler> packet_handler; // 먼저 선언되어 있다면 해당 변수는 나중에 선언되는 변수에서 사용 가능하다.
+	std::array<Session*, MAX_USER> users;
+	std::array<TetrisRoom*, MAX_ROOM> rooms;
+	
+	// 변수-> 컨테이너 생성 시 객체 생성자에 인자 넣는게 안된다.
+	// 포인터 -> 생성자에서 인자 넣고 동적할당 하면 된다.
+
+	bool is_running = true;
+	
+public:
+	IOCPServer();
+	~IOCPServer();
+
+	//getters
+	//std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() { return users; };
+	//std::array<std::unique_ptr<TetrisRoom>, MAX_ROOM>& GetRoomList() { return rooms; };
+	int GetEmptyUserIndex();
+	int GetEmptyRoomIndex();
+	int GetNewUserId();
+	bool GetRunning() const { return is_running; }
+	HANDLE GetHandle() const { return iocp_handle; }
+	Session* GetSession(int user_index) const { return users[user_index]; }
+	long long GetTickCount() const { return tick_count.load(); }
+	TetrisRoom* GetRoom(int room_index) const { return rooms[room_index]; }
+	Database& GetDB() { return db; }
+
+	void AddTickCount() { tick_count.fetch_add(1); }
+
+	//virtual MQueue& GetTaskQueue() override;
+
+	void Disconnect(int user_index);
+	void StartServer();
+	void ProcessGQCS();
+	void ProcessPacket(int recv_bytes, int user_index);
+	void RoutePacket(char* packet, int user_index);
+	void BroadCastLobby(char* packet);
+	//void BroadCastRoom(char* packet, int room_id);
+	void SendToSelf(char* packet, int self_index);
+	void CreateRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
+	void ProcessDB(DBOverlapped* db_over, int user_index);
+	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
+	std::string CharBufToString(const char* buf, int buf_size);
+};
+
+===== FILE END: IOCPServer.h =====
+
+===== FILE BEGIN: main.cpp =====
+#include <iostream>
+#include <vector>
+#include <thread>
+#include <chrono>
+#include <mutex>
+#include <condition_variable>
+#include "IOCPServer.h"
+
+IOCPServer iocp_server;
+
+std::mutex              g_tick_mutex;
+std::condition_variable g_tick_cv;
+
+int  g_tick_counter = 0;
+//bool tick_enable = false; 
+
+void WorkerThread()
+{
+    iocp_server.ProcessGQCS();
+}
+
+void TickWorkerThread(int num)
+{
+    int thread_num = num;
+    int last_tick = 0;
+
+    while (iocp_server.GetRunning())
+    {
+        std::unique_lock<std::mutex> lock(g_tick_mutex);
+
+        // 람다 함수가 참을 반환해야 다음 코드가 진행된다. notify 관련 함수가 호출되면 조건 검사를 다시 수행한다.
+        g_tick_cv.wait(lock, [&] { // 전달한 lock으로 람다 내부 범위를 lock, 조건 검사하고 바로 unlock한다.
+            if (!iocp_server.GetRunning()) return true; // 종료 신호가 오면 바로 빠져나오기
+            return g_tick_counter > last_tick;
+            });
+
+        int current_tick = g_tick_counter; // 틱이 밀려 있어도 새로운 처리를 전달받은 시점에 한 번에 처리
+        lock.unlock();
+
+        for (int i = thread_num; i < MAX_ROOM; i += MAX_TICK_WORKERS) {
+            if (iocp_server.GetRoom(i)->GetRoomState() != PLAY) continue;
+            iocp_server.GetRoom(i)->ProcessPlayTasks();
+            iocp_server.GetRoom(i)->UpdateTick();
+        }
+
+        last_tick = current_tick;
+    }
+}
+
+void TimerThread()
+{
+    using clock = std::chrono::steady_clock;
+
+    auto next_tick = clock::now();
+
+    while (iocp_server.GetRunning())
+    {
+        // 다음 틱 시각 계산 후 그때까지 잠자기 cpu 내의 하드웨어 타이머를 통해 타이머 인터럽트가 발생하면 깨어나므로, 대기 중 CPU를 소모하지 않는다.
+        next_tick += std::chrono::milliseconds(FRAME_TIME);
+        std::this_thread::sleep_until(next_tick);
+
+        {
+            std::lock_guard<std::mutex> lock(g_tick_mutex);
+            ++g_tick_counter; // 새 틱 발생
+        }
+
+        // 새 틱이 생겼으니 TickWorker 들을 깨운다.
+        g_tick_cv.notify_all();
+    }
+}
+
+void DBThread()
+{
+    iocp_server.GetDB().Run();
+}
+
+int main()
+{
+    SetConsoleOutputCP(65001);
+
+    iocp_server.StartServer();
+    iocp_server.GetDB().init(iocp_server.GetHandle());
+
+    std::vector<std::thread> worker_threads;
+    int num_threads = std::thread::hardware_concurrency();
+
+    std::vector<std::thread> tick_workers;
+    for (int i = 0; i < MAX_TICK_WORKERS; ++i){
+        tick_workers.emplace_back(TickWorkerThread, i);
+        --num_threads;
+    }
+
+    std::thread timer_thread(TimerThread);
+    --num_threads;
+
+    std::thread db_thread(DBThread);
+    --num_threads;
+
+    for (int i = 0; i < num_threads; ++i)
+        worker_threads.emplace_back(WorkerThread);
+
+    for (auto& th : worker_threads)
+        th.join();
+
+    for (auto& th : tick_workers)
+        th.join();
+
+    timer_thread.join();
+    db_thread.join();
+
+    return 0;
+}
+
+===== FILE END: main.cpp =====
+
+===== FILE BEGIN: MQueue.h =====
+#pragma once
+#include <queue>
+#include <mutex>
+
+template <typename T>
+class MQueue
+{
+private:
+    std::queue<T> m_queue;
+    std::mutex q_mutex;
+
+public:
+    // Enqueue
+    void EnQ(const T& value)
+    {
+        std::lock_guard<std::mutex> lock(q_mutex);
+        m_queue.push(value);
+    }
+
+    // Dequeue (큐가 비었으면 기본값 반환)
+    T DeQ()
+    {
+        std::lock_guard<std::mutex> lock(q_mutex);
+        if (m_queue.empty())
+            return T();  // 기본값(T()) 반환
+
+        T value = m_queue.front();
+        m_queue.pop();
+        return value;
+    }
+
+    // Is queue empty?
+    bool IsEmpty()
+    {
+        std::lock_guard<std::mutex> lock(q_mutex);
+        return m_queue.empty();
+    }
+
+    void Swap(MQueue<T>& other)
+    {
+        std::lock_guard<std::mutex> lock(q_mutex);
+		std::lock_guard<std::mutex> other_lock(other.q_mutex);
+        std::swap(m_queue, other.m_queue);
+    }
+
+};
+
+
+===== FILE END: MQueue.h =====
+
+===== FILE BEGIN: multi_iocp_server.cpp =====
+#include <iostream>
+#include <array>
+#include <WS2tcpip.h>
+#include <MSWSock.h>
+#include <thread>
+#include <vector>
+#include <mutex>
+#include <unordered_set>
+#include "protocol.h"
+
+#pragma comment(lib, "WS2_32.lib")
+#pragma comment(lib, "MSWSock.lib")
+using namespace std;
+
+enum COMP_TYPE { OP_ACCEPT, OP_RECV, OP_SEND };
+class OVER_EXP {
+public:
+	WSAOVERLAPPED _over;
+	WSABUF _wsabuf;
+	char _send_buf[BUF_SIZE];
+	COMP_TYPE _comp_type;
+	OVER_EXP()
+	{
+		_wsabuf.len = BUF_SIZE;
+		_wsabuf.buf = _send_buf;
+		_comp_type = OP_RECV;
+		ZeroMemory(&_over, sizeof(_over));
+	}
+	OVER_EXP(char* packet)
+	{
+		_wsabuf.len = packet[0];
+		_wsabuf.buf = _send_buf;
+		ZeroMemory(&_over, sizeof(_over));
+		_comp_type = OP_SEND;
+		memcpy(_send_buf, packet, packet[0]);
+	}
+};
+
+enum S_STATE { ST_FREE, ST_ALLOC, ST_INGAME };
+class SESSION {
+	OVER_EXP _recv_over;
+
+public:
+	mutex _s_lock;
+	S_STATE _state;
+	int _id;
+	SOCKET _socket;
+	short	x, y;
+	char	_name[NAME_SIZE];
+	int		_prev_remain;
+	int		_last_move_time;
+public:
+	SESSION()
+	{
+		_id = -1;
+		_socket = 0;
+		x = y = 0;
+		_name[0] = 0;
+		_state = ST_FREE;
+		_prev_remain = 0;
+	}
+
+	~SESSION() {}
+
+	void do_recv()
+	{
+		DWORD recv_flag = 0;
+		memset(&_recv_over._over, 0, sizeof(_recv_over._over));
+		_recv_over._wsabuf.len = BUF_SIZE - _prev_remain;
+		_recv_over._wsabuf.buf = _recv_over._send_buf + _prev_remain;
+		WSARecv(_socket, &_recv_over._wsabuf, 1, 0, &recv_flag,
+			&_recv_over._over, 0);
+	}
+
+	void do_send(void* packet)
+	{
+		OVER_EXP* sdata = new OVER_EXP{ reinterpret_cast<char*>(packet) };
+		WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
+	}
+	void send_login_info_packet()
+	{
+		SC_LOGIN_INFO_PACKET p;
+		p.id = _id;
+		p.size = sizeof(SC_LOGIN_INFO_PACKET);
+		p.type = SC_LOGIN_INFO;
+		p.x = x;
+		p.y = y;
+		do_send(&p);
+	}
+	void send_move_packet(int c_id);
+	void send_add_player_packet(int c_id);
+	void send_remove_player_packet(int c_id)
+	{
+		SC_REMOVE_PLAYER_PACKET p;
+		p.id = c_id;
+		p.size = sizeof(p);
+		p.type = SC_REMOVE_PLAYER;
+		do_send(&p);
+	}
+};
+
+array<SESSION, MAX_USER> clients;
+
+SOCKET g_s_socket, g_c_socket;
+OVER_EXP g_a_over;
+
+void SESSION::send_move_packet(int c_id)
+{
+	SC_MOVE_PLAYER_PACKET p;
+	p.id = c_id;
+	p.size = sizeof(SC_MOVE_PLAYER_PACKET);
+	p.type = SC_MOVE_PLAYER;
+	p.x = clients[c_id].x;
+	p.y = clients[c_id].y;
+	p.move_time = clients[c_id]._last_move_time;
+	do_send(&p);
+}
+
+void SESSION::send_add_player_packet(int c_id)
+{
+	SC_ADD_PLAYER_PACKET add_packet;
+	add_packet.id = c_id;
+	strcpy_s(add_packet.name, clients[c_id]._name);
+	add_packet.size = sizeof(add_packet);
+	add_packet.type = SC_ADD_PLAYER;
+	add_packet.x = clients[c_id].x;
+	add_packet.y = clients[c_id].y;
+	do_send(&add_packet);
+}
+
+int get_new_client_id()
+{
+	for (int i = 0; i < MAX_USER; ++i) {
+		lock_guard <mutex> ll{ clients[i]._s_lock };
+		if (clients[i]._state == ST_FREE)
+			return i;
+	}
+	return -1;
+}
+
+void process_packet(int c_id, char* packet)
+{
+	switch (packet[1]) {
+	case CS_LOGIN: {
+		CS_LOGIN_PACKET* p = reinterpret_cast<CS_LOGIN_PACKET*>(packet);
+		strcpy_s(clients[c_id]._name, p->name);
+		clients[c_id].send_login_info_packet();
+		{
+			lock_guard<mutex> ll{ clients[c_id]._s_lock };
+			clients[c_id]._state = ST_INGAME;
+		}
+		for (auto& pl : clients) {
+			{
+				lock_guard<mutex> ll(pl._s_lock);
+				if (ST_INGAME != pl._state) continue;
+			}
+			if (pl._id == c_id) continue;
+			pl.send_add_player_packet(c_id);
+			clients[c_id].send_add_player_packet(pl._id);
+		}
+		break;
+	}
+	case CS_MOVE: {
+		CS_MOVE_PACKET* p = reinterpret_cast<CS_MOVE_PACKET*>(packet);
+		clients[c_id]._last_move_time = p->move_time;
+		short x = clients[c_id].x;
+		short y = clients[c_id].y;
+		switch (p->direction) {
+		case 0: if (y > 0) y--; break;
+		case 1: if (y < W_HEIGHT - 1) y++; break;
+		case 2: if (x > 0) x--; break;
+		case 3: if (x < W_WIDTH - 1) x++; break;
+		}
+		clients[c_id].x = x;
+		clients[c_id].y = y;
+
+		for (auto& cl : clients) {
+			if (cl._state != ST_INGAME) continue;
+			cl.send_move_packet(c_id);
+
+		}
+	}
+	}
+}
+
+void disconnect(int c_id)
+{
+	for (auto& pl : clients) {
+		{
+			lock_guard<mutex> ll(pl._s_lock);
+			if (ST_INGAME != pl._state) continue;
+		}
+		if (pl._id == c_id) continue;
+		pl.send_remove_player_packet(c_id);
+	}
+	closesocket(clients[c_id]._socket);
+
+	lock_guard<mutex> ll(clients[c_id]._s_lock);
+	clients[c_id]._state = ST_FREE;
+}
+
+void worker_thread(HANDLE h_iocp)
+{
+	while (true) {
+		DWORD num_bytes;
+		ULONG_PTR key;
+		WSAOVERLAPPED* over = nullptr;
+		BOOL ret = GetQueuedCompletionStatus(h_iocp, &num_bytes, &key, &over, INFINITE);
+		OVER_EXP* ex_over = reinterpret_cast<OVER_EXP*>(over);
+		if (FALSE == ret) {
+			if (ex_over->_comp_type == OP_ACCEPT) cout << "Accept Error";
+			else {
+				cout << "GQCS Error on client[" << key << "]\n";
+				disconnect(static_cast<int>(key));
+				if (ex_over->_comp_type == OP_SEND) delete ex_over;
+				continue;
+			}
+		}
+
+		if ((0 == num_bytes) && ((ex_over->_comp_type == OP_RECV) || (ex_over->_comp_type == OP_SEND))) {
+			disconnect(static_cast<int>(key));
+			if (ex_over->_comp_type == OP_SEND) delete ex_over;
+			continue;
+		}
+
+		switch (ex_over->_comp_type) {
+		case OP_ACCEPT: {
+			int client_id = get_new_client_id();
+			if (client_id != -1) {
+				{
+					lock_guard<mutex> ll(clients[client_id]._s_lock);
+					clients[client_id]._state = ST_ALLOC;
+				}
+				clients[client_id].x = 0;
+				clients[client_id].y = 0;
+				clients[client_id]._id = client_id;
+				clients[client_id]._name[0] = 0;
+				clients[client_id]._prev_remain = 0;
+				clients[client_id]._socket = g_c_socket;
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_c_socket),
+					h_iocp, client_id, 0);
+				clients[client_id].do_recv();
+				g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+			}
+			else {
+				cout << "Max user exceeded.\n";
+			}
+			ZeroMemory(&g_a_over._over, sizeof(g_a_over._over));
+			int addr_size = sizeof(SOCKADDR_IN);
+			AcceptEx(g_s_socket, g_c_socket, g_a_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &g_a_over._over);
+			break;
+		}
+		case OP_RECV: {
+			int remain_data = num_bytes + clients[key]._prev_remain;
+			char* p = ex_over->_send_buf;
+			while (remain_data > 0) {
+				int packet_size = p[0];
+				if (packet_size <= remain_data) {
+					process_packet(static_cast<int>(key), p);
+					p = p + packet_size;
+					remain_data = remain_data - packet_size;
+				}
+				else break;
+			}
+			clients[key]._prev_remain = remain_data;
+			if (remain_data > 0) {
+				memcpy(ex_over->_send_buf, p, remain_data);
+			}
+			clients[key].do_recv();
+			break;
+		}
+		case OP_SEND:
+			delete ex_over;
+			break;
+		}
+	}
+}
+
+int main()
+{
+	HANDLE h_iocp;
+
+	WSADATA WSAData;
+	WSAStartup(MAKEWORD(2, 2), &WSAData);
+	g_s_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	SOCKADDR_IN server_addr;
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_port = htons(PORT_NUM);
+	server_addr.sin_addr.S_un.S_addr = INADDR_ANY;
+	bind(g_s_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
+	listen(g_s_socket, SOMAXCONN);
+	SOCKADDR_IN cl_addr;
+	int addr_size = sizeof(cl_addr);
+	h_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), h_iocp, 9999, 0);
+	g_c_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+	g_a_over._comp_type = OP_ACCEPT;
+	AcceptEx(g_s_socket, g_c_socket, g_a_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &g_a_over._over);
+
+	vector <thread> worker_threads;
+	int num_threads = std::thread::hardware_concurrency();
+	for (int i = 0; i < num_threads; ++i)
+		worker_threads.emplace_back(worker_thread, h_iocp);
+	for (auto& th : worker_threads)
+		th.join();
+	closesocket(g_s_socket);
+	WSACleanup();
+}
+
+===== FILE END: multi_iocp_server.cpp =====
+
+===== FILE BEGIN: PacketHandler.cpp =====
+#include <iostream>
+#include "PacketHandler.h"
+#include "define.h"
+#include "packetType.h"
+#include "IOCPServer.h"
+
+PacketHandler::PacketHandler(IOCPServer* server) : server(server)
+{
+}
+
+// 패킷 핸들러를 따로 만들경우 IOCPServer 맴버 변수 접근을 위한 getter가 많이 필요하다..
+// IServer 가상함수로 만들고 업캐스팅을 하는 작업은..불필요하게 복잡해지는 느낌이 있다.
+// IOCP의 맴버 함수로 만들면 편하긴 한데.. switch로 만들꺼라 너무 길어길 것 같아 걱정이다.. 어떻게 해야할까?
+
+//char temp_id[MAX_USER_ID] = "master";
+//char temp_password[MAX_USER_PASSWORD] = "1234";
+//char temp_name[MAX_USER_NAME] = "master";
+
+void PacketHandler::HandlePacket(char* packet, int user_index)
+{
+	//static auto& users = server->GetSessionList();
+	//static auto& rooms = server->GetRoomList();
+	PrintPacketType(packet[2]);
+	//short* p_size;
+	//p_size = reinterpret_cast<short*>(packet);
+	//std::cout << "packet_size: " << *p_size << std::endl;
+
+	switch (packet[2]) {
+
+	case C2S_LOGIN: {
+		C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
+		int id = server->GetSession(user_index)->GetId();
+		int index = server->GetSession(user_index)->GetIndex();
+		// null은 있을수도, 없을수도 있음. 그래서 일단 전체를 받아야함. strnlen(buf, max_size) -> null 직전까지 길이 반환, 안만나면 최대길이 반환
+		std::string login_id = server->CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
+		std::string password = server->CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
+		Database& db = server->GetDB();
+		auto task_login = [&db, id, index, login_id, password]() {
+			db.ExecuteLogin(id, index, login_id, password);
+			};
+		
+		db.Enqueue(task_login);
+		//server->GetDB().Enqueue
+		//// 우선은 연결 요청이 들어오는 즉시 세션을 사용하도록 함. -> 나중에 반드시 바꿔야함
+		//S2C_LOGIN_PACKET send_p;
+		//send_p.size = sizeof(S2C_LOGIN_PACKET);
+		//send_p.type = S2C_LOGIN;
+		//memcpy(send_p.user_name, temp_name, MAX_USER_NAME);
+		//if (!memcmp(temp_id, recv_p->user_id, MAX_USER_ID) && !memcmp(temp_password, recv_p->user_password, MAX_USER_PASSWORD)) send_p.id = server->GetSession(user_index)->GetId();	
+		//else send_p.id = -1;
+
+		//std::cout << "size: " << recv_p->size << ", type: " << (int)recv_p->type << ", id: " << recv_p->user_id << ", pw: " << recv_p->user_password << std::endl;
+
+		//server->SendToSelf((char*)&send_p, user_index);
+
+		break;
+	}
+		
+	case C2S_MESSAGE: { // 테스트는 메세지 가변으로 해놓고 이건 가변으로 안했네;; 뭐했냐 나
+		C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
+		int msg_size = recv_p->size - sizeof(C2S_MESSAGE_PACKET);
+		if (msg_size == 0) return;
+		int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
+		char* send_p = new char[send_p_size];
+		S2C_MESSAGE_PACKET front_p;
+		front_p.size = send_p_size;
+		front_p.type = S2C_MESSAGE;
+		front_p.id = recv_p->id;
+		server->StringToCharBuf(server->GetSession(user_index)->GetInfo().nickname, front_p.user_name, sizeof(front_p.user_name));
+		memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET)); // 구조체 부분 복사
+		memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size); // 가변데이터 복사
+		
+		server->BroadCastLobby(send_p);
+
+		delete[] send_p;
+
+		break;
+	}
+
+	case C2S_TEST: {
+		// recv_p->size에 구조체 + 가변길이 데이터가 들어있다는 가정하에 구현->나중에 테스트 프로그램 로직도 바꿔야함
+		//std::cout << "테스트 패킷 수신" << std::endl;
+		C2S_TEST_PACKET* recv_p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
+		char* send_p = new char[recv_p->size];
+		int msg_size = recv_p->size - sizeof(C2S_TEST_PACKET);
+		S2C_TEST_PACKET front_p;
+		front_p.size = recv_p->size;
+		front_p.type = S2C_TEST;
+		front_p.id = recv_p->id;
+		front_p.last_time = recv_p->last_time;
+		memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET)); // 구조체 부분 복사
+		memcpy(send_p + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_TEST_PACKET), msg_size); // 가변데이터 복사
+
+		server->BroadCastLobby(send_p);
+
+		delete[] send_p;
+
+		break;
+	}
+		
+	case C2S_DISCONNECT: { 
+		C2S_DISCONNECT_PACKET* recv_p = reinterpret_cast<C2S_DISCONNECT_PACKET*>(packet);
+		server->Disconnect(recv_p->id);
+		break;
+	}
+
+	case C2S_ADD_OPEN_ROOM: {
+		server->CreateRoom(packet, user_index);
+		break;
+	}
+
+	case C2S_ADD_LOCK_ROOM: {
+		server->CreateRoom(packet, user_index);
+		break;
+	}
+	}
+	
+}
+
+
+===== FILE END: PacketHandler.cpp =====
+
+===== FILE BEGIN: PacketHandler.h =====
+#pragma once
+
+class IOCPServer;
+
+class PacketHandler
+{
+protected:
+	IOCPServer* server;
+public:
+	PacketHandler(IOCPServer* server);
+	virtual void HandlePacket(char* pakcet, int user_index);
+};
+
+
+===== FILE END: PacketHandler.h =====
+
+===== FILE BEGIN: packetType.h =====
+#pragma once
+#include <iostream>
+
+constexpr char S2C_LOGIN = 1;
+constexpr char C2S_LOGIN = 2;
+constexpr char S2C_MESSAGE = 3;
+constexpr char C2S_MESSAGE = 4;
+constexpr char S2C_TEST = 5;
+constexpr char C2S_TEST = 6;
+constexpr char S2C_DISCONNECT = 7;
+constexpr char C2S_DISCONNECT = 8;
+
+constexpr char C2S_ADD_OPEN_ROOM = 9;
+constexpr char S2C_ADD_OPEN_ROOM = 10;
+
+constexpr char C2S_ADD_LOCK_ROOM = 11;
+constexpr char S2C_ADD_LOCK_ROOM = 12;
+
+constexpr char C2S_ADD_USER = 13;
+constexpr char S2C_ADD_USER = 14;
+
+constexpr char C2S_DELETE_USER = 15;
+constexpr char S2C_DELETE_USER = 16;
+
+constexpr char C2S_READY = 17;
+constexpr char S2C_READY = 18;
+
+constexpr char C2S_START = 19;
+constexpr char S2C_START = 20;
+
+constexpr char C2S_KICK = 21;
+constexpr char S2C_KICK = 22;
+
+constexpr char C2S_MOVE = 23;
+constexpr char S2C_MOVE = 24;
+
+constexpr char S2C_SPAWN = 25;
+
+constexpr char S2C_GAMEOVER = 27;
+
+constexpr char S2C_GAMEEND = 29;
+
+constexpr char S2C_CLEARLINE = 31;
+
+constexpr char S2C_FIX = 33;
+
+constexpr char S2C_ADDLINE = 35;
+
+constexpr char S2C_UPDATE_SCORE = 37;
+
+constexpr char S2C_TEST_LOGIN = 101;
+constexpr char C2S_TEST_LOGIN = 102;
+
+inline void PrintPacketType(char type)
+{
+    std::cout << "Packet Type: ";
+
+    switch (type)
+    {
+    case S2C_LOGIN:          std::cout << "S2C_LOGIN"; break;
+    case C2S_LOGIN:          std::cout << "C2S_LOGIN"; break;
+
+    case S2C_MESSAGE:        std::cout << "S2C_MESSAGE"; break;
+    case C2S_MESSAGE:        std::cout << "C2S_MESSAGE"; break;
+
+    case S2C_TEST:           std::cout << "S2C_TEST"; break;
+    case C2S_TEST:           std::cout << "C2S_TEST"; break;
+
+    case S2C_DISCONNECT:     std::cout << "S2C_DISCONNECT"; break;
+    case C2S_DISCONNECT:     std::cout << "C2S_DISCONNECT"; break;
+
+    case C2S_ADD_OPEN_ROOM:  std::cout << "C2S_ADD_OPEN_ROOM"; break;
+    case S2C_ADD_OPEN_ROOM:  std::cout << "S2C_ADD_OPEN_ROOM"; break;
+
+    case C2S_ADD_LOCK_ROOM:  std::cout << "C2S_ADD_LOCK_ROOM"; break;
+    case S2C_ADD_LOCK_ROOM:  std::cout << "S2C_ADD_LOCK_ROOM"; break;
+
+    case C2S_ADD_USER:       std::cout << "C2S_ADD_USER"; break;
+    case S2C_ADD_USER:       std::cout << "S2C_ADD_USER"; break;
+
+    case C2S_DELETE_USER:    std::cout << "C2S_DELETE_USER"; break;
+    case S2C_DELETE_USER:    std::cout << "S2C_DELETE_USER"; break;
+
+    case C2S_READY:          std::cout << "C2S_READY"; break;
+    case S2C_READY:          std::cout << "S2C_READY"; break;
+
+    case C2S_START:          std::cout << "C2S_START"; break;
+    case S2C_START:          std::cout << "S2C_START"; break;
+
+    case C2S_KICK:           std::cout << "C2S_KICK"; break;
+    case S2C_KICK:           std::cout << "S2C_KICK"; break;
+
+    case C2S_MOVE:           std::cout << "C2S_MOVE"; break;
+    case S2C_MOVE:           std::cout << "S2C_MOVE"; break;
+
+    case S2C_SPAWN:          std::cout << "S2C_SPAWN"; break;
+
+    case S2C_GAMEOVER:       std::cout << "S2C_GAMEOVER"; break;
+    case S2C_GAMEEND:        std::cout << "S2C_GAMEEND"; break;
+
+    case S2C_CLEARLINE:      std::cout << "S2C_CLEARLINE"; break;
+
+    case S2C_TEST_LOGIN:     std::cout << "S2C_TEST_LOGIN"; break;
+    case C2S_TEST_LOGIN:     std::cout << "C2S_TEST_LOGIN"; break;
+
+    default:                 std::cout << "UNKNOWN_PACKET_TYPE"; break;
+    }
+
+    std::cout << std::endl;
+}
+
+
+
+===== FILE END: packetType.h =====
+
+===== FILE BEGIN: RoomPacketHandler.cpp =====
+#include "RoomPacketHandler.h"
+#include "TetrisRoom.h"
+#include "IOCPServer.h"
+
+RoomPacketHandler::RoomPacketHandler(TetrisRoom* room, IOCPServer* server) : room(room), PacketHandler(server)
+{
+
+}
+
+void RoomPacketHandler::HandlePacket(char* packet, int user_index)
+{
+	PrintPacketType(packet[2]);
+
+	switch (packet[2]) {
+	case C2S_ADD_USER: {
+		//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
+		room->AddUser(server->GetSession(user_index));
+		break;
+	}
+
+	case C2S_DELETE_USER: {
+		room->DeleteUser(server->GetSession(user_index)->GetId());
+		break;
+	}
+
+	case C2S_READY: {
+		//C2S_READY_PACKET* recv_p = reinterpret_cast<C2S_READY_PACKET*>(packet);
+		room->ReadyUser(server->GetSession(user_index)->GetId());
+		break;
+	}
+
+	case C2S_KICK: {
+		C2S_KICK_PACKET* recv_p = reinterpret_cast<C2S_KICK_PACKET*>(packet);
+		room->KickUser(server->GetSession(user_index)->GetId(), recv_p->kick_user_id);
+		break;
+	}
+
+	case C2S_START: {
+		//C2S_START_PACKET* recv_p = reinterpret_cast<C2S_START_PACKET*>(packet);
+		room->StartGame(server->GetSession(user_index)->GetId());
+		break;
+	}
+
+	case C2S_MOVE: {
+		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
+		TaskInfo new_task;
+		new_task.id = server->GetSession(user_index)->GetId();
+		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+		room->GetTasks().AddTask(new_task);
+		break;
+	}
+	}
+}
+
+
+===== FILE END: RoomPacketHandler.cpp =====
+
+===== FILE BEGIN: RoomPacketHandler.h =====
+#pragma once
+#include "PacketHandler.h"
+
+class TetrisRoom;
+class IOCPServer;
+
+class RoomPacketHandler : public PacketHandler
+{
+	TetrisRoom* room;
+public:
+	RoomPacketHandler(TetrisRoom* room, IOCPServer* server);
+	virtual void HandlePacket(char* packet, int user_index) override;
+};
+
+===== FILE END: RoomPacketHandler.h =====
+
+===== FILE BEGIN: RoomSession.cpp =====
+#include "RoomSession.h"
+
+RoomSession::RoomSession()
+{
+	r_user_state.Store(ROOM_USER_STATE::EMPTY);
+}
+
+RoomSession::~RoomSession()
+{
+
+}
+
+void RoomSession::InitSession(Session* s)
+{
+	session = s;
+	tetris.Clear();
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	tetromino_index = 0;
+
+	score = 0;
+	ClearSendBuf();
+}
+
+void RoomSession::ClearSession()
+{
+	session = nullptr;
+	tetris.Clear();
+	r_user_state.Store(ROOM_USER_STATE::EMPTY);
+	tetromino_index = 0;
+
+	score = 0;
+	ClearSendBuf();
+}
+
+void RoomSession::ClearData()
+{
+	tetris.Clear();
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	tetromino_index = 0;
+
+	score = 0;
+	ClearSendBuf();
+}
+
+void RoomSession::AddToSendBuffer(const char* data, int data_size)
+{
+	memcpy(send_buf + send_data_size, data, data_size);
+	send_data_size += data_size;
+}
+
+void RoomSession::SendTickBatch(HANDLE iocp_handle)
+{
+	if (send_data_size >= 3) {
+		session->SendBoundPacket(send_buf, send_data_size, iocp_handle);
+		ClearSendBuf();
+	}
+	
+}
+
+void RoomSession::ClearSendBuf()
+{
+	send_data_size = 0;
+	ZeroMemory(send_buf, sizeof(send_buf));
+}
+
+
+===== FILE END: RoomSession.cpp =====
+
+===== FILE BEGIN: RoomSession.h =====
+#pragma once
+#include <string>
+#include <array>
+#include "Tetris.h"
+#include "define.h"
+#include "Session.h"
+
+class RoomSession
+{
+	Session* session = nullptr; // 상속으로 하면 세션을 받아올 수가 없음
+	Tetris tetris;
+	char send_buf[BUF_SIZE];
+	int send_data_size = 0;
+	// std::string user_name; // 방 생성할 때 만들도록 일단 하고, 나중에 회원가입 - DB 연동으로 session 클래스에 포함해보자.
+	// char user_name[MAX_USER_NAME];
+	Atomic<ROOM_USER_STATE> r_user_state;
+
+	int tetromino_index = 0;
+
+	int score = 0;
+
+public:
+	RoomSession();
+	~RoomSession();
+
+	Session* GetSession() const { return session; }
+	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.Load(); }
+	Tetris& GetTetris() { return tetris; }
+	int GetTetrominoIndex() const { return tetromino_index; }
+	void AddTetrominoIndex() { ++tetromino_index; }
+	int GetScore() const { return score; }
+
+	void SetRoomUserState(ROOM_USER_STATE new_state) { return r_user_state.Store(new_state); }
+	void SetScore(int val) { score = val; }	
+
+	void InitSession(Session* s);
+	void ClearSession();
+	void ClearData();
+	void AddToSendBuffer(const char* data, int data_size);
+	void SendTickBatch(HANDLE iocp_handle);
+	void ClearSendBuf();
+};
+
+===== FILE END: RoomSession.h =====
+
+===== FILE BEGIN: Session.cpp =====
+#include <iostream>
+#include "Session.h"
+#include "packetType.h"
+
+Session::Session()
+{
+	recv_over.SetOperationType(RECV);
+}
+
+void Session::InitSession(int new_index, int new_id, SOCKET new_socket)
+{
+	id = new_id;
+	recv_over.SetOperationId(new_id);
+	index = new_index;
+	socket = new_socket;
+	remain_data_size = 0; // 얘 기준으로 버퍼에 쓰니까 굳이 버퍼 자체를 초기화할 필요는 없어 보임.
+	room_index = -1;
+	info.clear();
+	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
+	//state = LOGIN;
+}
+
+void Session::InitDBInfo(DBResultLogin* db_info)
+{
+	info.login_id = db_info->login_id;
+	info.nickname = db_info->nickname;
+	info.lose_count = db_info->lose_count;
+	info.win_count = db_info->win_count;
+	info.max_score = db_info->max_score;
+}
+
+void Session::SendPacket(char* packet, const HANDLE iocp_handle)
+{
+	if (state == NONE) return;
+	IOOverlapped* send_over = new IOOverlapped;
+	send_over->SetOperationType(SEND);
+	send_over->SetOperationId(id);
+	short packet_size = GetPacketSize(packet);
+	memcpy(send_over->packet_buf, packet, packet_size);
+	send_over->wsabuf.len = packet_size;
+	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
+		std::cout << id << " Session::SendPacket() WSASend error, PGCS\n";
+	}
+}
+
+void Session::SendBoundPacket(char* packet, int data_size, const HANDLE iocp_handle)
+{
+	if (state == NONE) return;
+	IOOverlapped* send_over = new IOOverlapped;
+	send_over->SetOperationType(SEND);
+	send_over->SetOperationId(id);
+	memcpy(send_over->packet_buf, packet, data_size);
+	send_over->wsabuf.len = data_size;
+	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
+		std::cout << id << " Session::SendBoundPacket() WSASend error, PGCS\n";
+	}
+}
+
+void Session::RecvPacket(const HANDLE iocp_handle)
+{
+	if (state == NONE) return;
+	DWORD recv_flag = 0;
+	ZeroMemory(&recv_over.ex_over.over, sizeof(recv_over.ex_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
+	recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
+	recv_over.wsabuf.buf = recv_over.packet_buf + remain_data_size;
+	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
+		&recv_over.ex_over.over, 0);
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
+		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
+	}
+}
+
+short Session::GetPacketSize(char* packet)
+{
+	//switch (packet[2]) {
+	//case S2C_TEST: {
+	//	S2C_TEST_PACKET* p = reinterpret_cast<S2C_TEST_PACKET*>(packet);
+	//	short packet_size;
+	//	memcpy(&packet_size, packet, sizeof(packet_size));
+	//	packet_size += p->message_size;
+	//	return packet_size;
+	//}
+	//case C2S_TEST: {
+	//	C2S_TEST_PACKET* p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
+	//	short packet_size;
+	//	memcpy(&packet_size, packet, sizeof(packet_size));
+	//	packet_size += p->message_size;
+	//	return packet_size;
+	//}
+	//default: {
+	//}
+	//}
+
+	short packet_size;
+	memcpy(&packet_size, packet, sizeof(packet_size));
+	return packet_size;
+}
+
+bool Session::SetState(USER_STATE expected, USER_STATE desired)
+{
+	// false -> true
+	if (desired != expected) {
+		if (state.Compare_exchange_strong(expected, desired)) return true;
+		else return false;
+	}
+
+	// 같으면 원하는 상태이므로 true 반환
+	return true;
+}
+
+===== FILE END: Session.cpp =====
+
+===== FILE BEGIN: Session.h =====
+#pragma once
+#include <WinSock2.h>
+#include <MSWSock.h>
+#include <mutex>
+#include "ExOverlapped.h"
+#include "Atomic.h"
+#include "define.h"
+#include "DBResult.h"
+
+class Session
+{
+	SOCKET socket;
+	IOOverlapped recv_over;
+	std::mutex session_mutex;
+	//IServer* server_interface;
+	int id = -1;
+	int index = -1;
+	int room_index = -1;
+	int remain_data_size = 0;
+	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
+
+	Atomic<USER_STATE> state = NONE;
+	DBResultLogin info;
+public:
+
+	Session(); // 인자로 IPacketHandler를 받을 때 자식 클래스 Packethandler를 받는다->업캐스팅, 자식에서 재정의한 가상함수만 사용 가능하다.
+
+	void InitSession(int new_index, int new_id, SOCKET new_socket);
+	void InitDBInfo(DBResultLogin* info);
+	void SendPacket(char* packet, const HANDLE iocp_handle);
+	void SendBoundPacket(char* packet, int data_size, const HANDLE iocp_handle);
+	void RecvPacket(const HANDLE iocp_handle);
+	
+	short GetPacketSize(char* packet);
+
+	//getters
+	SOCKET GetSocket() const { return socket; }
+	IOOverlapped& GetExOver() { return recv_over; }
+
+	int GetId() const { return id; }
+	int GetIndex() const { return index; }
+	int GetRoomIndex() const { return room_index; }
+	int GetRemainDataSize() const { return remain_data_size; }
+	USER_STATE GetState() const { return state.GetSelf(); }
+	DBResultLogin& GetInfo() { return info; }
+	//std::string GetPrimaryKey() const { return login_id; }
+
+	//setters
+	void SetIndex(int new_index) { index = new_index; }
+	void SetRoomIndex(int new_room_id) { room_index = new_room_id; }
+	void SetRemainDataSize(int new_data_size) { remain_data_size += new_data_size; }
+	void SetState(USER_STATE new_state) { state = new_state; } // 흠..?
+	bool SetState(USER_STATE expected, USER_STATE desired);
+	//void SetPrimaryKey(std::string val) { login_id = val; }
+};
+
+===== FILE END: Session.h =====
+
+===== FILE BEGIN: settings.h =====
+#pragma once
+constexpr int FPS = 50;
+constexpr int FRAME_TIME = 1000 / FPS;
+constexpr int MAX_TICK_WORKERS = 4;
+
+constexpr int CLEAR_LINE_SCORE = 10;
+
+constexpr int BUF_SIZE = 10240;
+constexpr int MAX_MESSAGE_SIZE = 512;
+constexpr int PORT_NUM = 12345;
+
+constexpr int MAX_USER = 10000;
+constexpr int MAX_ROOM = 5000;
+constexpr int MAX_ROOM_NAME = 48; // 16자 * UTF-8 1문자 크기(3)
+constexpr int MAX_ROOM_PASSWORD = 48;
+constexpr int MAX_ARRAY_SIZE = 127;
+constexpr int ID_SIZE = 16;
+
+constexpr int MAX_USER_ID = 48;
+constexpr int MAX_USER_PASSWORD = 48;
+constexpr int MAX_USER_NAME = 48;
+
+constexpr int MOVE_TIMEOUT_TICK = static_cast<int>(FPS * 0.05); // 좌우, 아래 이동 3가지
+constexpr int ROTATE_TIMEOUT_TICK = static_cast<int>(FPS * 0.1);
+constexpr int DOWN_TIMEOUT_TICK = static_cast<int>(FPS * 0.5); // 자동 아래 이동 시간
+constexpr int DROP_TIMEOUT_TICK = static_cast<int>(FPS * 0.1);
+constexpr int GARBAGE_LINE_TIMEOUT_TICK = static_cast<int>(FPS * 10);
+===== FILE END: settings.h =====
+
+===== FILE BEGIN: task_type.h =====
+#pragma once
+#include <variant>
+#include "enum_class.h"
+
+constexpr int INPUT_TYPE_NUM = 5; // RIGHT, LEFT, DOWN, ROTATE, DROP
+
+struct TaskMove {
+	EVENT_TYPE move_type;
+};
+
+struct TaskClearLine {
+	int line_index;
+};
+
+struct TaskAddLine {
+	int hole_x;
+};
+
+struct TaskFix{
+	//int fixed_x;
+	//int fixed_y;
+};;
+
+struct TaskGameover {
+	
+};
+
+struct TaskUp {
+
+};
+
+// 이벤트 타입 말고 따로 필요한 내용이 없다면 굳이 구조체로 안만든다
+
+using task_var = std::variant<TaskMove, TaskClearLine, TaskAddLine, TaskFix, TaskGameover, TaskUp>;
+
+struct TaskType {
+	EVENT_TYPE event_type;
+	task_var task;
+};
+===== FILE END: task_type.h =====
+
+===== FILE BEGIN: Tetris.cpp =====
+#include <vector>
+#include <algorithm>
+#include <random>
+#include <variant>
+#include "Tetris.h"
+
+Tetris::Tetris()
+{
+    Clear(); // init처럼 쓰는중
+}
+
+void Tetris::InitNewTetromino(char type, Position spawn_pos)
+{
+    current_tetromino.type = type;
+    current_tetromino.moved_pos.x = spawn_pos.x;
+	current_tetromino.moved_pos.y = spawn_pos.y;
+    current_tetromino.shape_index = 0;
+	current_tetromino.default_pos = TETROMINOS.at(type)[0].default_pos;
+}
+
+// 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
+// 그러면 회전된 테트로미노 관리가 수월해진다.
+EVENT_TYPE Tetris::HandleTetrominoKeyInput(EVENT_TYPE move_type, std::vector<TaskType>& send_pending_tasks) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
+{
+    PrintMoveType(move_type);
+    Tetromino if_move_tetromino = current_tetromino;
+	if(!CheckInputAllow(move_type)) return EVENT_TYPE::NONE;
+    switch (move_type) {
+    case EVENT_TYPE::RIGHT:
+        ++if_move_tetromino.moved_pos.x;
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::RIGHT} });
+			tick_data.SetRightTick(0);
+            return EVENT_TYPE::RIGHT;
+        }
+        return EVENT_TYPE::NONE;
+
+    case EVENT_TYPE::LEFT:
+        --if_move_tetromino.moved_pos.x;
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::LEFT} });
+			tick_data.SetLeftTick(0);
+            return EVENT_TYPE::LEFT;
+        }
+        return EVENT_TYPE::NONE;
+
+    case EVENT_TYPE::DOWN:
+        ++if_move_tetromino.moved_pos.y;
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::DOWN} });
+			tick_data.SetDownTick(0);
+			tick_data.SetDownTimeoutTick(0);
+            return EVENT_TYPE::DOWN;
+        }
+        else {
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::FIX, TaskFix{} });
+            return EVENT_TYPE::FIX;
+        }
+
+    case EVENT_TYPE::ROTATE: {
+        const std::vector<Tetromino>& shapes = TETROMINOS.at(if_move_tetromino.type);
+        if (if_move_tetromino.shape_index + 1 < shapes.size()) ++if_move_tetromino.shape_index; // 다음 인덱스가 존재하면
+        else if_move_tetromino.shape_index = 0; // 다음 인덱스가 없다면
+
+        if_move_tetromino.default_pos = shapes[if_move_tetromino.shape_index].default_pos; // 회전된 인덱스로 테트로미노 변경
+        if (IsValidPosition(if_move_tetromino)) {
+            current_tetromino = if_move_tetromino;
+            send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::MOVE, TaskMove{EVENT_TYPE::ROTATE} });
+			tick_data.SetRotateTick(0);
+            return EVENT_TYPE::ROTATE;
+        }
+        return EVENT_TYPE::NONE;
+    }
+
+    case EVENT_TYPE::DROP: {
+        while (true) {
+            if (IsValidPosition(if_move_tetromino)) {
+                current_tetromino = if_move_tetromino;
+                ++if_move_tetromino.moved_pos.y;
+            }
+            else {
+                send_pending_tasks.emplace_back(TaskType{ EVENT_TYPE::FIX, TaskFix{} });
+				tick_data.SetDropTick(0);
+                return EVENT_TYPE::FIX;
+            }
+        }
+    }
+    }
+	return EVENT_TYPE::NONE;
+}
+
+bool Tetris::IsValidPosition(const Tetromino& t)
+{
+    Position real_pos[4]; 
+
+    for (int i = 0; i < 4; ++i) {
+        real_pos[i].x = t.default_pos[i].x + t.moved_pos.x;
+        real_pos[i].y = t.default_pos[i].y + t.moved_pos.y;
+    }
+
+    for (auto& pos : real_pos) {
+        if (pos.x < 0 || pos.x > BOARD_WIDTH - 1) return false;
+        if (pos.y < 0 || pos.y > TOTAL_HEIGHT - 1) return false;
+        if (board[pos.y][pos.x] == true) return false;
+    }
+    return true;
+}
+
+void Tetris::FixTetromino()
+{
+    Position real_pos[4];
+
+    for (int i = 0; i < 4; ++i) {
+        real_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_pos.x;
+        real_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_pos.y;
+    }
+
+    for (auto& pos : real_pos) {
+        board[pos.y][pos.x] = true;
+    }
+}
+
+std::vector<char> Tetris::ClearLine()
+{
+    std::vector<char> index_lines;
+
+    // ✅ 줄 삭제는 "보이는 영역"만: RESERVE_HEIGHT ~ TOTAL_HEIGHT-1
+    for (int y = HIDDEN_HEIGHT; y < TOTAL_HEIGHT; ++y) {
+        if (std::all_of(board[y].begin(), board[y].end(), // 한 줄이 모두 true(채워짐)이면
+            [](bool cell) { return cell; })) {
+            std::fill(board[y].begin(), board[y].end(), false); // 현재 줄을 모두 false로 바꾸고
+
+            // false 줄을 맨 위로 옮기고, 맨 위에서 1줄씩 아래로 당김
+            // (숨겨진 0~RESERVE_HEIGHT-1 줄도 같이 아래로 내려오지만,
+            //  줄 삭제 시의 "중력"은 전체 스택을 대상으로 적용)
+            std::rotate(board.begin(), board.begin() + y, board.begin() + y + 1);
+			index_lines.emplace_back(y);
+			std::cout << "Cleared line index y = " << y << "\n";
+        }
+    }
+
+    return index_lines;
+}
+
+std::vector<char> Tetris::GetGarbegeLineHoles(int cleard_line_num)
+{
+    int add_num = 0;
+    // 지워진 라인에 따라 증가되는 라인 수가 다름
+    switch (cleard_line_num) {
+    case 1:
+        add_num = 0;
+        break;
+
+    case 2:
+        add_num = 1;
+        break;
+
+    case 3:
+        add_num = 2;
+        break;
+
+    case 4:
+        add_num = 4;
+        break;
+
+	default:
+		add_num = 0;
+    }
+
+    std::vector<char> holes;
+    for (int i = 0; i < add_num; ++i) {
+        int hole_x = GetRandomHoleX();
+        holes.emplace_back(static_cast<int>(hole_x));
+	}
+
+    return holes;
+}
+
+void Tetris::AddGarbageLines(int line_num, std::vector<TaskType>& send_pending_tasks)
+{
+	Tetromino copy_tetromino = current_tetromino;
+
+    // 줄 추가작업
+    for (size_t i = 0; i < line_num; i++){
+        std::rotate(board.begin(), board.begin() + 1, board.end());
+        std::fill(board[TOTAL_HEIGHT - 1].begin(), board[TOTAL_HEIGHT - 1].end(), true);
+        int hole_x = GetRandomHoleX();
+        board[TOTAL_HEIGHT - 1][hole_x] = false;
+
+		TaskType add_line;
+		add_line.event_type = EVENT_TYPE::ADDLINE;
+        add_line.task = TaskAddLine{ .hole_x = hole_x };
+        send_pending_tasks.emplace_back(add_line);
+
+        if (CheckGameover()) {
+            TaskType gameover;
+            gameover.event_type = EVENT_TYPE::GAMEOVER;
+			gameover.task = TaskGameover{};
+			return;
+        }
+
+        // 테트로미노와 겹치면 안겹치게 테트로미노 위로 올리기
+        if (!IsValidPosition(current_tetromino)) {
+            --current_tetromino.moved_pos.y;
+            TaskType up_task;
+            up_task.event_type = EVENT_TYPE::MOVE;
+            up_task.task = TaskMove{EVENT_TYPE::UP};
+            send_pending_tasks.emplace_back(up_task);
+        }
+    }
+}
+
+int Tetris::GetRandomHoleX()
+{
+    // OS/하드웨어 엔트로피에서 시드 생성
+    static int prev_x = 0;
+    static std::random_device rd;
+
+    // 넣어준 시드값에 의해 생성될 난수가 준비된다.
+    static std::mt19937 gen(rd());
+
+    // 0~BOARD_WIDTH - 1 범위에서 균등 분포로 값 출력
+    static std::uniform_int_distribution<int> dist(0, BOARD_WIDTH - 1);
+	int random_x;
+    do {
+        random_x = dist(gen);
+    } while (random_x == prev_x);  // 이전과 같은 위치를 피한다
+
+    prev_x = random_x;
+
+    return random_x;
+}
+
+void Tetris::Clear()
+{
+    // ✅ 전체 보드(TOTAL_HEIGHT) 초기화
+    for (int i = 0; i < TOTAL_HEIGHT; ++i) {
+        for (int j = 0; j < BOARD_WIDTH; ++j) {
+            board[i][j] = false;
+        }
+    } // 가로 = WIDTH = x / 세로 = HEIGHT = y
+
+	pending_moves.fill(false);
+	tick_data.InitTickData();
+}
+
+bool Tetris::CheckGameover()
+{
+    for (int x = 0; x < BOARD_WIDTH; ++x) {
+        for (int y = 0; y < HIDDEN_HEIGHT; ++y) {
+            if (board[y][x] == true) {
+				return true;
+            }
+        }
+    }
+    return false;
+}
+
+void Tetris::DebugPrintBoard()
+{
+    // 현재 테트로미노의 실제 보드 상 위치 계산
+    std::array<Position, 4> real_tetromino_pos;
+    for (int i = 0; i < 4; ++i) {
+        real_tetromino_pos[i].x = current_tetromino.default_pos[i].x + current_tetromino.moved_pos.x;
+        real_tetromino_pos[i].y = current_tetromino.default_pos[i].y + current_tetromino.moved_pos.y;
+    }
+
+    std::cout << "====== Tetris Board (y: 0 ~ " << (TOTAL_HEIGHT - 1) << ") ======\n";
+
+    for (int y = 0; y < TOTAL_HEIGHT; ++y) {
+        std::cout << "|";
+        for (int x = 0; x < BOARD_WIDTH; ++x) {
+
+            bool is_current = false;
+            for (const auto& p : real_tetromino_pos) {
+                if (p.x == x && p.y == y) {
+                    is_current = true;
+                    break;
+                }
+            }
+
+            if (is_current)
+                std::cout << "▣";          // 현재 떨어지는 테트로미노: 빗금 네모
+            else
+                std::cout << (board[y][x] ? "■" : "□");  // 고정된 블록 / 빈 칸
+        }
+        std::cout << "|\n";
+    }
+
+    std::cout << "====================================\n";
+}
+
+bool Tetris::CheckInputAllow(EVENT_TYPE move_type)
+{
+    switch (move_type)
+    {
+    case EVENT_TYPE::LEFT:
+        if (tick_data.GetLeftTick() >= MOVE_TIMEOUT_TICK) return true;
+        return false;
+
+    case EVENT_TYPE::RIGHT:
+        if (tick_data.GetRightTick() >= MOVE_TIMEOUT_TICK) return true;
+        return false;
+
+    case EVENT_TYPE::DOWN:
+        if (tick_data.GetDownTick() >= MOVE_TIMEOUT_TICK) return true;
+        return false;
+
+    case EVENT_TYPE::ROTATE:
+        if (tick_data.GetRotateTick() >= ROTATE_TIMEOUT_TICK) return true;
+        return false;
+
+    case EVENT_TYPE::DROP:
+        if (tick_data.GetDropTick() >= DROP_TIMEOUT_TICK) return true;
+        return false;
+
+    default:
+        return false;
+    }
+}
+
+std::vector<TaskType> Tetris::TickProcess()
+{
+    std::vector<TaskType> send_pending_tasks;
+
+    // 첫 번째로 줄 추가 처리
+    if (tick_data.GetGarbageLineTick() >= tick_data.GetGarbageLineTimeout()) {
+        tick_data.SetGarbageLineTick(0);
+        AddGarbageLines(1, send_pending_tasks);
+        for (auto& t : send_pending_tasks) {
+            if (t.event_type == EVENT_TYPE::GAMEOVER) {
+                return send_pending_tasks;
+            }
+        }
+    }
+
+    // 두 번째로 쌓인 입력 처리
+    // 먼저 다운 타임아웃 이벤트 처리
+    if (tick_data.GetDownTimeoutTick() >= tick_data.GetDownTimeout()) {
+		tick_data.SetDownTimeoutTick(0);
+        input_tasks.emplace_back(EVENT_TYPE::DOWN);
+    }
+
+    // 중복되는 이벤트 합치기
+    for (auto& type : input_tasks) {
+        int t = static_cast<int>(type);
+        if (t < 0 || t >= INPUT_TYPE_NUM) {
+            std::cout << "Tetris::TickProcess() - Invalid input task type: " << t << "\n";
+            continue;
+        }
+        pending_moves[static_cast<int>(t)] = true;
+    }
+
+    // 합쳐진 이벤트들 처리
+    for (int i = static_cast<int>(EVENT_TYPE::DROP); i >= static_cast<int>(EVENT_TYPE::RIGHT); --i) {
+        if (pending_moves[i] == true) {
+            EVENT_TYPE t = static_cast<EVENT_TYPE>(i);
+			EVENT_TYPE result = HandleTetrominoKeyInput(t, send_pending_tasks);
+            if (result == EVENT_TYPE::NONE) {
+                continue;
+            }
+            else if (result == EVENT_TYPE::FIX){
+				return send_pending_tasks;
+            }
+        }
+    }
+
+    
+	return send_pending_tasks;
+}
+
+
+===== FILE END: Tetris.cpp =====
+
+===== FILE BEGIN: Tetris.h =====
+#pragma once
+#include "Tetromino.h"
+#include "TetrisTickData.h"
+#include "task_type.h"
+constexpr int HIDDEN_HEIGHT = 5;
+constexpr int BOARD_WIDTH = 10;
+constexpr int BOARD_HEIGHT = 20;
+constexpr int TOTAL_HEIGHT = BOARD_HEIGHT + HIDDEN_HEIGHT;
+
+inline void PrintMoveType(EVENT_TYPE type)
+{
+	switch (type)
+	{
+	case EVENT_TYPE::RIGHT:
+		std::cout << "RIGHT\n";
+		break;
+	case EVENT_TYPE::LEFT:
+		std::cout << "LEFT\n";
+		break;
+	case EVENT_TYPE::DOWN:
+		std::cout << "DOWN\n";
+		break;
+	case EVENT_TYPE::ROTATE:
+		std::cout << "ROTATE\n";
+		break;
+	case EVENT_TYPE::DROP:
+		std::cout << "DROP\n";
+		break;
+	}
+}
+
+
+class Tetris
+{
+	std::array<std::array<bool, BOARD_WIDTH>, TOTAL_HEIGHT> board;
+	std::array<bool, INPUT_TYPE_NUM> pending_moves; // 1틱에 여러 입력이 들어오는 것을 방지하기 위한 컨테이너
+	std::vector<EVENT_TYPE> input_tasks;
+	Tetromino current_tetromino;
+	TetrisTickData tick_data;
+public:
+	Tetris();
+
+	//bool GetNewSpawn() const { return new_spawn; }
+	//void SetNewSpawn(bool val) { new_spawn = val; }
+	Tetromino GetCurrentTetromino() const { return current_tetromino; }
+	Position GetCurrentTetrominoPos() const { return current_tetromino.moved_pos; }
+	TetrisTickData& GetTickData() { return tick_data; }
+	std::vector<EVENT_TYPE>& GetInputTasks() { return input_tasks; }
+
+	void InitNewTetromino(char type, Position spawn_pos);
+	EVENT_TYPE HandleTetrominoKeyInput(EVENT_TYPE move_type, std::vector<TaskType>& send_pending_tasks);
+	bool IsValidPosition(const Tetromino& t); // 이건 움직였다고 가정한 값을 넘김
+	void FixTetromino();
+	std::vector<char> ClearLine();
+	std::vector<char> GetGarbegeLineHoles(int cleard_line_num);
+	void AddGarbageLines(int line_num, std::vector<TaskType>& send_pending_tasks);
+
+	int GetRandomHoleX();
+	void Clear();
+	bool CheckGameover();
+	void DebugPrintBoard();
+	void SetPendingMove(int move_type) { pending_moves[move_type] = true; }
+	bool CheckInputAllow(EVENT_TYPE move_type);
+	std::vector<TaskType> TickProcess();
+	void ClearTasks() { input_tasks.clear(); }
+	void ClearPendingMoves() { pending_moves.fill(false); }
+};
+
+===== FILE END: Tetris.h =====
+
+===== FILE BEGIN: TetrisRoom.cpp =====
+#include <random>
+#include "TetrisRoom.h"
+TetrisRoom::TetrisRoom(IOCPServer* server) : server(server), room_handler(this, server)
+{
+	
+}
+
+TetrisRoom::~TetrisRoom()
+{
+
+}
+
+void TetrisRoom::InitRoom(char* packet, Session* session) // 네트워크 절약을 위해 비밀번호 포함 여부를 다르게 하여 패킷을 두 개로 구분, 같은 역할이므로 하나의 함수로 받아 케이스로 처리
+{
+	switch (packet[2]) {
+	case C2S_ADD_OPEN_ROOM: {
+		C2S_ADD_OPEN_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
+		if (!(p->max_user == 1 || p->max_user == 2 || p->max_user == 5)) break;
+		host_id = session->GetId();
+		max_user = p->max_user;
+		// resize는 만약 기존 벡터 메모리가 부족할 경우 새 메모리를 할당하고 기존 메모리 내용을 복사하는데, 여기서 아토믹 복사 불가 문제가 발생할 수 있음
+		room_users.reserve(p->max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
+		for (int i = 0; i < p->max_user; ++i){
+			room_users.emplace_back(); 
+		}
+		memcpy(room_name, p->room_name, sizeof(room_name));
+		is_password = false;
+		S2C_ADD_OPEN_ROOM_PACKET send_p;
+		send_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
+		send_p.type = S2C_ADD_OPEN_ROOM;
+		send_p.id = session->GetId();
+		send_p.max_user = max_user;
+		memcpy(send_p.room_name, p->room_name, sizeof(room_name));
+		session->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
+		AddUser(session);
+		break;
+	}
+
+	case C2S_ADD_LOCK_ROOM:{
+		C2S_ADD_LOCK_ROOM_PACKET* p = reinterpret_cast<C2S_ADD_LOCK_ROOM_PACKET*>(packet);
+		if (!(p->max_user == 1 || p->max_user == 2 || p->max_user == 5)) break;
+		host_id = session->GetId();
+		max_user = p->max_user;
+		room_users.reserve(p->max_user);
+		for (int i = 0; i < p->max_user; ++i) {
+			room_users.emplace_back();
+		}
+		memcpy(room_name, p->room_name, sizeof(room_name));
+		is_password = true;
+		memcpy(room_password, p->room_password, sizeof(room_password));
+		S2C_ADD_LOCK_ROOM_PACKET send_p;
+		send_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
+		send_p.type = S2C_ADD_LOCK_ROOM;
+		send_p.id = session->GetId();
+		send_p.max_user = max_user;
+		memcpy(send_p.room_name, p->room_name, sizeof(room_name));
+		memcpy(send_p.room_password, p->room_password, sizeof(room_password));
+		session->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
+		AddUser(session);
+		break;
+	}
+	}
+	std::cout << "Session id: " << session->GetId() << " Create room. room id(index): " << room_id;
+}
+
+void TetrisRoom::AddUser(Session* new_session)
+{
+	//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
+
+	bool b_send = false;
+	for(auto& r_user : room_users){
+		if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
+			
+		else {
+			new_session->SetState(ROOM);
+			r_user.InitSession(new_session);
+			S2C_ADD_USER_PACKET p;
+			p.size = sizeof(S2C_ADD_USER_PACKET);
+			p.type = S2C_ADD_USER;
+			// p.name = 세션에 이름 변수 추가 필요
+			p.id = new_session->GetId();
+			p.is_add = true;
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+
+			return;
+		}	
+
+	}
+
+	// 성공과 실패에 따라 패킷을 나눌까? 사실 방이 다 차 있다면 클라이언트 수준에서 송신 자체를 막아야 할 것 같기는 한데..
+	// 아니지. 클라에서 실제로 방이 빈 것으로 보였어도, 누군가가 먼저 차지했다면 그건 알 수가 없으니까 처리가 필요
+	S2C_ADD_USER_PACKET p;
+	p.size = sizeof(S2C_ADD_USER_PACKET);
+	p.type = S2C_ADD_USER;
+	// p.name = 세션에 이름 변수 추가 필요
+	p.id = new_session->GetId();
+	p.is_add = false;
+	new_session->SendPacket(reinterpret_cast<char*>(&p), server->GetHandle()); // 방이 꽉 찼을 경우 본인에게만 실패 전송
+}
+
+void TetrisRoom::DeleteUser(const int id)
+{
+	//std::cout << "delete user id: " << id << std::endl;
+	for (auto& r_user : room_users){
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
+			//std::cout << "delete user id: " << id << std::endl;
+			//room_mutex.lock();
+			r_user.GetSession()->SetState(LOBBY);
+
+			S2C_DELETE_USER_PACKET p;
+			p.size = sizeof(S2C_DELETE_USER_PACKET);
+			p.type = S2C_DELETE_USER;
+			p.id = id;
+			int new_host_id = -1;
+			if (p.id == host_id) { // 새 방장 여부에 따른 처리
+				new_host_id = FindNewHost(p.id);
+				host_id = new_host_id;
+				p.new_host_id = new_host_id;
+			}
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+			if (new_host_id == -1) { // 현재 방에 아무도 없으면
+				ClearRoom();
+				std::cout << "Room index " << room_id << " now empty" << std::endl;
+			}
+			r_user.ClearSession(); // 해당 아이디 세션 정리
+
+			break;
+			//room_mutex.unlock();
+		}
+	}
+}
+
+void TetrisRoom::ReadyUser(int id)
+{
+	if (host_id == id) return;
+
+	for (auto& r_user : room_users){
+		if (r_user.GetSession()->GetId() == id) { // 레디 상태 변화
+			r_user.SetRoomUserState(ROOM_USER_STATE::READY);
+
+			S2C_READY_PACKET p;
+			p.size = sizeof(S2C_READY_PACKET);
+			p.type = S2C_READY;
+			p.id = r_user.GetSession()->GetId();
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::READY) p.is_ready = true;				
+			else p.is_ready = false;
+				
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+			break;
+		}
+	}
+
+}
+
+
+void TetrisRoom::KickUser(int id, int kick_user_id)
+{
+	if (id != host_id) return;
+
+	for (auto& r_user : room_users) {
+		if (r_user.GetSession()->GetId() == kick_user_id) { // 삭제할 아이디 검색
+			r_user.ClearSession(); // 해당 아이디 세션 정리
+			r_user.SetRoomUserState(ROOM_USER_STATE::EMPTY);
+			r_user.GetSession()->SetState(LOBBY);
+
+			S2C_KICK_PACKET p;
+			p.size = sizeof(S2C_KICK_PACKET);
+			p.type = S2C_KICK;
+			p.kick_user_id = kick_user_id;
+			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+
+			break;
+		}
+	}
+}
+
+void TetrisRoom::StartGame(int id)
+{
+	if (id != host_id) return;
+	if (room_state == PLAY) return;
+
+	int host_index = -1;
+	for (int i = 0; i < max_user; i++){
+		if (room_users[i].GetSession()->GetId() == host_id) {
+			host_index = i;
+			break;
+		}
+	}
+
+	if(host_index == -1) return; // host_id가 논리적으로는 존재해야 하지만.. 버그 예외처리
+
+	int ready_user_count = 0;
+	S2C_START_PACKET start_p;
+
+	for(auto& r_user : room_users){
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue; // 사용 중이지 않은 인덱스는 건너뜀
+		if (r_user.GetSession()->GetId() == host_id) continue; // 방장은 건너뜀
+
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::WAIT) { // 방에 있는데 레디가 안된 사람이 있으면 시작 불가			
+			start_p.size = sizeof(S2C_START_PACKET);
+			start_p.type = S2C_START;
+			start_p.is_start = false;
+
+			room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&start_p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
+			return;
+		}
+		else ++ready_user_count;
+	}
+
+	if (max_user != 1 && ready_user_count == 0) { // 방장만 존재하면 당연히 시작 불가
+		start_p.size = sizeof(S2C_START_PACKET);
+		start_p.type = S2C_START;
+		start_p.is_start = false;
+		start_p.score = 0;
+
+		room_users[host_index].GetSession()->SendPacket(reinterpret_cast<char*>(&start_p), server->GetHandle()); // 시작 불가는 방장에게만 보내면 됨
+		// 보내야 할까? 시작 불가 알림창 정도는  클라에게 맏겨도 될 듯 하다. 잘못 와도 시작만 안하면 되니까
+		return;
+	}
+	SetRoomState(PLAY);
+
+	// 모든 조건 통과->게임 시작
+	Add7BagTetrominoList();
+	for (auto& r_user : room_users){
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		r_user.SetRoomUserState(ROOM_USER_STATE::PLAY);
+		r_user.GetTetris().InitNewTetromino(tetromino_spawn_list[r_user.GetTetrominoIndex()], spawn_pos);
+	}
+
+	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
+	InitGame();
+
+	start_p.size = sizeof(S2C_START_PACKET);
+	start_p.type = S2C_START;
+	start_p.is_start = true;
+	start_p.score = 0;
+	Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
+	
+	for (auto& r_user : room_users) {
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		S2C_SPAWN_PACKET spawn_p;
+		spawn_p.size = sizeof(S2C_SPAWN_PACKET);
+		spawn_p.type = S2C_SPAWN;
+		spawn_p.id = r_user.GetSession()->GetId();
+		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+		spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
+		spawn_p.spawn_x = spawn_pos.x;
+		spawn_p.spawn_y = spawn_pos.y;
+		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
+	}
+}
+
+void TetrisRoom::BuildBroadcastData(RoomSession& r_session, std::vector<TaskType>& tasks)
+{
+	for(auto& task : tasks){
+		switch (task.event_type) {
+		case EVENT_TYPE::MOVE: {
+			// 각 무브별 틱 초기화 추가가 애매하므로, 무브 틱 값 초기화는 Tetris::HandleTetrominoKeyInput에서 처리
+			auto& t = std::get<TaskMove>(task.task);
+			MakeMovePacketData(r_session, static_cast<int>(t.move_type));
+			break;
+		}
+
+		// fix는 항상 라인 클리어와 스폰을 동반한다.
+		case EVENT_TYPE::FIX: {
+			r_session.GetTetris().FixTetromino();
+			r_session.GetTetris().GetTickData().SetDownTick(0);
+			r_session.GetTetris().GetTickData().SetDownTimeoutTick(0);
+			r_session.GetTetris().GetTickData().SetDropTick(0);
+
+			// 줄 추가시 게임 오버가 될 수도 있지만 블록 고정시에도 게임 오버가 될 수 있다. 이것 역시 fix와 동반되는 과정이다.
+			if (r_session.GetTetris().CheckGameover()) {
+				if (max_user == 1) {
+					// 일단 종료 패킷을 보냄
+					r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
+					S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
+					send_p.size = sizeof(S2C_GAMEOVER_PACKET);
+					send_p.type = S2C_GAMEOVER;
+					send_p.id = r_session.GetSession()->GetId();
+					r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
+					r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
+					RequestUpdateScore(r_session);
+					ClearGame();
+				}
+				else {
+					if (CheckWinner()) {
+						ClearGame();
+					}
+				}
+				return;
+			}
+
+			S2C_FIX_PACKET fix_p;
+			fix_p.size = sizeof(S2C_FIX_PACKET);
+			fix_p.type = S2C_FIX;
+			fix_p.id = r_session.GetSession()->GetId();
+			fix_p.fixed_x = r_session.GetTetris().GetCurrentTetromino().moved_pos.x;
+			fix_p.fixed_y = r_session.GetTetris().GetCurrentTetromino().moved_pos.y;
+			r_session.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.size);
+
+			r_session.GetTetris().CheckGameover();
+
+			std::vector<char> index_lines = r_session.GetTetris().ClearLine();
+			if (!index_lines.empty()) {
+				r_session.SetScore(r_session.GetScore() + (CLEAR_LINE_SCORE * index_lines.size() * index_lines.size()));
+				for (int i = 0; i < index_lines.size(); i++) {
+					S2C_CLEARLINE_PACKET clear_line_p;
+					clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
+					clear_line_p.type = S2C_CLEARLINE;
+					clear_line_p.id = r_session.GetSession()->GetId();
+					clear_line_p.score = r_session.GetScore();
+					clear_line_p.line_index = index_lines[i];
+					r_session.AddToSendBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.size);
+				}
+			}
+
+			if (r_session.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList();
+			r_session.AddTetrominoIndex();
+
+			if (SetNewTetromino(r_session.GetSession()->GetId())) {
+				S2C_SPAWN_PACKET spawn_p;
+				spawn_p.size = sizeof(S2C_SPAWN_PACKET);
+				spawn_p.type = S2C_SPAWN;
+				spawn_p.id = r_session.GetSession()->GetId();
+				spawn_p.tetromino_type = tetromino_spawn_list[r_session.GetTetrominoIndex()];
+				spawn_p.next_tetromino_type = tetromino_spawn_list[r_session.GetTetrominoIndex() + 1];
+				spawn_p.spawn_x = static_cast<char>(spawn_pos.x);
+				spawn_p.spawn_y = static_cast<char>(spawn_pos.y);
+				r_session.AddToSendBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
+			}
+			break;
+		}
+		case EVENT_TYPE::ADDLINE: {
+			r_session.GetTetris().GetTickData().SetGarbageLineTick(0);
+			S2C_ADDLINE_PACKET add_line_p;
+			add_line_p.size = sizeof(S2C_ADDLINE_PACKET);
+			add_line_p.type = S2C_ADDLINE;
+			add_line_p.id = r_session.GetSession()->GetId();
+			auto& t = std::get<TaskAddLine>(task.task);
+			add_line_p.hole_x = static_cast<char>(t.hole_x);
+			r_session.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.size);
+			break;
+		}
+
+		case EVENT_TYPE::GAMEOVER: {
+			if (max_user == 1) {
+				// 일단 종료 패킷을 보냄
+				r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
+				S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
+				send_p.size = sizeof(S2C_GAMEOVER_PACKET);
+				send_p.type = S2C_GAMEOVER;
+				send_p.id = r_session.GetSession()->GetId();
+				r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
+				r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
+				RequestUpdateScore(r_session);
+				ClearGame();
+			}
+			else {
+				if(CheckWinner()) { // 나중에 승패 추가
+					ClearGame();
+				}
+			}
+			return;
+		}
+		}
+	}
+}
+
+void TetrisRoom::BroadcastTickData()
+{
+	for (auto& r_user : room_users) {
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		r_user.SendTickBatch(server->GetHandle());
+	}
+}
+
+void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
+{
+	for (auto& r_user : room_users) {
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+			r_user.GetSession()->SendPacket(packet, iocp_handle);
+	}
+}
+
+void TetrisRoom::SendToSelf(char* packet, Session* session)
+{
+	// 굳이 필요 없는 함수인 듯 하다..?
+}
+
+void TetrisRoom::InitGame()
+{
+	for (auto& r_user : room_users) { 
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		r_user.GetTetris().Clear();
+	}
+}
+
+void TetrisRoom::ClearGame()
+{
+	room_state = WAIT;
+	tasks.Clear();
+	tetromino_spawn_list.clear();
+	for (auto& r_user : room_users) {
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		r_user.ClearData();
+	}
+}
+
+void TetrisRoom::ProcessPlayTasks()
+{
+	tasks.SwapTask();
+	while(!tasks.task_queue.IsEmpty()){
+		TaskInfo task = tasks.GetTask();
+		for (auto& r_user : room_users) {
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+			if (r_user.GetSession()->GetId() == task.id) {
+				// 각 작업들을 각 세션에 분배
+				r_user.GetTetris().GetInputTasks().emplace_back(task.type);
+				
+				//r_user.GetTetris().DebugPrintBoard();
+				break;
+			}
+		}
+	}
+
+	for(auto& r_user : room_users){
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		std::vector<TaskType> send_pending_tasks = r_user.GetTetris().TickProcess();
+		BuildBroadcastData(r_user, send_pending_tasks);
+	}
+
+
+	ClearEventsInTick();
+	BroadcastTickData();
+}
+
+void TetrisRoom::Add7BagTetrominoList()
+{
+	std::random_device rd;
+	std::mt19937 gen(rd());
+
+	std::vector<int> v = { 0, 1, 2, 3, 4, 5, 6 }; // I, J, L, O, S, T, Z
+
+	std::shuffle(v.begin(), v.end(), gen);
+	tetromino_spawn_list.reserve(tetromino_spawn_list.size() + v.size());
+	tetromino_spawn_list.insert(tetromino_spawn_list.end(), v.begin(), v.end());
+}
+
+bool TetrisRoom::SetNewTetromino(int id)
+{
+	for (auto& r_user : room_users) {
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		if (r_user.GetSession()->GetId() == id){
+			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]), spawn_pos);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool TetrisRoom::CheckWinner()
+{
+	if (max_user == 1) {
+		//for (auto& r_user : room_users) {
+
+		//}
+		return false;
+	}
+	else {
+		int over_count = 0;
+		int player_count = 0;
+		for (auto& r_user : room_users){
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::PLAY) ++player_count;
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::GAMEOVER) ++over_count;
+		}
+
+		if ((player_count - over_count) > 1) return false; // 아직 승자가 결정되지 않음
+		else {
+			for (auto& r_user : room_users) {
+				// 승자와 패자는 다른 패킷이 가야함(승자는 승리, 패자는 패배 플래그)
+				bool is_winner = false;
+				if (r_user.GetRoomUserState() == ROOM_USER_STATE::GAMEOVER) is_winner = false;
+				else is_winner = true;
+				S2C_GAMEEND_PACKET gameend_p;
+				gameend_p.size = sizeof(S2C_GAMEEND_PACKET);
+				gameend_p.type = S2C_GAMEEND;
+				gameend_p.id = r_user.GetSession()->GetId();
+				gameend_p.is_winner = is_winner;
+				Broadcast(reinterpret_cast<char*>(&gameend_p), server->GetHandle());
+			}
+			return true;
+		}
+	}
+}
+
+void TetrisRoom::ClearRoom()
+{
+	room_state = EMPTY;
+	tasks.Clear();
+	tetromino_spawn_list.clear();
+	room_users.clear();
+}
+
+void TetrisRoom::UpdateTick()
+{
+	for(auto& r_user : room_users){
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		r_user.GetTetris().GetTickData().UpdateTickData();
+	}
+}
+
+void TetrisRoom::ReduceTimeouts(int type, RoomSession& r_session)
+{
+	switch(type){
+	case DOWN_TIMEOUT:
+		if (r_session.GetScore() <= 100) {
+			r_session.GetTetris().GetTickData().SetDownTimeout(25);
+		}
+
+		else if (100 < r_session.GetScore() && r_session.GetScore() <= 300) {
+			r_session.GetTetris().GetTickData().SetDownTimeout(24);
+		}
+
+		else if (300 < r_session.GetScore() && r_session.GetScore() <= 600) {
+			r_session.GetTetris().GetTickData().SetDownTimeout(23);
+		}
+
+		else if (600 < r_session.GetScore() && r_session.GetScore() <= 1000) {
+			r_session.GetTetris().GetTickData().SetDownTimeout(22);
+		}
+
+		else if (1000 < r_session.GetScore() && r_session.GetScore() <= 1500) {
+			r_session.GetTetris().GetTickData().SetDownTimeout(21);
+		}
+
+		else if (1500 < r_session.GetScore()) {
+			r_session.GetTetris().GetTickData().SetDownTimeout(20);
+		}
+		
+		break;
+
+	case ADD_TIMEOUT:
+		if (r_session.GetTetris().GetTickData().GetGarbageLineTimeout() > 500)
+		r_session.GetTetris().GetTickData().SetGarbageLineTimeout(r_session.GetTetris().GetTickData().GetGarbageLineTimeout() - 5);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void TetrisRoom::MakeMovePacketData(RoomSession& r_session, int move_type)
+{
+	S2C_MOVE_PACKET move_p;
+	move_p.size = sizeof(S2C_MOVE_PACKET);
+	move_p.type = S2C_MOVE;
+	move_p.id = r_session.GetSession()->GetId();
+	move_p.move_type = static_cast<char>(move_type);
+	r_session.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
+}
+
+void TetrisRoom::ClearEventsInTick()
+{
+	for(auto& r_user : room_users){
+		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		r_user.GetTetris().ClearPendingMoves();
+		r_user.GetTetris().ClearTasks();
+	}
+}
+
+void TetrisRoom::RequestUpdateScore(RoomSession& r_session)
+{
+	if (r_session.GetSession()->GetInfo().max_score < r_session.GetScore()) {
+		int id = r_session.GetSession()->GetId();
+		int index = r_session.GetSession()->GetIndex();
+		std::string login_id = r_session.GetSession()->GetInfo().login_id;
+		int new_score = r_session.GetScore();
+		Database& db = server->GetDB();
+		auto task_update_score = [id, index, login_id, new_score, &db] {
+			db.ExecuteUpdateScore(id, index, login_id, new_score);
+			};
+		server->GetDB().Enqueue(task_update_score);
+	}
+}
+
+void TetrisRoom::SetRoomId(int room_index)
+{
+	room_id = room_index;
+}
+
+void TetrisRoom::SetRoomState(ROOM_STATE new_state)
+{
+	room_state = new_state;
+}
+
+int TetrisRoom::FindNewHost(int delete_id)
+{
+	for (auto& r_user : room_users) { 
+		if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) {
+			if (r_user.GetSession()->GetId() == delete_id) continue;
+			return r_user.GetSession()->GetId();
+		}
+	}
+	return -1;
+}
+
+
+===== FILE END: TetrisRoom.cpp =====
+
+===== FILE BEGIN: TetrisRoom.h =====
+#pragma once
+#include <vector>
+#include <array>
+#include <mutex>
+#include "RoomSession.h"
+#include "Session.h"
+#include "define.h"
+#include "packetType.h"
+#include "RoomPacketHandler.h"
+#include "IOCPServer.h"
+
+constexpr int ADD_TIMEOUT = 1;
+constexpr int DOWN_TIMEOUT = 2;
+
+struct TaskInfo
+{
+	EVENT_TYPE type;
+	int id;
+};
+
+//struct TaskQueue
+//{
+//	MQueue<TaskInfo> tasks;
+//	//std::atomic<bool> access = false;
+//};
+
+struct Tasks
+{
+	MQueue<TaskInfo> task_queue;
+	MQueue<TaskInfo> pending_queue;
+
+	Tasks() {
+		//task_queue.access.store(false);
+		//pending_queue.access.store(true);
+	}
+
+	TaskInfo GetTask() { return task_queue.DeQ(); }
+
+	void AddTask(const TaskInfo& task) { pending_queue.EnQ(task); }
+	void SwapTask() { task_queue.Swap(pending_queue); }
+	void Clear() {
+		MQueue<TaskInfo> empty;
+		task_queue.Swap(empty);
+		pending_queue.Swap(empty);
+	}
+};
+
+class TetrisRoom
+{
+	//std::array<RoomSession*, MAX_USER>& users;
+	std::vector<RoomSession> room_users; // 아토믹 변수는 복사가 안돼서..
+	RoomPacketHandler room_handler;
+	IOCPServer* server;
+	Atomic<ROOM_STATE> room_state;
+	Tasks tasks;
+	std::vector<char> tetromino_spawn_list;
+	Position spawn_pos{ 3, 0 };
+
+	int host_id;
+	int room_id;
+	char room_name[MAX_ROOM_NAME];
+	bool is_password;
+	char room_password[MAX_ROOM_PASSWORD];
+	char max_user;
+
+	//std::mutex room_mutex;
+	
+public:
+	TetrisRoom(IOCPServer* server);
+	~TetrisRoom();
+
+	ROOM_STATE GetRoomState() const { return room_state.GetSelf(); }
+	RoomPacketHandler& GetRoomPacketHandler() { return room_handler; }
+	Tasks& GetTasks() { return tasks; }
+
+	void SetRoomId(const int room_index);
+	void SetRoomState(const ROOM_STATE new_state); // 방 상태 변경은 딱히 동시접근할 일이 없어보임
+	int FindNewHost(int delete_id); // 방장이 나갔을 때 새로운 방장 찾기
+
+	void InitRoom(char* packet, Session* session);
+	void AddUser(Session* new_session);
+	void DeleteUser(const int id);
+	void ReadyUser(int id);
+	void KickUser(int id, int kick_user_id);
+	void StartGame(const int id);
+	void BuildBroadcastData(RoomSession& r_session, std::vector<TaskType>& tasks);
+	void BroadcastTickData();
+	void Broadcast(char* packet, const HANDLE iocp_handle);
+	void SendToSelf(char* packet, Session* session);
+
+	void InitGame();
+	void ClearGame();
+	void ProcessPlayTasks();
+	void Add7BagTetrominoList();
+	bool SetNewTetromino(int id);
+	bool CheckWinner();
+	void ClearRoom();
+	void UpdateTick();
+	//bool CheckInputTick(RoomSession& r_session);
+	void ReduceTimeouts(int type, RoomSession& r_session);
+	//void SendToSelf(char* packet, Session* session);
+
+	void MakeMovePacketData(RoomSession& r_session, int move_type);
+	void ClearEventsInTick();
+	void RequestUpdateScore(RoomSession& r_session);
+};
+
+===== FILE END: TetrisRoom.h =====
+
+===== FILE BEGIN: TetrisTickData.cpp =====
+#include "TetrisTickData.h"
+
+void TetrisTickData::InitTickData()
+{
+	left_tick_counter = 0;
+	right_tick_counter = 0;
+	down_tick_counter = 0;
+	rotate_tick_counter = 0;
+	drop_tick_counter = 0;
+	down_timeout_tick_counter = 0; 
+	garbage_line_tick_counter = 0;
+
+	down_timeout = DOWN_TIMEOUT_TICK;
+	garbage_line_timeout = GARBAGE_LINE_TIMEOUT_TICK;
+}
+
+void TetrisTickData::UpdateTickData()
+{
+	++left_tick_counter;
+	++right_tick_counter;
+	++down_tick_counter;
+	++rotate_tick_counter;
+	++drop_tick_counter;
+	++down_timeout_tick_counter;
+	++garbage_line_tick_counter;
+}
+
+
+===== FILE END: TetrisTickData.cpp =====
+
+===== FILE BEGIN: TetrisTickData.h =====
+#pragma once
+#include "define.h"
+#include "settings.h"
+
+class TetrisTickData
+{
+	// 인풋
+	int left_tick_counter = 0;
+	int right_tick_counter = 0;
+	int down_tick_counter = 0; 
+	int rotate_tick_counter = 0;
+	int drop_tick_counter = 0;
+	// 자동 하강
+	int down_timeout_tick_counter = 0;
+	int garbage_line_tick_counter = 0;
+	// 타임아웃 틱
+	int down_timeout = DOWN_TIMEOUT_TICK;
+	int garbage_line_timeout = GARBAGE_LINE_TIMEOUT_TICK;
+
+public:
+	//getters
+	int GetLeftTick() const { return left_tick_counter; }
+	int GetRightTick() const { return right_tick_counter; }
+	int GetDownTick() const { return down_tick_counter; }
+	int GetRotateTick() const { return rotate_tick_counter; }
+	int GetDropTick() const { return drop_tick_counter; }
+	int GetDownTimeoutTick() const { return down_timeout_tick_counter; }
+	int GetGarbageLineTick() const { return garbage_line_tick_counter; }
+
+	int GetDownTimeout() const { return down_timeout; }
+	int GetGarbageLineTimeout() const { return garbage_line_timeout; }
+
+	//setters
+	void SetLeftTick(int val) { left_tick_counter = val; }
+	void SetRightTick(int val) { right_tick_counter = val; }
+	void SetDownTick(int val) { down_tick_counter = val; }
+	void SetRotateTick(int val) { rotate_tick_counter = val; }
+	void SetDropTick(int val) { drop_tick_counter = val; }
+	void SetDownTimeoutTick(int val) { down_timeout_tick_counter = val; }
+	void SetGarbageLineTick(int val) { garbage_line_tick_counter = val; }
+
+	void SetDownTimeout(int val) { down_timeout = val; }
+	void SetGarbageLineTimeout(int val) { garbage_line_timeout = val; }
+
+	void InitTickData();
+	void UpdateTickData();
+};
+===== FILE END: TetrisTickData.h =====
+
+===== FILE BEGIN: Tetromino.h =====
+#pragma once
+#include <iostream>
+#include <vector>
+#include <array>
+#include <unordered_map>
+
+constexpr char I = 0;
+constexpr char J = 1;
+constexpr char L = 2;
+constexpr char O = 3;
+constexpr char S = 4;
+constexpr char T = 5;
+constexpr char Z = 6;
+
+struct Position {
+    char x, y;
+};
+
+struct Tetromino {
+    char type;             // I, J, L, O, S, T, Z
+    char shape_index;            // 0 … (각 타입별 회전 상태 개수 − 1)
+	Position moved_pos;
+    std::array<Position, 4> default_pos;
+
+    void PrintInfo() const
+    {
+        std::cout << "==== Current Tetromino Info ====\n";
+        std::cout << "Type: " << (int)type << "\n";
+        std::cout << "Shape Index: " << (int)shape_index << "\n";
+        std::cout << "Moved Pos: (" << (int)moved_pos.x << ", "
+            << (int)moved_pos.y << ")\n";
+
+        std::cout << "Blocks (Real Positions):\n";
+        for (int i = 0; i < 4; ++i) {
+            int real_x = default_pos[i].x + moved_pos.x;
+            int real_y = default_pos[i].y + moved_pos.y;
+
+            std::cout << "  [" << i << "] default("
+                << (int)default_pos[i].x << ", " << (int)default_pos[i].y
+                << ") -> real(" << real_x << ", " << real_y << ")\n";
+        }
+
+        std::cout << "=========================\n";
+    }
+
+};
+
+const std::unordered_map<char, std::vector<Tetromino>> TETROMINOS = {
+    { I, {
+        { I, 0, {0, 0}, {{ {0,1}, {1,1}, {2,1}, {3,1} }} },
+        { I, 1, {0, 0}, {{ {2,0}, {2,1}, {2,2}, {2,3} }} }
+    } },
+    { J, {
+        { J, 0, {0, 0}, {{ {0,0}, {0,1}, {1,1}, {2,1} }} },
+        { J, 1, {0, 0}, {{ {1,0}, {2,0}, {1,1}, {1,2} }} },
+        { J, 2, {0, 0}, {{ {0,1}, {1,1}, {2,1}, {2,2} }} },
+        { J, 3, {0, 0}, {{ {1,0}, {1,1}, {0,2}, {1,2} }} }
+    } },
+    { L, {
+        { L, 0, {0, 0}, {{ {2,0}, {0,1}, {1,1}, {2,1} }} },
+        { L, 1, {0, 0}, {{ {1,0}, {1,1}, {1,2}, {2,2} }} },
+        { L, 2, {0, 0}, {{ {0,1}, {1,1}, {2,1}, {0,2} }} },
+        { L, 3, {0, 0}, {{ {0,0}, {1,0}, {1,1}, {1,2} }} }
+    } },
+    { O, {
+        { O, 0, {0, 0}, {{ {1,0}, {2,0}, {1,1}, {2,1} }} }
+    } },
+    { S, {
+        { S, 0, {0, 0}, {{ {1,1}, {2,1}, {0,2}, {1,2} }} },
+        { S, 1, {0, 0}, {{ {1,0}, {1,1}, {2,1}, {2,2} }} }
+    } },
+    { T, {
+        { T, 0, {0, 0}, {{ {1,0}, {0,1}, {1,1}, {2,1} }} },
+        { T, 1, {0, 0}, {{ {1,0}, {1,1}, {2,1}, {1,2} }} },
+        { T, 2, {0, 0}, {{ {0,1}, {1,1}, {2,1}, {1,2} }} },
+        { T, 3, {0, 0}, {{ {1,0}, {0,1}, {1,1}, {1,2} }} }
+    } },
+    { Z, {
+        { Z, 0, {0, 0}, {{ {0,1}, {1,1}, {1,2}, {2,2} }} },
+        { Z, 1, {0, 0}, {{ {2,0}, {1,1}, {2,1}, {1,2} }} }
+    } }
+};
+
+
+===== FILE END: Tetromino.h =====
+
