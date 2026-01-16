@@ -6,6 +6,8 @@ from define import *
 from login_state import LoginState
 from network import NetworkWorker
 from resource_manager import ResourceManager
+from session import Session
+from loading_state import LoadingState
 
 class GameLoop:
     def __init__(self):
@@ -23,8 +25,8 @@ class GameLoop:
         self.rm = ResourceManager()
         self.rm.init()
         self.net_worker = NetworkWorker()
-        
-        self.state = LoginState(self.screen, self.rm, net_worker=self.net_worker)
+        self.sesseion = Session()
+        self.state = LoginState(self.screen, self.rm, self.net_worker, self.sesseion)
         self.state.connect()
 
         self.prev_time = time.perf_counter()

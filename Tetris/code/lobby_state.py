@@ -18,12 +18,13 @@ from my_info import MyInfo
 from create_room_window import RoomCreateWindow
 from single_play import SinglePlayState
 from packet_manager import *
+from shutter_animaion import ShutterAnimation
 
 LOBBY = 1
 CREATE_ROOM = 2
 
 class LobbyState:
-    def __init__(self, screen, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session):
+    def __init__(self, screen, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session, is_animation: bool = False):
         self.screen = screen
         self.rm = rm
         self.my_session = my_session
@@ -39,8 +40,14 @@ class LobbyState:
         self.btn_draw_x, self.btn_draw_y = 0, 0
 
         self.reactable_screen = LOBBY
+
+        self.open_shutter = ShutterAnimation(self.screen, self.rm)
+        self.is_animation = is_animation
     
         self.set_layout()
+
+        if is_animation:
+            self.open_shutter.start_animation()
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
@@ -141,6 +148,10 @@ class LobbyState:
 
 
     def update(self, dt_ms, events):
+        if self.is_animation and self.open_shutter.is_active: 
+            self.open_shutter.update(dt_ms)
+            return
+
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit()
@@ -187,3 +198,4 @@ class LobbyState:
         self.my_info_rect.draw(self.screen)
 
         if self.reactable_screen == CREATE_ROOM: self.room_create_window.draw()
+        if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()

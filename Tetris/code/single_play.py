@@ -13,7 +13,6 @@ from button import Button
 from tetris_board import TetrisBoard
 from tetromino import Tetromino
 from tetris_board import *
-from lobby_state import LobbyState
 
 RIGHT = 0
 LEFT = 1
@@ -260,6 +259,7 @@ class SinglePlayState:
                     self.rm.move_sound.play()
 
         elif packet_type == S2C_DELETE_USER:
+            from lobby_state import LobbyState
             delete_id = data.get("id")
             if delete_id == self.my_session.id:
                 pygame.mixer.music.stop()

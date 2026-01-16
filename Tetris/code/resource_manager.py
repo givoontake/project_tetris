@@ -11,7 +11,7 @@ class ResourceManager:
     def __init__(self):
         self.block_images = {}
         self.button_images = {}
-
+        self.shutter_image = self.load_image("resource/backgrounds/shutter.png", BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT)
         # sounds
         self.bgm = pygame.mixer.music.load("resource/sounds/bgm_ingame.mp3")
         self.button_sound_hover = pygame.mixer.Sound("resource/sounds/button_hover.mp3")
@@ -20,6 +20,8 @@ class ResourceManager:
         self.fix_sound = pygame.mixer.Sound("resource/sounds/sound_effect_fix.mp3")
         self.clearline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_clearline.mp3")
         self.addline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_addline.mp3")
+
+        self.shutter_sound = pygame.mixer.Sound("resource/sounds/shutter_open.mp3")
 
     def init(self):
         self.block_images = {
@@ -78,6 +80,10 @@ class ResourceManager:
         # 절대 크기로 스케일링
         scaled_image = pygame.transform.smoothscale(image, (int(width), int(height)))
         return scaled_image
+    
+    def load_font(self, font_size: int) -> pygame.font.Font:
+        font = pygame.font.Font("resource/dodamdodam.ttf", font_size)
+        return font
 
 DEFAULT_RED = 1
 DEFAULT_ORANGE = 2
