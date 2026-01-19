@@ -26,7 +26,7 @@ class ResourceManager:
         self.addline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_addline.mp3")
         self.shutter_sound = pygame.mixer.Sound("resource/sounds/shutter_open.mp3")
 
-        self.login_button = self.load_image("resource/button/login_button.png", 300, 60)
+        self.login_button = self.load_image("resource/button/login_button.png", 200, 100)
         self.login_label_frame = self.load_image("resource/login_label_frame.png", 400, 100)
 
     def init(self):
@@ -86,6 +86,9 @@ class ResourceManager:
         # 절대 크기로 스케일링
         scaled_image = pygame.transform.smoothscale(image, (int(width), int(height)))
         return scaled_image
+    
+    def scale_image(self, image: pygame.Surface, width: int, height: int) -> pygame.Surface:
+        return pygame.transform.smoothscale(image, (int(width), int(height)))
     
     def load_font(self, font_size: int) -> pygame.font.Font:
         font = pygame.font.Font("resource/dodamdodam.ttf", font_size)

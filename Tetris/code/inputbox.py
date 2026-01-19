@@ -9,19 +9,16 @@ class InputBox:
     def __init__(
         self,
         screen: pygame.Surface,
-        x: int,
-        y: int,
-        w: int,
-        h: int,
+        rect: pygame.Rect,
         placeholder: str = "",
         max_input_len: int | None = None,  # optional과 같음
         is_password: bool = False,
         allow_korean: bool = True,   # ✅ 한글 허용 여부
     ):
         self.screen = screen
-        self.rect = pygame.Rect(x, y, w, h)
+        self.rect = rect
         self.placeholder = placeholder
-        self.text_h = int(h*0.8)
+        self.text_h = int(rect.h*0.8)
         self.text = ""
         self.editing_text = ""
         self.active = False

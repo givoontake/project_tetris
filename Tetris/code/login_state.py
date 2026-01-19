@@ -23,8 +23,8 @@ class LoginState(BaseState):
         super().__init__(screen, rm, net_worker, session)
         self.title_font = self.rm.load_font(40)
         self.background_image = self.rm.shutter_image
-        self.id_box: Optional[LabelFrame] = None
-        self.pw_box: Optional[LabelFrame] = None
+        self.id_label: Optional[LabelFrame] = None
+        self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
         self.popup: PopupBox = PopupBox(self.screen, self.rm, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
         self.popup2: PopupBox = PopupBox(self.screen, self.rm, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
@@ -35,20 +35,41 @@ class LoginState(BaseState):
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
-        box_w, box_h = 350, 40
-        center_x = (sw - box_w) // 2
-        center_y = (sh - (box_h * 2 + 64 + 46)) // 2
+
+        ADJUST_SCALE_X = 0.85
+        ADJUST_SCALE_Y = 0.7
         
-        id_rect = pygame.Rect(center_x, center_y, box_w, box_h)
-        self.id_box = LabelFrame(self.screen, self.rm, id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디", MAX_INPUT, False, False)
-        pw_rect = pygame.Rect(center_x, center_y + self.id_box.frame_rect.h, id_rect.w, id_rect.h)
-        self.pw_box = LabelFrame(self.screen, self.rm, pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", MAX_INPUT, True, False)
-        btn_rect = pygame.Rect((sw - 300) // 2, pw_rect.bottom + 28, 300, 100)
-        self.btn_login = Button(self.screen, btn_rect, self.rm, self.rm.login_button, "로그인", True)
+        label_w, label_h = 400, 100
+        label_image = self.rm.scale_image(self.rm.login_label_frame, label_w, label_h)
+        button_w, button_h = 200, 100
+        button_image = self.rm.scale_image(self.rm.login_button, button_w, button_h)
+        adjust_x = (1-ADJUST_SCALE_X)*label_w
+        adjust_y = (1-ADJUST_SCALE_Y)*label_h
+        input_box_w, input_box_h = label_w - adjust_x*2, label_h - adjust_y*2
+
+        total_h = label_h * 2 + (button_h // 2) + button_h
+
+        group_top = (sh - total_h) // 2
+        label_left = (sw - label_w) // 2
+        draw_x, draw_y = label_left, group_top
+
+        id_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
+        id_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
+        self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, "아이디", MAX_INPUT, False, False)
+
+        draw_y += label_h
+        pw_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
+        pw_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
+        self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, "비밀번호", MAX_INPUT, True, False)
+
+        draw_x += (label_w - button_w) // 2
+        draw_y += label_h + (button_h // 2)
+        btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
+        self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인", True)
 
     def send_login(self):
-        user_id = self.id_box.text
-        user_pw = self.pw_box.text
+        user_id = self.id_label.input_box.text
+        user_pw = self.pw_label.input_box.text
         data = {
             "size": 2 + 1 + MAX_USER_ID + MAX_USER_PASSWORD,
             "type": C2S_LOGIN,
@@ -111,8 +132,8 @@ class LoginState(BaseState):
             if ev.type == pygame.QUIT:
                 pygame.quit(); raise SystemExit
                 
-            self.id_box.handle_event(ev)
-            self.pw_box.handle_event(ev)
+            self.id_label.handle_event(ev)
+            self.pw_label.handle_event(ev)
 
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
                 self.send_login()
@@ -120,8 +141,8 @@ class LoginState(BaseState):
             if self.btn_login.handle_event(ev):
                 self.send_login()
 
-        self.id_box.update(dt_ms)
-        self.pw_box.update(dt_ms)
+        self.id_label.update(dt_ms)
+        self.pw_label.update(dt_ms)
         return self
 
     def draw(self):
@@ -130,8 +151,8 @@ class LoginState(BaseState):
         sw, _ = self.screen.get_size()
         #title = self.title_font.render("로그인", True, (255, 255, 255))
         #self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
-        self.id_box.draw()
-        self.pw_box.draw()
+        self.id_label.draw()
+        self.pw_label.draw()
         self.btn_login.draw(self.screen)
         if self.popup.visible:
             self.popup.draw()
