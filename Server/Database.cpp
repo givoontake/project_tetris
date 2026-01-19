@@ -253,7 +253,7 @@ void Database::ExecuteLogin(int session_id, int session_index, const std::string
 
                     std::cout << "로그인 성공. " << std::endl;
                     std::cout << "id: " << login_id << std::endl;
-                    std::cout << "pw: " << password << std::endl;
+                    //std::cout << "pw: " << password << std::endl;
                     std::cout << "nickname: " << p->nickname << std::endl;
                 }
                 else
