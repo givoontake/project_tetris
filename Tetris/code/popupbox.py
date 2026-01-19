@@ -16,7 +16,7 @@ class PopupBox:
         self.visible = False
         self.left_button_text = left_text
         self.right_button_text = right_text
-        self.am = rm
+        self.rm = rm
 
         # 색 / 스타일
         self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
@@ -44,9 +44,10 @@ class PopupBox:
 
         left_x  = self.win_x
         right_x = self.win_x + btn_w
-
-        self.left_button = Button(left_x,  btn_y, btn_w, btn_h, self.left_button_text, self.am)
-        self.right_button= Button(right_x, btn_y, btn_w, btn_h, self.right_button_text, self.am)
+        left_rect = pygame.Rect(left_x, btn_y, btn_w, btn_h)
+        right_rect = pygame.Rect(right_x, btn_y, btn_w, btn_h)
+        self.left_button = Button(self.screen, left_rect, self.rm, None, self.left_button_text, True)
+        self.right_button= Button(self.screen, right_rect, self.rm, None, self.right_button_text, True)
 
     def _recalc_layout(self):
         """현재 screen 사이즈를 기준으로 팝업 사각형을 다시 계산한다."""

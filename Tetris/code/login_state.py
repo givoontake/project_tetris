@@ -14,8 +14,8 @@ from button import Button
 from inputbox import InputBox
 from popupbox import PopupBox
 from lobby_state import LobbyState
-from loading_state import LoadingState
 from base_state import BaseState
+from label_frame import LabelFrame
 
 class LoginState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager,
@@ -23,8 +23,8 @@ class LoginState(BaseState):
         super().__init__(screen, rm, net_worker, session)
         self.title_font = self.rm.load_font(40)
         self.background_image = self.rm.shutter_image
-        self.id_box: Optional[InputBox] = None
-        self.pw_box: Optional[InputBox] = None
+        self.id_box: Optional[LabelFrame] = None
+        self.pw_box: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
         self.popup: PopupBox = PopupBox(self.screen, self.rm, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
         self.popup2: PopupBox = PopupBox(self.screen, self.rm, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
@@ -35,18 +35,16 @@ class LoginState(BaseState):
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
-        input_box_w, input_box_h = 360, 42
-        center_x = (sw - input_box_w) // 2
-        center_y = (sh - (input_box_h * 2 + 64 + 46)) // 2
-
-        id_rect = pygame.Rect(center_x, center_y, input_box_w, input_box_h)
-        pw_rect = pygame.Rect(center_x, center_y + input_box_h + 20, input_box_w, input_box_h)
+        box_w, box_h = 350, 40
+        center_x = (sw - box_w) // 2
+        center_y = (sh - (box_h * 2 + 64 + 46)) // 2
+        
+        id_rect = pygame.Rect(center_x, center_y, box_w, box_h)
+        self.id_box = LabelFrame(self.screen, self.rm, id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디", MAX_INPUT, False, False)
+        pw_rect = pygame.Rect(center_x, center_y + self.id_box.frame_rect.h, id_rect.w, id_rect.h)
+        self.pw_box = LabelFrame(self.screen, self.rm, pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", MAX_INPUT, True, False)
         btn_rect = pygame.Rect((sw - 300) // 2, pw_rect.bottom + 28, 300, 100)
-
-        self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디", MAX_INPUT)
-        self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", MAX_INPUT, is_password=True)
-
-        self.btn_login = Button(btn_rect.x,btn_rect.y,btn_rect.w,btn_rect.h, "로그인",self.rm)
+        self.btn_login = Button(self.screen, btn_rect, self.rm, self.rm.login_button, "로그인", True)
 
     def send_login(self):
         user_id = self.id_box.text
@@ -132,8 +130,8 @@ class LoginState(BaseState):
         sw, _ = self.screen.get_size()
         #title = self.title_font.render("로그인", True, (255, 255, 255))
         #self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
-        self.id_box.draw(self.screen)
-        self.pw_box.draw(self.screen)
+        self.id_box.draw()
+        self.pw_box.draw()
         self.btn_login.draw(self.screen)
         if self.popup.visible:
             self.popup.draw()

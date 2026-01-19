@@ -8,6 +8,7 @@ PLACEHOLDER = (100, 100, 100)
 class InputBox:
     def __init__(
         self,
+        screen: pygame.Surface,
         x: int,
         y: int,
         w: int,
@@ -17,6 +18,7 @@ class InputBox:
         is_password: bool = False,
         allow_korean: bool = True,   # ✅ 한글 허용 여부
     ):
+        self.screen = screen
         self.rect = pygame.Rect(x, y, w, h)
         self.placeholder = placeholder
         self.text_h = int(h*0.8)
@@ -44,6 +46,9 @@ class InputBox:
         self.backspace_repeat_time1_active = True
         self.backspace_repeat_time2 = 50
         self.backspace_repeat_time2_active = False
+
+    def get_inputbox_rect(self) -> pygame.Rect:
+        return self.rect
 
     def add_char(self, ch: str):
         if not self.active:
@@ -189,9 +194,9 @@ class InputBox:
             self.backspace_repeat_time2_active = False
 
 
-    def draw(self, surf: pygame.Surface):
+    def draw(self):
         # 배경
-        pygame.draw.rect(surf, self.color, self.rect)
+        #pygame.draw.rect(self.screen, self.color, self.rect)
 
         # 보여줄 텍스트 (비밀번호면 ●로 마스킹)
         show_text = self.get_render_text()
@@ -203,11 +208,11 @@ class InputBox:
         text_x = self.rect.x + self.padding
         text_y = self.rect.y + (self.rect.height - txt.get_height()) // 2
         text_pos = (text_x, text_y)
-        surf.blit(txt, text_pos)
+        self.screen.blit(txt, text_pos)
 
         # 커서
         if self.active and self.cursor_visible:
             cursor_x = text_x + txt.get_width()
             cursor_y = text_y
             cursor_h = self.text_h
-            pygame.draw.rect(surf, WHITE,(cursor_x, cursor_y, 2, cursor_h))
+            pygame.draw.rect(self.screen, WHITE,(cursor_x, cursor_y, 2, cursor_h))

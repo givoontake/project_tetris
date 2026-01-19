@@ -8,7 +8,11 @@ from define import *
 #     image: Optional[pygame.Surface] # pygame.Surface 이거나 None
 
 class ResourceManager:
+    FONT_SIZE = 30
+    HOVER_SCALE = 1.05
+    PRESS_SCALE = 0.95
     def __init__(self):
+        # fonts
         self.block_images = {}
         self.button_images = {}
         self.shutter_image = self.load_image("resource/backgrounds/shutter.png", BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT)
@@ -20,8 +24,10 @@ class ResourceManager:
         self.fix_sound = pygame.mixer.Sound("resource/sounds/sound_effect_fix.mp3")
         self.clearline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_clearline.mp3")
         self.addline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_addline.mp3")
-
         self.shutter_sound = pygame.mixer.Sound("resource/sounds/shutter_open.mp3")
+
+        self.login_button = self.load_image("resource/button/login_button.png", 300, 60)
+        self.login_label_frame = self.load_image("resource/login_label_frame.png", 400, 100)
 
     def init(self):
         self.block_images = {
