@@ -7,7 +7,7 @@ from login_state import LoginState
 from network import NetworkWorker
 from resource_manager import ResourceManager
 from session import Session
-from loading_state import LoadingState
+from font_manager import FontManager
 
 class GameLoop:
     def __init__(self):
@@ -24,9 +24,10 @@ class GameLoop:
 
         self.rm = ResourceManager()
         self.rm.init()
+        self.fm = FontManager()
         self.net_worker = NetworkWorker()
         self.sesseion = Session()
-        self.state = LoginState(self.screen, self.rm, self.net_worker, self.sesseion)
+        self.state = LoginState(self.screen, self.rm, self.fm, self.net_worker, self.sesseion)
         self.state.connect()
 
         self.prev_time = time.perf_counter()

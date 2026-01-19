@@ -1,18 +1,20 @@
 import pygame
 from resource_manager import ResourceManager
+from font_manager import *
 from define import *
 
 class Rectangle:
     def __init__(self, 
         screen: pygame.Surface,
         rect: pygame.Rect, 
-        font: pygame.font.Font,
+        fm: FontManager,
         image: pygame.Surface = None, 
         text: str = "", 
         ):
         self.screen = screen
         self.rect = rect
-        self.font = font
+        self.fm = fm
+        self.font = fm.get_font(RECTANGLE_FONT_SIZE)
         self.image = None
         if image is not None: 
             self.image = pygame.transform.smoothscale(image, (self.rect.w, self.rect.h))

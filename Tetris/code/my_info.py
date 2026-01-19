@@ -1,7 +1,8 @@
 import pygame
+from define import *
 
 class MyInfo:
-    def __init__(self, rect: pygame.Rect, session):
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, session):
         """
         rect: MyInfo를 표시할 영역(Rect)
         session: Session 인스턴스 (nickname, win, lose 포함)
@@ -14,7 +15,7 @@ class MyInfo:
         self.font_stat = pygame.font.Font("resource/dodamdodam.ttf", 28)   # 승/패: 28px
         self.font_max_score = pygame.font.Font("resource/dodamdodam.ttf", 28) # 최고점수
 
-        self.text_color = (255, 255, 255)
+        self.text_color = WHITE
         self.padding = 20  # 닉네임과 승/패 간 간격
 
     def draw(self, surface: pygame.Surface):

@@ -1,6 +1,7 @@
 import pygame
 from typing import Optional
 
+from font_manager import FontManager
 from define import *
 
 PLACEHOLDER = (100, 100, 100)
@@ -10,6 +11,7 @@ class InputBox:
         self,
         screen: pygame.Surface,
         rect: pygame.Rect,
+        fm: FontManager,
         placeholder: str = "",
         max_input_len: int | None = None,  # optional과 같음
         is_password: bool = False,
@@ -17,6 +19,7 @@ class InputBox:
     ):
         self.screen = screen
         self.rect = rect
+        self.fm = fm
         self.placeholder = placeholder
         self.text_h = int(rect.h*0.8)
         self.text = ""
@@ -25,10 +28,9 @@ class InputBox:
         self.is_password = is_password
         self.allow_korean = allow_korean
         self.max_input_len = max_input_len
-
-        self.font = pygame.font.Font("resource/dodamdodam.ttf", self.text_h)
         self.padding = int(self.text_h / 2)
         self.color = GRAY
+        self.font = self.fm.get_font(self.text_h)
 
         # 커서 점멸
         self.cursor_visible = True

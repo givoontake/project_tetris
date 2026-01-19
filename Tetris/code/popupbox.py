@@ -2,10 +2,11 @@ import pygame
 
 from button import Button
 from resource_manager import ResourceManager
+from font_manager import *
 
 class PopupBox:
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, message: str,
-                 left_text: str = "확인", right_text: str = "취소"):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+                 message: str, left_text: str = "확인", right_text: str = "취소"):
         """
         screen : 현재 게임 화면 surface
         message: 알림 내용(팝업 중앙)
@@ -17,6 +18,7 @@ class PopupBox:
         self.left_button_text = left_text
         self.right_button_text = right_text
         self.rm = rm
+        self.fm = fm
 
         # 색 / 스타일
         self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
@@ -25,10 +27,10 @@ class PopupBox:
         self.border_thickness = 2
 
         # 폰트 (기존 폰트와 동일 계열)
-        self.font_msg = pygame.font.Font("resource/dodamdodam.ttf", 36)
+        self.font_msg = self.fm.get_font(POPUPBOX_FONT_SIZE)
 
         # 레이아웃 계산
-        self._recalc_layout()
+        self.set_layout()
 
         # 버튼 생성
         # 버튼 크기 규칙:
@@ -46,10 +48,10 @@ class PopupBox:
         right_x = self.win_x + btn_w
         left_rect = pygame.Rect(left_x, btn_y, btn_w, btn_h)
         right_rect = pygame.Rect(right_x, btn_y, btn_w, btn_h)
-        self.left_button = Button(self.screen, left_rect, self.rm, None, self.left_button_text, True)
-        self.right_button= Button(self.screen, right_rect, self.rm, None, self.right_button_text, True)
+        self.left_button = Button(screen, left_rect, rm, fm, None, self.left_button_text, True)
+        self.right_button= Button(screen, right_rect, rm, fm, None, self.right_button_text, True)
 
-    def _recalc_layout(self):
+    def set_layout(self):
         """현재 screen 사이즈를 기준으로 팝업 사각형을 다시 계산한다."""
         sw, sh = self.screen.get_size()
         self.win_w = sw // 2
@@ -107,7 +109,7 @@ class PopupBox:
         팝업도 똑같이 다시 가운데 정렬해야 하므로 이 함수 호출해주면 됨.
         """
         self.screen = new_screen
-        self._recalc_layout()
+        self.set_layout()
 
         # 버튼 위치/크기도 다시 계산
         btn_h = self.win_h // 3

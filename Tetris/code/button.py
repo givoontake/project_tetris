@@ -2,6 +2,7 @@ import pygame
 
 from define import *
 from resource_manager import ResourceManager
+from font_manager import *
 from rectangle import Rectangle
 
 class Button:
@@ -9,30 +10,29 @@ class Button:
         screen: pygame.Surface,
         rect: pygame.Rect, 
         rm: ResourceManager,
+        fm: FontManager,
         image: pygame.Surface = None, 
         text: str = "", 
         react: bool = True
     ):
         self.rm = rm
-        self.idle_font = self.rm.load_font(self.rm.FONT_SIZE) # 폰트는 크기를 변경할 수 없으므로 내부에서 정해서 인자로 넘김
+        self.fm = fm
         self.react = react
         self.hovered = False
         self.pressed = False
         self.pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
         self.hover_sound_printed = False
-        self.idle = Rectangle(screen, rect, self.idle_font, image, text)
+        self.idle = Rectangle(screen, rect, fm, image, text)
         if image == None:
             self.hover = None
             self.press = None
         else: 
-            hover_font = self.rm.load_font(int(self.rm.FONT_SIZE*self.rm.HOVER_SCALE))
-            press_font = self.rm.load_font(int(self.rm.FONT_SIZE*self.rm.PRESS_SCALE))
 
             hover_rect = self._set_rect_scale(self.idle.rect, self.rm.HOVER_SCALE)
             press_rect = self._set_rect_scale(self.idle.rect, self.rm.PRESS_SCALE)
 
-            self.hover = Rectangle(screen, hover_rect, hover_font, image, text)
-            self.press = Rectangle(screen, press_rect, press_font, image, text)
+            self.hover = Rectangle(screen, hover_rect, self.fm, image, text)
+            self.press = Rectangle(screen, press_rect, self.fm, image, text)
 
     def _set_rect_scale(self, rect: pygame.Rect, scale: float) -> pygame.Rect:
         if scale < 0.1 or scale > 1.1:

@@ -24,6 +24,8 @@ LOBBY = 1
 CREATE_ROOM = 2
 
 class LobbyState:
+    BASE_X = 100
+    BASE_Y = 50
     def __init__(self, screen, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session, is_animation: bool = False):
         self.screen = screen
         self.rm = rm

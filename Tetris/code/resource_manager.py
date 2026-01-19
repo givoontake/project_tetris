@@ -8,7 +8,6 @@ from define import *
 #     image: Optional[pygame.Surface] # pygame.Surface 이거나 None
 
 class ResourceManager:
-    FONT_SIZE = 30
     HOVER_SCALE = 1.05
     PRESS_SCALE = 0.95
     def __init__(self):
@@ -89,10 +88,7 @@ class ResourceManager:
     
     def scale_image(self, image: pygame.Surface, width: int, height: int) -> pygame.Surface:
         return pygame.transform.smoothscale(image, (int(width), int(height)))
-    
-    def load_font(self, font_size: int) -> pygame.font.Font:
-        font = pygame.font.Font("resource/dodamdodam.ttf", font_size)
-        return font
+
 
 DEFAULT_RED = 1
 DEFAULT_ORANGE = 2

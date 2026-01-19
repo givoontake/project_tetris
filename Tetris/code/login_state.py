@@ -9,6 +9,7 @@ from packet_type import *
 from session import Session
 from network import NetworkWorker
 from resource_manager import ResourceManager
+from font_manager import FontManager
 
 from button import Button
 from inputbox import InputBox
@@ -18,16 +19,15 @@ from base_state import BaseState
 from label_frame import LabelFrame
 
 class LoginState(BaseState):
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager,
-                  net_worker: NetworkWorker, session: Session):
-        super().__init__(screen, rm, net_worker, session)
-        self.title_font = self.rm.load_font(40)
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager, net_worker: NetworkWorker, session: Session):
+        super().__init__(screen, rm, fm, net_worker, session)
+        self.fm = fm
         self.background_image = self.rm.shutter_image
         self.id_label: Optional[LabelFrame] = None
         self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
-        self.popup: PopupBox = PopupBox(self.screen, self.rm, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
-        self.popup2: PopupBox = PopupBox(self.screen, self.rm, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
+        self.popup: PopupBox = PopupBox(screen, rm, fm, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
+        self.popup2: PopupBox = PopupBox(screen, rm, fm, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
         self.set_layout()
 
     def connect(self):
@@ -55,17 +55,17 @@ class LoginState(BaseState):
 
         id_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
         id_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
-        self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, "아이디", MAX_INPUT, False, False)
+        self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, self.fm, "아이디", MAX_INPUT, False, False)
 
         draw_y += label_h
         pw_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
         pw_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
-        self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, "비밀번호", MAX_INPUT, True, False)
+        self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, self.fm, "비밀번호", MAX_INPUT, True, False)
 
         draw_x += (label_w - button_w) // 2
         draw_y += label_h + (button_h // 2)
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
-        self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인", True)
+        self.btn_login = Button(self.screen, btn_rect, self.rm, self.fm, button_image, "로그인", True)
 
     def send_login(self):
         user_id = self.id_label.input_box.text
