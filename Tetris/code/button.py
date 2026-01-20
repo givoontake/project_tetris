@@ -76,7 +76,7 @@ class Button:
 
         return clicked
 
-    def draw(self, surface: pygame.Surface):
+    def draw(self):
         button = None
         if self.pressed and self.press is not None:
             button = self.press
