@@ -26,8 +26,8 @@ class LoginState(BaseState):
         self.id_label: Optional[LabelFrame] = None
         self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
-        self.popup: PopupBox = PopupBox(screen, rm, fm, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
-        self.popup2: PopupBox = PopupBox(screen, rm, fm, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
+        self.popup: PopupBox = PopupBox(screen, rm, fm, "서버와의 연결이 원활하지 않습니다.", ["재시도", "종료"])
+        self.popup2: PopupBox = PopupBox(screen, rm, fm, "아이디 또는 비밀번호를 확인하세요.", ["재시도", "종료"])
         self.set_layout()
 
     def connect(self):
@@ -153,7 +153,7 @@ class LoginState(BaseState):
         #self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
         self.id_label.draw()
         self.pw_label.draw()
-        self.btn_login.draw(self.screen)
+        self.btn_login.draw()
         if self.popup.visible:
             self.popup.draw()
         if self.popup2.visible:
