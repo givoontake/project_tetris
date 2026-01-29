@@ -8,42 +8,41 @@ from packet_type import *
 from session import Session
 from network import NetworkWorker
 from resource_manager import *
+from font_manager import *
 
 from button import Button
 from inputbox import InputBox
 
-from room_window import RoomWindow
+from room_window import RoomList
 from chat_window import ChatWindow
-from my_info import MyInfo
+from my_info import Profile
 from create_room_window import RoomCreateWindow
 from single_play import SinglePlayState
 from packet_manager import *
 from shutter_animaion import ShutterAnimation
 
-LOBBY = 1
-CREATE_ROOM = 2
+MENU_WIDTH = 200
+MENU_HEIGHT = 100
 
 class LobbyState:
-    BASE_X = 100
-    BASE_Y = 50
-    def __init__(self, screen, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session, is_animation: bool = False):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+                 net_worker: NetworkWorker, my_session: Session, is_animation: bool = False):
         self.screen = screen
         self.rm = rm
+        self.fm = fm
         self.my_session = my_session
         self.net_worker = net_worker
-        self.logo_surface = None
-        self.buttons: list[Button] = []
-        self.room_window = RoomWindow(pygame.Rect(50, 200, 1000, 400))
-        self.chat_window = ChatWindow(50, 600, 1000, 200)
+        self.top_menus: list[Button] = []
+        self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm, fm)
+        self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), fm)
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
-        self.chat_input_box = InputBox(input_box_rect.x, input_box_rect.y, input_box_rect.w, input_box_rect.h,
-                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
-        self.my_info_rect = MyInfo(pygame.Rect(1050, 600, 300, 300), self.my_session)
-        self.btn_draw_x, self.btn_draw_y = 0, 0
+        self.chat_input_box = InputBox(screen, input_box_rect, self.fm,
+                                       "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
+        self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), fm, my_session)
 
-        self.reactable_screen = LOBBY
-
-        self.open_shutter = ShutterAnimation(self.screen, self.rm)
+        self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.my_session)
+        # self.reactable_screen = LOBBY
+        self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
     
         self.set_layout()
@@ -52,27 +51,22 @@ class LobbyState:
             self.open_shutter.start_animation()
 
     def set_layout(self):
-        sw, sh = self.screen.get_size()
+        draw_x, draw_y = 50, 0
+        logo_w, logo_h = self.rm.logo.get_size()
+        logo_rect = pygame.Rect(draw_x, draw_y, logo_w, logo_h)
+        logo = Button(self.screen, logo_rect, self.rm, self.fm, self.rm.logo, "", False)
+        self.top_menus.append(logo)
+        draw_x += logo_rect.w
+        menu_texts: list[str] = ["빠른시작", "방만들기", "상점", "설정", "", "게임종료"]
+        for menu_text in menu_texts:
+            menu_rect = pygame.Rect(draw_x, draw_y, MENU_WIDTH, MENU_HEIGHT) 
+            menu = Button(self.screen, menu_rect, self.rm, self.fm, None, menu_text, True)
+            self.top_menus.append(menu)
+            draw_x += MENU_WIDTH
 
-        self.logo_surface = self.rm.button_images[BUTTON_LOGO_IDLE]
-        logo_w, logo_h = self.logo_surface.get_size()
-
-        btn_w, btn_h = 200, 100
-        #btn_y = 0
-
-        top_menus_text = ["방만들기", "상점", "설정"]
-
-        logo = Button(self.btn_draw_x, self.btn_draw_y, logo_w, logo_h, None, self.rm, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
-        self.buttons.append(logo)
-        self.btn_draw_x += logo_w
-
-        for btn_text in top_menus_text:
-            self.buttons.append(Button(self.btn_draw_x, self.btn_draw_y, btn_w, btn_h, btn_text, self.rm))
-            self.btn_draw_x += btn_w
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        self.set_layout()
+    # def on_resize(self, w, h, screen):
+    #     self.screen = screen
+    #     self.set_layout()
 
     def send_message(self, message: str): # 메세지는 가변이라 문자열 포맷을 크기만큼 만들어 직접 전송
         if len(message) == 0: return
@@ -95,45 +89,6 @@ class LobbyState:
         except Exception as e:
             print("[LoginState] send_login() error:", e)
 
-    def send_create_room(self, data: dict[str]):
-        id = self.my_session.id
-        max_user = data["max_user"]
-        room_name = data["room_name"]
-        room_name = room_name.encode("utf-8")
-        
-        if data.get("room_password") == None:
-            size = 2+1+4+1+MAX_ROOM_NAME
-            type = C2S_ADD_OPEN_ROOM
-            packet_bytes = struct.pack(
-                f"<hbib{MAX_ROOM_NAME}s",
-                size,
-                type,
-                id,
-                max_user,
-                room_name
-            )
-        else:
-            size = 2+1+4+1+MAX_ROOM_NAME + MAX_ROOM_PASSWORD
-            type = C2S_ADD_LOCK_ROOM
-            room_password = data["room_password"]
-            room_password = room_password.encode("utf-8")
-
-            packet_bytes = struct.pack(
-                f"<hbib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s",
-                size,
-                type,
-                id,
-                max_user,
-                room_name,
-                room_password
-            )
-            
-        
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[LoginState] send_create_room() error:", e)
-
     def handle_packet(self, data: dict):
         if data:
             #print(f"LobbyState->handle_packet() recv_bytes: {data.get("size")} / recv type: {data.get("type")}")
@@ -141,63 +96,70 @@ class LobbyState:
                 self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
 
             elif data.get("type") == S2C_ADD_OPEN_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.net_worker, self.my_session, data.get("room_name"))
+                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.my_session, data.get("room_name"))
 
             elif data.get("type") == S2C_ADD_LOCK_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
+                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
             
         return self
 
+    def handle_event(self, ev: pygame.event.Event):
+        if ev.type == pygame.QUIT:
+            pygame.quit()
+            raise SystemExit
+        
+        event = None
+        if self.room_create_window.visible == False:
+            for menu in self.top_menus:
+                if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
+                    event = menu.idle.text
+                    break
+
+            if event is not None:
+                if event == "방만들기":
+                    self.room_create_window.visible = True
+                    
+                # 나중에 메뉴별 상태 만들고 동작 추가
+                return
+
+            event = self.room_list.handle_event(ev)
+            if event is not None:
+                # 나중에 방 참가 패킷 전송 추가
+                pass
+            # return
+            self.chat_window.handle_event(ev) # 보여주기만 하므로 반환값은 없음
+            message = self.chat_input_box.handle_event(ev)
+            if message is not None:
+                self.send_message(message)
+
+        else:
+            self.room_create_window.handle_event(ev)
 
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 
             self.open_shutter.update(dt_ms)
             return
-
-        for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit()
-                raise SystemExit
-
-            if self.reactable_screen == LOBBY:
-                for btn in self.buttons:
-                    if btn.handle_event(ev):
-                        if btn.text == "방만들기":
-                            self.room_create_window = RoomCreateWindow(self.screen, self.rm)
-                            self.room_create_window.open()
-                            self.reactable_screen = CREATE_ROOM
-
-                self.room_window.handle_event(ev)
-                self.chat_window.handle_event(ev)
-                send_input = self.chat_input_box.handle_event(ev)
-                if send_input is not None:
-                    self.send_message(send_input)
-
-            elif self.reactable_screen == CREATE_ROOM:
-                # 어떤 버튼이 눌렸느냐에 따른 동작 추가
-                data = self.room_create_window.handle_event(ev)
-                if data == "취소":
-                    self.reactable_screen = LOBBY
-                elif data == None:
-                    pass
-                else: 
-                    self.send_create_room(data)
+        
+        self.chat_input_box.update(dt_ms)
                     
-        if self.reactable_screen == LOBBY: self.chat_input_box.update(dt_ms)
-        elif self.reactable_screen == CREATE_ROOM: self.room_create_window.update(dt_ms)
+        for ev in events:
+            self.handle_event(ev)
+
+        if self.room_create_window.visible:
+            self.room_create_window.update(dt_ms)
         
         return self
 
     def draw(self):
         self.screen.fill(BLACK)
 
-        for btn in self.buttons:
-            btn.draw(self.screen)
+        for menu in self.top_menus:
+            menu.draw()
 
-        self.room_window.draw(self.screen)
-        self.chat_window.draw(self.screen)
-        self.chat_input_box.draw(self.screen)
-        self.my_info_rect.draw(self.screen)
+        self.room_list.draw()
+        self.chat_window.draw()
+        self.chat_input_box.draw()
+        self.my_info_rect.draw()
 
-        if self.reactable_screen == CREATE_ROOM: self.room_create_window.draw()
+        if self.room_create_window.visible: self.room_create_window.draw()
         if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()

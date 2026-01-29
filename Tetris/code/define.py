@@ -14,11 +14,7 @@ INITIAL_SCALE = 0.95
 # Grid
 GRID_COLUMNS = 10
 GRID_ROWS = 20
-CELL_SIZE = 30
-
-# Preview (5x5 셀)
-PREVIEW_CELL_SIZE = CELL_SIZE * 5
-
+CELL_SIZE = 35 # 리소스에서 로드하려면 기본적인 값이 필요해서 값 유지
 # BLANK_WIDTH = 100
 # BLANK_HEIGHT = 50
 
@@ -82,6 +78,7 @@ SHAPES_INDEX = {
 
 ORANGE = (255, 165, 0)
 GRAY   = (128, 128, 128)
+DARK_GRAY = (64,64,64)
 WHITE  = (255, 255, 255)
 BLUE = (0, 0, 150)
 BLACK = (0, 0, 0)

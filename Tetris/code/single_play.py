@@ -8,6 +8,7 @@ from packet_type import *
 from session import Session
 from network import NetworkWorker
 from resource_manager import ResourceManager
+from font_manager import FontManager
 
 from button import Button
 from tetris_board import TetrisBoard
@@ -22,25 +23,24 @@ DROP = 4
 UP = 5
 
 class SinglePlayState:
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+                  net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
         self.screen = screen
-        self.room_title = room_title
-        self.room_password = room_password
+        self.title = room_title
+        self.password = room_password
 
         self.rm = rm
+        self.fm = fm
         self.net_worker = net_worker
         self.my_session = session
 
         # UI 요소들
         self.board: Optional[TetrisBoard] = None
-        self.btn_start: Optional[Button] = None
+        # self.btn_start: Optional[Button] = None
 
-        self.btn_room_title: Optional[Button] = None
-        self.btn_room_password: Optional[Button] = None
-        self.btn_room_exit: Optional[Button] = None
-
-        # 상단 텍스트용 폰트
-        self.header_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
+        self.title_box: Optional[Rectangle] = None
+        self.password_box: Optional[Rectangle] = None
+        self.btn_exit: Optional[Button] = None
 
         # 연속 전송용 변수
         self.left_pressed = False
@@ -62,8 +62,50 @@ class SinglePlayState:
         self.down_first_over = False
         self.down_first_move = False
 
-        self.init()
+        self.set_layout()
         self.clear()
+
+    def set_layout(self):
+        header_w, header_h = 300, 50
+
+        sw, sh = self.screen.get_size()
+        board_w = int(sw*0.4)
+        board_h = int(sh*0.8)
+        board_x = ((sw - board_w) // 2) + int(board_w*0.15)
+        board_y = header_h
+        board_rect = pygame.Rect(board_x, board_y, board_w, board_h)
+        self.board = TetrisBoard(self.screen, board_rect, self.fm, self.my_session)
+        self.my_session.set_block_scale(self.rm, self.board.cell_length)
+
+        btn_w = self.board.rect.w - self.board.score_box.rect.w
+        btn_h = sh*0.1
+        btn_x = board_x
+        btn_y = board_y + board_h
+        btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+
+        self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
+
+        # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
+        draw_x, draw_y = 0, 0
+        title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
+        title = f"방 제목: {self.title}"
+        self.title_box = Rectangle(self.screen, title_rect, self.fm, None, title)
+
+        draw_x += header_w 
+        password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
+        if self.password == None:
+            pw_val = "비밀번호: 없음"
+        else:
+            pw_val = f"비밀번호: {self.password}"
+        self.password_box = Rectangle(self.screen, password_rect, self.fm, None, pw_val)
+
+        from lobby_state import MENU_WIDTH, MENU_HEIGHT
+        draw_x = sw - MENU_WIDTH
+        draw_y = 0
+        draw_w = MENU_WIDTH
+        draw_h = MENU_HEIGHT
+        exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, self.fm, None, "나가기")
 
     def clear(self):
         self.left_pressed = False
@@ -263,7 +305,7 @@ class SinglePlayState:
             delete_id = data.get("id")
             if delete_id == self.my_session.id:
                 pygame.mixer.music.stop()
-                return LobbyState(self.screen, self.rm, self.net_worker, self.my_session)
+                return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.my_session)
             
         elif packet_type == S2C_SPAWN:
             print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
@@ -304,139 +346,10 @@ class SinglePlayState:
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self
 
-    # ------------ 레이아웃 초기화 ------------ #
-    def init(self):
-        self._build_layout()
-
-    def _build_layout(self):
-        sw, sh = self.screen.get_size()
-
-        # --- 보드 / 미리보기 배치 ---
-        board_w = BOARD_COLS * CELL_SIZE
-        board_h = BOARD_ROWS * CELL_SIZE
-        valid_w = board_w
-        valid_h = (BOARD_ROWS - HIDDEN_ROWS) * CELL_SIZE
-        preview_w = PREVIEW_COLS * CELL_SIZE
-        preview_h = PREVIEW_ROWS * CELL_SIZE
-        score_w = PREVIEW_COLS*CELL_SIZE
-        score_h = PREVIEW_ROWS*CELL_SIZE
-
-        total_w = board_w + preview_w
-        total_h = board_h
-
-        offset_x = (sw - total_w) // 2
-        offset_y = (sh - total_h) // 2
-
-        board_rect = pygame.Rect(
-            offset_x,
-            offset_y,
-            board_w,
-            board_h,
-        )
-
-        valid_rect = pygame.Rect(
-            offset_x,
-            offset_y + HIDDEN_ROWS*CELL_SIZE,
-            valid_w,
-            valid_h,
-        )
-
-        preview_rect = pygame.Rect(
-            offset_x + board_w,
-            offset_y + HIDDEN_ROWS*CELL_SIZE,
-            preview_w,
-            preview_h,
-        )
-
-        score_rect = pygame.Rect(
-            offset_x + board_w,
-            offset_y + HIDDEN_ROWS*CELL_SIZE + preview_h,
-            score_w,
-            score_h
-        )
-
-        self.board = TetrisBoard(
-            screen=self.screen,
-            board_rect=board_rect,
-            valid_rect=valid_rect,
-            preview_rect=preview_rect,
-            score_rect=score_rect,
-            session=self.my_session
-        )
-
-        # 게임 시작 버튼 (보드 중앙 아래쪽 정도에 배치)
-        btn_w, btn_h = 200, 100
-        btn_x = board_rect.centerx - btn_w // 2
-        btn_y = board_rect.bottom - 200
-
-        self.btn_start = Button(
-            x=btn_x,
-            y=btn_y,
-            w=btn_w,
-            h=btn_h,
-            text="게임 시작",
-            rm=self.rm,
-            react=True,
-        )
-
-        # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
-        header_w, header_h = 300, 50
-        header_y = 0
-        title_x = 0
-        pw_x = header_w  # 바로 오른쪽에 붙이기
-
-        # 상호작용 X: react=False, 텍스트는 직접 그릴 것이므로 text=None
-        self.btn_room_title = Button(
-            x=title_x,
-            y=header_y,
-            w=header_w,
-            h=header_h,
-            text=None,
-            rm=self.rm,
-            react=False,
-        )
-        self.btn_room_password = Button(
-            x=pw_x,
-            y=header_y,
-            w=header_w,
-            h=header_h,
-            text=None,
-            rm=self.rm,
-            react=False,
-        )
-        exit_w, exit_h = 200, 100
-        exit_x, exit_y = sw - exit_w, 0
-        self.btn_room_exit = Button(
-            x=exit_x,
-            y=exit_y,
-            w=exit_w,
-            h=exit_h,
-            text="나가기",
-            rm=self.rm,
-            react=True,
-        )
     # ------------ 상단 방 정보 그리기 ------------ #
     def draw_room_header(self):
-        """상단의 방 제목 / 비밀번호 영역을 그린다."""
-        if not self.btn_room_title or not self.btn_room_password:
-            return
-
-        # 버튼 사각형만 그리기 (테두리)
-        self.btn_room_title.draw(self.screen)
-        self.btn_room_password.draw(self.screen)
-
-        # 텍스트는 직접 렌더링
-        title_text = f"방 제목: {self.room_title}"
-        pw_text = f"비밀번호: {self.room_password or '없음'}"
-
-        title_surf = self.header_font.render(title_text, True, (255, 255, 255))
-        pw_surf = self.header_font.render(pw_text, True, (255, 255, 255))
-
-        title_rect = title_surf.get_rect(center=self.btn_room_title.rect.center)
-        pw_rect = pw_surf.get_rect(center=self.btn_room_password.rect.center)
-
-        self.screen.blit(title_surf, title_rect)
-        self.screen.blit(pw_surf, pw_rect)
+        self.title_box.draw()
+        self.password_box.draw()
 
     # ------------ 이벤트 처리 ------------ #
     def update(self, dt_ms, events):
@@ -453,7 +366,7 @@ class SinglePlayState:
             if self.btn_start and self.btn_start.handle_event(ev):
                 self.send_start()
 
-            if self.btn_room_exit.handle_event(ev):
+            if self.btn_exit.handle_event(ev):
                 self.send_delete_user()
                 
         if self.left_pressed: self.left_elapsed_time += dt_ms
@@ -473,11 +386,11 @@ class SinglePlayState:
 
         # 상단 방 제목/비밀번호
         self.draw_room_header()
-        self.btn_room_exit.draw(self.screen)
+        self.btn_exit.draw()
 
         # 보드 및 미리보기/프로필/블록
         self.board.draw()
 
         # 게임 시작 버튼 (게임 시작 전)
         if not self.board.game_started and self.btn_start:
-            self.btn_start.draw(self.screen)
+            self.btn_start.draw()

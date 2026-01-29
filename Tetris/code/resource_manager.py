@@ -27,6 +27,7 @@ class ResourceManager:
 
         self.login_button = self.load_image("resource/button/login_button.png", 200, 100)
         self.login_label_frame = self.load_image("resource/login_label_frame.png", 400, 100)
+        self.logo = self.load_image("resource/button/new_tetris_logo.png", 250, 100)
 
     def init(self):
         self.block_images = {
@@ -54,9 +55,6 @@ class ResourceManager:
         BUTTON_LOGIN_IDLE: self.load_image("resource/button/button_login_idle.png", 300, 100),
         BUTTON_LOGIN_HOVER: self.load_image("resource/button/button_login_hover.png", 300, 100),
         BUTTON_LOGIN_PRESS: self.load_image("resource/button/button_login_press.png", 300, 100),
-        BUTTON_LOGO_IDLE: self.load_image("resource/button/tetris_logo.png", 500, 100),
-        BUTTON_LOGO_HOVER: self.load_image("resource/button/tetris_logo.png", 500, 100),
-        BUTTON_LOGO_PRESS: self.load_image("resource/button/tetris_logo.png", 500, 100)
         }
 
         self.button_sound_hover.set_volume(0.8)

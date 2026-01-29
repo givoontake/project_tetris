@@ -1,28 +1,27 @@
 import pygame
 from define import *
+from session import Session
+from font_manager import FontManager
 
-class MyInfo:
-    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, session):
-        """
-        rect: MyInfo를 표시할 영역(Rect)
-        session: Session 인스턴스 (nickname, win, lose 포함)
-        """
+class Profile:
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, fm: FontManager, session: Session):
+        self.screen = screen
         self.rect = rect
         self.my_session = session
 
         # 폰트 설정
-        self.font_nick = pygame.font.Font("resource/dodamdodam.ttf", 40)   # 닉네임: 40px
-        self.font_stat = pygame.font.Font("resource/dodamdodam.ttf", 28)   # 승/패: 28px
-        self.font_max_score = pygame.font.Font("resource/dodamdodam.ttf", 28) # 최고점수
+        self.font_nickname = fm.load_font(40)
+        self.font_stat = fm.load_font(30)
+        self.font_max_score = fm.load_font(30)
 
         self.text_color = WHITE
         self.padding = 20  # 닉네임과 승/패 간 간격
 
-    def draw(self, surface: pygame.Surface):
+    def draw(self):
         # 세션에서 정보 읽기
 
         # 1) 닉네임
-        nick_surf = self.font_nick.render(self.my_session.nickname, True, self.text_color)
+        nick_surf = self.font_nickname.render(self.my_session.nickname, True, self.text_color)
         nick_rect = nick_surf.get_rect(
             center=(self.rect.centerx, self.rect.y + nick_surf.get_height() // 2)
         )
@@ -43,7 +42,7 @@ class MyInfo:
         )
 
         # 실제 그리기
-        surface.blit(nick_surf, nick_rect)
-        surface.blit(stat_surf, stat_rect)
-        surface.blit(score_surf, score_rect)
+        self.screen.blit(nick_surf, nick_rect)
+        self.screen.blit(stat_surf, stat_rect)
+        self.screen.blit(score_surf, score_rect)
 

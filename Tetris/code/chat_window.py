@@ -1,5 +1,6 @@
 import pygame
 from define import *
+from font_manager import FontManager
 
 CHAT_WINDOW_WIDTH = 1000
 CHAT_WINDOW_HEIGHT = 250
@@ -12,15 +13,15 @@ LINE_PADDING = 5         # 줄 간 간격 (수직 패딩)
 OPTIMIZED_OFFSET = 10
 
 class ChatWindow:
-    def __init__(self, x: int, y: int, w: int, h: int):
-        """
-        x, y: 채팅창의 좌상단 좌표
-        w, h: 채팅창 크기
-        """
-        self.window_x = x
-        self.window_y = y
-        self.window_w = w
-        self.window_h = h
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, fm: FontManager):
+        self.screen = screen
+        self.rect = rect
+        self.fm = fm
+
+        self.window_x = rect.x
+        self.window_y = rect.y
+        self.window_w = rect.w
+        self.window_h = rect.h
 
         self.bg_scroll_x = self.window_x + self.window_w
         self.bg_scroll_y = self.window_y
@@ -263,16 +264,16 @@ class ChatWindow:
         self.scroll_h = self.bg_scroll_h
         self.scroll_rect = pygame.Rect(self.scroll_x, int(self.scroll_y), self.scroll_w, self.scroll_h)
 
-    def draw(self, surface: pygame.Surface):
+    def draw(self):
         """
         - 회색 사각형 배경을 먼저 그림
         - 최근 메시지 최대 show_lines줄만 화면에 표시
         - 위에서부터 아래로 순서대로, 한 줄 높이(line_height) 간격으로 그린다.
         """
         # 배경 박스
-        pygame.draw.rect(surface, GRAY, self.bg_scroll_rect)
-        if self.can_drag: pygame.draw.rect(surface, ORANGE, self.scroll_rect)
-        else: pygame.draw.rect(surface, WHITE, self.scroll_rect)
+        pygame.draw.rect(self.screen, GRAY, self.bg_scroll_rect)
+        if self.can_drag: pygame.draw.rect(self.screen, ORANGE, self.scroll_rect)
+        else: pygame.draw.rect(self.screen, WHITE, self.scroll_rect)
 
         if self.scrollable_line > 0:
             self.show_end = self.show_start + self.show_lines
@@ -285,5 +286,5 @@ class ChatWindow:
         draw_text_y = self.window_y
         for i in range(self.show_start, self.show_end):
             text_surf = self.font.render(self.texts[i], True, WHITE)
-            surface.blit(text_surf, (self.window_x, draw_text_y))
+            self.screen.blit(text_surf, (self.window_x, draw_text_y))
             draw_text_y += self.line_height

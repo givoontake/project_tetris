@@ -46,8 +46,24 @@ class InputBox:
         self.backspace_repeat_time2 = 50
         self.backspace_repeat_time2_active = False
 
+    def _reset_text(self):
+        self.text = ""
+        self.editing_text = ""
+
+    def _reset_cursor(self):
+        self.backspace_repeat_timer = 0
+        self.backspace_repeat_time1_active = True
+        self.backspace_repeat_time2_active = False
+        self.backspace_pressed = False
+
     def get_inputbox_rect(self) -> pygame.Rect:
-        return self.rect
+        return self.backspace_repeat_time1_active
+    
+    def extract_text(self) -> str:
+        text = self.get_total_text()
+        self._reset_text()
+        self._reset_cursor()
+        return text
 
     def add_char(self, ch: str):
         if not self.active:
@@ -85,8 +101,8 @@ class InputBox:
         else:
             total_text = self.text
         
-        if self.is_password:
-            total_text = "●" * len(total_text)
+        # if self.is_password:
+        #     total_text = "●" * len(total_text)
 
         return total_text
 
@@ -137,7 +153,7 @@ class InputBox:
         # ===== 최종 확정된 문자 입력 =====
         elif ev.type == pygame.TEXTINPUT:
             self.add_char(ev.text)
-
+ 
         # ===== 제어키 처리 (백스페이스 + 엔터) =====
         elif ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_BACKSPACE:  # TEXTINPUT으로는 문자 아니면 처리 안됨, 따로 처리 필요
@@ -145,21 +161,12 @@ class InputBox:
                 self.backspace_pressed = True
 
             elif ev.key == pygame.K_RETURN:
-                input_text = self.get_total_text()
-                self.text = ""
-                self.editing_text = ""
-                self.backspace_repeat_timer = 0
-                self.backspace_repeat_time1_active = True
-                self.backspace_repeat_time2_active = False
-                self.backspace_pressed = False
+                input_text = self.extract_text()
                 return input_text
                 
         elif ev.type == pygame.KEYUP:
             if ev.key == pygame.K_BACKSPACE:
-                self.backspace_repeat_timer = 0
-                self.backspace_repeat_time1_active = True
-                self.backspace_repeat_time2_active = False
-                self.backspace_pressed = False
+                self._reset_cursor()
 
         return None
 
@@ -194,10 +201,6 @@ class InputBox:
 
 
     def draw(self):
-        # 배경
-        #pygame.draw.rect(self.screen, self.color, self.rect)
-
-        # 보여줄 텍스트 (비밀번호면 ●로 마스킹)
         show_text = self.get_render_text()
         if not show_text and not self.active:
             txt = self.font.render(self.placeholder, True, PLACEHOLDER)

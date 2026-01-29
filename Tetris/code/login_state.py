@@ -67,14 +67,12 @@ class LoginState(BaseState):
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
         self.btn_login = Button(self.screen, btn_rect, self.rm, self.fm, button_image, "로그인", True)
 
-    def send_login(self):
-        user_id = self.id_label.input_box.text
-        user_pw = self.pw_label.input_box.text
+    def send_login(self, id: str, pw: str):
         data = {
             "size": 2 + 1 + MAX_USER_ID + MAX_USER_PASSWORD,
             "type": C2S_LOGIN,
-            "user_id": user_id,
-            "user_password": user_pw
+            "user_id": id,
+            "user_password": pw
         }
         try:
             self.net_worker.send_packet(self.net_worker._pm.dic_to_bytes(data))
@@ -103,9 +101,29 @@ class LoginState(BaseState):
 
                     self.session.load_texture(self.rm)
                     print(f"id={id}, nickname={nickname}, win={win}, lose={lose}")
-                    return LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True)
+                    return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session, is_animation=True)
             
             return self
+        
+
+    def handle_event(self, ev: pygame.event.Event):
+        if ev.type == pygame.QUIT:
+            pygame.quit(); raise SystemExit
+        
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
+            id = self.id_label.input_box.handle_event(ev)
+            pw = self.pw_label.input_box.handle_event(ev)
+            self.send_login(id, pw)
+            return
+        
+        else:
+            self.id_label.input_box.handle_event(ev)
+            self.pw_label.input_box.handle_event(ev)
+            
+        if self.btn_login.handle_event(ev):
+            id = self.id_label.input_box.extract_text()
+            pw = self.pw_label.input_box.extract_text()
+            self.send_login(id, pw)
 
     def update(self, dt_ms, events):
         if self.popup.visible:
@@ -129,17 +147,7 @@ class LoginState(BaseState):
             return self  # 로그인 UI는 건드리지도 않음
         
         for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit(); raise SystemExit
-                
-            self.id_label.handle_event(ev)
-            self.pw_label.handle_event(ev)
-
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
-                self.send_login()
-
-            if self.btn_login.handle_event(ev):
-                self.send_login()
+            self.handle_event(ev)
 
         self.id_label.update(dt_ms)
         self.pw_label.update(dt_ms)

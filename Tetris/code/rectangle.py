@@ -10,6 +10,7 @@ class Rectangle:
         fm: FontManager,
         image: pygame.Surface = None, 
         text: str = "", 
+        border_width = 0
         ):
         self.screen = screen
         self.rect = rect
@@ -17,11 +18,14 @@ class Rectangle:
         self.font = fm.get_font(RECTANGLE_FONT_SIZE)
         self.image = None
         if image is not None: 
-            self.image = pygame.transform.smoothscale(image, (self.rect.w, self.rect.h))
+            self.set_image(image)
         self.text = text
         self.text_color: tuple[int, int, int] = WHITE
         self.background_color: tuple[int, int, int] = BLACK
+        self.border_color: tuple[int, int, int] = WHITE
         self.font_surface = self.font.render(self.text, False, self.text_color)
+
+        self.border_width = border_width
 
     # def get_rect(self) -> pygame.Rect: 
     #     return self.rect
@@ -32,15 +36,31 @@ class Rectangle:
     def set_text_color(self, color = tuple[int, int, int]): # r, g, b
         self.text_color = color
         self.font_surface = self.font.render(self.text, False, self.text_color)
+
+    def set_image(self, new_image: pygame.Surface):
+        scaled_image = pygame.transform.smoothscale(new_image, (self.rect.w, self.rect.h))
+        self.image = scaled_image
         
+    def set_text(self, new_text: pygame.Surface):
+        self.text = new_text
+        self.font_surface = self.font.render(self.text, False, self.text_color)
+
+    def set_border(self, new_border_width: int): # 0이면 테두리 없음. 0보다 크면 그 두께만큼 테두리 생성
+        self.border_width = new_border_width
+
     def _get_center_pos(self) -> tuple[int, int]: # x, y
         center_x = self.rect.x + self.rect.w // 2
         center_y = self.rect.y + self.rect.h // 2
         return center_x, center_y
     
+    def update_rect(self, new_rect: pygame.Rect):
+        self.rect = new_rect
+    
     def draw(self):
         if self.image == None:
             pygame.draw.rect(self.screen, self.background_color, self.rect)
+            if self.border_width > 0:
+                pygame.draw.rect(self.screen, self.border_color, self.rect, self.border_width)
         else:
             self.screen.blit(self.image, self.rect)
 
