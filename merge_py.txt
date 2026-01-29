@@ -1,71 +1,72 @@
+===== FILE BEGIN: code\base_state.py =====
+import pygame
+from resource_manager import ResourceManager
+from network import NetworkWorker
+from session import Session
+from font_manager import FontManager
+
+class BaseState:
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager, net_worker: NetworkWorker, session: Session):
+        self.screen = screen
+        self.rm = rm
+        self.fm = fm
+        self.net_worker = net_worker
+        self.session = session
+
+    def handle_packets(self):
+        pass
+
+    def update(self):
+        pass
+
+    def draw(self):
+        pass
+===== FILE END: code\base_state.py =====
+
 ===== FILE BEGIN: code\button.py =====
 import pygame
 
 from define import *
 from resource_manager import ResourceManager
+from font_manager import *
+from rectangle import Rectangle
 
 class Button:
-    """
-    통합 버튼 클래스.
-
-    - idle_btn_type / hover_btn_type / press_btn_type 은 AssetManager에 등록된 이미지 키
-      -> Button은 이미지를 새로 로드하거나 스케일하지 않는다.
-      -> 그냥 AssetManager에서 꺼낸 Surface를 그대로 쓴다.
-    - 세 타입 키가 모두 None이면 fallback(단색 사각형)으로 렌더한다.
-    - handle_event(ev)에서 클릭이 성립하면 True를 반환한다.
-
-    
-    사용 전:
-        Button.shared_font = pygame.font.Font(... ) # 외부에서 넣어주거나, 없으면 __init__에서 기본 생성
-    """
-    shared_font: pygame.font.Font | None = None
-
-    def __init__(
-        self,
-        x: int,
-        y: int,
-        w: int,
-        h: int,
-        text: str = None,
-        rm: ResourceManager = None,
-        idle_btn_type=None,
-        hover_btn_type=None,
-        press_btn_type=None,
-        react = True
+    def __init__(self, 
+        screen: pygame.Surface,
+        rect: pygame.Rect, 
+        rm: ResourceManager,
+        fm: FontManager,
+        image: pygame.Surface = None, 
+        text: str = "", 
+        react: bool = True
     ):
-        # 버튼 위치/크기 정보
-        self.rect = pygame.Rect(x, y, w, h)
-
-        # 상태 플래그
         self.rm = rm
-        self.text = text
+        self.fm = fm
+        self.react = react
         self.hovered = False
         self.pressed = False
-        self._pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
+        self.pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
         self.hover_sound_printed = False
+        self.idle = Rectangle(screen, rect, fm, image, text)
+        if image == None:
+            self.hover = None
+            self.press = None
+        else: 
 
-        # 폰트 준비 (공용 폰트 없으면 기본 생성)
-        if Button.shared_font is None:
-            Button.shared_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
-        self.font = Button.shared_font
+            hover_rect = self._set_rect_scale(self.idle.rect, self.rm.HOVER_SCALE)
+            press_rect = self._set_rect_scale(self.idle.rect, self.rm.PRESS_SCALE)
 
-        # 텍스트 surface 미리 만들어두기
-        self.text_surface = self.font.render(self.text, True, (255, 255, 255))
-        self.text_rect = self.text_surface.get_rect(center=self.rect.center)
+            self.hover = Rectangle(screen, hover_rect, self.fm, image, text)
+            self.press = Rectangle(screen, press_rect, self.fm, image, text)
 
-        # 상태별 이미지 Surface 직접 참조 (스케일 X, 로드 X)
-        if rm == None:
-            self.idle_img = None
-            self.hover_img = None
-            self.press_img = None
+    def _set_rect_scale(self, rect: pygame.Rect, scale: float) -> pygame.Rect:
+        if scale < 0.1 or scale > 1.1:
+            raise ValueError("scale must be between 0.1 and 1.1")
         
-        else:
-            self.idle_img  = self.rm.button_images[idle_btn_type]  if idle_btn_type  is not None else None
-            self.hover_img = self.rm.button_images[hover_btn_type] if hover_btn_type is not None else None
-            self.press_img = self.rm.button_images[press_btn_type] if press_btn_type is not None else None
-
-        self.react = react
-
+        temp_rect = rect.copy() 
+        return temp_rect.scale_by(scale)
+        
     def handle_event(self, ev: pygame.event.Event) -> bool:
         if self.react == False:
             return False
@@ -77,7 +78,7 @@ class Button:
         """
         clicked = False
         if ev.type == pygame.MOUSEMOTION:
-            self.hovered = self.rect.collidepoint(ev.pos)
+            self.hovered = self.idle.rect.collidepoint(ev.pos)
             if self.hovered:
                 if self.hover_sound_printed == False:
                     self.hover_sound_printed = True
@@ -85,61 +86,49 @@ class Button:
             else: self.hover_sound_printed = False
 
         elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
-            if self.rect.collidepoint(ev.pos):
+            if self.idle.rect.collidepoint(ev.pos):
                 self.pressed = True
-                self._pressed_inside = True
+                self.pressed_inside = True
                 self.rm.button_sound_press.play()
             else:
                 self.pressed = False
-                self._pressed_inside = False
+                self.pressed_inside = False
 
         elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
-            if self.pressed and self._pressed_inside and self.rect.collidepoint(ev.pos):
+            if self.pressed and self.pressed_inside and self.idle.rect.collidepoint(ev.pos):
                 clicked = True
             self.pressed = False
-            self._pressed_inside = False
+            self.pressed_inside = False
 
         return clicked
 
-    def draw(self, surface: pygame.Surface):
-        """
-        현재 상태에 맞는 이미지를 골라 그린다.
-        우선순위: press_img > hover_img > idle_img
-        아무 이미지도 없으면 fallback 사각형으로 그린다.
-        텍스트는 항상 위에 얹는다.
-        """
+    def draw(self):
+        button = None
+        if self.pressed and self.press is not None:
+            button = self.press
+        elif self.hovered and self.hover is not None:
+            button = self.hover
+        elif button is not None:
+            button = self.idle
 
-        used_img = None
-        if self.pressed and self.press_img is not None:
-            used_img = self.press_img
-        elif self.hovered and self.hover_img is not None:
-            used_img = self.hover_img
-        elif self.idle_img is not None:
-            used_img = self.idle_img
-
-        if used_img is not None:
-            # 준비된 이미지 그대로 blit
-            surface.blit(used_img, self.rect.topleft)
+        if button is not None:
+            button.draw()
+            
         else:
-            # fallback: 단색 버튼(색은 원하는 걸로 바꿔도 됨)
             if self.pressed:
-                color = ORANGE    # ORANGE-ish
+                self.idle.set_background_color(ORANGE)   # ORANGE-ish
             elif self.hovered:
-                color = GRAY # GRAY-ish
+                self.idle.set_background_color(GRAY)
             else:
-                color = BLACK    # DARK-ish
+                self.idle.set_background_color(BLACK)
 
-            pygame.draw.rect(surface, color, self.rect)
-
-        # 텍스트 중앙에 그리기
-        if self.text is not None:
-            self.text_rect.center = self.rect.center
-            surface.blit(self.text_surface, self.text_rect)
+            self.idle.draw()
 ===== FILE END: code\button.py =====
 
 ===== FILE BEGIN: code\chat_window.py =====
 import pygame
 from define import *
+from font_manager import FontManager
 
 CHAT_WINDOW_WIDTH = 1000
 CHAT_WINDOW_HEIGHT = 250
@@ -152,15 +141,15 @@ LINE_PADDING = 5         # 줄 간 간격 (수직 패딩)
 OPTIMIZED_OFFSET = 10
 
 class ChatWindow:
-    def __init__(self, x: int, y: int, w: int, h: int):
-        """
-        x, y: 채팅창의 좌상단 좌표
-        w, h: 채팅창 크기
-        """
-        self.window_x = x
-        self.window_y = y
-        self.window_w = w
-        self.window_h = h
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, fm: FontManager):
+        self.screen = screen
+        self.rect = rect
+        self.fm = fm
+
+        self.window_x = rect.x
+        self.window_y = rect.y
+        self.window_w = rect.w
+        self.window_h = rect.h
 
         self.bg_scroll_x = self.window_x + self.window_w
         self.bg_scroll_y = self.window_y
@@ -403,16 +392,16 @@ class ChatWindow:
         self.scroll_h = self.bg_scroll_h
         self.scroll_rect = pygame.Rect(self.scroll_x, int(self.scroll_y), self.scroll_w, self.scroll_h)
 
-    def draw(self, surface: pygame.Surface):
+    def draw(self):
         """
         - 회색 사각형 배경을 먼저 그림
         - 최근 메시지 최대 show_lines줄만 화면에 표시
         - 위에서부터 아래로 순서대로, 한 줄 높이(line_height) 간격으로 그린다.
         """
         # 배경 박스
-        pygame.draw.rect(surface, GRAY, self.bg_scroll_rect)
-        if self.can_drag: pygame.draw.rect(surface, ORANGE, self.scroll_rect)
-        else: pygame.draw.rect(surface, WHITE, self.scroll_rect)
+        pygame.draw.rect(self.screen, GRAY, self.bg_scroll_rect)
+        if self.can_drag: pygame.draw.rect(self.screen, ORANGE, self.scroll_rect)
+        else: pygame.draw.rect(self.screen, WHITE, self.scroll_rect)
 
         if self.scrollable_line > 0:
             self.show_end = self.show_start + self.show_lines
@@ -425,7 +414,7 @@ class ChatWindow:
         draw_text_y = self.window_y
         for i in range(self.show_start, self.show_end):
             text_surf = self.font.render(self.texts[i], True, WHITE)
-            surface.blit(text_surf, (self.window_x, draw_text_y))
+            self.screen.blit(text_surf, (self.window_x, draw_text_y))
             draw_text_y += self.line_height
 
 ===== FILE END: code\chat_window.py =====
@@ -438,72 +427,12 @@ from inputbox import InputBox
 from define import *
 from define_format import *
 from resource_manager import *
-
-class ToggleButton:
-    """활성/비활성 상태를 가지는 작은 토글 버튼."""
-    def __init__(self, rm: ResourceManager, rect: pygame.Rect, text: str):
-        self.rm = rm
-        self.rect = rect
-        self.text = text
-        self.active = False
-
-        self.hovered = False
-        self.pressed = False
-        self._pressed_inside = False
-        self.hover_sound_printed = False
-
-        if Button.shared_font is None:
-            Button.shared_font = pygame.font.Font("resource/dodamdodam.ttf", 20)
-        self.font = Button.shared_font
-        self.text_surface = self.font.render(self.text, True, WHITE)
-        self.text_rect = self.text_surface.get_rect(center=self.rect.center)
-
-    def handle_event(self, ev: pygame.event.Event) -> bool:
-        """클릭 성립 시 True 반환, 그 순간 active=True로 설정(그룹 관리는 외부에서)."""
-        clicked = False
-
-        if ev.type == pygame.MOUSEMOTION:
-            self.hovered = self.rect.collidepoint(ev.pos)
-            if self.hovered:
-                if self.hover_sound_printed == False:
-                    self.hover_sound_printed = True
-                    self.rm.button_sound_hover.play()
-            else: self.hover_sound_printed = False
-
-        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
-            if self.rect.collidepoint(ev.pos):
-                self.pressed = True
-                self._pressed_inside = True
-            else:
-                self.pressed = False
-                self._pressed_inside = False
-                self.rm.button_sound_press.play()
-
-        elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
-            if self.pressed and self._pressed_inside and self.rect.collidepoint(ev.pos):
-                clicked = True
-            self.pressed = False
-            self._pressed_inside = False
-
-        if clicked:
-            self.active = True
-        return clicked
-
-    def draw(self, surface: pygame.Surface):
-        if self.active:
-            color = ORANGE
-        else:
-            if self.pressed:
-                color = (200, 120, 0)
-            elif self.hovered:
-                color = GRAY
-            else:
-                color = BLACK
-
-        pygame.draw.rect(surface, color, self.rect, border_radius=6)
-        self.text_rect.center = self.rect.center
-        surface.blit(self.text_surface, self.text_rect)
-
+from font_manager import FontManager
+from rectangle import Rectangle
+from network import NetworkWorker
+from session import Session
+from toggle_button import ToggleButton
+from packet_manager import *
 
 class RoomCreateWindow:
     """
@@ -525,29 +454,32 @@ class RoomCreateWindow:
     LEFT_PADDING = 20
     RIGHT_PADDING = 20
 
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager, net_worker: NetworkWorker, my_session: Session):
         self.screen = screen
-        self.visible = False
         self.rm = rm
+        self.fm = fm
+        self.net_worker = net_worker
+        self.my_session = my_session
+        self.rect = pygame.Rect(0, 0, 0, 0)
+        self.window: Rectangle
+        self.background: Rectangle
 
-        # 선택 상태
-        self.selected_max_user = 2   # 1 / 2 / 5
-        self.is_public = True        # True: 공개, False: 비공개
+        self.title: InputBox = None
+        self.option_player: list[ToggleButton] = []
+        self.option_open: list[ToggleButton] = []
+        self.password: InputBox = None
+        self.option_make: list[ToggleButton] = []
 
-        # 레이아웃 관련
-        self.window_rect: pygame.Rect | None = None
+        self.col_num = 5 # 총 5줄
 
-        # UI 요소
-        self.title_box: Optional[InputBox] = None
-        self.password_box: Optional[InputBox] = None
-        self.count_buttons: list[ToggleButton] = []
-        self.vis_buttons: list[ToggleButton] = []
-        self.btn_create: Optional[Button] = None
-        self.btn_cancel: Optional[Button] = None
+        self.title_val: Optional[str] = None
+        self.player_val: Optional[int] = None
+        self.is_open: Optional[bool] = None
+        self.password_val: Optional[str] = None
+        
+        self.visible = False
 
-        self.label_font = pygame.font.Font("resource/dodamdodam.ttf", 20)
-
-        self._recalc_layout()
+        self.set_layout()
 
     # -------- 외부에서 제어 -------- #
     def open(self):
@@ -556,251 +488,216 @@ class RoomCreateWindow:
     def close(self):
         self.visible = False
 
-    def on_resize(self, new_screen: pygame.Surface):
-        self.screen = new_screen
-        self._recalc_layout()
+    def _reset(self):
+        self.title_val = None
+        self.player_val = None
+        self.is_open = None
+        self.password_val = None
 
-    # -------- 내부 레이아웃 계산 -------- #
-    def _compute_height(self) -> int:
-        base_rows = 4  # 제목 / 인원 / 공개여부 / 하단 버튼
-        if not self.is_public:
-            base_rows += 1  # 암호 줄
+    # def on_resize(self, new_screen: pygame.Surface):
+    #     self.screen = new_screen
+    #     self.set_layout()
 
-        rows = base_rows
-        return (
-            self.TOP_PADDING
-            + rows * self.ROW_HEIGHT
-            + (rows - 1) * self.GAP
-            + self.BOTTOM_PADDING
-        )
-
-    def _recalc_layout(self):
+    def set_layout(self):
         sw, sh = self.screen.get_size()
-        win_w = self.WIDTH
-        win_h = self._compute_height()
+        # background_rect = pygame.Rect(0, 0, sw, sh)
+        # self.background = Rectangle(self.screen, background_rect, self.fm, None, "")
+        
+        self.rect.w = sw // 2
+        self.rect.h = sh // 2
+        self.rect.x = (sw // 2) - (self.rect.w // 2)
+        self.rect.y = (sh // 2) - (self.rect.h // 2)
+        outline_padding_w = self.rect.w // 10 # 10%
+        outline_padding_h = self.rect.h // 10
+        inner_padding_w = self.rect.w // 20 # 5%
+        inner_padding_h = self.rect.h // 20
+        self.window = Rectangle(self.screen, self.rect, self.fm, None, "")
+        # 각 h은 전체 줄수와 관련이 있다.
 
-        win_x = (sw - win_w) // 2
-        win_y = (sh - win_h) // 2
-        self.window_rect = pygame.Rect(win_x, win_y, win_w, win_h)
+        # copy_rect = pygame.Rect(0, 0, 0, 0) # copy로 여러 복사본을 만들기 위해 값 복사용 rect 생성
+        draw_x, draw_y = self.rect.x + outline_padding_w, self.rect.y + outline_padding_h # 우선 시작 좌표, 계속 갱신할 예정
+        draw_h = (self.rect.h - (outline_padding_h*2 + inner_padding_h*(self.col_num - 1))) // self.col_num # 고정값
+        # draw_w는 그때그때 계산
+        # draw_ 는 레이아웃 값 조작용, 이 값을 기준으로 복사본을 생성해 계속 넣어주면 된다.
+        
+        draw_w = self.rect.w - outline_padding_w*2
+        title_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.title = InputBox(self.screen, title_rect, self.fm, "방 제목", MAX_INPUT, False, True)
+        draw_y += draw_h + inner_padding_h
 
-        # 🔹 내부 usable 영역 (좌우 패딩 적용)
-        inner_x = win_x + self.LEFT_PADDING
-        inner_w = win_w - (self.LEFT_PADDING + self.RIGHT_PADDING)
+        op_player_texts = ["1인", "2인", "5인"]
+        draw_w = (self.rect.w - (outline_padding_w*2 + inner_padding_w*(len(op_player_texts) - 1))) // len(op_player_texts)
+        for op_text in op_player_texts:
+            op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+            option = ToggleButton(self.screen, op_rect, self.rm, self.fm, None, op_text)
+            self.option_player.append(option)
+            draw_x += (draw_w + inner_padding_w)
+        draw_x = self.rect.x + outline_padding_w
+        draw_y += draw_h + inner_padding_h
 
-        cur_y = win_y + self.TOP_PADDING
-        row_x = inner_x
-        row_w = inner_w
+        op_open_texts = ["공개", "비공개"]
+        draw_w = (self.rect.w - (outline_padding_w*2 + inner_padding_w*(len(op_open_texts) - 1))) // len(op_open_texts)
+        
+        for op_text in op_open_texts:
+            op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+            option = ToggleButton(self.screen, op_rect, self.rm, self.fm, None, op_text)
+            self.option_open.append(option)
+            draw_x += (draw_w + inner_padding_w)
+        draw_x = self.rect.x + outline_padding_w
+        draw_y += draw_h + inner_padding_h
 
-        # 1) 방 제목 InputBox
-        title_rect = pygame.Rect(row_x, cur_y, row_w, self.ROW_HEIGHT)
-        cur_y += self.ROW_HEIGHT + self.GAP
+        draw_w = self.rect.w - outline_padding_w*2
+        pw_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.password = InputBox(self.screen, pw_rect, self.fm, "비밀번호", MAX_INPUT, False, True)
+        draw_y += draw_h + inner_padding_h
 
-        if self.title_box is None:
-            self.title_box = InputBox(
-                title_rect.x, title_rect.y, title_rect.w, title_rect.h,
-                "방 제목을 입력하세요",
-                max_input_len=MAX_INPUT,
-                is_password=False,
-                allow_korean=True
+        op_make_texts = ["만들기", "취소"]
+        draw_w = (self.rect.w - (outline_padding_w*2 + inner_padding_w*(len(op_make_texts) - 1))) // len(op_make_texts)
+        
+        for op_text in op_make_texts:
+            op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+            option = ToggleButton(self.screen, op_rect, self.rm, self.fm, None, op_text)
+            self.option_make.append(option)
+            draw_x += (draw_w + inner_padding_w)
+
+    def _send_create_room(self):
+        if self.title_val == None: return
+        if self.player_val == None: return
+        if self.is_open == None: return
+        if self.is_open == False: 
+            if self.password_val == None: return
+        id = self.my_session.id
+        encoded_title = self.title_val.encode("utf-8")
+        
+        if self.is_open:
+            size = 2+1+4+1+MAX_ROOM_NAME
+            type = C2S_ADD_OPEN_ROOM
+            packet_bytes = struct.pack(
+                f"<hbib{MAX_ROOM_NAME}s",
+                size,
+                type,
+                id,
+                int(self.player_val),
+                encoded_title
             )
+
         else:
-            self.title_box.rect = title_rect
+            size = 2+1+4+1+MAX_ROOM_NAME + MAX_ROOM_PASSWORD
+            type = C2S_ADD_LOCK_ROOM
+            encoded_password = self.password_val.encode("utf-8")           
 
-        # 2) 인원 토글 버튼들 (1인 / 2인 / 5인)
-        count_row_rect = pygame.Rect(row_x, cur_y, row_w, self.ROW_HEIGHT)
-        cur_y += self.ROW_HEIGHT + self.GAP
-
-        margin_x = 10
-        spacing = 10
-        btn_w = (row_w - margin_x * 2 - spacing * 2) // 3
-        btn_h = self.ROW_HEIGHT
-        y_btn = count_row_rect.y
-
-        x1 = count_row_rect.x + margin_x
-        x2 = x1 + btn_w + spacing
-        x3 = x2 + btn_w + spacing
-
-        if not self.count_buttons:
-            self.count_buttons = [
-                ToggleButton(self.rm, pygame.Rect(x1, y_btn, btn_w, btn_h), "1인"),
-                ToggleButton(self.rm, pygame.Rect(x2, y_btn, btn_w, btn_h), "2인"),
-                ToggleButton(self.rm, pygame.Rect(x3, y_btn, btn_w, btn_h), "5인"),
-            ]
-        else:
-            self.count_buttons[0].rect.update(x1, y_btn, btn_w, btn_h)
-            self.count_buttons[1].rect.update(x2, y_btn, btn_w, btn_h)
-            self.count_buttons[2].rect.update(x3, y_btn, btn_w, btn_h)
-
-        # 3) 공개 / 비공개
-        vis_row_rect = pygame.Rect(row_x, cur_y, row_w, self.ROW_HEIGHT)
-        cur_y += self.ROW_HEIGHT + self.GAP
-
-        btn_w2 = (row_w - margin_x * 2 - spacing) // 2
-        yv = vis_row_rect.y
-        x1v = vis_row_rect.x + margin_x
-        x2v = x1v + btn_w2 + spacing
-
-        if not self.vis_buttons:
-            self.vis_buttons = [
-                ToggleButton(self.rm, pygame.Rect(x1v, yv, btn_w2, btn_h), "공개"),
-                ToggleButton(self.rm, pygame.Rect(x2v, yv, btn_w2, btn_h), "비공개"),
-            ]
-        else:
-            self.vis_buttons[0].rect.update(x1v, yv, btn_w2, btn_h)
-            self.vis_buttons[1].rect.update(x2v, yv, btn_w2, btn_h)
-            self.vis_buttons[0].active = self.is_public
-            self.vis_buttons[1].active = not self.is_public
-
-        # 4) 암호 InputBox (비공개일 때만 레이아웃에 포함)
-        pw_rect = None
-        if not self.is_public:
-            pw_rect = pygame.Rect(row_x, cur_y, row_w, self.ROW_HEIGHT)
-            cur_y += self.ROW_HEIGHT + self.GAP
-
-        if self.password_box is None:
-            self.password_box = InputBox(
-                row_x, cur_y, row_w, self.ROW_HEIGHT,
-                "비밀번호",
-                max_input_len=MAX_INPUT,
-                is_password=True,
-                allow_korean=False
+            packet_bytes = struct.pack(
+                f"<hbib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s",
+                size,
+                type,
+                id,
+                int(self.player_val),
+                encoded_title,
+                encoded_password
             )
-        if pw_rect is not None:
-            self.password_box.rect = pw_rect
+            
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[LoginState] send_create_room() error:", e)
 
-        # 5) 하단 버튼 (방 만들기 / 취소)
-        btn_row_rect = pygame.Rect(row_x, cur_y, row_w, self.ROW_HEIGHT)
-        btn_h_bottom = self.ROW_HEIGHT
-        spacing_bottom = 10
-        btn_w_bottom = (row_w - spacing_bottom) // 2
-        x_left = btn_row_rect.x
-        x_right = x_left + btn_w_bottom + spacing_bottom
-        y_bottom = btn_row_rect.y
-
-        if self.btn_create is None:
-            self.btn_create = Button(x_left, y_bottom, btn_w_bottom, btn_h_bottom, "방 만들기", self.rm)
-            self.btn_cancel = Button(x_right, y_bottom, btn_w_bottom, btn_h_bottom, "취소", self.rm)
-        else:
-            self.btn_create.rect.update(x_left, y_bottom, btn_w_bottom, btn_h_bottom)
-            self.btn_cancel.rect.update(x_right, y_bottom, btn_w_bottom, btn_h_bottom)
 
     # -------- 내부 상태 보조 -------- #
-    def _set_count_active(self, index: int):
-        vals = [1, 2, 5]
-        self.selected_max_user = vals[index]
-        for i, btn in enumerate(self.count_buttons):
-            btn.active = (i == index)
+    def _set_player_value(self, val: str):
+        for option in self.option_player:
+            if option.text == val: option.pressed = True
+            else: option.pressed = False
 
-    def _set_visibility(self, is_public: bool):
-        if self.is_public == is_public:
-            return
-        self.is_public = is_public
-        self._recalc_layout()
+        int_val = int(val.replace("인", "")) # "인"을 모두 찾아 ""()빈칸으로 대체
+        self.player_val = int_val
+
+    def _set_open_value(self, val: str):
+        for option in self.option_open:
+            if option.text == val: option.pressed = True
+            else: option.pressed = False
+        if val == "공개": 
+            self.is_open = True
+            self.password.active = False
+        elif val == "비공개":
+            self.is_open = False
+            self.password.active = True
 
     # -------- 프레임 업데이트 -------- #
     def update(self, dt_ms: int):
-        """커서 깜빡임 등 시간 기반 업데이트만 처리."""
         if not self.visible:
             return
-        self.title_box.update(dt_ms)
-        if not self.is_public and self.password_box is not None:
-            self.password_box.update(dt_ms)
+        
+        self.title.update(dt_ms)
+        self.password.update(dt_ms)
 
     # -------- 이벤트 처리 (버튼 이벤트 반환) -------- #
     def handle_event(self, ev: pygame.event.Event):
         if not self.visible:
             return None
+        
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
+            # input의 enter 키는 입력된 문자열을 반환하고 초기화
+            return
+        
+        self.title.handle_event(ev)
 
-        # 제목 / 암호 입력
-        self.title_box.handle_event(ev)
-        if not self.is_public and self.password_box is not None:
-            self.password_box.handle_event(ev)
+        for option in self.option_player:
+            if option.handle_event(ev):
+                self._set_player_value(option.text)
+                break
 
-        # 인원 토글
-        for idx, btn in enumerate(self.count_buttons):
-            if btn.handle_event(ev):
-                self._set_count_active(idx)
+        for option in self.option_open:
+            if option.handle_event(ev):
+                self._set_open_value(option.text)
+                break
 
-        # 공개 / 비공개 토글
-        if self.vis_buttons[0].handle_event(ev):   # 공개
-            self._set_visibility(True)
-        if self.vis_buttons[1].handle_event(ev):   # 비공개
-            self._set_visibility(False)
+        if self.is_open == False:
+            self.password.handle_event(ev)
 
-        # 하단 버튼
-        if self.btn_create.handle_event(ev):
-            title = self.title_box.text.strip()
-            max_user = self.selected_max_user
-            is_public = self.is_public
-            password = None
-            if not is_public and self.password_box is not None:
-                pw = self.password_box.text
-                password = pw if pw != "" else None
-
-            result = {
-                "room_name": title,
-                "max_user": max_user,
-                "room_password": password,
-            }
-            self.close()
-            return result
-
-        if self.btn_cancel.handle_event(ev):
-            self.close()
-            return "취소"
-
-        return None
+        for option in self.option_make:
+            if option.handle_event(ev):
+                if option.text == "만들기":
+                    self.title_val = self.title.extract_text()
+                    self.password_val = self.password.extract_text()
+                    self._send_create_room()
+                elif option.text == "취소":
+                    pass
+                self.visible = False
+                self._reset()
 
     # -------- 그리기 -------- #
     def draw(self):
         if not self.visible:
             return
+        
+        self.window.draw()
 
-        sw, sh = self.screen.get_size()
+        self.title.draw()
+        for option in self.option_player:
+            option.draw()
 
-        # 반투명 오버레이
-        overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 160))
-        self.screen.blit(overlay, (0, 0))
+        for option in self.option_open:
+            option.draw()
 
-        # 본체 박스
-        pygame.draw.rect(self.screen, (20, 20, 20), self.window_rect, border_radius=10)
-        pygame.draw.rect(self.screen, WHITE, self.window_rect, 2, border_radius=10)
+        self.password.draw()
 
-        # 🔹 라벨 x도 패딩 적용
-        x = self.window_rect.x + self.LEFT_PADDING
-        y = self.window_rect.y + self.TOP_PADDING
-
-        # 라벨들
-        label_title = self.label_font.render("방 제목", True, WHITE)
-        self.screen.blit(label_title, (x, y - self.label_font.get_height()))
-
-        y_count_label = y + self.ROW_HEIGHT + self.GAP
-        label_count = self.label_font.render("인원", True, WHITE)
-        self.screen.blit(label_count, (x, y_count_label - self.label_font.get_height()))
-
-        y_vis_label = y_count_label + self.ROW_HEIGHT + self.GAP
-        label_vis = self.label_font.render("공개 여부", True, WHITE)
-        self.screen.blit(label_vis, (x, y_vis_label - self.label_font.get_height()))
-
-        if not self.is_public:
-            y_pw_label = y_vis_label + self.ROW_HEIGHT + self.GAP
-            label_pw = self.label_font.render("암호", True, WHITE)
-            self.screen.blit(label_pw, (x, y_pw_label - self.label_font.get_height()))
-
-        # 요소들 그리기
-        self.title_box.draw(self.screen)
-        for btn in self.count_buttons:
-            btn.draw(self.screen)
-        for btn in self.vis_buttons:
-            btn.draw(self.screen)
-        if not self.is_public and self.password_box is not None:
-            self.password_box.draw(self.screen)
-
-        self.btn_create.draw(self.screen)
-        self.btn_cancel.draw(self.screen)
+        for option in self.option_make:
+            option.draw()
 
 ===== FILE END: code\create_room_window.py =====
+
+===== FILE BEGIN: code\dataclass.py =====
+from dataclasses import dataclass
+
+@dataclass
+class RoomData:
+    room_id: int = -1
+    locked: str = "방 제목"
+    title: str = "공개"
+    cur_user: str = "현재 인원"
+    max_user: str = "최대 인원"
+    status: str = "방 상태"
+===== FILE END: code\dataclass.py =====
 
 ===== FILE BEGIN: code\define.py =====
 # define.py
@@ -819,11 +716,7 @@ INITIAL_SCALE = 0.95
 # Grid
 GRID_COLUMNS = 10
 GRID_ROWS = 20
-CELL_SIZE = 30
-
-# Preview (5x5 셀)
-PREVIEW_CELL_SIZE = CELL_SIZE * 5
-
+CELL_SIZE = 35 # 리소스에서 로드하려면 기본적인 값이 필요해서 값 유지
 # BLANK_WIDTH = 100
 # BLANK_HEIGHT = 50
 
@@ -887,6 +780,7 @@ SHAPES_INDEX = {
 
 ORANGE = (255, 165, 0)
 GRAY   = (128, 128, 128)
+DARK_GRAY = (64,64,64)
 WHITE  = (255, 255, 255)
 BLUE = (0, 0, 150)
 BLACK = (0, 0, 0)
@@ -905,6 +799,134 @@ BLACK = (0, 0, 0)
 # 실제 프로젝트에서는 여러 개를 나열하여 사용 가능
 # ----------------------------------------------------------------------
 ===== FILE END: code\define.py =====
+
+===== FILE BEGIN: code\define_anim_images.py =====
+import pygame
+from resource_manager import *
+from enum import IntEnum
+
+LARGE_SIZE = 50
+MEDIUM_SIZE = 40
+SMALL_SIZE = 30
+
+class IMAGE_TYPE(IntEnum):
+    LARGE = 1
+    MEDIUM = 2
+    SMALL = 3
+
+# 파이썬의 함수들은 기본적으로 가상함수이다.
+class Base:
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        self.screen = screen
+        self.rm = rm
+        self.image_type: IMAGE_TYPE = IMAGE_TYPE.LARGE
+        self.large_image: Optional[pygame.Surface] = None
+        self.medium_image: Optional[pygame.Surface] = None
+        self.small_image: Optional[pygame.Surface] = None
+       
+    def draw(self, x: int, y: int):
+        draw_x = x
+        draw_y = y
+        if self.image_type == IMAGE_TYPE.LARGE:
+            self.screen.blit(self.large_image, (draw_x, draw_y))
+
+        elif self.image_type == IMAGE_TYPE.MEDIUM:
+            offset = LARGE_SIZE - MEDIUM_SIZE / 2
+            self.screen.blit(self.large_image, (draw_x + offset, draw_y + offset))
+
+        elif self.image_type == IMAGE_TYPE.SMALL:
+            offset = LARGE_SIZE - SMALL_SIZE / 2
+            self.screen.blit(self.large_image, (draw_x + offset, draw_y + offset))
+
+    def reset_image_type(self):
+        self.image_type = IMAGE_TYPE.SMALL
+
+class Red(Base):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        super().__init__(screen, rm)
+        self.image = self.rm.block_images[DEFAULT_RED]
+
+        self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
+        self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
+        self.small_image = pygame.transform.smoothscale(self.image, (SMALL_SIZE, SMALL_SIZE))
+
+    def draw(self, x: int, y: int):
+        super().draw(x, y)
+
+class Orange(Base):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        super().__init__(screen, rm)
+        self.image = self.rm.block_images[DEFAULT_ORANGE]
+
+        self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
+        self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
+        self.small_image = pygame.transform.smoothscale(self.image, (SMALL_SIZE, SMALL_SIZE))
+
+    def draw(self, x: int, y: int):
+        super().draw(x, y)
+
+class Yellow(Base):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        super().__init__(screen, rm)
+        self.image = self.rm.block_images[DEFAULT_YELLOW]
+
+        self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
+        self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
+        self.small_image = pygame.transform.smoothscale(self.image, (SMALL_SIZE, SMALL_SIZE))
+
+    def draw(self, x: int, y: int):
+        super().draw(x, y)
+
+class Green(Base):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        super().__init__(screen, rm)
+        self.image = self.rm.block_images[DEFAULT_GREEN]
+
+        self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
+        self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
+        self.small_image = pygame.transform.smoothscale(self.image, (SMALL_SIZE, SMALL_SIZE))
+
+    def draw(self, x: int, y: int):
+        super().draw(x, y)
+
+class Blue(Base):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        super().__init__(screen, rm)
+        self.image = self.rm.block_images[DEFAULT_BLUE]
+
+        self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
+        self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
+        self.small_image = pygame.transform.smoothscale(self.image, (SMALL_SIZE, SMALL_SIZE))
+
+    def draw(self, x: int, y: int):
+        super().draw(x, y)
+
+class Indigo(Base):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        super().__init__(screen, rm)
+        self.image = self.rm.block_images[DEFAULT_INDIGO]
+
+        self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
+        self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
+        self.small_image = pygame.transform.smoothscale(self.image, (SMALL_SIZE, SMALL_SIZE))
+
+    def draw(self, x: int, y: int):
+        super().draw(x, y)
+
+class Purple(Base):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        super().__init__(screen, rm)
+        self.image = self.rm.block_images[DEFAULT_PURPLE]
+
+        self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
+        self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
+        self.small_image = pygame.transform.smoothscale(self.image, (SMALL_SIZE, SMALL_SIZE))
+
+    def draw(self, x: int, y: int):
+        super().draw(x, y)
+
+
+===== FILE END: code\define_anim_images.py =====
 
 ===== FILE BEGIN: code\define_format.py =====
 # define_format.py
@@ -1086,6 +1108,47 @@ FIELD_SIZE = {
 }
 ===== FILE END: code\define_format.py =====
 
+===== FILE BEGIN: code\font_manager.py =====
+import pygame
+from typing import Optional
+
+MIN_SIZE = 10
+MAX_SIZE = 50
+
+RECTANGLE_FONT_SIZE = 30
+POPUPBOX_FONT_SIZE = 40
+class FontManager:
+    def __init__(self):
+        self.fonts: dict[int, Optional[pygame.font.Font]] = {}
+
+        for i in range(MIN_SIZE, MAX_SIZE + 1, 2):
+            if i == RECTANGLE_FONT_SIZE:
+                font = self.load_font(i)
+                self.fonts[i] = font
+            elif i == POPUPBOX_FONT_SIZE:
+                font = self.load_font(i)
+                self.fonts[i] = font
+            else:
+                self.fonts[i] = None
+
+    def get_font(self, font_size: int) -> pygame.font.Font:
+        if font_size < 10: _font_size = 10
+        elif font_size > 50: _font_size = 50
+        else:
+            _font_size = (font_size // 2)*2
+        if self.fonts[_font_size] == None:
+            font = self.load_font(_font_size)
+            self.fonts[_font_size] = font
+            return font
+        else:    
+            return self.fonts[_font_size]
+            
+    def load_font(self, font_size: int) -> pygame.font.Font:
+        font = pygame.font.Font("resource/dodamdodam.ttf", font_size)
+        return font
+
+===== FILE END: code\font_manager.py =====
+
 ===== FILE BEGIN: code\game_loop.py =====
 import time
 import queue
@@ -1095,6 +1158,8 @@ from define import *
 from login_state import LoginState
 from network import NetworkWorker
 from resource_manager import ResourceManager
+from session import Session
+from font_manager import FontManager
 
 class GameLoop:
     def __init__(self):
@@ -1111,9 +1176,10 @@ class GameLoop:
 
         self.rm = ResourceManager()
         self.rm.init()
+        self.fm = FontManager()
         self.net_worker = NetworkWorker()
-        
-        self.state = LoginState(self.screen, self.rm, net_worker=self.net_worker)
+        self.sesseion = Session()
+        self.state = LoginState(self.screen, self.rm, self.fm, self.net_worker, self.sesseion)
         self.state.connect()
 
         self.prev_time = time.perf_counter()
@@ -1184,6 +1250,7 @@ if __name__ == '__main__':
 import pygame
 from typing import Optional
 
+from font_manager import FontManager
 from define import *
 
 PLACEHOLDER = (100, 100, 100)
@@ -1191,28 +1258,28 @@ PLACEHOLDER = (100, 100, 100)
 class InputBox:
     def __init__(
         self,
-        x: int,
-        y: int,
-        w: int,
-        h: int,
+        screen: pygame.Surface,
+        rect: pygame.Rect,
+        fm: FontManager,
         placeholder: str = "",
         max_input_len: int | None = None,  # optional과 같음
         is_password: bool = False,
         allow_korean: bool = True,   # ✅ 한글 허용 여부
     ):
-        self.rect = pygame.Rect(x, y, w, h)
+        self.screen = screen
+        self.rect = rect
+        self.fm = fm
         self.placeholder = placeholder
-        self.text_h = int(h*0.8)
+        self.text_h = int(rect.h*0.8)
         self.text = ""
         self.editing_text = ""
         self.active = False
         self.is_password = is_password
         self.allow_korean = allow_korean
         self.max_input_len = max_input_len
-
-        self.font = pygame.font.Font("resource/dodamdodam.ttf", self.text_h)
         self.padding = int(self.text_h / 2)
         self.color = GRAY
+        self.font = self.fm.get_font(self.text_h)
 
         # 커서 점멸
         self.cursor_visible = True
@@ -1227,6 +1294,25 @@ class InputBox:
         self.backspace_repeat_time1_active = True
         self.backspace_repeat_time2 = 50
         self.backspace_repeat_time2_active = False
+
+    def _reset_text(self):
+        self.text = ""
+        self.editing_text = ""
+
+    def _reset_cursor(self):
+        self.backspace_repeat_timer = 0
+        self.backspace_repeat_time1_active = True
+        self.backspace_repeat_time2_active = False
+        self.backspace_pressed = False
+
+    def get_inputbox_rect(self) -> pygame.Rect:
+        return self.backspace_repeat_time1_active
+    
+    def extract_text(self) -> str:
+        text = self.get_total_text()
+        self._reset_text()
+        self._reset_cursor()
+        return text
 
     def add_char(self, ch: str):
         if not self.active:
@@ -1264,8 +1350,8 @@ class InputBox:
         else:
             total_text = self.text
         
-        if self.is_password:
-            total_text = "●" * len(total_text)
+        # if self.is_password:
+        #     total_text = "●" * len(total_text)
 
         return total_text
 
@@ -1316,7 +1402,7 @@ class InputBox:
         # ===== 최종 확정된 문자 입력 =====
         elif ev.type == pygame.TEXTINPUT:
             self.add_char(ev.text)
-
+ 
         # ===== 제어키 처리 (백스페이스 + 엔터) =====
         elif ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_BACKSPACE:  # TEXTINPUT으로는 문자 아니면 처리 안됨, 따로 처리 필요
@@ -1324,21 +1410,12 @@ class InputBox:
                 self.backspace_pressed = True
 
             elif ev.key == pygame.K_RETURN:
-                input_text = self.get_total_text()
-                self.text = ""
-                self.editing_text = ""
-                self.backspace_repeat_timer = 0
-                self.backspace_repeat_time1_active = True
-                self.backspace_repeat_time2_active = False
-                self.backspace_pressed = False
+                input_text = self.extract_text()
                 return input_text
                 
         elif ev.type == pygame.KEYUP:
             if ev.key == pygame.K_BACKSPACE:
-                self.backspace_repeat_timer = 0
-                self.backspace_repeat_time1_active = True
-                self.backspace_repeat_time2_active = False
-                self.backspace_pressed = False
+                self._reset_cursor()
 
         return None
 
@@ -1372,11 +1449,7 @@ class InputBox:
             self.backspace_repeat_time2_active = False
 
 
-    def draw(self, surf: pygame.Surface):
-        # 배경
-        pygame.draw.rect(surf, self.color, self.rect)
-
-        # 보여줄 텍스트 (비밀번호면 ●로 마스킹)
+    def draw(self):
         show_text = self.get_render_text()
         if not show_text and not self.active:
             txt = self.font.render(self.placeholder, True, PLACEHOLDER)
@@ -1386,15 +1459,164 @@ class InputBox:
         text_x = self.rect.x + self.padding
         text_y = self.rect.y + (self.rect.height - txt.get_height()) // 2
         text_pos = (text_x, text_y)
-        surf.blit(txt, text_pos)
+        self.screen.blit(txt, text_pos)
 
         # 커서
         if self.active and self.cursor_visible:
             cursor_x = text_x + txt.get_width()
             cursor_y = text_y
             cursor_h = self.text_h
-            pygame.draw.rect(surf, WHITE,(cursor_x, cursor_y, 2, cursor_h))
+            pygame.draw.rect(self.screen, WHITE,(cursor_x, cursor_y, 2, cursor_h))
 ===== FILE END: code\inputbox.py =====
+
+===== FILE BEGIN: code\label_frame.py =====
+import pygame
+from typing import Optional
+from inputbox import InputBox
+from resource_manager import ResourceManager
+from font_manager import FontManager
+from define_format import *
+
+class LabelFrame:
+    def __init__(
+        self,
+        screen: pygame.Surface,
+        image: pygame.Surface,     
+        input_rect: pygame.Rect,
+        label_rect: pygame.Rect,
+        fm: FontManager,
+        placeholder: str = "",
+        max_input_len: int | None = None,  # optional과 같음
+        is_password: bool = False,
+        allow_korean: bool = True,   # ✅ 한글 허용 여부
+    ):
+        self.screen = screen
+        self.frame_image = image
+        self.frame_rect = label_rect
+        self.input_box = InputBox(screen, input_rect, fm, placeholder, max_input_len, is_password, allow_korean)
+        
+    def _set_rect_scale(self, rect: pygame.Rect, scale_x: float, scale_y: float) -> pygame.Rect: # x = 가로, y = 세로 스케일
+        if scale_x < 0.1 or scale_x > 2.0: # 최소 범위는 너무 작은 스케일을 방지하기 위함. 최대는 큰 스케일 방지를 위한 적당한 값임
+            raise ValueError("scale_x must be between 0.1 and 2.0")
+        if scale_y < 0.1 or scale_y > 2.0:
+            raise ValueError("scale_y must be between 0.1 and 2.0")
+        
+        temp_rect = rect.copy()
+        temp_rect.x = temp_rect.x + temp_rect.x*(1-scale_x)
+        temp_rect.y = temp_rect.x + temp_rect.y*(1-scale_y)
+        temp_rect.w = temp_rect.w*scale_x
+        temp_rect.h = temp_rect.h*scale_y
+    
+        return temp_rect
+    
+    def move_pos(self, dx: int, dy: int):
+        # sw, sh = self.screen.get_size()
+        # if self.frame_rect.x + dx < 0 or self.frame_rect.x + dx + self.frame_rect.w > sw:
+        #     raise ValueError("객체는 화면 좌우 외부로 잘릴 수 없습니다.")
+
+        # if self.frame_rect.y + dy < 0 or self.frame_rect.y + dy + self.frame_rect.h > sh:
+        #     raise ValueError("객체는 화면 세로 외부로 잘릴 수 없습니다.")
+        
+        self.frame_rect.x += dx
+        self.input_box.rect.x += dx
+
+        self.frame_rect.y += dy
+        self.input_box.rect.y += dy
+
+    def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
+        return self.input_box.handle_event(ev)
+    
+    def update(self, dt_ms: int):
+        self.input_box.update(dt_ms)
+    
+    def draw(self):
+        self.screen.blit(self.frame_image, self.frame_rect)
+        self.input_box.draw()
+
+        
+===== FILE END: code\label_frame.py =====
+
+===== FILE BEGIN: code\loading_animation.py =====
+import pygame
+from resource_manager import *
+from define_anim_images import *
+
+class LoadingAnimation:
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
+        self.images: list[Base] = [Red(screen, rm), Orange(screen, rm), Yellow(screen, rm),
+                                    Green(screen, rm), Blue(screen, rm), Indigo(screen, rm), Purple(screen, rm)]
+        self.large_image_offset = -1
+        self.screen_width, self.screen_height = screen.get_size()
+        
+    def animation(self):
+        image_width = IMAGE_TYPE.LARGE
+        image_height = IMAGE_TYPE.LARGE
+        center_x = self.screen_width / 2 - image_width / 2
+        center_y = self.screen_height / 2 - image_height / 2
+        padding_x = 30
+        total_width = len(self.images)*image_width + padding_x*(len(self.images) - 1)
+        start_draw_x = center_x - total_width / 2
+        draw_y = center_y
+
+        draw_x = start_draw_x
+        for image in self.images:
+            image.draw(draw_x, draw_y)
+            draw_x += image_width + padding_x
+
+    def set_next_images(self):
+        self.large_image_offset = (index + 1) % len(self.images)
+        index = self.large_image_offset
+        for image in self.images:
+            image.reset_image_type()
+
+        if index == 0:
+            self.images[index].image_type = IMAGE_TYPE.LARGE
+            self.images[index + 1].image_type = IMAGE_TYPE.MEDIUM
+
+        elif index == 6:
+            self.images[index].image_type = IMAGE_TYPE.LARGE
+            self.images[index - 1].image_type = IMAGE_TYPE.MEDIUM
+
+        else:
+            self.images[index].image_type = IMAGE_TYPE.LARGE
+            self.images[index + 1].image_type = IMAGE_TYPE.MEDIUM
+            self.images[index - 1].image_type = IMAGE_TYPE.MEDIUM
+===== FILE END: code\loading_animation.py =====
+
+===== FILE BEGIN: code\loading_state.py =====
+import pygame
+from resource_manager import ResourceManager
+from network import NetworkWorker
+from loading_animation import LoadingAnimation
+from base_state import BaseState
+
+class LoadingState(BaseState):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker):
+        self.screen = screen
+        self.rm = rm
+        self.net_worker = net_worker
+        sw, sh = self.screen.get_size()
+        self.background = pygame.Surface((sw, sh), pygame.SRCALPHA)
+        self.anim = LoadingAnimation(self.screen, self.rm)
+        self.elapsed_time = 0
+
+    def update(self, dt_ms, events):
+        self.elapsed_time += dt_ms * 1000
+        if self.elapsed_time > 100:
+            self.elapsed_time =- 100
+            self.anim.set_next_images()
+            self.draw_flag = True
+        pass
+        # if hasattr(self.state, "init"):
+        #     self.state.init()
+
+    def draw(self):
+        self.background.fill(0,0,0,128)
+        self.screen.blit(self.background, (0,0))
+        self.anim.animation()
+        pygame.display.flip()
+
+===== FILE END: code\loading_state.py =====
 
 ===== FILE BEGIN: code\lobby_state.py =====
 import pygame
@@ -1407,62 +1629,65 @@ from packet_type import *
 from session import Session
 from network import NetworkWorker
 from resource_manager import *
+from font_manager import *
 
 from button import Button
 from inputbox import InputBox
 
-from room_window import RoomWindow
+from room_window import RoomList
 from chat_window import ChatWindow
-from my_info import MyInfo
+from my_info import Profile
 from create_room_window import RoomCreateWindow
 from single_play import SinglePlayState
 from packet_manager import *
+from shutter_animaion import ShutterAnimation
 
-LOBBY = 1
-CREATE_ROOM = 2
+MENU_WIDTH = 200
+MENU_HEIGHT = 100
 
 class LobbyState:
-    def __init__(self, screen, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+                 net_worker: NetworkWorker, my_session: Session, is_animation: bool = False):
         self.screen = screen
         self.rm = rm
+        self.fm = fm
         self.my_session = my_session
         self.net_worker = net_worker
-        self.logo_surface = None
-        self.buttons: list[Button] = []
-        self.room_window = RoomWindow(pygame.Rect(50, 200, 1000, 400))
-        self.chat_window = ChatWindow(50, 600, 1000, 200)
+        self.top_menus: list[Button] = []
+        self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm, fm)
+        self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), fm)
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
-        self.chat_input_box = InputBox(input_box_rect.x, input_box_rect.y, input_box_rect.w, input_box_rect.h,
-                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
-        self.my_info_rect = MyInfo(pygame.Rect(1050, 600, 300, 300), self.my_session)
-        self.btn_draw_x, self.btn_draw_y = 0, 0
+        self.chat_input_box = InputBox(screen, input_box_rect, self.fm,
+                                       "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
+        self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), fm, my_session)
 
-        self.reactable_screen = LOBBY
+        self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.my_session)
+        # self.reactable_screen = LOBBY
+        self.open_shutter = ShutterAnimation(screen, rm)
+        self.is_animation = is_animation
     
         self.set_layout()
 
+        if is_animation:
+            self.open_shutter.start_animation()
+
     def set_layout(self):
-        sw, sh = self.screen.get_size()
+        draw_x, draw_y = 50, 0
+        logo_w, logo_h = self.rm.logo.get_size()
+        logo_rect = pygame.Rect(draw_x, draw_y, logo_w, logo_h)
+        logo = Button(self.screen, logo_rect, self.rm, self.fm, self.rm.logo, "", False)
+        self.top_menus.append(logo)
+        draw_x += logo_rect.w
+        menu_texts: list[str] = ["빠른시작", "방만들기", "상점", "설정", "", "게임종료"]
+        for menu_text in menu_texts:
+            menu_rect = pygame.Rect(draw_x, draw_y, MENU_WIDTH, MENU_HEIGHT) 
+            menu = Button(self.screen, menu_rect, self.rm, self.fm, None, menu_text, True)
+            self.top_menus.append(menu)
+            draw_x += MENU_WIDTH
 
-        self.logo_surface = self.rm.button_images[BUTTON_LOGO_IDLE]
-        logo_w, logo_h = self.logo_surface.get_size()
-
-        btn_w, btn_h = 200, 100
-        #btn_y = 0
-
-        top_menus_text = ["방만들기", "상점", "설정"]
-
-        logo = Button(self.btn_draw_x, self.btn_draw_y, logo_w, logo_h, None, self.rm, BUTTON_LOGO_IDLE, BUTTON_LOGO_HOVER, BUTTON_LOGO_PRESS)
-        self.buttons.append(logo)
-        self.btn_draw_x += logo_w
-
-        for btn_text in top_menus_text:
-            self.buttons.append(Button(self.btn_draw_x, self.btn_draw_y, btn_w, btn_h, btn_text, self.rm))
-            self.btn_draw_x += btn_w
-
-    def on_resize(self, w, h, screen):
-        self.screen = screen
-        self.set_layout()
+    # def on_resize(self, w, h, screen):
+    #     self.screen = screen
+    #     self.set_layout()
 
     def send_message(self, message: str): # 메세지는 가변이라 문자열 포맷을 크기만큼 만들어 직접 전송
         if len(message) == 0: return
@@ -1485,45 +1710,6 @@ class LobbyState:
         except Exception as e:
             print("[LoginState] send_login() error:", e)
 
-    def send_create_room(self, data: dict[str]):
-        id = self.my_session.id
-        max_user = data["max_user"]
-        room_name = data["room_name"]
-        room_name = room_name.encode("utf-8")
-        
-        if data.get("room_password") == None:
-            size = 2+1+4+1+MAX_ROOM_NAME
-            type = C2S_ADD_OPEN_ROOM
-            packet_bytes = struct.pack(
-                f"<hbib{MAX_ROOM_NAME}s",
-                size,
-                type,
-                id,
-                max_user,
-                room_name
-            )
-        else:
-            size = 2+1+4+1+MAX_ROOM_NAME + MAX_ROOM_PASSWORD
-            type = C2S_ADD_LOCK_ROOM
-            room_password = data["room_password"]
-            room_password = room_password.encode("utf-8")
-
-            packet_bytes = struct.pack(
-                f"<hbib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s",
-                size,
-                type,
-                id,
-                max_user,
-                room_name,
-                room_password
-            )
-            
-        
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[LoginState] send_create_room() error:", e)
-
     def handle_packet(self, data: dict):
         if data:
             #print(f"LobbyState->handle_packet() recv_bytes: {data.get("size")} / recv type: {data.get("type")}")
@@ -1531,61 +1717,71 @@ class LobbyState:
                 self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
 
             elif data.get("type") == S2C_ADD_OPEN_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.net_worker, self.my_session, data.get("room_name"))
+                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.my_session, data.get("room_name"))
 
             elif data.get("type") == S2C_ADD_LOCK_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
+                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
             
         return self
 
+    def handle_event(self, ev: pygame.event.Event):
+        if ev.type == pygame.QUIT:
+            pygame.quit()
+            raise SystemExit
+        
+        event = None
+        if self.room_create_window.visible == False:
+            for menu in self.top_menus:
+                if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
+                    event = menu.idle.text
+                    break
+
+            if event is not None:
+                if event == "방만들기":
+                    self.room_create_window.visible = True
+                    
+                # 나중에 메뉴별 상태 만들고 동작 추가
+                return
+
+            event = self.room_list.handle_event(ev)
+            if event is not None:
+                # 나중에 방 참가 패킷 전송 추가
+                pass
+            # return
+            self.chat_window.handle_event(ev) # 보여주기만 하므로 반환값은 없음
+            message = self.chat_input_box.handle_event(ev)
+            if message is not None:
+                self.send_message(message)
+
+        else:
+            self.room_create_window.handle_event(ev)
 
     def update(self, dt_ms, events):
-        for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit()
-                raise SystemExit
-
-            if self.reactable_screen == LOBBY:
-                for btn in self.buttons:
-                    if btn.handle_event(ev):
-                        if btn.text == "방만들기":
-                            self.room_create_window = RoomCreateWindow(self.screen, self.rm)
-                            self.room_create_window.open()
-                            self.reactable_screen = CREATE_ROOM
-
-                self.room_window.handle_event(ev)
-                self.chat_window.handle_event(ev)
-                send_input = self.chat_input_box.handle_event(ev)
-                if send_input is not None:
-                    self.send_message(send_input)
-
-            elif self.reactable_screen == CREATE_ROOM:
-                # 어떤 버튼이 눌렸느냐에 따른 동작 추가
-                data = self.room_create_window.handle_event(ev)
-                if data == "취소":
-                    self.reactable_screen = LOBBY
-                elif data == None:
-                    pass
-                else: 
-                    self.send_create_room(data)
+        if self.is_animation and self.open_shutter.is_active: 
+            self.open_shutter.update(dt_ms)
+            return
                     
-        if self.reactable_screen == LOBBY: self.chat_input_box.update(dt_ms)
-        elif self.reactable_screen == CREATE_ROOM: self.room_create_window.update(dt_ms)
+        for ev in events:
+            self.handle_event(ev)
+
+        if self.room_create_window.visible:
+            self.room_create_window.update(dt_ms)
         
         return self
 
     def draw(self):
         self.screen.fill(BLACK)
 
-        for btn in self.buttons:
-            btn.draw(self.screen)
+        for menu in self.top_menus:
+            menu.draw()
 
-        self.room_window.draw(self.screen)
-        self.chat_window.draw(self.screen)
-        self.chat_input_box.draw(self.screen)
-        self.my_info_rect.draw(self.screen)
+        self.room_list.draw()
+        self.chat_window.draw()
+        self.chat_input_box.draw()
+        self.my_info_rect.draw()
 
-        if self.reactable_screen == CREATE_ROOM: self.room_create_window.draw()
+        if self.room_create_window.visible: self.room_create_window.draw()
+        if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()
 ===== FILE END: code\lobby_state.py =====
 
 ===== FILE BEGIN: code\login_state.py =====
@@ -1600,42 +1796,25 @@ from packet_type import *
 from session import Session
 from network import NetworkWorker
 from resource_manager import ResourceManager
+from font_manager import FontManager
 
 from button import Button
 from inputbox import InputBox
 from popupbox import PopupBox
 from lobby_state import LobbyState
+from base_state import BaseState
+from label_frame import LabelFrame
 
-# class BaseState:
-#     def __init__(self, screen, asset):
-#         self.screen = screen
-
-#     def init(self): 
-#         pass
-
-#     def update(self, dt_ms, events, data=None):
-#         """메인 루프에서 계산된 dt(ms)를 전달받아 갱신."""
-#         return self
-
-#     def draw(self):
-#         pass
-
-#     def on_resize(self, w, h, screen):
-#         self.screen = screen
-
-
-class LoginState:
-    def __init__(self, screen, rm: Optional[ResourceManager], net_worker: Optional[NetworkWorker]):
-        self.screen = screen
-        self.net_worker = net_worker
-        self.title_font = pygame.font.Font("resource/dodamdodam.ttf", 36)
-
-        self.rm = rm
-        self.id_box: Optional[InputBox] = None
-        self.pw_box: Optional[InputBox] = None
+class LoginState(BaseState):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager, net_worker: NetworkWorker, session: Session):
+        super().__init__(screen, rm, fm, net_worker, session)
+        self.fm = fm
+        self.background_image = self.rm.shutter_image
+        self.id_label: Optional[LabelFrame] = None
+        self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
-        self.popup = PopupBox(self.screen, self.rm, "서버와의 연결이 원활하지 않습니다.", "재시도", "종료")
-        self.popup2 = PopupBox(self.screen, self.rm, "아이디 또는 비밀번호를 확인하세요.", "재시도", "종료")
+        self.popup: PopupBox = PopupBox(screen, rm, fm, "서버와의 연결이 원활하지 않습니다.", ["재시도", "종료"])
+        self.popup2: PopupBox = PopupBox(screen, rm, fm, "아이디 또는 비밀번호를 확인하세요.", ["재시도", "종료"])
         self.set_layout()
 
     def connect(self):
@@ -1643,67 +1822,97 @@ class LoginState:
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
-        input_box_w, input_box_h = 360, 42
-        center_x = (sw - input_box_w) // 2
-        center_y = (sh - (input_box_h * 2 + 64 + 46)) // 2
 
-        id_rect = pygame.Rect(center_x, center_y, input_box_w, input_box_h)
-        pw_rect = pygame.Rect(center_x, center_y + input_box_h + 20, input_box_w, input_box_h)
-        btn_rect = pygame.Rect((sw - 300) // 2, pw_rect.bottom + 28, 300, 100)
+        ADJUST_SCALE_X = 0.85
+        ADJUST_SCALE_Y = 0.7
+        
+        label_w, label_h = 400, 100
+        label_image = self.rm.scale_image(self.rm.login_label_frame, label_w, label_h)
+        button_w, button_h = 200, 100
+        button_image = self.rm.scale_image(self.rm.login_button, button_w, button_h)
+        adjust_x = (1-ADJUST_SCALE_X)*label_w
+        adjust_y = (1-ADJUST_SCALE_Y)*label_h
+        input_box_w, input_box_h = label_w - adjust_x*2, label_h - adjust_y*2
 
-        self.id_box = InputBox(id_rect.x, id_rect.y, id_rect.w, id_rect.h, "아이디", MAX_INPUT)
-        self.pw_box = InputBox(pw_rect.x, pw_rect.y, pw_rect.w, pw_rect.h, "비밀번호", MAX_INPUT, is_password=True)
+        total_h = label_h * 2 + (button_h // 2) + button_h
 
-        # 버튼은 폰트 전달 없이 생성됨
-        self.btn_login = Button(
-            btn_rect.x,
-            btn_rect.y,
-            btn_rect.w,
-            btn_rect.h,
-            "로그인",
-            self.rm
-        )
+        group_top = (sh - total_h) // 2
+        label_left = (sw - label_w) // 2
+        draw_x, draw_y = label_left, group_top
 
-    def send_login(self):
-        user_id = self.id_box.text
-        user_pw = self.pw_box.text
+        id_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
+        id_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
+        self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, self.fm, "아이디", MAX_INPUT, False, False)
+
+        draw_y += label_h
+        pw_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
+        pw_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
+        self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, self.fm, "비밀번호", MAX_INPUT, True, False)
+
+        draw_x += (label_w - button_w) // 2
+        draw_y += label_h + (button_h // 2)
+        btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
+        self.btn_login = Button(self.screen, btn_rect, self.rm, self.fm, button_image, "로그인", True)
+
+    def send_login(self, id: str, pw: str):
         data = {
             "size": 2 + 1 + MAX_USER_ID + MAX_USER_PASSWORD,
             "type": C2S_LOGIN,
-            "user_id": user_id,
-            "user_password": user_pw
+            "user_id": id,
+            "user_password": pw
         }
         try:
             self.net_worker.send_packet(self.net_worker._pm.dic_to_bytes(data))
+            self.active_loading = True
         except Exception as e:
             print("[LoginState] send_login error:", e)
 
     def handle_packet(self, data: Optional[dict]):
         if data:
             # print(", ".join(f"{k}: {v}" for k, v in data.items()))
-            if data.get("id") == -1:
-                self.popup2.visible = True
-            
-            else:
-                # 내 세션의 아이디를 설정하는 코드 필요
-                my_session = Session()
-                id = data.get("id")
-                my_session.id = id
-                nickname = data.get("user_name")
-                my_session.nickname = nickname
-                win = data.get("win_count")
-                my_session.win = win
-                lose = data.get("lose_count")
-                my_session.lose = lose
-                max_score = data.get("max_score")
-                my_session.max_score = max_score
-                my_session.load_texture(self.rm)
-                print(f"id={id}, nickname={nickname}, win={win}, lose={lose}")
-                return LobbyState(self.screen, self.rm, self.net_worker, my_session)
+            if data.get("type") == S2C_LOGIN:
+                if data.get("id") == -1:
+                    self.popup2.visible = True
+                
+                else:
+                    id = data.get("id")
+                    self.session.id = id
+                    nickname = data.get("user_name")
+                    self.session.nickname = nickname
+                    win = data.get("win_count")
+                    self.session.win = win
+                    lose = data.get("lose_count")
+                    self.session.lose = lose
+                    max_score = data.get("max_score")
+                    self.session.max_score = max_score
+
+                    self.session.load_texture(self.rm)
+                    print(f"id={id}, nickname={nickname}, win={win}, lose={lose}")
+                    return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session, is_animation=True)
             
             return self
+        
 
-    def update(self, dt_ms, events):            
+    def handle_event(self, ev: pygame.event.Event):
+        if ev.type == pygame.QUIT:
+            pygame.quit(); raise SystemExit
+        
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
+            id = self.id_label.input_box.handle_event(ev)
+            pw = self.pw_label.input_box.handle_event(ev)
+            self.send_login(id, pw)
+            return
+        
+        else:
+            self.id_label.input_box.handle_event(ev)
+            self.pw_label.input_box.handle_event(ev)
+            
+        if self.btn_login.handle_event(ev):
+            id = self.id_label.input_box.extract_text()
+            pw = self.pw_label.input_box.extract_text()
+            self.send_login(id, pw)
+
+    def update(self, dt_ms, events):
         if self.popup.visible:
             btn_name = self.popup.handle_event(events)
             if btn_name == "재시도":
@@ -1725,30 +1934,21 @@ class LoginState:
             return self  # 로그인 UI는 건드리지도 않음
         
         for ev in events:
-            if ev.type == pygame.QUIT:
-                pygame.quit(); raise SystemExit
-                
-            self.id_box.handle_event(ev)
-            self.pw_box.handle_event(ev)
+            self.handle_event(ev)
 
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
-                self.send_login()
-
-            if self.btn_login.handle_event(ev):
-                self.send_login()
-
-        self.id_box.update(dt_ms)
-        self.pw_box.update(dt_ms)
+        self.id_label.update(dt_ms)
+        self.pw_label.update(dt_ms)
         return self
 
     def draw(self):
-        self.screen.fill((18, 18, 18))
+        background_rect = pygame.Rect(0,0,BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT)
+        self.screen.blit(self.background_image, background_rect)
         sw, _ = self.screen.get_size()
-        title = self.title_font.render("로그인", True, (255, 255, 255))
-        self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
-        self.id_box.draw(self.screen)
-        self.pw_box.draw(self.screen)
-        self.btn_login.draw(self.screen)
+        #title = self.title_font.render("로그인", True, (255, 255, 255))
+        #self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
+        self.id_label.draw()
+        self.pw_label.draw()
+        self.btn_login.draw()
         if self.popup.visible:
             self.popup.draw()
         if self.popup2.visible:
@@ -1759,29 +1959,29 @@ class LoginState:
 
 ===== FILE BEGIN: code\my_info.py =====
 import pygame
+from define import *
+from session import Session
+from font_manager import FontManager
 
-class MyInfo:
-    def __init__(self, rect: pygame.Rect, session):
-        """
-        rect: MyInfo를 표시할 영역(Rect)
-        session: Session 인스턴스 (nickname, win, lose 포함)
-        """
+class Profile:
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, fm: FontManager, session: Session):
+        self.screen = screen
         self.rect = rect
         self.my_session = session
 
         # 폰트 설정
-        self.font_nick = pygame.font.Font("resource/dodamdodam.ttf", 40)   # 닉네임: 40px
-        self.font_stat = pygame.font.Font("resource/dodamdodam.ttf", 28)   # 승/패: 28px
-        self.font_max_score = pygame.font.Font("resource/dodamdodam.ttf", 28) # 최고점수
+        self.font_nickname = fm.load_font(40)
+        self.font_stat = fm.load_font(30)
+        self.font_max_score = fm.load_font(30)
 
-        self.text_color = (255, 255, 255)
+        self.text_color = WHITE
         self.padding = 20  # 닉네임과 승/패 간 간격
 
-    def draw(self, surface: pygame.Surface):
+    def draw(self):
         # 세션에서 정보 읽기
 
         # 1) 닉네임
-        nick_surf = self.font_nick.render(self.my_session.nickname, True, self.text_color)
+        nick_surf = self.font_nickname.render(self.my_session.nickname, True, self.text_color)
         nick_rect = nick_surf.get_rect(
             center=(self.rect.centerx, self.rect.y + nick_surf.get_height() // 2)
         )
@@ -1802,9 +2002,9 @@ class MyInfo:
         )
 
         # 실제 그리기
-        surface.blit(nick_surf, nick_rect)
-        surface.blit(stat_surf, stat_rect)
-        surface.blit(score_surf, score_rect)
+        self.screen.blit(nick_surf, nick_rect)
+        self.screen.blit(stat_surf, stat_rect)
+        self.screen.blit(score_surf, score_rect)
 
 
 ===== FILE END: code\my_info.py =====
@@ -2248,62 +2448,68 @@ import pygame
 
 from button import Button
 from resource_manager import ResourceManager
+from font_manager import *
+from rectangle import Rectangle
 
 class PopupBox:
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, message: str,
-                 left_text: str = "확인", right_text: str = "취소"):
-        """
-        screen : 현재 게임 화면 surface
-        message: 알림 내용(팝업 중앙)
-        left_text / right_text: 하단 좌/우 버튼에 표시할 텍스트
-        """
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+                 message: str, buttons_text: list[str]):
         self.screen = screen
         self.message = message
         self.visible = False
-        self.left_button_text = left_text
-        self.right_button_text = right_text
-        self.am = rm
+        self.buttons_text = buttons_text
+        self.buttons: list[Button] = []
+        self.message_window: Rectangle = None
+        self.popup_window: Rectangle = None
+        self.rm = rm
+        self.fm = fm
 
         # 색 / 스타일
-        self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
-        self.window_color = (0, 0, 0)           # 팝업 본체
-        self.border_color = (255, 255, 255)
-        self.border_thickness = 2
+        # self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
+        # self.window_color = (0, 0, 0)           # 팝업 본체
+        # self.border_color = (255, 255, 255)
+        # self.border_thickness = 2
 
         # 폰트 (기존 폰트와 동일 계열)
-        self.font_msg = pygame.font.Font("resource/dodamdodam.ttf", 36)
+        self.font_msg = self.fm.get_font(POPUPBOX_FONT_SIZE)
 
         # 레이아웃 계산
-        self._recalc_layout()
+        self.set_layout()
 
-        # 버튼 생성
-        # 버튼 크기 규칙:
-        #   높이 = 팝업 높이의 1/3
-        #   너비 = 팝업 너비의 1/2
-        #   팝업 하단에 위치 (좌우 배치)
-        btn_h = self.win_h // 3
-        btn_w = self.win_w // 2
-
-        # y는 팝업 맨 아래에 버튼이 딱 붙게.
-        # 팝업 내부 기준: 아래쪽 영역 전체가 버튼 높이
-        btn_y = self.win_y + (self.win_h - btn_h)
-
-        left_x  = self.win_x
-        right_x = self.win_x + btn_w
-
-        self.left_button = Button(left_x,  btn_y, btn_w, btn_h, self.left_button_text, self.am)
-        self.right_button= Button(right_x, btn_y, btn_w, btn_h, self.right_button_text, self.am)
-
-    def _recalc_layout(self):
+    def set_layout(self):
         """현재 screen 사이즈를 기준으로 팝업 사각형을 다시 계산한다."""
-        sw, sh = self.screen.get_size()
-        self.win_w = sw // 2
-        self.win_h = sh // 2
-        self.win_x = (sw - self.win_w) // 2
-        self.win_y = (sh - self.win_h) // 2
-        self.window_rect = pygame.Rect(self.win_x, self.win_y, self.win_w, self.win_h)
+        if len(self.buttons_text) < 1:
+            raise ValueError("팝업은 최소 1개의 버튼을 포함해야 합니다.")
+        elif len(self.buttons_text) > 3:
+            raise ValueError("팝업은 최대 3개의 버튼을 포함할 수 있습니다.")
 
-    def handle_event(self, events: list[pygame.event.Event])-> str: # 어떤 버튼이 눌렸는가
+        sw, sh = self.screen.get_size()
+        win_w = sw // 2
+        win_h = sh // 2
+        win_x = (sw - win_w) // 2
+        win_y = (sh - win_h) // 2
+        win_rect = pygame.Rect(win_x, win_y, win_w, win_h)
+        self.popup_window = Rectangle(self.screen, win_rect, self.fm, None, "")
+        
+        msg_x = win_x
+        msg_y = win_y
+        msg_w = win_w
+        msg_h = (win_h * 2) // 3
+        msg_rect = pygame.Rect(msg_x, msg_y, msg_w, msg_h)
+        self.message_window = Rectangle(self.screen, msg_rect, self.fm, None, self.message)
+        self.message_window.fm.get_font(POPUPBOX_FONT_SIZE)
+
+        btn_h = win_h // 3
+        btn_w = win_w // len(self.buttons_text)
+        btn_x = win_x 
+        btn_y = win_y + (win_h - btn_h)
+
+        draw_x = btn_x
+        for i in range(len(self.buttons_text)):
+            button_rect = pygame.Rect(draw_x + i*btn_w, btn_y, btn_w, btn_h)
+            self.buttons.append(Button(self.screen, button_rect, self.rm, self.fm, None, self.buttons_text[i], True))
+
+    def handle_event(self, events: list[pygame.event.Event])-> Optional[str]: # 어떤 버튼이 눌렸는가
         """
         - ESC 키로 닫힘
         - 각 버튼 클릭 시 닫힘
@@ -2314,14 +2520,14 @@ class PopupBox:
         for ev in events:
             # ESC로 닫기
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                return "확인"
+                return "esc"
 
             # 버튼 이벤트 처리
-            if self.left_button.handle_event(ev):
-                return self.left_button_text
-            
-            if self.right_button.handle_event(ev):
-                return self.right_button_text
+            for button in self.buttons:
+                if(button.handle_event(ev)):
+                    return button.idle.text
+                
+        return None
 
     def draw(self):
         if not self.visible:
@@ -2331,41 +2537,92 @@ class PopupBox:
 
         # 1) 전체 화면 어둡게(반투명 오버레이)
         overlay = pygame.Surface((sw, sh), pygame.SRCALPHA)
-        overlay.fill(self.bg_overlay_color)
+        overlay.fill((0, 0, 0, 128))
         self.screen.blit(overlay, (0, 0))
 
-        # 2) 팝업 본체(검은 박스)
-        pygame.draw.rect(self.screen, self.window_color, self.window_rect, border_radius=8)
-
-        # 3) 본문 메시지: 팝업 중앙
-        msg_surf = self.font_msg.render(self.message, True, (255, 255, 255))
-        msg_rect = msg_surf.get_rect(center=self.window_rect.center)
-        self.screen.blit(msg_surf, msg_rect)
-
-        # 4) 두 버튼 그리기
-        self.left_button.draw(self.screen)
-        self.right_button.draw(self.screen)
-
-    def on_resize(self, new_screen: pygame.Surface):
-        """
-        화면 리사이즈 시 GameLoop에서 state.on_resize(...) 부르잖아?
-        팝업도 똑같이 다시 가운데 정렬해야 하므로 이 함수 호출해주면 됨.
-        """
-        self.screen = new_screen
-        self._recalc_layout()
-
-        # 버튼 위치/크기도 다시 계산
-        btn_h = self.win_h // 3
-        btn_w = self.win_w // 2
-        btn_y = self.win_y + (self.win_h - btn_h)
-        left_x  = self.win_x
-        right_x = self.win_x + btn_w
-
-        # 버튼 rect들 갱신
-        self.left_button.rect.update(left_x, btn_y, btn_w, btn_h)
-        self.right_button.rect.update(right_x, btn_y, btn_w, btn_h)
+        self.popup_window.draw()
+        self.message_window.draw()
+        for button in self.buttons:
+            button.draw()
 
 ===== FILE END: code\popupbox.py =====
+
+===== FILE BEGIN: code\rectangle.py =====
+import pygame
+from resource_manager import ResourceManager
+from font_manager import *
+from define import *
+
+class Rectangle:
+    def __init__(self, 
+        screen: pygame.Surface,
+        rect: pygame.Rect, 
+        fm: FontManager,
+        image: pygame.Surface = None, 
+        text: str = "", 
+        border_width = 0
+        ):
+        self.screen = screen
+        self.rect = rect
+        self.fm = fm
+        self.font = fm.get_font(RECTANGLE_FONT_SIZE)
+        self.image = None
+        if image is not None: 
+            self.set_image(image)
+        self.text = text
+        self.text_color: tuple[int, int, int] = WHITE
+        self.background_color: tuple[int, int, int] = BLACK
+        self.border_color: tuple[int, int, int] = WHITE
+        self.font_surface = self.font.render(self.text, False, self.text_color)
+
+        self.border_width = border_width
+
+    # def get_rect(self) -> pygame.Rect: 
+    #     return self.rect
+    
+    def set_background_color(self, color = tuple[int, int, int]): # r, g, b
+        self.background_color = color
+
+    def set_text_color(self, color = tuple[int, int, int]): # r, g, b
+        self.text_color = color
+        self.font_surface = self.font.render(self.text, False, self.text_color)
+
+    def set_image(self, new_image: pygame.Surface):
+        scaled_image = pygame.transform.smoothscale(new_image, (self.rect.w, self.rect.h))
+        self.image = scaled_image
+        
+    def set_text(self, new_text: pygame.Surface):
+        self.text = new_text
+        self.font_surface = self.font.render(self.text, False, self.text_color)
+
+    def set_border(self, new_border_width: int): # 0이면 테두리 없음. 0보다 크면 그 두께만큼 테두리 생성
+        self.border_width = new_border_width
+
+    def _get_center_pos(self) -> tuple[int, int]: # x, y
+        center_x = self.rect.x + self.rect.w // 2
+        center_y = self.rect.y + self.rect.h // 2
+        return center_x, center_y
+    
+    def update_rect(self, new_rect: pygame.Rect):
+        self.rect = new_rect
+    
+    def draw(self):
+        if self.image == None:
+            pygame.draw.rect(self.screen, self.background_color, self.rect)
+            if self.border_width > 0:
+                pygame.draw.rect(self.screen, self.border_color, self.rect, self.border_width)
+        else:
+            self.screen.blit(self.image, self.rect)
+
+        font_rect = self.font_surface.get_rect()
+        center_x, center_y = self._get_center_pos()
+        draw_font_x = center_x - font_rect.w / 2
+        draw_font_y = center_y - font_rect.h / 2
+        font_rect.x = draw_font_x
+        font_rect.y = draw_font_y
+        self.screen.blit(self.font_surface, font_rect)        
+    
+===== FILE END: code\rectangle.py =====
 
 ===== FILE BEGIN: code\resource_manager.py =====
 # image_loader.py
@@ -2378,10 +2635,13 @@ from define import *
 #     image: Optional[pygame.Surface] # pygame.Surface 이거나 None
 
 class ResourceManager:
+    HOVER_SCALE = 1.05
+    PRESS_SCALE = 0.95
     def __init__(self):
+        # fonts
         self.block_images = {}
         self.button_images = {}
-
+        self.shutter_image = self.load_image("resource/backgrounds/shutter.png", BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT)
         # sounds
         self.bgm = pygame.mixer.music.load("resource/sounds/bgm_ingame.mp3")
         self.button_sound_hover = pygame.mixer.Sound("resource/sounds/button_hover.mp3")
@@ -2390,6 +2650,11 @@ class ResourceManager:
         self.fix_sound = pygame.mixer.Sound("resource/sounds/sound_effect_fix.mp3")
         self.clearline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_clearline.mp3")
         self.addline_sound = pygame.mixer.Sound("resource/sounds/sound_effect_addline.mp3")
+        self.shutter_sound = pygame.mixer.Sound("resource/sounds/shutter_open.mp3")
+
+        self.login_button = self.load_image("resource/button/login_button.png", 200, 100)
+        self.login_label_frame = self.load_image("resource/login_label_frame.png", 400, 100)
+        self.logo = self.load_image("resource/button/new_tetris_logo.png", 250, 100)
 
     def init(self):
         self.block_images = {
@@ -2417,9 +2682,6 @@ class ResourceManager:
         BUTTON_LOGIN_IDLE: self.load_image("resource/button/button_login_idle.png", 300, 100),
         BUTTON_LOGIN_HOVER: self.load_image("resource/button/button_login_hover.png", 300, 100),
         BUTTON_LOGIN_PRESS: self.load_image("resource/button/button_login_press.png", 300, 100),
-        BUTTON_LOGO_IDLE: self.load_image("resource/button/tetris_logo.png", 500, 100),
-        BUTTON_LOGO_HOVER: self.load_image("resource/button/tetris_logo.png", 500, 100),
-        BUTTON_LOGO_PRESS: self.load_image("resource/button/tetris_logo.png", 500, 100)
         }
 
         self.button_sound_hover.set_volume(0.8)
@@ -2448,6 +2710,10 @@ class ResourceManager:
         # 절대 크기로 스케일링
         scaled_image = pygame.transform.smoothscale(image, (int(width), int(height)))
         return scaled_image
+    
+    def scale_image(self, image: pygame.Surface, width: int, height: int) -> pygame.Surface:
+        return pygame.transform.smoothscale(image, (int(width), int(height)))
+
 
 DEFAULT_RED = 1
 DEFAULT_ORANGE = 2
@@ -2475,66 +2741,94 @@ BUTTON_LOGO_HOVER = 1005
 BUTTON_LOGO_PRESS = 1006
 ===== FILE END: code\resource_manager.py =====
 
+===== FILE BEGIN: code\room_list.py =====
+import pygame
+from font_manager import FontManager
+from resource_manager import ResourceManager
+
+class RoomList:
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, fm: FontManager):
+        self.screen = screen
+        self.rect = rect
+        self.rm = rm
+        self.fm = fm
+
+        
+        
+===== FILE END: code\room_list.py =====
+
 ===== FILE BEGIN: code\room_window.py =====
 # room_window.py
 import pygame
-from typing import Optional, Iterable
+from define import *
+from typing import Optional
+from rectangle import Rectangle
+from resource_manager import ResourceManager
+from font_manager import FontManager
 
-# 기존 버튼 색/폰트 규칙을 그대로 활용
-from button import Button, ORANGE, GRAY, WHITE, BLACK
+from dataclass import RoomData
 
 # 행 하나(방 하나)를 표현하는 뷰-오브젝트
 class RoomInfo:
-    """
-    하나의 방 행. Button의 상호작용 규칙(hover/press/색)을 그대로 따름.
-    클릭 성립 시 room_id를 반환하고, 아니면 None.
-    """
-    def __init__(self, rect: pygame.Rect, room_id: int,
-                 locked: bool, title: str, cur_user: int, max_user: int, status: str, is_header: bool = False):
-        
+    LOCKED_WIDTH_RATE = 0.15
+    TITLE_WIDTH_RATE = 0.35
+    CAPACITY_WIDTH_DATE = 0.35
+    STATUS_WIDTH_RATE = 0.15
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, fm: FontManager, 
+                 data: RoomData, background_color: tuple[int, int, int], is_reactable: bool = False):
+        self.screen = screen
         self.rect = rect
-        self.room_id = room_id
-        self.title = title
-        self.locked = locked
-        self.cur_user = cur_user
-        self.max_user = max_user
-        self.status = status
-        self.is_header = is_header
+        self.rm = rm
+        self.fm = fm
+        self.data = data
+        self.background_color = background_color
+        self.is_reactable = is_reactable
 
-        if is_header == True:
-            self.room_id = -1
-            self.title = "방 제목"
-            self.locked = "공개"
-            self.cur_user = "현재 인원"
-            self.max_user = "최대 인원"
-            self.status = "방 상태"
+        self.background = Rectangle(self.screen, self.rect, self.fm, None, "")
+        self.info_rects: list[Rectangle] = []
 
-        # 버튼과 동일한 상호작용 상태
         self.hovered = False
         self.pressed = False
-
-        # 공용 폰트 사용(없으면 Button에서 생성해 둠)
-        if Button.shared_font is None:
-            Button.shared_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
-        self.font = Button.shared_font
-
-        # 열 배치(비율 기반) — 필요하면 RoomWindow에서 설정을 주입하여 덮어씀
-        # [잠금아이콘, 제목, 인원, 상태]의 상대폭 비율
-        self.info_width_rate = (0.1, 0.4, 0.4, 0.1)
-
-        # 텍스트 컬러는 버튼 규칙(항상 흰색) 유지
         self.text_color = WHITE
-    
-    def updata_info(self, info: "RoomInfo"):
-        self.room_id = info.room_id
-        self.title = info.title
-        self.locked = info.locked
-        self.cur_user = info.cur_user
-        self.max_user = info.max_user
-        self.status = info.status
+
+        self.set_layout()
+
+    def set_layout(self):
+        # [잠금아이콘, 제목, 인원, 상태]의 상대폭 비율
+
+        locked_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.w*self.LOCKED_WIDTH_RATE, self.rect.h)       
+        self.locked = Rectangle(self.screen, locked_rect, self.fm, None, str(self.data.locked))
+        self.info_rects.append(self.locked)
+
+        title_rect = locked_rect.copy()
+        title_rect.x += locked_rect.w
+        title_rect.w = self.rect.w*self.TITLE_WIDTH_RATE
+        self.title = Rectangle(self.screen, title_rect, self.fm, None, str(self.data.title))
+        self.info_rects.append(self.title)
+
+        capacity_rect = title_rect.copy()
+        capacity_rect.x += title_rect.w
+        capacity_rect.w = self.rect.w*self.CAPACITY_WIDTH_DATE
+        self.capacity = Rectangle(self.screen, capacity_rect, self.fm, None, f"{str(self.data.cur_user)}/{str(self.data.max_user)}")
+        self.info_rects.append(self.capacity)
+
+        status_rect = capacity_rect.copy()
+        status_rect.x += capacity_rect.w
+        status_rect.w = self.rect.w*self.STATUS_WIDTH_RATE
+        self.status = Rectangle(self.screen, status_rect, self.fm, None, f"{str(self.data.status)}")
+        self.info_rects.append(self.status)
+
+    def update_info(self, data: RoomData):
+        self.room_id = data.room_id
+        self.title = data.title
+        self.locked = data.locked
+        self.cur_user = data.cur_user
+        self.max_user = data.max_user
+        self.status = data.status
+        self.set_layout()
 
     def handle_event(self, ev: pygame.event.Event) -> Optional[int]:
-        if self.is_header: return None
+        if self.is_reactable == False: return None
         clicked = False
 
         if ev.type == pygame.MOUSEMOTION:
@@ -2552,152 +2846,117 @@ class RoomInfo:
             self.pressed = False
  
         return self.room_id if clicked else None
-
-    def _columns(self) -> list[pygame.Rect]:
-        """현재 rect 기준으로 열(Rect)들을 계산."""
-        x, y, w, h = self.rect
-        w_lock = int(w * self.info_width_rate[0])
-        w_title = int(w * self.info_width_rate[1])
-        w_count = int(w * self.info_width_rate[2])
-        w_state = w - (w_lock + w_title + w_count)
-        cols = [
-            pygame.Rect(x, y, w_lock, h),                      # 잠금
-            pygame.Rect(x + w_lock, y, w_title, h),            # 제목
-            pygame.Rect(x + w_lock + w_title, y, w_count, h),  # 인원
-            pygame.Rect(x + w_lock + w_title + w_count, y, w_state, h)  # 상태
-        ]
-        return cols
-
-    def draw(self, surface: pygame.Surface, background_color):
-        # 배경
-        bg_color = background_color
-        if self.pressed:
-            bg_color = ORANGE
-        elif self.hovered:
-             bg_color = GRAY
-        pygame.draw.rect(surface, bg_color, self.rect, border_radius=6)
-
-        # 구분선(하단 1px)
-        pygame.draw.line(surface, (40, 40, 40),
-                         (self.rect.left, self.rect.bottom-1),
-                         (self.rect.right, self.rect.bottom-1))
-
-        # 각 열에 텍스트 배치
-        col_lock, col_title, col_count, col_state = self._columns()
-
-        # 1) 잠금 표시
-        lock_text = "공개" if self.locked else "비공개"
-        lock_surf = self.font.render(lock_text, True, self.text_color)
-        surface.blit(lock_surf, lock_surf.get_rect(center=col_lock.center))
-
-        # 2) 제목
-        title_surf = self.font.render(self.title, True, self.text_color)
-        title_pos = (col_title.x + 12, col_title.y + (col_title.h - title_surf.get_height()) // 2)
-        surface.blit(title_surf, title_pos)
-
-        # 3) 인원 (cur/max)
-        count_text = f"{self.cur_user}/{self.max_user}"
-        count_surf = self.font.render(count_text, True, self.text_color)
-        surface.blit(count_surf, count_surf.get_rect(center=col_count.center))
-
-        # 4) 상태
-        state_surf = self.font.render(self.status, True, self.text_color)
-        surface.blit(state_surf, state_surf.get_rect(center=col_state.center))
-
-
-class RoomWindow:
     
+    def set_react_color(self):
+        if self.is_reactable: return
+
+        color = self.background_color
+        if self.pressed:
+            color = ORANGE
+        elif self.hovered:
+            color = GRAY
+        self.set_background_color(color)
+
+    def set_background_color(self, color: tuple[int, int, int]): # r, g, b
+        self.background.set_background_color(color)
+        for info in self.info_rects:
+            info.set_background_color(color)
+
+    def update_info_rects(self, new_rect_y: int):
+        for info in self.info_rects:
+            info.rect.y = new_rect_y
+
+    def draw(self):
+        for info in self.info_rects:
+            info.draw()
+
+class RoomList:
     VISIBLE_ROOM = 8
-    BACKGROUND_1 = (10,10,10)
-    BACKGROUND_2 = (50,50,50)
+    BACKGROUND_1 = GRAY
+    BACKGROUND_2 = DARK_GRAY
 
-    def __init__(self, rect: pygame.Rect):
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, fm: FontManager):
+        self.screen = screen
         self.rect = rect
-        self.room_h = int(rect.h / self.VISIBLE_ROOM) # 기본값, _recalc_layout에서 다시 계산
-
-        # 스타일
-        self.bg_color = (22, 22, 22)
-        self.border_color = (60, 60, 60)
+        self.rm = rm
+        self.fm = fm
+        self.background = Rectangle(screen, rect, fm, None, "")
+        header_rect = rect.copy()
+        header_rect.h = rect.h / 8
+        self.header = RoomInfo(screen, header_rect, rm, fm, RoomData(), BLACK, False)
+        self.base_room_rect = header_rect.copy()
+        self.base_room_rect.y += header_rect.h
+        self.rooms: list[RoomInfo] = []
+        self.show_rooms: list[RoomInfo] = []
 
         # 데이터
-        self.header_info = RoomInfo(self.get_room_rect(0, True), 0, 0, 0, 0, 0, 0, True)
-        self.rooms: list["RoomInfo"] = []
+        self.rooms: list[RoomInfo] = []
         self.page_index: int = 0
 
-    def get_rect_index(self, index):
-        return index % self.VISIBLE_ROOM
+    def set_layout(self):
+        pass
 
-    def get_room_rect(self, room_index: int, is_header: bool = False) -> pygame.Rect:
-        """0~N 슬롯의 rect 계산 (간격 없이 위에서부터 바로 쌓기)."""
-        index = self.get_rect_index(room_index)
-        x = self.rect.x
-        y = self.rect.y + index * self.room_h
-        if is_header == True:
-            y = self.rect.y - self.room_h
-        w = self.rect.w
-        h = self.room_h
-        return pygame.Rect(x, y, w, h)
-    
-    def set_room_rect(self, delete_index):
-        for i in range(delete_index, len(self.rooms)):
-            self.rooms[i].rect = self.get_room_rect(i)
-
-    def get_show_rooms(self) -> list["RoomInfo"]:
+    def update_show_rooms(self):
         start = self.page_index * self.VISIBLE_ROOM
         end = start + self.VISIBLE_ROOM
-        if end > len(self.rooms) -1:
+        if end > len(self.rooms) - 1:
             end = len(self.rooms)
 
-        return self.rooms[start:end]
+        self.show_rooms = self.rooms[start:end]
 
     # ---------------- 외부 API ---------------- #
     def clear(self):
         self.rooms.clear()
         self.page_index = 0
 
-    def update_room(self, info: RoomInfo | RoomInfo): # 기존 방에 대한 업데이트만 수행
+    def update_room(self, info: RoomData | RoomData): # 기존 방에 대한 업데이트만 수행
         for room in self.rooms:
             if room.room_id == info.room_id:
-                room.updata_info(info)
+                room.update_info(info)
                 break
 
-    def add_room(self, info: RoomInfo | RoomInfo):
+    def update_rooms(self, start_index: int):
+        for index in range(start_index, len(self.rooms)):
+            if index % 2: color = GRAY
+            else: color = DARK_GRAY
+            rect_index = index % self.VISIBLE_ROOM
+            room_rect = self.base_room_rect.copy()
+            room_rect.y = self.base_room_rect.y + rect_index*self.base_room_rect.h
+            self.rooms[index].update_info_rects(room_rect.y)
+            self.rooms[index].set_background_color(color)
+
+    def add_room(self, info: RoomData | RoomData):
         add_index = len(self.rooms) # 추가되는 부분의 인덱스는 길이와 같다.
-        info.rect = self.get_room_rect(add_index)
-        self.rooms.append(info)
+        if add_index % 2: color = GRAY
+        else: color = DARK_GRAY
+        rect_index = add_index % self.VISIBLE_ROOM
+        room_rect = self.base_room_rect.copy()
+        room_rect.y = self.base_room_rect.y + rect_index*self.base_room_rect.h
+        room = RoomInfo(self.screen, room_rect, self.rm, self.fm, info, color, True)
+        self.rooms.append(room)
+        self.update_show_rooms()
 
     def delete_room(self, delete_room_id: int):
-        for i in range(len(self.rooms)):
-            if self.rooms[i].room_id == delete_room_id:
-                del self.rooms[i]
-                # self.rooms.remove(self.rooms[i])
-                self.set_room_rect(i)
+        for index in range(len(self.rooms)):
+            if self.rooms[index].room_id == delete_room_id:
+                del self.rooms[index]
+                self.update_rooms(index)
                 break
 
-    #def on_resize(self, rect: pygame.Rect):
+        self.update_show_rooms()
 
     def handle_event(self, ev: pygame.event.Event) -> Optional[int]:
-        for room in self.get_show_rooms():
+        for room in self.show_rooms:
             result = room.handle_event(ev)
             if result is not None:
                 return result
         return None
 
-    def draw(self, surface: pygame.Surface):
-
-        pygame.draw.rect(surface, BLACK, self.rect)
-
-        show_rooms = self.get_show_rooms()
-        color = None
-
-        self.header_info.draw(surface, BLACK)
-        for i in range(len(show_rooms)):
-            if i % 2 == 0:
-                color = self.BACKGROUND_1
-            else:
-                color = self.BACKGROUND_2
-            
-            show_rooms[i].draw(surface, color)
+    def draw(self):
+        self.background.draw()
+        self.header.draw()
+        for room in self.show_rooms:
+            room.draw()
 
 ===== FILE END: code\room_window.py =====
 
@@ -2744,10 +3003,61 @@ class Session:
         'T': rm.block_images[DEFAULT_PURPLE],
         'G': rm.block_images[DEFAULT_GRAY],
     }
+       
+    def set_block_scale(self, rm: ResourceManager, block_length: int):
+        for key, value in self.block_texture.items():
+            self.block_texture[key] = rm.scale_image(value, block_length, block_length)
+
     # def set_id(self, new_id: int):
     #     self.id = int(new_id)
 
 ===== FILE END: code\session.py =====
+
+===== FILE BEGIN: code\shutter_animaion.py =====
+import pygame
+from resource_manager import ResourceManager
+from define import *
+
+class ShutterAnimation:
+    def __init__(self, screen: pygame.surface, rm: ResourceManager):
+        self.screen = screen
+        self.rm = rm
+        self.shutter_image = self.rm.shutter_image
+        self.shutter_sound = self.rm.shutter_sound
+        self.x = 0
+        self.y = 0
+        self.dy = 0
+        self.w = BASE_SCREEN_WIDTH
+        self.h = BASE_SCREEN_HEIGHT
+        self.dh = 0
+        self.animaion_ms = 3000
+        self.elapsed_time = 0
+        self.is_active: bool = False
+
+    def start_animation(self):
+        self.is_active = True
+        self.rm.shutter_sound.play()
+
+    def update(self, dt_ms):
+        if self.is_active == False: return
+        
+        delta = 0
+        self.elapsed_time += dt_ms
+        if self.animaion_ms < self.elapsed_time:
+            delta = 1
+            self.elapsed_time = self.animaion_ms
+            self.is_active = False
+        else:
+            delta = self.elapsed_time / self.animaion_ms
+        
+        self.dy = delta*self.h
+        self.dh = self.dy
+        
+    def draw(self):
+        if self.is_active == False: return
+        image_rect = pygame.Rect(self.x, self.dy, self.w, self.h - self.dh)
+        self.screen.blit(self.shutter_image, (0,0), image_rect)
+===== FILE END: code\shutter_animaion.py =====
 
 ===== FILE BEGIN: code\single_play.py =====
 import pygame
@@ -2760,12 +3070,12 @@ from packet_type import *
 from session import Session
 from network import NetworkWorker
 from resource_manager import ResourceManager
+from font_manager import FontManager
 
 from button import Button
 from tetris_board import TetrisBoard
 from tetromino import Tetromino
 from tetris_board import *
-from lobby_state import LobbyState
 
 RIGHT = 0
 LEFT = 1
@@ -2775,25 +3085,24 @@ DROP = 4
 UP = 5
 
 class SinglePlayState:
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+                  net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
         self.screen = screen
-        self.room_title = room_title
-        self.room_password = room_password
+        self.title = room_title
+        self.password = room_password
 
         self.rm = rm
+        self.fm = fm
         self.net_worker = net_worker
         self.my_session = session
 
         # UI 요소들
         self.board: Optional[TetrisBoard] = None
-        self.btn_start: Optional[Button] = None
+        # self.btn_start: Optional[Button] = None
 
-        self.btn_room_title: Optional[Button] = None
-        self.btn_room_password: Optional[Button] = None
-        self.btn_room_exit: Optional[Button] = None
-
-        # 상단 텍스트용 폰트
-        self.header_font = pygame.font.Font("resource/dodamdodam.ttf", 28)
+        self.title_box: Optional[Rectangle] = None
+        self.password_box: Optional[Rectangle] = None
+        self.btn_exit: Optional[Button] = None
 
         # 연속 전송용 변수
         self.left_pressed = False
@@ -2815,8 +3124,50 @@ class SinglePlayState:
         self.down_first_over = False
         self.down_first_move = False
 
-        self.init()
+        self.set_layout()
         self.clear()
+
+    def set_layout(self):
+        header_w, header_h = 300, 50
+
+        sw, sh = self.screen.get_size()
+        board_w = int(sw*0.4)
+        board_h = int(sh*0.8)
+        board_x = ((sw - board_w) // 2) + int(board_w*0.15)
+        board_y = header_h
+        board_rect = pygame.Rect(board_x, board_y, board_w, board_h)
+        self.board = TetrisBoard(self.screen, board_rect, self.fm, self.my_session)
+        self.my_session.set_block_scale(self.rm, self.board.cell_length)
+
+        btn_w = self.board.rect.w - self.board.score_box.rect.w
+        btn_h = sh*0.1
+        btn_x = board_x
+        btn_y = board_y + board_h
+        btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+
+        self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
+
+        # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
+        draw_x, draw_y = 0, 0
+        title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
+        title = f"방 제목: {self.title}"
+        self.title_box = Rectangle(self.screen, title_rect, self.fm, None, title)
+
+        draw_x += header_w 
+        password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
+        if self.password == None:
+            pw_val = "비밀번호: 없음"
+        else:
+            pw_val = f"비밀번호: {self.password}"
+        self.password_box = Rectangle(self.screen, password_rect, self.fm, None, pw_val)
+
+        from lobby_state import MENU_WIDTH, MENU_HEIGHT
+        draw_x = sw - MENU_WIDTH
+        draw_y = 0
+        draw_w = MENU_WIDTH
+        draw_h = MENU_HEIGHT
+        exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, self.fm, None, "나가기")
 
     def clear(self):
         self.left_pressed = False
@@ -3012,10 +3363,11 @@ class SinglePlayState:
                     self.rm.move_sound.play()
 
         elif packet_type == S2C_DELETE_USER:
+            from lobby_state import LobbyState
             delete_id = data.get("id")
             if delete_id == self.my_session.id:
                 pygame.mixer.music.stop()
-                return LobbyState(self.screen, self.rm, self.net_worker, self.my_session)
+                return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.my_session)
             
         elif packet_type == S2C_SPAWN:
             print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
@@ -3056,139 +3408,10 @@ class SinglePlayState:
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self
 
-    # ------------ 레이아웃 초기화 ------------ #
-    def init(self):
-        self._build_layout()
-
-    def _build_layout(self):
-        sw, sh = self.screen.get_size()
-
-        # --- 보드 / 미리보기 배치 ---
-        board_w = BOARD_COLS * CELL_SIZE
-        board_h = BOARD_ROWS * CELL_SIZE
-        valid_w = board_w
-        valid_h = (BOARD_ROWS - HIDDEN_ROWS) * CELL_SIZE
-        preview_w = PREVIEW_COLS * CELL_SIZE
-        preview_h = PREVIEW_ROWS * CELL_SIZE
-        score_w = PREVIEW_COLS*CELL_SIZE
-        score_h = PREVIEW_ROWS*CELL_SIZE
-
-        total_w = board_w + preview_w
-        total_h = board_h
-
-        offset_x = (sw - total_w) // 2
-        offset_y = (sh - total_h) // 2
-
-        board_rect = pygame.Rect(
-            offset_x,
-            offset_y,
-            board_w,
-            board_h,
-        )
-
-        valid_rect = pygame.Rect(
-            offset_x,
-            offset_y + HIDDEN_ROWS*CELL_SIZE,
-            valid_w,
-            valid_h,
-        )
-
-        preview_rect = pygame.Rect(
-            offset_x + board_w,
-            offset_y + HIDDEN_ROWS*CELL_SIZE,
-            preview_w,
-            preview_h,
-        )
-
-        score_rect = pygame.Rect(
-            offset_x + board_w,
-            offset_y + HIDDEN_ROWS*CELL_SIZE + preview_h,
-            score_w,
-            score_h
-        )
-
-        self.board = TetrisBoard(
-            screen=self.screen,
-            board_rect=board_rect,
-            valid_rect=valid_rect,
-            preview_rect=preview_rect,
-            score_rect=score_rect,
-            session=self.my_session
-        )
-
-        # 게임 시작 버튼 (보드 중앙 아래쪽 정도에 배치)
-        btn_w, btn_h = 200, 100
-        btn_x = board_rect.centerx - btn_w // 2
-        btn_y = board_rect.bottom - 200
-
-        self.btn_start = Button(
-            x=btn_x,
-            y=btn_y,
-            w=btn_w,
-            h=btn_h,
-            text="게임 시작",
-            rm=self.rm,
-            react=True,
-        )
-
-        # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
-        header_w, header_h = 300, 50
-        header_y = 0
-        title_x = 0
-        pw_x = header_w  # 바로 오른쪽에 붙이기
-
-        # 상호작용 X: react=False, 텍스트는 직접 그릴 것이므로 text=None
-        self.btn_room_title = Button(
-            x=title_x,
-            y=header_y,
-            w=header_w,
-            h=header_h,
-            text=None,
-            rm=self.rm,
-            react=False,
-        )
-        self.btn_room_password = Button(
-            x=pw_x,
-            y=header_y,
-            w=header_w,
-            h=header_h,
-            text=None,
-            rm=self.rm,
-            react=False,
-        )
-        exit_w, exit_h = 200, 100
-        exit_x, exit_y = sw - exit_w, 0
-        self.btn_room_exit = Button(
-            x=exit_x,
-            y=exit_y,
-            w=exit_w,
-            h=exit_h,
-            text="나가기",
-            rm=self.rm,
-            react=True,
-        )
     # ------------ 상단 방 정보 그리기 ------------ #
     def draw_room_header(self):
-        """상단의 방 제목 / 비밀번호 영역을 그린다."""
-        if not self.btn_room_title or not self.btn_room_password:
-            return
-
-        # 버튼 사각형만 그리기 (테두리)
-        self.btn_room_title.draw(self.screen)
-        self.btn_room_password.draw(self.screen)
-
-        # 텍스트는 직접 렌더링
-        title_text = f"방 제목: {self.room_title}"
-        pw_text = f"비밀번호: {self.room_password or '없음'}"
-
-        title_surf = self.header_font.render(title_text, True, (255, 255, 255))
-        pw_surf = self.header_font.render(pw_text, True, (255, 255, 255))
-
-        title_rect = title_surf.get_rect(center=self.btn_room_title.rect.center)
-        pw_rect = pw_surf.get_rect(center=self.btn_room_password.rect.center)
-
-        self.screen.blit(title_surf, title_rect)
-        self.screen.blit(pw_surf, pw_rect)
+        self.title_box.draw()
+        self.password_box.draw()
 
     # ------------ 이벤트 처리 ------------ #
     def update(self, dt_ms, events):
@@ -3205,7 +3428,7 @@ class SinglePlayState:
             if self.btn_start and self.btn_start.handle_event(ev):
                 self.send_start()
 
-            if self.btn_room_exit.handle_event(ev):
+            if self.btn_exit.handle_event(ev):
                 self.send_delete_user()
                 
         if self.left_pressed: self.left_elapsed_time += dt_ms
@@ -3225,14 +3448,14 @@ class SinglePlayState:
 
         # 상단 방 제목/비밀번호
         self.draw_room_header()
-        self.btn_room_exit.draw(self.screen)
+        self.btn_exit.draw()
 
         # 보드 및 미리보기/프로필/블록
         self.board.draw()
 
         # 게임 시작 버튼 (게임 시작 전)
         if not self.board.game_started and self.btn_start:
-            self.btn_start.draw(self.screen)
+            self.btn_start.draw()
 
 ===== FILE END: code\single_play.py =====
 
@@ -3242,13 +3465,18 @@ from typing import Optional
 
 from define import *
 from session import Session
-from my_info import MyInfo
+from my_info import Profile
 from tetromino import Tetromino
+from font_manager import FontManager
+from rectangle import Rectangle
 
+BOARD_WIDTH = 15
+BOARD_HEIGHT = 25
 
 BOARD_COLS   = 10
 HIDDEN_ROWS  = 5
-BOARD_ROWS   = 20+HIDDEN_ROWS
+VALID_ROWS = 20
+BOARD_ROWS   = VALID_ROWS + HIDDEN_ROWS
 PREVIEW_COLS = 5
 PREVIEW_ROWS = 5
 
@@ -3262,32 +3490,25 @@ UP = 5
 
 # -------------------- 싱글 플레이 보드 --------------------
 class TetrisBoard:
-    """
-    싱글플레이 테트리스 보드.
-
-    - grid / current / next_shape 를 모두 로컬로 가진다.
-    - 블록 렌더링은 Session.block_texture 를 우선 사용한다.
-    """
-
+    # 각 ui들은 전체 rect에 상댓값으로 배치하는게 좋아 보인다.
+    # 쓸데없이 rect를 전부 받을 필요가 없다. rect는 전체 하나만 받고, 나머지는 상댓값으로 배치한다.
+    # 보드는 rect 클래스를 통해 2차원 격자로 생성한다. rect 클래스에 set_image 함수를 추가한다.
     def __init__(
         self,
         screen: pygame.Surface,
-        board_rect: pygame.Rect,
-        valid_rect: pygame.Rect,
-        preview_rect: pygame.Rect,
-        score_rect: pygame.Rect,
+        rect: pygame.Rect,
+        fm: FontManager,
         session: Session,
     ):
         self.screen = screen
-        self.board_rect = board_rect
-        self.valid_rect = valid_rect
-        self.preview_rect = preview_rect
-        self.score_rect = score_rect
+        self.rect = rect
+        self.fm = fm
         self.score = 0
         self.session = session
 
         self.cols = BOARD_COLS
         self.rows = BOARD_ROWS
+        # self.cell_rect = pygame.Rect(0, 0, 0, 0)
 
         # 보드 생성 및 None으로 초기화 (각 칸에는 shape_key('I','J',...) 또는 None)
         self.grid: list[list[Optional[str]]] = [
@@ -3300,18 +3521,9 @@ class TetrisBoard:
 
         # 현재/다음 블록
         self.current_tetromino: Optional[Tetromino] = None
-        # next_tetromino는 미리보기용 shape_key(str)
         self.next_tetromino_shape: Optional[str] = None
 
-        # 보드 내부 개인정보 패널(MyInfo)
-        info_h = self.board_rect.h // 3
-        profile_rect = pygame.Rect(
-            self.board_rect.x + 20,
-            self.board_rect.y + self.board_rect.h // 2 - info_h,
-            self.board_rect.w - 40,
-            info_h,
-        )
-        self.my_info = MyInfo(profile_rect, self.session)
+        self.set_layout()
 
     # # ------------ 좌표/충돌 판정 ------------ #
     # def in_bounds(self, x: int, y: int) -> bool:
@@ -3325,6 +3537,29 @@ class TetrisBoard:
     #         if self.grid[y][x] is not None:
     #             return False
     #     return True
+
+    def set_layout(self):
+        cell_w1 = self.rect.w // BOARD_WIDTH
+        cell_w2 = self.rect.h // BOARD_HEIGHT
+        self.cell_length = min(cell_w1, cell_w2)
+        
+        draw_x = self.rect.x
+        draw_y = self.rect.y + HIDDEN_ROWS*self.cell_length
+        draw_w = self.cell_length*self.cols
+        draw_h = self.cell_length*VALID_ROWS
+        profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
+        
+        draw_x = self.rect.x + self.cell_length*self.cols
+        draw_w = self.cell_length*PREVIEW_COLS
+        draw_h = draw_w
+        self.preview_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.preview_box = Rectangle(self.screen, self.preview_rect, self.fm, None, "", 1)
+
+        draw_y += draw_w
+        score_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        score_text = "score: "
+        self.score_box = Rectangle(self.screen, score_rect, self.fm, None, score_text, 1)
 
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
     def fix(self, fix_x, fix_y):
@@ -3440,10 +3675,10 @@ class TetrisBoard:
     def draw_board_frame(self):
         """보드 전체 테두리."""
         # pygame.draw.rect(self.screen, (0, 0, 0), self.board_rect)
-        valid_x = self.valid_rect.x
-        valid_y = self.valid_rect.y
-        valid_w = self.valid_rect.w
-        valid_h = self.valid_rect.h
+        valid_x = self.rect.x 
+        valid_y = self.rect.y + self.cell_length*HIDDEN_ROWS
+        valid_w = self.cell_length*self.cols
+        valid_h = self.cell_length*VALID_ROWS
         pygame.draw.line(self.screen, WHITE, (valid_x,  valid_y), (valid_x, valid_y + valid_h))
         pygame.draw.line(self.screen, WHITE, (valid_x,  valid_y + valid_h), (valid_x + valid_w, valid_y + valid_h))
         pygame.draw.line(self.screen, WHITE, (valid_x + valid_w, valid_y + valid_h), (valid_x + valid_w, valid_y))
@@ -3457,8 +3692,8 @@ class TetrisBoard:
             for x, y in self.current_tetromino.blocks:
                 falling_cells.add((x, y))
 
-        bx = self.board_rect.x
-        by = self.board_rect.y
+        bx = self.rect.x
+        by = self.rect.y
 
         # 1) grid에 고정된 블록 렌더 (25칸 전체)
         for r in range(self.rows):
@@ -3472,8 +3707,8 @@ class TetrisBoard:
 
                 tex = tex_map[shape_key]
 
-                px = bx + c * CELL_SIZE
-                py = by + r * CELL_SIZE
+                px = bx + c * self.cell_length
+                py = by + r * self.cell_length
                 self.screen.blit(tex, (px, py))
 
         # 2) 현재 테트로미노 렌더 (여기서만 1번)
@@ -3481,15 +3716,12 @@ class TetrisBoard:
             tex = tex_map[self.current_tetromino.shape_key]
 
             for x, y in self.current_tetromino.blocks:
-                px = bx + x * CELL_SIZE
-                py = by + y * CELL_SIZE
+                px = bx + x * self.cell_length
+                py = by + y * self.cell_length
                 self.screen.blit(tex, (px, py))
 
-
-
     def draw_preview(self):
-        pygame.draw.rect(self.screen, (0, 0, 0), self.preview_rect)
-        pygame.draw.rect(self.screen, (255, 255, 255), self.preview_rect, 1)
+        self.preview_box.draw()
 
         if self.next_tetromino_shape is None:
             return
@@ -3505,28 +3737,27 @@ class TetrisBoard:
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
 
-        shape_w = (max_x - min_x + 1) * CELL_SIZE
-        shape_h = (max_y - min_y + 1) * CELL_SIZE
+        shape_w = (max_x - min_x + 1) * self.cell_length
+        shape_h = (max_y - min_y + 1) * self.cell_length
 
         offx = (
             self.preview_rect.x
             + (self.preview_rect.w - shape_w) / 2
-            - min_x * CELL_SIZE
+            - min_x * self.cell_length
         )
         offy = (
             self.preview_rect.y
             + (self.preview_rect.h - shape_h) / 2
-            - min_y * CELL_SIZE
+            - min_y * self.cell_length
         )
 
         for cx, cy in shape:
-            px = int(offx + cx * CELL_SIZE)
-            py = int(offy + cy * CELL_SIZE)
+            px = int(offx + cx * self.cell_length)
+            py = int(offy + cy * self.cell_length)
             self.screen.blit(tex, (px, py))
 
-
     def draw_landing_blocks(self):
-        LANDING_ALPHA = 50
+        LANDING_ALPHA = 80
         landing = self.make_landing_tetromino()
         if not landing or not self.game_started or self.game_over:
             return
@@ -3537,31 +3768,21 @@ class TetrisBoard:
 
         tex = self.session.block_texture[landing.shape_key]
 
-        bx = self.board_rect.x
-        by = self.board_rect.y
+        bx = self.rect.x
+        by = self.rect.y
 
         for x, y in landing.blocks:
-            px = bx + x * CELL_SIZE
-            py = by + y * CELL_SIZE
+            px = bx + x * self.cell_length
+            py = by + y * self.cell_length
 
             ghost = tex.copy()
             ghost.set_alpha(LANDING_ALPHA)
             self.screen.blit(ghost, (px, py))
 
-
-
     def draw_score(self):
-        pygame.draw.rect(self.screen, BLACK, self.score_rect)
-        pygame.draw.rect(self.screen, WHITE, self.score_rect, 1)
-
-        # 중앙 정렬을 위해 텍스트 렌더링
-        font = pygame.font.Font("resource/dodamdodam.ttf", 32)
-        text = font.render(f"Score: {self.score}", True, WHITE)
-
-        # 텍스트를 score_rect 중앙에 배치
-        text_rect = text.get_rect(center=self.score_rect.center)
-
-        self.screen.blit(text, text_rect)
+        score_text = f"score: {self.score}"
+        self.score_box.set_text(score_text)
+        self.score_box.draw()
 
     def draw(self):
         # 보드 프레임 & 미리보기는 항상 그림
@@ -3571,7 +3792,7 @@ class TetrisBoard:
 
         if not self.game_started:
             # 시작 전: 보드 내부에 내 정보
-            self.my_info.draw(self.screen)
+            self.profile.draw()
         else:
             # 게임 중: 로컬 보드/블록 렌더
             self.draw_cells()
@@ -3621,4 +3842,46 @@ class Tetromino:
         )
 ===== FILE END: code\tetromino.py =====
 
-===== FILE BEGIN: code\UI\change_state.py =====
+===== FILE BEGIN: code\toggle_button.py =====
+from define_format import *
+from resource_manager import *
+from font_manager import FontManager
+from rectangle import Rectangle
+
+class ToggleButton(Rectangle):
+    """활성/비활성 상태를 가지는 작은 토글 버튼."""
+    def __init__(self, 
+        screen: pygame.Surface,
+        rect: pygame.Rect, 
+        rm: ResourceManager,
+        fm: FontManager,
+        image: pygame.Surface = None, 
+        text: str = "", 
+        ):
+        super().__init__(screen, rect, fm, image, text)
+        self.rm = rm
+        self.active = False
+
+        self.pressed = False
+
+    def handle_event(self, ev: pygame.event.Event) -> bool:
+        if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+            if self.rect.collidepoint(ev.pos):
+                if self.pressed:
+                    pass
+                else:
+                    self.pressed = True
+                    self.rm.button_sound_press.play()
+                return True
+        return False
+
+    def draw(self):
+        if self.pressed:
+            color = ORANGE
+        else:
+            color = GRAY
+
+        self.set_background_color(color)
+        super().draw()
+===== FILE END: code\toggle_button.py =====
+

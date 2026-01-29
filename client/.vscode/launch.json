@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Tetris Client",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "tetris.main.game_loop",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ]
+}
