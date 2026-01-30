@@ -17,29 +17,26 @@ from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
 from tetris.ui.create_room_window import RoomCreateWindow
 from tetris.states.single_play import SinglePlayState
+from tetris.states.base_state import BaseState
 from tetris.net.packet_manager import *
 from tetris.animation.shutter_animaion import ShutterAnimation
 
 MENU_WIDTH = 200
 MENU_HEIGHT = 100
 
-class LobbyState:
+class LobbyState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
-                 net_worker: NetworkWorker, my_session: Session, is_animation: bool = False):
-        self.screen = screen
-        self.rm = rm
-        self.fm = fm
-        self.my_session = my_session
-        self.net_worker = net_worker
+                 net_worker: NetworkWorker, session: Session, is_animation: bool = False):
+        super().__init__(screen, rm, fm, net_worker, session)
         self.top_menus: list[Button] = []
         self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm, fm)
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
         self.chat_input_box = InputBox(screen, input_box_rect, self.fm,
                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
         self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), self.chat_input_box.font)
-        self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), fm, my_session)
+        self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), fm, session)
 
-        self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.my_session)
+        self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.session)
         # self.reactable_screen = LOBBY
         self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
@@ -70,7 +67,7 @@ class LobbyState:
     def send_message(self, message: str): # 메세지는 가변이라 문자열 포맷을 크기만큼 만들어 직접 전송
         if len(message) == 0: return
         type = C2S_MESSAGE
-        id = self.my_session.id
+        id = self.session.id
         message = message.encode("utf-8")
         message_bytes = len(message)
         size = 2 + 1 + 4 + message_bytes 
@@ -95,10 +92,10 @@ class LobbyState:
                 self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
 
             elif data.get("type") == S2C_ADD_OPEN_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.my_session, data.get("room_name"))
+                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.session, data.get("room_name"))
 
             elif data.get("type") == S2C_ADD_LOCK_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.my_session, data.get("room_name"), data.get("room_password"))
+                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.session, data.get("room_name"), data.get("room_password"))
             
         return self
 

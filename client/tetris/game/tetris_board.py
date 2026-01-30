@@ -5,6 +5,7 @@ from tetris.config.define import *
 from tetris.net.session import Session
 from tetris.ui.my_info import Profile
 from tetris.game.tetromino import Tetromino
+from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
 from tetris.ui.rectangle import Rectangle
 
@@ -35,14 +36,16 @@ class TetrisBoard:
         self,
         screen: pygame.Surface,
         rect: pygame.Rect,
+        rm: ResourceManager,
         fm: FontManager,
-        session: Session,
+        textures : dict
     ):
         self.screen = screen
         self.rect = rect
+        self.rm = rm
         self.fm = fm
-        self.score = 0
-        self.session = session
+        self.textures = textures
+        self.score = None # 싱글용
 
         self.cols = BOARD_COLS
         self.rows = BOARD_ROWS
@@ -63,30 +66,19 @@ class TetrisBoard:
 
         self.set_layout()
 
-    # # ------------ 좌표/충돌 판정 ------------ #
-    # def in_bounds(self, x: int, y: int) -> bool:
-    #     return 0 <= x < self.cols and 0 <= y < self.rows
-
-    # def can_place(self, tet: Tetromino) -> bool:
-    #     """tetromino의 각 블록이 보드 안이고, 이미 고정된 블록과 겹치지 않는지 확인."""
-    #     for x, y in tet.blocks:
-    #         if not self.in_bounds(x, y):
-    #             return False
-    #         if self.grid[y][x] is not None:
-    #             return False
-    #     return True
-
     def set_layout(self):
         cell_w1 = self.rect.w // BOARD_WIDTH
         cell_w2 = self.rect.h // BOARD_HEIGHT
         self.cell_length = min(cell_w1, cell_w2)
+        self._set_texture_size(self.cell_length)
         
         draw_x = self.rect.x
         draw_y = self.rect.y + HIDDEN_ROWS*self.cell_length
         draw_w = self.cell_length*self.cols
         draw_h = self.cell_length*VALID_ROWS
-        profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
+        self.grid_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        # profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        # self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
         
         draw_x = self.rect.x + self.cell_length*self.cols
         draw_w = self.cell_length*PREVIEW_COLS
@@ -99,6 +91,13 @@ class TetrisBoard:
         score_text = "score: "
         self.score_box = Rectangle(self.screen, score_rect, self.fm, None, score_text, 1)
 
+    def _set_texture_size(self, size: int):
+        for key, texture in self.textures.items():
+            self.textures[key] = self.rm.scale_image(texture, size, size)
+
+    def set_score(self, new_score: Optional[int]):
+        self.score = new_score
+
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
     def fix(self, fix_x, fix_y):
         if not self.current_tetromino:
@@ -110,17 +109,20 @@ class TetrisBoard:
         for x, y in self.current_tetromino.blocks:
             self.grid[y][x] = self.current_tetromino.shape_key
 
+        self.rm.fix_sound.play()
         self.current_tetromino = None
 
     def clear_lines(self, row_index: int):
         del self.grid[row_index]
         self.grid.insert(0, [None for _ in range(self.cols)])
+        self.rm.clearline_sound.play()
 
     def add_line(self, hole_x: int):
         new_line = ['G' for _ in range(BOARD_COLS)]
         new_line[hole_x] = None
         self.grid.append(new_line)
         del self.grid[0]
+        self.rm.addline_sound.play()
 
     # ------------ 로컬 이동/회전/하드드랍 (델타 기반) ------------ #
     def move(self, dx: int, dy: int):
@@ -130,6 +132,7 @@ class TetrisBoard:
         
         self.current_tetromino.x += dx
         self.current_tetromino.y += dy
+        self.rm.move_sound.play()
 
     def rotate(self, delta: int = 1):
         """현재 테트로미노 회전."""
@@ -162,19 +165,18 @@ class TetrisBoard:
 
             landing = moved
 
-    def clear_board(self):
+    def clear(self):
         for r in range(self.rows):
             for c in range(self.cols):
                 self.grid[r][c] = None
 
+        self.game_over = True
+        self.current_tetromino = None
+        self.game_started = False
+        self.score = 0
+
     # ------------ 서버 move_type에 대응하는 진입점 ------------ #
     def handle_move(self, move_type: int):
-        """
-        서버에서 승인된 move_type을 SinglePlayState가 넘겨주는 함수.
-
-        move_type 값:
-            RIGHT, LEFT, DOWN, ROTATE, DROP (TIMEOUT은 필요시 확장)
-        """
         if not self.game_started or self.game_over or not self.current_tetromino:
             return
 
@@ -202,8 +204,8 @@ class TetrisBoard:
         self.game_started = True
         self.game_over = False
 
-        # 보드 리셋
-        self.clear_board()
+        # # 보드 리셋
+        # self.clear()
 
         # 서버 주도 게임이라면 current_tetromino는
         # S2C_START 이후/또는 별도 패킷에서 세팅된다고 가정할 수 있음.
@@ -222,7 +224,7 @@ class TetrisBoard:
         pygame.draw.line(self.screen, WHITE, (valid_x + valid_w, valid_y + valid_h), (valid_x + valid_w, valid_y))
 
     def draw_cells(self):
-        tex_map = self.session.block_texture
+        tex_map = self.textures
 
         # 현재 테트로미노 좌표 (grid 렌더에서 제외)
         falling_cells = set()
@@ -268,7 +270,7 @@ class TetrisBoard:
 
         shape_key = self.next_tetromino_shape
         shape = SHAPES[shape_key][0]
-        tex = self.session.block_texture[shape_key]
+        tex = self.textures[shape_key]
 
         xs = [cx for (cx, _) in shape]
         ys = [cy for (_, cy) in shape]
@@ -304,7 +306,7 @@ class TetrisBoard:
         if landing.y == self.current_tetromino.y:
             return
 
-        tex = self.session.block_texture[landing.shape_key]
+        tex = self.textures[landing.shape_key]
 
         bx = self.rect.x
         by = self.rect.y
@@ -317,7 +319,7 @@ class TetrisBoard:
             ghost.set_alpha(LANDING_ALPHA)
             self.screen.blit(ghost, (px, py))
 
-    def draw_score(self):
+    def draw_score(self): # 그리지 않을거면 호출 자체를 하지 말 것
         score_text = f"score: {self.score}"
         self.score_box.set_text(score_text)
         self.score_box.draw()
@@ -330,7 +332,8 @@ class TetrisBoard:
 
         if not self.game_started:
             # 시작 전: 보드 내부에 내 정보
-            self.profile.draw()
+            # self.profile.draw()
+            pass
         else:
             # 게임 중: 로컬 보드/블록 렌더
             self.draw_cells()

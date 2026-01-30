@@ -40,10 +40,6 @@ class Session:
         'T': rm.block_images[DEFAULT_PURPLE],
         'G': rm.block_images[DEFAULT_GRAY],
     }
-       
-    def set_block_scale(self, rm: ResourceManager, block_length: int):
-        for key, value in self.block_texture.items():
-            self.block_texture[key] = rm.scale_image(value, block_length, block_length)
 
     # def set_id(self, new_id: int):
     #     self.id = int(new_id)

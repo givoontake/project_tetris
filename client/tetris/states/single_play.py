@@ -11,9 +11,9 @@ from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
 
 from tetris.ui.button import Button
-from tetris.game.tetris_board import TetrisBoard
-from tetris.game.tetromino import Tetromino
 from tetris.game.tetris_board import *
+from tetris.game.room_session import RoomSession
+from tetris.states.base_state import BaseState
 
 RIGHT = 0
 LEFT = 1
@@ -22,21 +22,16 @@ DOWN = 3
 DROP = 4
 UP = 5
 
-class SinglePlayState:
+class SinglePlayState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
                   net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
-        self.screen = screen
+        super().__init__(screen, rm, fm, net_worker, session)
         self.title = room_title
         self.password = room_password
 
-        self.rm = rm
-        self.fm = fm
-        self.net_worker = net_worker
-        self.my_session = session
-
         # UI 요소들
-        self.board: Optional[TetrisBoard] = None
-        # self.btn_start: Optional[Button] = None
+        # self.room_session.board: Optional[TetrisBoard] = None
+        self.btn_start: Optional[Button] = None
 
         self.title_box: Optional[Rectangle] = None
         self.password_box: Optional[Rectangle] = None
@@ -74,10 +69,11 @@ class SinglePlayState:
         board_x = ((sw - board_w) // 2) + int(board_w*0.15)
         board_y = header_h
         board_rect = pygame.Rect(board_x, board_y, board_w, board_h)
-        self.board = TetrisBoard(self.screen, board_rect, self.fm, self.my_session)
-        self.my_session.set_block_scale(self.rm, self.board.cell_length)
+        self.room_session = RoomSession(self.screen, board_rect, self.rm, self.fm, self.net_worker, self.session, True)
+        # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
+        self.room_session.board.set_score(0)
 
-        btn_w = self.board.rect.w - self.board.score_box.rect.w
+        btn_w = self.room_session.board.rect.w - self.room_session.board.score_box.rect.w
         btn_h = sh*0.1
         btn_x = board_x
         btn_y = board_y + board_h
@@ -108,148 +104,10 @@ class SinglePlayState:
         self.btn_exit = Button(self.screen, exit_rect, self.rm, self.fm, None, "나가기")
 
     def clear(self):
-        self.left_pressed = False
-        self.right_pressed = False
-        self.down_pressed = False
-        self.rotate_pressed = False
-        self.drop_pressed = False
-
-        self.left_elapsed_time = 0
-        self.left_first_over = False
-        self.left_first_move = False
-        self.right_elapsed_time = 0
-        self.right_first_over = False
-        self.right_first_move = False
-        self.down_elapsed_time = 0
-        self.down_first_over = False
-        self.down_first_move = False
+        self.room_session.clear()
 
     def handle_event(self, ev):
-        if ev.key == pygame.K_LEFT:
-            # move_type = LEFT
-            if ev.type == pygame.KEYDOWN: 
-                self.left_pressed = True
-            elif ev.type == pygame.KEYUP: 
-                self.left_pressed = False
-                self.left_first_over = False
-                self.left_first_move = False
-                self.left_elapsed_time = 0
-
-        elif ev.key == pygame.K_RIGHT:
-            # move_type = RIGHT
-            if ev.type == pygame.KEYDOWN: 
-                self.right_pressed = True
-            elif ev.type == pygame.KEYUP: 
-                self.right_pressed = False
-                self.right_first_over = False
-                self.right_first_move = False
-                self.right_elapsed_time = 0
-
-        # 소프트 드랍
-        elif ev.key == pygame.K_DOWN:
-            # move_type = DOWN
-            if ev.type == pygame.KEYDOWN:
-                self.down_pressed = True
-            elif ev.type == pygame.KEYUP:
-                self.down_pressed = False
-                self.down_first_over = False
-                self.down_first_move = False
-                self.down_elapsed_time = 0
-
-        # 하드 드랍(스페이스)
-        elif ev.key == pygame.K_SPACE:
-            if ev.type == pygame.KEYDOWN: self.drop_pressed = True
-            elif ev.type == pygame.KEYUP: self.drop_pressed = False
-            # move_type = DROP
-
-        # 회전(위)
-        elif ev.key == pygame.K_UP:
-            if ev.type == pygame.KEYDOWN: self.rotate_pressed = True
-            elif ev.type == pygame.KEYUP: self.rotate_pressed = False
-
-    # ------------ 네트워크 연동용 함수 (키 입력 → C2S_MOVE) ------------ # 
-
-    def send_move_handler(self):
-        if self.left_pressed:
-            if self.left_first_over == False:
-                if self.left_first_move == False:
-                    self.send_move(LEFT)
-                    self.left_first_move = True
-                    
-                if self.left_elapsed_time >= self.first_delay_ms:
-                    self.send_move(LEFT)
-                    self.left_first_over = True
-                    self.left_elapsed_time = 0
-
-            else:
-                if self.left_elapsed_time >= self.delay_ms:
-                    self.send_move(LEFT)
-                    self.left_elapsed_time = 0
-            
-
-        if self.right_pressed:
-            if self.right_first_over == False:
-                if self.right_first_move == False:
-                    self.send_move(RIGHT)
-                    self.right_first_move = True
-
-                if self.right_elapsed_time >= self.first_delay_ms:
-                    self.send_move(RIGHT)
-                    self.right_first_over = True
-                    self.right_elapsed_time = 0
-
-            else:
-                if self.right_elapsed_time >= self.delay_ms:
-                    self.send_move(RIGHT)
-                    self.right_elapsed_time = 0
-
-        # 소프트 드랍
-        if self.down_pressed:
-            if self.down_first_over == False:
-                if self.down_first_move == False:
-                    self.send_move(DOWN)
-                    self.down_first_move = True
-                if self.down_elapsed_time >= self.first_delay_ms:
-                    self.send_move(DOWN)
-                    self.down_first_over = True
-                    self.down_elapsed_time = 0
-
-            else:
-                if self.down_elapsed_time >= self.delay_ms:
-                    self.send_move(DOWN)
-                    self.down_elapsed_time = 0
-        # 하드 드랍(스페이스)
-        if self.rotate_pressed:
-            self.send_move(ROTATE)
-            self.rotate_pressed = False
-        # 회전(위)
-        if self.drop_pressed:
-            self.send_move(DROP)
-            self.left_pressed = False
-            self.right_pressed = False
-            self.down_pressed = False
-            self.rotate_pressed = False
-            self.drop_pressed = False
-
-    def send_move(self, move_type):
-        size = 2 + 1 + 1
-        type = C2S_MOVE
-        self.move_type = move_type
-
-        packet_bytes = struct.pack(
-            "<hbb",
-            size,
-            type,
-            self.move_type
-        )
-
-        MOVE_NAME = {LEFT: "LEFT", RIGHT: "RIGHT", DOWN: "DOWN", DROP: "DROP", ROTATE: "ROTATE"}
-        # print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(self.move_type, self.move_type))
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[SinglePlayState] send_move() error:", e)
+        self.room_session.handle_event(ev)
 
     def send_start(self):
         size = 2 + 1
@@ -283,65 +141,31 @@ class SinglePlayState:
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: Optional[dict]):
-
         packet_type = data.get("type")
 
         if packet_type == S2C_START:
             # 게임이 시작되었다고 서버가 알려줌
-            if data.get("is_start") and self.board:
-                self.board.start_game()
+            if data.get("is_start"):
+                self.room_session.board.start_game()
                 pygame.mixer.music.play(-1)
 
-        elif packet_type == S2C_MOVE:
-            # move_type에 따라 보드에 반영
-            move_type = data.get("move_type")
-            if move_type is not None and self.board:
-                self.board.handle_move(move_type)
-                if move_type != DOWN:
-                    self.rm.move_sound.play()
-
-        elif packet_type == S2C_DELETE_USER:
+        elif packet_type == S2C_DELETE_USER: # 사실 싱글에는 의미 없음
             from tetris.states.lobby_state import LobbyState
             delete_id = data.get("id")
-            if delete_id == self.my_session.id:
+            if delete_id == self.room_session.session.id:
                 pygame.mixer.music.stop()
-                return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.my_session)
-            
-        elif packet_type == S2C_SPAWN:
-            print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
-            if self.my_session.id == data.get("id"):
-                self.board.current_tetromino = Tetromino(SHAPES_INDEX[data.get("tetromino_type")],data.get("spawn_x"), data.get("spawn_y"))
-                self.board.next_tetromino_shape = SHAPES_INDEX[data.get("next_tetromino_type")]
-
-        elif packet_type == S2C_FIX:
-            if self.my_session.id == data.get("id"):
-                if self.board.current_tetromino == None:
-                    pass
-                else:
-                    self.board.fix(data.get("fixed_x"), data.get("fixed_y"))
-                    self.rm.fix_sound.play()
-
-        elif packet_type == S2C_CLEARLINE:
-            if self.my_session.id == data.get("id"):
-                self.board.clear_lines(data.get("line_index"))
-                self.rm.clearline_sound.play()
-                self.board.score = data.get("score")
-
-        elif packet_type == S2C_ADDLINE:
-            if self.my_session.id == data.get("id"):
-                self.rm.addline_sound.play()
-                self.board.add_line(data.get("hole_x"))
+                return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session)
 
         elif packet_type == S2C_GAMEOVER:
-            self.board.game_over = True
-            self.board.current_tetromino = None
-            self.board.game_started = False
-            self.init()
-            self.clear()
+            self.room_session.clear()
             pygame.mixer.music.stop()
 
         elif packet_type == S2C_UPDATE_SCORE:
-            self.my_session.max_score = data.get("max_score")
+            self.room_session.session.max_score = data.get("max_score")
+
+        else:
+            if self.room_session.session.id == data.get("id"):
+                self.room_session.handle_packet(data)
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self
@@ -358,7 +182,7 @@ class SinglePlayState:
                 # 상위 루프에서 처리
                 continue
 
-            if (ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP) and self.board and self.board.game_started:
+            if (ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP) and self.room_session.board.game_started:
                 self.handle_event(ev)
 
             # # 게임 시작 버튼 클릭
@@ -369,17 +193,12 @@ class SinglePlayState:
             if self.btn_exit.handle_event(ev):
                 self.send_delete_user()
                 
-        if self.left_pressed: self.left_elapsed_time += dt_ms
-        if self.right_pressed: self.right_elapsed_time += dt_ms
-        if self.down_pressed: self.down_elapsed_time += dt_ms
-
-        if self.board and self.board.game_started:
-            self.send_move_handler()
+        self.room_session.update(dt_ms)
 
         return self
 
     def draw(self):
-        if self.board is None:
+        if self.room_session.board is None:
             return
 
         self.screen.fill((0, 0, 0))
@@ -389,8 +208,8 @@ class SinglePlayState:
         self.btn_exit.draw()
 
         # 보드 및 미리보기/프로필/블록
-        self.board.draw()
+        self.room_session.board.draw()
 
         # 게임 시작 버튼 (게임 시작 전)
-        if not self.board.game_started and self.btn_start:
+        if not self.room_session.board.game_started and self.btn_start:
             self.btn_start.draw()
