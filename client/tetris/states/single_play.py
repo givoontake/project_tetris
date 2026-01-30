@@ -14,6 +14,7 @@ from tetris.ui.button import Button
 from tetris.game.tetris_board import *
 from tetris.game.room_session import RoomSession
 from tetris.states.base_state import BaseState
+from tetris.states.define_layout import *
 
 RIGHT = 0
 LEFT = 1
@@ -41,12 +42,12 @@ class SinglePlayState(BaseState):
         self.clear()
 
     def set_layout(self):
-        header_w, header_h = 300, 50
 
         sw, sh = self.screen.get_size()
-        board_w = int(sw*0.4)
-        board_h = int(sh*0.8)
-        board_x = ((sw - board_w) // 2) + int(board_w*0.15)
+        header_w, header_h = sw*INFO_HEADER_WIDTH, sh*INFO_HEADER_HEIGHT
+        board_w = int(sw*BOARD_WIDTH)
+        board_h = int(sh*BOARD_HEIGHT)
+        board_x = ((sw - int(board_w*0.66)) // 2)
         board_y = header_h
         board_rect = pygame.Rect(board_x, board_y, board_w, board_h)
         self.room_session = RoomSession(self.screen, board_rect, self.rm, self.fm, self.net_worker, self.session, True)
@@ -54,7 +55,7 @@ class SinglePlayState(BaseState):
         self.room_session.board.set_score(0)
 
         btn_w = self.room_session.board.grid_rect.w
-        btn_h = sh*0.1
+        btn_h = sh*READY_BUTTON_HEIGHT
         btn_x = board_rect.x
         btn_y = board_rect.y + board_rect.h
         btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
