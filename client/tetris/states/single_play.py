@@ -37,26 +37,6 @@ class SinglePlayState(BaseState):
         self.password_box: Optional[Rectangle] = None
         self.btn_exit: Optional[Button] = None
 
-        # 연속 전송용 변수
-        self.left_pressed = False
-        self.right_pressed = False
-        self.down_pressed = False
-        self.rotate_pressed = False
-        self.drop_pressed = False
-
-        self.first_delay_ms = 300
-        self.delay_ms = 50
-
-        self.left_elapsed_time = 0
-        self.left_first_over = False
-        self.left_first_move = False
-        self.right_elapsed_time = 0
-        self.right_first_over = False
-        self.right_first_move = False
-        self.down_elapsed_time = 0
-        self.down_first_over = False
-        self.down_first_move = False
-
         self.set_layout()
         self.clear()
 
