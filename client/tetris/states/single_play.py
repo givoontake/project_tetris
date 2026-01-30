@@ -53,10 +53,10 @@ class SinglePlayState(BaseState):
         # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
         self.room_session.board.set_score(0)
 
-        btn_w = self.room_session.board.rect.w - self.room_session.board.score_box.rect.w
+        btn_w = self.room_session.board.grid_rect.w
         btn_h = sh*0.1
-        btn_x = board_x
-        btn_y = board_y + board_h
+        btn_x = board_rect.x
+        btn_y = board_rect.y + board_rect.h
         btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
 
         self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
