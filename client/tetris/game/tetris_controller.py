@@ -7,9 +7,8 @@ from tetris.net.session import Session
 from tetris.states.single_play import RIGHT, LEFT, ROTATE, DOWN, DROP, UP
 
 class TetrisController:
-    def __init__(self, net_worker: NetworkWorker, my_session: Session):
+    def __init__(self, net_worker: NetworkWorker):
         self.net_worker = net_worker
-        self.my_session = my_session
 
         # 컨트롤 제어 변수들
         self.left_pressed = False
@@ -31,48 +30,49 @@ class TetrisController:
         self.down_first_over = False
         self.down_first_move = False
 
-    def handle_event(self, ev):
-        if ev.key == pygame.K_LEFT:
-            # move_type = LEFT
-            if ev.type == pygame.KEYDOWN: 
-                self.left_pressed = True
-            elif ev.type == pygame.KEYUP: 
-                self.left_pressed = False
-                self.left_first_over = False
-                self.left_first_move = False
-                self.left_elapsed_time = 0
+    def handle_event(self, ev: pygame.event.Event):
+        if ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP:
+            if ev.key == pygame.K_LEFT:
+                # move_type = LEFT
+                if ev.type == pygame.KEYDOWN: 
+                    self.left_pressed = True
+                elif ev.type == pygame.KEYUP: 
+                    self.left_pressed = False
+                    self.left_first_over = False
+                    self.left_first_move = False
+                    self.left_elapsed_time = 0
 
-        elif ev.key == pygame.K_RIGHT:
-            # move_type = RIGHT
-            if ev.type == pygame.KEYDOWN: 
-                self.right_pressed = True
-            elif ev.type == pygame.KEYUP: 
-                self.right_pressed = False
-                self.right_first_over = False
-                self.right_first_move = False
-                self.right_elapsed_time = 0
+            elif ev.key == pygame.K_RIGHT:
+                # move_type = RIGHT
+                if ev.type == pygame.KEYDOWN: 
+                    self.right_pressed = True
+                elif ev.type == pygame.KEYUP: 
+                    self.right_pressed = False
+                    self.right_first_over = False
+                    self.right_first_move = False
+                    self.right_elapsed_time = 0
 
-        # 소프트 드랍
-        elif ev.key == pygame.K_DOWN:
-            # move_type = DOWN
-            if ev.type == pygame.KEYDOWN:
-                self.down_pressed = True
-            elif ev.type == pygame.KEYUP:
-                self.down_pressed = False
-                self.down_first_over = False
-                self.down_first_move = False
-                self.down_elapsed_time = 0
+            # 소프트 드랍
+            elif ev.key == pygame.K_DOWN:
+                # move_type = DOWN
+                if ev.type == pygame.KEYDOWN:
+                    self.down_pressed = True
+                elif ev.type == pygame.KEYUP:
+                    self.down_pressed = False
+                    self.down_first_over = False
+                    self.down_first_move = False
+                    self.down_elapsed_time = 0
 
-        # 하드 드랍(스페이스)
-        elif ev.key == pygame.K_SPACE:
-            if ev.type == pygame.KEYDOWN: self.drop_pressed = True
-            elif ev.type == pygame.KEYUP: self.drop_pressed = False
-            # move_type = DROP
+            # 하드 드랍(스페이스)
+            elif ev.key == pygame.K_SPACE:
+                if ev.type == pygame.KEYDOWN: self.drop_pressed = True
+                elif ev.type == pygame.KEYUP: self.drop_pressed = False
+                # move_type = DROP
 
-        # 회전(위)
-        elif ev.key == pygame.K_UP:
-            if ev.type == pygame.KEYDOWN: self.rotate_pressed = True
-            elif ev.type == pygame.KEYUP: self.rotate_pressed = False
+            # 회전(위)
+            elif ev.key == pygame.K_UP:
+                if ev.type == pygame.KEYDOWN: self.rotate_pressed = True
+                elif ev.type == pygame.KEYUP: self.rotate_pressed = False
 
     # ------------ 네트워크 연동용 함수 (키 입력 → C2S_MOVE) ------------ # 
 

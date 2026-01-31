@@ -36,7 +36,7 @@ class LobbyState(BaseState):
         self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), self.chat_input_box.font)
         self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), fm, session)
 
-        self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.session)
+        self.room_create_window = None
         # self.reactable_screen = LOBBY
         self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
@@ -105,7 +105,7 @@ class LobbyState(BaseState):
             raise SystemExit
         
         event = None
-        if self.room_create_window.visible == False:
+        if self.room_create_window == None:
             for menu in self.top_menus:
                 if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
                     event = menu.idle.text
@@ -113,7 +113,7 @@ class LobbyState(BaseState):
 
             if event is not None:
                 if event == "방만들기":
-                    self.room_create_window.visible = True
+                    self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.session)
                     
                 # 나중에 메뉴별 상태 만들고 동작 추가
                 return
@@ -129,7 +129,9 @@ class LobbyState(BaseState):
                 self.send_message(message)
 
         else:
-            self.room_create_window.handle_event(ev)
+            str = self.room_create_window.handle_event(ev)
+            if str == "만들기" or str == "취소":
+                self.room_create_window = None
 
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 
@@ -141,7 +143,7 @@ class LobbyState(BaseState):
         for ev in events:
             self.handle_event(ev)
 
-        if self.room_create_window.visible:
+        if self.room_create_window:
             self.room_create_window.update(dt_ms)
         
         return self
@@ -157,5 +159,5 @@ class LobbyState(BaseState):
         self.chat_input_box.draw()
         self.my_info_rect.draw()
 
-        if self.room_create_window.visible: self.room_create_window.draw()
+        if self.room_create_window: self.room_create_window.draw()
         if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()

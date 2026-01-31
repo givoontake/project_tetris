@@ -26,8 +26,9 @@ class GameLoop:
         self.rm.init()
         self.fm = FontManager()
         self.net_worker = NetworkWorker()
-        self.sesseion = Session()
-        self.state = LoginState(self.screen, self.rm, self.fm, self.net_worker, self.sesseion)
+        self.session = Session()
+        self.session.set_my_session()
+        self.state = LoginState(self.screen, self.rm, self.fm, self.net_worker, self.session)
         self.state.connect()
 
         self.prev_time = time.perf_counter()

@@ -8,6 +8,8 @@ from tetris.game.tetromino import Tetromino
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
 from tetris.ui.rectangle import Rectangle
+from tetris.ui.button import Button
+from tetris.ui.toggle_button import ToggleButton
 
 BOARD_WIDTH = 15
 BOARD_HEIGHT = 25
@@ -38,13 +40,14 @@ class TetrisBoard:
         rect: pygame.Rect,
         rm: ResourceManager,
         fm: FontManager,
-        textures : dict
+        session : Session,
     ):
         self.screen = screen
         self.rect = rect
         self.rm = rm
         self.fm = fm
-        self.textures = textures
+        self.session = session
+        # self.is_single = is_single
         self.score = None # 싱글용
 
         self.cols = BOARD_COLS
@@ -77,6 +80,7 @@ class TetrisBoard:
         draw_w = self.cell_length*self.cols
         draw_h = self.cell_length*VALID_ROWS
         self.grid_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+
         # profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         # self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
         
@@ -86,17 +90,9 @@ class TetrisBoard:
         self.preview_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.preview_box = Rectangle(self.screen, self.preview_rect, self.fm, None, "", 1)
 
-        draw_y += draw_w
-        score_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        score_text = "score: "
-        self.score_box = Rectangle(self.screen, score_rect, self.fm, None, score_text, 1)
-
     def _set_texture_size(self, size: int):
-        for key, texture in self.textures.items():
-            self.textures[key] = self.rm.scale_image(texture, size, size)
-
-    def set_score(self, new_score: Optional[int]):
-        self.score = new_score
+        for key, texture in self.session.block_texture.items():
+            self.session.block_texture[key] = self.rm.scale_image(texture, size, size)
 
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
     def fix(self, fix_x, fix_y):
@@ -173,7 +169,6 @@ class TetrisBoard:
         self.game_over = True
         self.current_tetromino = None
         self.game_started = False
-        self.score = 0
 
     # ------------ 서버 move_type에 대응하는 진입점 ------------ #
     def handle_move(self, move_type: int):
@@ -224,7 +219,7 @@ class TetrisBoard:
         pygame.draw.line(self.screen, WHITE, (valid_x + valid_w, valid_y + valid_h), (valid_x + valid_w, valid_y))
 
     def draw_cells(self):
-        tex_map = self.textures
+        tex_map = self.session.block_texture
 
         # 현재 테트로미노 좌표 (grid 렌더에서 제외)
         falling_cells = set()
@@ -270,7 +265,7 @@ class TetrisBoard:
 
         shape_key = self.next_tetromino_shape
         shape = SHAPES[shape_key][0]
-        tex = self.textures[shape_key]
+        tex = self.session.block_texture[shape_key]
 
         xs = [cx for (cx, _) in shape]
         ys = [cy for (_, cy) in shape]
@@ -306,7 +301,7 @@ class TetrisBoard:
         if landing.y == self.current_tetromino.y:
             return
 
-        tex = self.textures[landing.shape_key]
+        tex = self.session.block_texture[landing.shape_key]
 
         bx = self.rect.x
         by = self.rect.y
@@ -319,16 +314,10 @@ class TetrisBoard:
             ghost.set_alpha(LANDING_ALPHA)
             self.screen.blit(ghost, (px, py))
 
-    def draw_score(self): # 그리지 않을거면 호출 자체를 하지 말 것
-        score_text = f"score: {self.score}"
-        self.score_box.set_text(score_text)
-        self.score_box.draw()
-
     def draw(self):
         # 보드 프레임 & 미리보기는 항상 그림
         self.draw_board_frame()
         self.draw_preview()
-        self.draw_score()
 
         if not self.game_started:
             # 시작 전: 보드 내부에 내 정보

@@ -12,7 +12,7 @@ from tetris.resources.font_manager import FontManager
 
 from tetris.ui.button import Button
 from tetris.game.tetris_board import *
-from tetris.game.room_session import RoomSession
+from tetris.game.tetris_session import TetrisSession
 from tetris.states.base_state import BaseState
 from tetris.states.define_layout import *
 
@@ -32,7 +32,7 @@ class SinglePlayState(BaseState):
 
         # UI 요소들
         # self.room_session.board: Optional[TetrisBoard] = None
-        self.btn_start: Optional[Button] = None
+        # self.btn_start: Optional[Button] = None
 
         self.title_box: Optional[Rectangle] = None
         self.password_box: Optional[Rectangle] = None
@@ -42,7 +42,6 @@ class SinglePlayState(BaseState):
         self.clear()
 
     def set_layout(self):
-
         sw, sh = self.screen.get_size()
         header_w, header_h = sw*INFO_HEADER_WIDTH, sh*INFO_HEADER_HEIGHT
         board_w = int(sw*BOARD_WIDTH)
@@ -50,17 +49,10 @@ class SinglePlayState(BaseState):
         board_x = ((sw - int(board_w*0.66)) // 2)
         board_y = header_h
         board_rect = pygame.Rect(board_x, board_y, board_w, board_h)
-        self.room_session = RoomSession(self.screen, board_rect, self.rm, self.fm, self.net_worker, self.session, True)
+        self.tetris_session = TetrisSession(self.screen, board_rect, self.rm, self.fm, self.net_worker, self.session, True)
         # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
-        self.room_session.board.set_score(0)
 
-        btn_w = self.room_session.board.grid_rect.w
-        btn_h = sh*READY_BUTTON_HEIGHT
-        btn_x = board_rect.x
-        btn_y = board_rect.y + board_rect.h
-        btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
-
-        self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
+        # self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
 
         # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
         draw_x, draw_y = 0, 0
@@ -85,25 +77,10 @@ class SinglePlayState(BaseState):
         self.btn_exit = Button(self.screen, exit_rect, self.rm, self.fm, None, "나가기")
 
     def clear(self):
-        self.room_session.clear()
+        self.tetris_session.clear()
 
     def handle_event(self, ev):
-        self.room_session.handle_event(ev)
-
-    def send_start(self):
-        size = 2 + 1
-        type = C2S_START
-
-        packet_bytes = struct.pack(
-            "<hb",
-            size,
-            type,
-        )
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[SinglePlayState] send_start() error:", e)
+        self.tetris_session.handle_event(ev)
 
     def send_delete_user(self):
         size = 2 + 1
@@ -127,26 +104,26 @@ class SinglePlayState(BaseState):
         if packet_type == S2C_START:
             # 게임이 시작되었다고 서버가 알려줌
             if data.get("is_start"):
-                self.room_session.board.start_game()
+                self.tetris_session.board.start_game()
                 pygame.mixer.music.play(-1)
 
         elif packet_type == S2C_DELETE_USER: # 사실 싱글에는 의미 없음
             from tetris.states.lobby_state import LobbyState
             delete_id = data.get("id")
-            if delete_id == self.room_session.session.id:
+            if delete_id == self.tetris_session.session.id:
                 pygame.mixer.music.stop()
                 return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session)
 
         elif packet_type == S2C_GAMEOVER:
-            self.room_session.clear()
+            self.tetris_session.clear()
             pygame.mixer.music.stop()
 
         elif packet_type == S2C_UPDATE_SCORE:
-            self.room_session.session.max_score = data.get("max_score")
+            self.tetris_session.session.max_score = data.get("max_score")
 
         else:
-            if self.room_session.session.id == data.get("id"):
-                self.room_session.handle_packet(data)
+            if self.tetris_session.session.id == data.get("id"):
+                self.tetris_session.handle_packet(data)
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self
@@ -163,23 +140,22 @@ class SinglePlayState(BaseState):
                 # 상위 루프에서 처리
                 continue
 
-            if (ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP) and self.room_session.board.game_started:
-                self.handle_event(ev)
+            # if (ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP) and self.tetris_session.board.game_started:
+            #     self.handle_event(ev)
 
             # # 게임 시작 버튼 클릭
             # elif ev.type == pygame.MOUSEBUTTONDOWN == 1:
-            if self.btn_start and self.btn_start.handle_event(ev):
-                self.send_start()
+            self.tetris_session.handle_event(ev)
 
             if self.btn_exit.handle_event(ev):
                 self.send_delete_user()
                 
-        self.room_session.update(dt_ms)
+        self.tetris_session.update(dt_ms)
 
         return self
 
     def draw(self):
-        if self.room_session.board is None:
+        if self.tetris_session.board is None:
             return
 
         self.screen.fill((0, 0, 0))
@@ -189,8 +165,4 @@ class SinglePlayState(BaseState):
         self.btn_exit.draw()
 
         # 보드 및 미리보기/프로필/블록
-        self.room_session.board.draw()
-
-        # 게임 시작 버튼 (게임 시작 전)
-        if not self.room_session.board.game_started and self.btn_start:
-            self.btn_start.draw()
+        self.tetris_session.draw()

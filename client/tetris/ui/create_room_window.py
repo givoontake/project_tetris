@@ -54,23 +54,22 @@ class RoomCreateWindow:
         self.player_val: Optional[int] = None
         self.is_open: Optional[bool] = None
         self.password_val: Optional[str] = None
-        
-        self.visible = False
 
         self.set_layout()
 
-    # -------- 외부에서 제어 -------- #
-    def open(self):
-        self.visible = True
+    # def _reset(self):
+    #     for option in self.option_player:
+    #         option.active = False
 
-    def close(self):
-        self.visible = False
+    #     for option in self.option_open:
+    #         option.active = False
 
-    def _reset(self):
-        self.title_val = None
-        self.player_val = None
-        self.is_open = None
-        self.password_val = None
+    #     for option in self.option_make:
+    #         option.active = False
+    #     self.title_val = None
+    #     self.player_val = None
+    #     self.is_open = None
+    #     self.password_val = None
 
     # def on_resize(self, new_screen: pygame.Surface):
     #     self.screen = new_screen
@@ -202,16 +201,11 @@ class RoomCreateWindow:
 
     # -------- 프레임 업데이트 -------- #
     def update(self, dt_ms: int):
-        if not self.visible:
-            return
-        
         self.title.update(dt_ms)
         self.password.update(dt_ms)
 
     # -------- 이벤트 처리 (버튼 이벤트 반환) -------- #
-    def handle_event(self, ev: pygame.event.Event):
-        if not self.visible:
-            return None
+    def handle_event(self, ev: pygame.event.Event)-> Optional[str]:
         
         if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
             # input의 enter 키는 입력된 문자열을 반환하고 초기화
@@ -238,16 +232,15 @@ class RoomCreateWindow:
                     self.title_val = self.title.extract_text()
                     self.password_val = self.password.extract_text()
                     self._send_create_room()
-                elif option.text == "취소":
-                    pass
-                self.visible = False
-                self._reset()
 
+                # elif option.text == "취소":
+                #     pass
+
+                return option.text
+
+        return None
     # -------- 그리기 -------- #
     def draw(self):
-        if not self.visible:
-            return
-        
         self.window.draw()
 
         self.title.draw()

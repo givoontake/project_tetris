@@ -14,6 +14,7 @@ class Session:
 
     def __init__(self):
         self.id = -1
+        self.is_my = False
         self.nickname = ""
         self.win = 0
         self.lose = 0
@@ -28,6 +29,9 @@ class Session:
                 if cls._shared is None:
                     cls._shared = Session()
         return cls._shared
+    
+    def set_my_session(self):
+        self.is_my = True
 
     def load_texture(self, rm: ResourceManager):
        self.block_texture = {

@@ -41,8 +41,12 @@ class Rectangle:
         scaled_image = pygame.transform.smoothscale(new_image, (self.rect.w, self.rect.h))
         self.image = scaled_image
         
-    def set_text(self, new_text: pygame.Surface):
+    def set_text(self, new_text: str):
         self.text = new_text
+        self.font_surface = self.font.render(self.text, False, self.text_color)
+
+    def set_text_size(self, new_size: int):
+        self.font = self.fm.get_font(new_size)
         self.font_surface = self.font.render(self.text, False, self.text_color)
 
     def set_border(self, new_border_width: int): # 0이면 테두리 없음. 0보다 크면 그 두께만큼 테두리 생성
