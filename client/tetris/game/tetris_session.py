@@ -9,6 +9,7 @@ from tetris.net.packet_type import *
 from tetris.game.tetromino import Tetromino
 from tetris.game.tetris_board import TetrisBoard
 from tetris.game.tetris_controller import TetrisController
+from tetris.game.define import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
 from tetris.ui.rectangle import Rectangle
@@ -16,22 +17,34 @@ from tetris.ui.button import Button
 from tetris.ui.toggle_button import ToggleButton
 
 class TetrisSession:
-    def __init__(self, screen: pygame.Surface, board_rect: pygame.Rect, rm: ResourceManager, fm: FontManager,
-                  net_worker: NetworkWorker, session: Session, is_single: bool):
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, fm: FontManager,
+                  net_worker: NetworkWorker, is_single: bool):
         self.screen = screen
         self.rm = rm
         self.fm = fm
         self.net_worker = net_worker
-        self.session = session
+        self.session: Optional[Session] = None
         self.is_single = is_single
-        self.board = TetrisBoard(screen, board_rect, rm, fm, session)
+        self.rect = rect
         self.controller = None
-
-        if session.is_my: self.controller = TetrisController(net_worker)
+        self.state: TSessionState = TSessionState.EMPTY
         self.score = 0
+
         self.set_layout()
 
+    def init_session(self, session: Session):
+        self.session = session
+        if session.is_my: self.controller = TetrisController(self.net_worker)
+        self.board.init(session.block_texture)
+        if self.is_single: self.set_score(0)
+        self.state = TSessionState.WAIT
+        self.nickname.set_text(self.session.nickname)
+
     def set_layout(self):
+        board_rect = self.rect.copy()
+        board_rect.h = self.rect.h*0.9
+        self.board = TetrisBoard(self.screen, board_rect, self.rm, self.fm)
+
         if self.is_single:
             ready_rect = self.board.grid_rect.copy()
             ready_rect.y += ready_rect.h
@@ -48,7 +61,7 @@ class TetrisSession:
             nickname_rect = self.board.grid_rect.copy()
             nickname_rect.y += nickname_rect.h
             nickname_rect.h = nickname_rect.h*0.1
-            self.nickname = Rectangle(self.screen, nickname_rect, self.fm, None, "")
+            self.nickname = Rectangle(self.screen, nickname_rect, self.fm, None, "", 1)
 
             ready_rect = nickname_rect.copy()
             ready_rect.x += nickname_rect.w
@@ -67,8 +80,18 @@ class TetrisSession:
     def set_ready(self, ready: bool):
         self.ready.active = ready
 
+    def set_state(self, new_state: TSessionState):
+        self.state = new_state
+
+    def reset(self):
+        self.board.reset()
+        self.state = TSessionState.WAIT
+
     def clear(self):
         self.board.clear()
+        self.state = TSessionState.EMPTY
+        self.nickname.set_text("")
+        self.session = None
         if self.is_single: self.set_score(0)
         if self.controller: self.controller.clear()
 
@@ -102,7 +125,11 @@ class TetrisSession:
             self.board.add_line(data.get("hole_x"))
 
     def handle_event(self, ev: pygame.event.Event):
-        if self.board.game_started:
+        if self.session == None: return
+        if self.session.is_my == False: # 내꺼 아니면 할 필요가 없음
+            return
+        
+        if self.state == TSessionState.PLAY:
             if self.controller: self.controller.handle_event(ev)
 
         else:
@@ -125,12 +152,15 @@ class TetrisSession:
             print("[TetrisSession] send_start() error:", e)
 
     def update(self, dt_ms):
-        if self.board.game_started:
+        if self.state == TSessionState.PLAY:
             if self.controller: self.controller.update(dt_ms)
 
     def draw(self):
-        self.board.draw()
-        if self.board.game_started == False:
+        self.board.draw_frame()
+        if self.state == TSessionState.PLAY:
+            self.board.draw_game()
+
+        if self.state == TSessionState.WAIT:
             self.ready.draw()
 
         if self.is_single:

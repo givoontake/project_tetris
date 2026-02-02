@@ -4,7 +4,7 @@ import struct
 from tetris.net.packet_type import *
 from tetris.net.network import NetworkWorker
 from tetris.net.session import Session
-from tetris.states.single_play import RIGHT, LEFT, ROTATE, DOWN, DROP, UP
+from tetris.game.define import *
 
 class TetrisController:
     def __init__(self, net_worker: NetworkWorker):
@@ -80,58 +80,58 @@ class TetrisController:
         if self.left_pressed:
             if self.left_first_over == False:
                 if self.left_first_move == False:
-                    self.send_move(LEFT)
+                    self.send_move(MoveType.LEFT)
                     self.left_first_move = True
                     
                 if self.left_elapsed_time >= self.first_delay_ms:
-                    self.send_move(LEFT)
+                    self.send_move(MoveType.LEFT)
                     self.left_first_over = True
                     self.left_elapsed_time = 0
 
             else:
                 if self.left_elapsed_time >= self.delay_ms:
-                    self.send_move(LEFT)
+                    self.send_move(MoveType.LEFT)
                     self.left_elapsed_time = 0
             
 
         if self.right_pressed:
             if self.right_first_over == False:
                 if self.right_first_move == False:
-                    self.send_move(RIGHT)
+                    self.send_move(MoveType.RIGHT)
                     self.right_first_move = True
 
                 if self.right_elapsed_time >= self.first_delay_ms:
-                    self.send_move(RIGHT)
+                    self.send_move(MoveType.RIGHT)
                     self.right_first_over = True
                     self.right_elapsed_time = 0
 
             else:
                 if self.right_elapsed_time >= self.delay_ms:
-                    self.send_move(RIGHT)
+                    self.send_move(MoveType.RIGHT)
                     self.right_elapsed_time = 0
 
         # 소프트 드랍
         if self.down_pressed:
             if self.down_first_over == False:
                 if self.down_first_move == False:
-                    self.send_move(DOWN)
+                    self.send_move(MoveType.DOWN)
                     self.down_first_move = True
                 if self.down_elapsed_time >= self.first_delay_ms:
-                    self.send_move(DOWN)
+                    self.send_move(MoveType.DOWN)
                     self.down_first_over = True
                     self.down_elapsed_time = 0
 
             else:
                 if self.down_elapsed_time >= self.delay_ms:
-                    self.send_move(DOWN)
+                    self.send_move(MoveType.DOWN)
                     self.down_elapsed_time = 0
         # 하드 드랍(스페이스)
         if self.rotate_pressed:
-            self.send_move(ROTATE)
+            self.send_move(MoveType.ROTATE)
             self.rotate_pressed = False
         # 회전(위)
         if self.drop_pressed:
-            self.send_move(DROP)
+            self.send_move(MoveType.DROP)
             self.left_pressed = False
             self.right_pressed = False
             self.down_pressed = False

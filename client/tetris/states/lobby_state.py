@@ -17,6 +17,7 @@ from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
 from tetris.ui.create_room_window import RoomCreateWindow
 from tetris.states.single_play import SinglePlayState
+from tetris.states.multi_play import MultiPlayState
 from tetris.states.base_state import BaseState
 from tetris.net.packet_manager import *
 from tetris.animation.shutter_animaion import ShutterAnimation
@@ -92,11 +93,22 @@ class LobbyState(BaseState):
                 self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
 
             elif data.get("type") == S2C_ADD_OPEN_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.session, data.get("room_name"))
+                max_user = data.get("max_user")
+                if max_user == 1:
+                    return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                                           self.session, data.get("room_name"))
+                elif max_user == 2 or max_user == 5:
+                    return MultiPlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                                          self.session, data.get("room_name"), max_user)
 
             elif data.get("type") == S2C_ADD_LOCK_ROOM:
-                return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, self.session, data.get("room_name"), data.get("room_password"))
-            
+                max_user = data.get("max_user")
+                if max_user == 1:
+                    return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                                           self.session, data.get("room_name"), data.get("room_password"))
+                elif max_user == 2 or max_user == 5:
+                    return MultiPlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                                          self.session, data.get("room_name"), max_user, data.get("room_password"))
         return self
 
     def handle_event(self, ev: pygame.event.Event):

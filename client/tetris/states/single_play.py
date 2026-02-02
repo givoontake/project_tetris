@@ -14,14 +14,7 @@ from tetris.ui.button import Button
 from tetris.game.tetris_board import *
 from tetris.game.tetris_session import TetrisSession
 from tetris.states.base_state import BaseState
-from tetris.states.define_layout import *
-
-RIGHT = 0
-LEFT = 1
-ROTATE = 2 
-DOWN = 3
-DROP = 4
-UP = 5
+from tetris.states.define import *
 
 class SinglePlayState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
@@ -39,17 +32,17 @@ class SinglePlayState(BaseState):
         self.btn_exit: Optional[Button] = None
 
         self.set_layout()
-        self.clear()
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
         header_w, header_h = sw*INFO_HEADER_WIDTH, sh*INFO_HEADER_HEIGHT
-        board_w = int(sw*BOARD_WIDTH)
-        board_h = int(sh*BOARD_HEIGHT)
-        board_x = ((sw - int(board_w*0.66)) // 2)
-        board_y = header_h
-        board_rect = pygame.Rect(board_x, board_y, board_w, board_h)
-        self.tetris_session = TetrisSession(self.screen, board_rect, self.rm, self.fm, self.net_worker, self.session, True)
+        tetris_w = int(sw*BOARD_WIDTH_RATE)
+        tetris_h = int(sh*BOARD_HEIGHT_RATE)
+        tetris_x = ((sw - int(tetris_w*0.66)) // 2)
+        tetris_y = header_h
+        tetris_rect = pygame.Rect(tetris_x, tetris_y, tetris_w, tetris_h)
+        self.tetris_session = TetrisSession(self.screen, tetris_rect, self.rm, self.fm, self.net_worker, True)
+        self.tetris_session.init_session(self.session)
         # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
 
         # self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
@@ -104,10 +97,10 @@ class SinglePlayState(BaseState):
         if packet_type == S2C_START:
             # 게임이 시작되었다고 서버가 알려줌
             if data.get("is_start"):
-                self.tetris_session.board.start_game()
+                self.tetris_session.set_state(TSessionState.PLAY)
                 pygame.mixer.music.play(-1)
 
-        elif packet_type == S2C_DELETE_USER: # 사실 싱글에는 의미 없음
+        elif packet_type == S2C_DELETE_USER:
             from tetris.states.lobby_state import LobbyState
             delete_id = data.get("id")
             if delete_id == self.tetris_session.session.id:
@@ -115,7 +108,7 @@ class SinglePlayState(BaseState):
                 return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session)
 
         elif packet_type == S2C_GAMEOVER:
-            self.tetris_session.clear()
+            self.tetris_session.reset()
             pygame.mixer.music.stop()
 
         elif packet_type == S2C_UPDATE_SCORE:
