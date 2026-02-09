@@ -1,11 +1,12 @@
 import pygame
 import struct
-from typing import Optional
+from typing import Optional, cast
 
 from tetris.config.define import *
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
-from tetris.net.packet_type import *
+from tetris.net.packet_types import *
+from tetris.net.packet_structs import *
 from tetris.game.tetromino import Tetromino
 from tetris.game.tetris_board import TetrisBoard
 from tetris.game.tetris_controller import TetrisController
@@ -37,8 +38,9 @@ class TetrisSession:
         if session.is_my: self.controller = TetrisController(self.net_worker)
         self.board.init(session.block_texture)
         if self.is_single: self.set_score(0)
+        else: self.nickname.set_text(self.session.nickname)
         self.state = TSessionState.WAIT
-        self.nickname.set_text(self.session.nickname)
+
 
     def set_layout(self):
         board_rect = self.rect.copy()
@@ -95,34 +97,33 @@ class TetrisSession:
         if self.is_single: self.set_score(0)
         if self.controller: self.controller.clear()
 
-    def handle_packet(self, data: Optional[dict]):
-        packet_type = data.get("type")
-
-        if packet_type == S2C_MOVE:
-            # move_type에 따라 보드에 반영
-            move_type = data.get("move_type")
-            if move_type is not None:
-                self.board.handle_move(move_type)
+    def handle_packet(self, data: Optional[RecvPacketStruct]):
+        if data.type == S2C_MOVE:
+            move_data = cast(S2C_MOVE_PACKET, data)
+            self.board.handle_move(move_data.move_type)
             
-        elif packet_type == S2C_SPAWN:
-            # print("[SPAWN DEBUG]", ", ".join(f"{k}={v}" for k, v in data.items()))
-            self.board.current_tetromino = Tetromino(SHAPES_INDEX[data.get("tetromino_type")],data.get("spawn_x"), data.get("spawn_y"))
-            self.board.next_tetromino_shape = SHAPES_INDEX[data.get("next_tetromino_type")]
+        elif data.type == S2C_SPAWN:
+            spawn_data = cast(S2C_SPAWN_PACKET, data)
+            self.board.current_tetromino = Tetromino(SHAPES_INDEX[spawn_data.tetromino_type], spawn_data.spawn_x, spawn_data.spawn_y)
+            self.board.next_tetromino_shape = SHAPES_INDEX[spawn_data.next_tetromino_type]
 
-        elif packet_type == S2C_FIX:
+        elif data.type == S2C_FIX:
+            fix_data = cast(S2C_FIX_PACKET, data)
             if self.board.current_tetromino == None:
                 pass
             else:
-                self.board.fix(data.get("fixed_x"), data.get("fixed_y"))
+                self.board.fix(fix_data.fixed_x, fix_data.fixed_y)
 
-        elif packet_type == S2C_CLEARLINE: 
-            self.board.clear_lines(data.get("line_index"))
-            self.set_score(data.get("score"))
+        elif data.type == S2C_CLEARLINE: 
+            clearline_data = cast(S2C_CLEARLINE_PACKET, data)
+            self.board.clear_lines(clearline_data.line_index)
+            self.set_score(clearline_data.score)
 
         # 멀티용 클리어라인 패킷 추가 필요 (스코어 제거 버전)
 
-        elif packet_type == S2C_ADDLINE:
-            self.board.add_line(data.get("hole_x"))
+        elif data.type == S2C_ADDLINE:
+            addline_data = cast(S2C_ADDLINE_PACKET, data)
+            self.board.add_line(addline_data.hole_x)
 
     def handle_event(self, ev: pygame.event.Event):
         if self.session == None: return
@@ -137,14 +138,11 @@ class TetrisSession:
                 self.send_start()
 
     def send_start(self):
-        size = 2 + 1
-        type = C2S_START
-
-        packet_bytes = struct.pack(
-            "<hb",
-            size,
-            type,
-        )
+        data = C2S_START_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_START
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
 
         try:
             self.net_worker.send_packet(packet_bytes)

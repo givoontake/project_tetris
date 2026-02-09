@@ -1,9 +1,9 @@
 import pygame
 import struct
-from typing import Optional
+from typing import Optional, cast
 
 from tetris.config.define import *
-from tetris.net.packet_type import *
+from tetris.net.packet_types import *
 
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
@@ -67,48 +67,44 @@ class LobbyState(BaseState):
 
     def send_message(self, message: str): # 메세지는 가변이라 문자열 포맷을 크기만큼 만들어 직접 전송
         if len(message) == 0: return
-        type = C2S_MESSAGE
-        id = self.session.id
-        message = message.encode("utf-8")
+        data = C2S_MESSAGE_PACKET()
+        data.type = C2S_MESSAGE
+        data.id = self.session.id
+        data.message = message.encode("utf-8")
         message_bytes = len(message)
-        size = 2 + 1 + 4 + message_bytes 
+        data.size = 2 + 1 + 4 + message_bytes
+        values = self.net_worker._pm.struct_to_values(data)
 
-        packet_bytes = struct.pack(
-            f"<hbi{message_bytes}s",
-            size,
-            type,      # or C2S_LOGIN이 아니라 실제 메시지 타입 상수
-            id,
-            message
-        )
+        packet_bytes = struct.pack(data.FMT, *values)
 
         try:
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
             print("[LoginState] send_login() error:", e)
 
-    def handle_packet(self, data: dict):
+    def handle_packet(self, data: RecvPacketStruct):
         if data:
-            #print(f"LobbyState->handle_packet() recv_bytes: {data.get("size")} / recv type: {data.get("type")}")
-            if data.get("type") == S2C_MESSAGE:
-                self.chat_window.add_new_message(data.get("user_name"), data.get("message"))
+            if data.type == S2C_MESSAGE:
+                message_data = cast(S2C_MESSAGE_PACKET, data)
+                self.chat_window.add_new_message(message_data.user_name, message_data.message)
 
-            elif data.get("type") == S2C_ADD_OPEN_ROOM:
-                max_user = data.get("max_user")
-                if max_user == 1:
+            elif data.type == S2C_ADD_OPEN_ROOM:
+                open_data = cast(S2C_ADD_OPEN_ROOM_PACKET, data)
+                if open_data.max_user == 1:
                     return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, 
-                                           self.session, data.get("room_name"))
-                elif max_user == 2 or max_user == 5:
+                                           self.session, open_data.room_name)
+                elif open_data.max_user == 2 or open_data.max_user == 5:
                     return MultiPlayState(self.screen, self.rm, self.fm, self.net_worker, 
-                                          self.session, data.get("room_name"), max_user)
+                                          self.session, open_data.room_name, open_data.max_user)
 
-            elif data.get("type") == S2C_ADD_LOCK_ROOM:
-                max_user = data.get("max_user")
-                if max_user == 1:
+            elif data.type == S2C_ADD_LOCK_ROOM:
+                lock_data = cast(S2C_ADD_LOCK_ROOM_PACKET, data)
+                if lock_data.max_user == 1:
                     return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, 
-                                           self.session, data.get("room_name"), data.get("room_password"))
-                elif max_user == 2 or max_user == 5:
+                                           self.session, lock_data.room_name, lock_data.room_password)
+                elif lock_data.max_user == 2 or lock_data.max_user == 5:
                     return MultiPlayState(self.screen, self.rm, self.fm, self.net_worker, 
-                                          self.session, data.get("room_name"), max_user, data.get("room_password"))
+                                          self.session, lock_data.room_name, lock_data.max_user, lock_data.room_password)
         return self
 
     def handle_event(self, ev: pygame.event.Event):

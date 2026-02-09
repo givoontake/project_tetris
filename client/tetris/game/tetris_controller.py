@@ -1,9 +1,9 @@
 import pygame
 import struct
 
-from tetris.net.packet_type import *
 from tetris.net.network import NetworkWorker
-from tetris.net.session import Session
+from tetris.net.packet_types import *
+from tetris.net.packet_structs import C2S_MOVE_PACKET
 from tetris.game.define import *
 
 class TetrisController:
@@ -139,16 +139,12 @@ class TetrisController:
             self.drop_pressed = False
 
     def send_move(self, move_type):
-        size = 2 + 1 + 1
-        type = C2S_MOVE
-        self.move_type = move_type
-
-        packet_bytes = struct.pack(
-            "<hbb",
-            size,
-            type,
-            self.move_type
-        )
+        data = C2S_MOVE_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_MOVE
+        data.move_type = move_type
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
 
         # MOVE_NAME = {LEFT: "LEFT", RIGHT: "RIGHT", DOWN: "DOWN", DROP: "DROP", ROTATE: "ROTATE"}
         # print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(self.move_type, self.move_type))

@@ -1,19 +1,10 @@
-"""
-수신 스트림 처리 파이프라인 (내부 버퍼 보유 버전)
-- merge_packet:   recv()로 받은 조각을 내부 버퍼에 병합
-- process_packet: 내부 버퍼에서 완성된 패킷을 잘라 '스레드 세이프 큐'에 넣기만 함
-- handle_packet:  (그대로 유지) 바이너리 전체만 받고 내부에서 type 바이트를 추출해 판별
-- register_handler: 패킷 타입별 처리 콜백 등록 (세션 등 외부 상태는 콜백에서 처리)
-
-패킷 경계 판정은 'size(H, 2바이트)' 기반:
-[ size: H ][ type: B ][ payload... ]
-"""
-
 import struct
 import queue
 
 from tetris.net.define_format import *             # 포맷 문자열 모음 (MAX_* 포함)
-from tetris.net.packet_type import *    
+from tetris.net.packet_types import *    
+from tetris.net.packet_structs import *
+from tetris.net.packet_registry import *
 
 MAX_QUEUE_SIZE = 1024
 
@@ -24,61 +15,57 @@ class PacketManager:
         # 메인 스레드로 넘길 '완성 패킷' 큐 (thread-safe)
         self.queue: "queue.Queue[dict]"= queue.Queue(maxsize=MAX_QUEUE_SIZE)
 
-    def dic_to_bytes(self, data: dict) ->bytes: # 송신을 위한 데이터 변환
-        packet_bytes = bytearray()
-
-        for key, value in data.items():
-            if key not in PACK_FIELD_FMT:
-                raise KeyError(f"PACK_FIELD_FMT에 '{key}'가 정의되어 있지 않습니다.")
-            
-            fmt = PACK_FIELD_FMT[key]
-
-            # ---- 문자열(char 배열) 처리 ----
-            if fmt.endswith("s"):
-                field_size = int(fmt[:-1])  
-                val_bytes = str(value).encode("utf-8")
-                val_bytes = val_bytes[:field_size].ljust(field_size, b"\x00")
-                packet_bytes.extend(struct.pack(f"<{fmt}", val_bytes))
-
-            # ---- bool, int, short, long long 등 ----
-            elif fmt in ("b", "h", "i", "q"):
-                packet_bytes.extend(struct.pack(f"<{fmt}", int(value)))
-
-            else:
-                raise ValueError(f"지원하지 않는 포맷: {fmt} (key='{key}')")
-
-        return bytes(packet_bytes)
+    def str_to_bytes(self, s: str, array_len: int) -> bytearray:
+        return str(s).encode("utf-8")[:array_len].ljust(array_len, b"\x00")
     
-    def bytes_to_dict(self, pkt: bytes) -> dict:
+    def struct_to_values(self, data: SendPacketStruct):
+        values: list = []
+        flds = fields(data)
+        for fld in flds:
+            value = getattr(data, fld.name)
+            values.append(value)
 
-        pkt_struct = PACKET_STRUCT[pkt[2]] # 패킷 구조체(리스트)
+        return values
+
+    def struct_to_bytes(self, data: SendPacketStruct) -> bytes:
+        fmts = data.FMT 
+        flds = fields(data) # 들어온 필드의 변수 선언 순서를 따른다.
+        if len(flds) != len(fmts):
+            raise ValueError(f"필드 수와 포맷 수 불일치")
+        values: list = []
         
-        offset = 0
-        data = {}
-        for field in pkt_struct: #구조체 내 필드 명
-            fmt = PACK_FIELD_FMT[field] # 필드 명에 따른 포맷
-            field_size = FIELD_SIZE[field] # 필드 명에 따른 필드 크기
-            if field == "message": # 메세지는 가변이라 따로 로직 정의
-                message_len = len(pkt) - (2+1+4+MAX_USER_NAME)
-                fmt = f"{message_len}s"
-                field_size = message_len
+        full_fmt: str = "<"
+
+        for fld, fmt in zip(flds, fmts):
+            value = getattr(data, fld.name)
+            full_fmt += fmt
+
+            if fmt.endswith("s"):
+                length = int(fmt[:-1]) # 포맷 문자 제거 및 나머지 숫자 문자열 부분 실제 숫자로 변경
+                # lJust는 현재 문자열을 받아 length만큼 새 바이트 버퍼를 할당하고, 복사한 다음 빈 공간을 널로 채운다는 것
+                # 우선 길이 검증을 위해 바이트로 변환한 문자열을 최대 길이만큼 자른다. 부족하면 ljust(left justify) 함수에서 널로 채울 것.
+
+                bytes_str = str(value).encode("utf-8")[:length].ljust(length, b"\x00")
                 
-            value = struct.unpack_from("<" + fmt, pkt, offset)[0] 
-
-            if isinstance(value, (bytes, bytearray)):
-                # C 스타일 널 종료 문자열 기준으로 앞부분만 사용
-                raw = value.split(b"\x00", 1)[0] # 문자열에 null(\x00)이 들어가면 터져버림
-                decoded = raw.decode("utf-8", errors="ignore")
-                data[field] = decoded
-
+                values.append(bytes_str)
+            elif fmt in ("b", "h", "i", "q"):
+                values.append(int(value))
             else:
-                # 숫자/불리언 등은 그대로 저장
-                data[field] = value
+                raise ValueError(f"지원하지 않는 포맷: {fmt}")
+            
+        return struct.pack(full_fmt, *values) # * 연산자는 리스트를 풀어 각 값을 위치 인자로 전달한다 *[1,2] -> 1, 2
 
-            offset += field_size
 
-        print(f"{data.get("size")} / recv type: {PRINT_TYPE[data.get("type")]}")
-        return dict(data)
+    def bytes_to_struct(self, pkt: bytes) -> RecvPacketStruct:
+        pkt_type = pkt[2]
+        struct_name = PACKET_REGISTRY[pkt_type]
+        packet_struct = struct_name()
+
+        bytes_data = struct.unpack(struct_name.FMT, pkt)
+        packet_struct.fill_data(bytes_data)
+
+        return packet_struct
+    
     # ---- 병합 단계 ----
     def merge_packet(self, pkt: bytes) -> None:
         """TCP로 받은 조각(chunk)을 내부 버퍼에 병합."""
@@ -109,7 +96,7 @@ class PacketManager:
             pkt_bytes = bytes(buf[offset:offset + size])
 
             # 스레드 세이프 큐에 적재 (꽉 차면 최신성 보존을 위해 가장 오래된 것을 드롭)
-            data = self.bytes_to_dict(pkt_bytes)
+            data = self.bytes_to_struct(pkt_bytes)
             
             while True:
                 try:
@@ -124,9 +111,6 @@ class PacketManager:
         if offset:
             del buf[:offset]
             #buf = buf[offset:]
-
-    def handle_packet(self, pkt_bytes: bytes) -> None:
-        pkt_type = pkt_bytes[2]  # type 바이트(3번째)
 
         
     

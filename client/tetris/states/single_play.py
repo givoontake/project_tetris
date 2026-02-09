@@ -1,12 +1,14 @@
 import pygame
 import struct
-from typing import Optional
+from typing import Optional, cast
 
 from tetris.config.define import *
-from tetris.net.packet_type import *
+from tetris.net.packet_types import *
 
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
+from tetris.net.packet_types import *
+from tetris.net.packet_structs import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
 
@@ -76,14 +78,11 @@ class SinglePlayState(BaseState):
         self.tetris_session.handle_event(ev)
 
     def send_delete_user(self):
-        size = 2 + 1
-        type = C2S_DELETE_USER
-
-        packet_bytes = struct.pack(
-            "<hb",
-            size,
-            type,
-        )
+        data = C2S_DELETE_USER_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_DELETE_USER
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
 
         try:
             self.net_worker.send_packet(packet_bytes)
@@ -91,32 +90,30 @@ class SinglePlayState(BaseState):
             print("[SinglePlayState] send_delete_user() error:", e)
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
-    def handle_packet(self, data: Optional[dict]):
-        packet_type = data.get("type")
-
-        if packet_type == S2C_START:
-            # 게임이 시작되었다고 서버가 알려줌
-            if data.get("is_start"):
+    def handle_packet(self, data: RecvPacketStruct):
+        if data.type == S2C_START:
+            start_data = cast(S2C_START_PACKET, data)
+            if start_data.is_start:
                 self.tetris_session.set_state(TSessionState.PLAY)
                 pygame.mixer.music.play(-1)
 
-        elif packet_type == S2C_DELETE_USER:
+        elif data.type == S2C_DELETE_USER:
             from tetris.states.lobby_state import LobbyState
-            delete_id = data.get("id")
-            if delete_id == self.tetris_session.session.id:
+            delete_user = cast(S2C_DELETE_USER_PACKET, data)
+            if delete_user.id == self.tetris_session.session.id:
                 pygame.mixer.music.stop()
                 return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session)
 
-        elif packet_type == S2C_GAMEOVER:
+        elif data.type == S2C_GAMEOVER:
             self.tetris_session.reset()
             pygame.mixer.music.stop()
 
-        elif packet_type == S2C_UPDATE_SCORE:
-            self.tetris_session.session.max_score = data.get("max_score")
+        elif data.type == S2C_UPDATE_SCORE:
+            update_score = cast(S2C_UPDATE_SCORE_PACKET, data)
+            self.tetris_session.session.max_score = update_score.max_score
 
         else:
-            if self.tetris_session.session.id == data.get("id"):
-                self.tetris_session.handle_packet(data)
+            self.tetris_session.handle_packet(data)
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
         return self

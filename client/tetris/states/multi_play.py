@@ -3,7 +3,7 @@ import struct
 from typing import Optional
 
 from tetris.config.define import *
-from tetris.net.packet_type import *
+from tetris.net.packet_types import *
 
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker

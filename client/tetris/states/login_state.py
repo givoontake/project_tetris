@@ -1,13 +1,14 @@
 import pygame
 import struct
-from typing import Optional
+from typing import Optional, cast
 
 from tetris.config.define import *
 from tetris.net.define_format import *
-from tetris.net.packet_type import *
+from tetris.net.packet_types import *
 
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
+from tetris.net.packet_structs import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
 
@@ -68,39 +69,37 @@ class LoginState(BaseState):
         self.btn_login = Button(self.screen, btn_rect, self.rm, self.fm, button_image, "로그인", True)
 
     def send_login(self, id: str, pw: str):
-        data = {
-            "size": 2 + 1 + MAX_USER_ID + MAX_USER_PASSWORD,
-            "type": C2S_LOGIN,
-            "user_id": id,
-            "user_password": pw
-        }
+        data = C2S_LOGIN_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_LOGIN
+        data.user_id = self.net_worker._pm.str_to_bytes(id, MAX_USER_ID)
+        data.user_password = self.net_worker._pm.str_to_bytes(pw, MAX_USER_PASSWORD)
+        values = self.net_worker._pm.struct_to_values(data)
+        packet = struct.pack(data.FMT, *values)
+
         try:
-            self.net_worker.send_packet(self.net_worker._pm.dic_to_bytes(data))
+            self.net_worker.send_packet(packet)
             self.active_loading = True
         except Exception as e:
             print("[LoginState] send_login error:", e)
 
-    def handle_packet(self, data: Optional[dict]):
+    def handle_packet(self, data: Optional[RecvPacketStruct]):
         if data:
             # print(", ".join(f"{k}: {v}" for k, v in data.items()))
-            if data.get("type") == S2C_LOGIN:
-                if data.get("id") == -1:
+            if data.type == S2C_LOGIN:
+                login_data = cast(S2C_LOGIN_PACKET, data) # 코드 작성시 불편함을 줄이기 위한 힌트용, 논리적으로는 맞으므로 굳이 할 필요는 없음
+                if login_data.id == -1:
                     self.popup2.visible = True
                 
                 else:
-                    id = data.get("id")
+                    id = login_data.id
                     self.session.id = id
-                    nickname = data.get("user_name")
-                    self.session.nickname = nickname
-                    win = data.get("win_count")
-                    self.session.win = win
-                    lose = data.get("lose_count")
-                    self.session.lose = lose
-                    max_score = data.get("max_score")
-                    self.session.max_score = max_score
+                    self.session.nickname = login_data.user_name
+                    self.session.win = login_data.win_count
+                    self.session.lose = login_data.lose_count
+                    self.session.max_score = login_data.max_score
 
                     self.session.load_texture(self.rm)
-                    print(f"id={id}, nickname={nickname}, win={win}, lose={lose}")
                     return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session, is_animation=True)
             
             return self

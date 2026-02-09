@@ -143,36 +143,27 @@ class RoomCreateWindow:
         if self.is_open == None: return
         if self.is_open == False: 
             if self.password_val == None: return
-        id = self.my_session.id
-        encoded_title = self.title_val.encode("utf-8")
-        
+
+        title = self.net_worker._pm.str_to_bytes(self.title_val, MAX_ROOM_NAME)
         if self.is_open:
-            size = 2+1+4+1+MAX_ROOM_NAME
-            type = C2S_ADD_OPEN_ROOM
-            packet_bytes = struct.pack(
-                f"<hbib{MAX_ROOM_NAME}s",
-                size,
-                type,
-                id,
-                int(self.player_val),
-                encoded_title
-            )
+            data = C2S_ADD_OPEN_ROOM_PACKET()
+            data.size = struct.calcsize(data.FMT)
+            data.type = C2S_ADD_OPEN_ROOM
+            data.id = self.my_session.id
+            data.max_user = self.player_val
+            data.room_name = title
 
         else:
-            size = 2+1+4+1+MAX_ROOM_NAME + MAX_ROOM_PASSWORD
-            type = C2S_ADD_LOCK_ROOM
-            encoded_password = self.password_val.encode("utf-8")           
-
-            packet_bytes = struct.pack(
-                f"<hbib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s",
-                size,
-                type,
-                id,
-                int(self.player_val),
-                encoded_title,
-                encoded_password
-            )
+            data = C2S_ADD_LOCK_ROOM_PACKET()
+            data.size = struct.calcsize(data.FMT)
+            data.type = C2S_ADD_LOCK_ROOM
+            data.id = self.my_session.id
+            data.max_user = self.player_val
+            data.room_name = title
+            data.room_password = self.net_worker._pm.str_to_bytes(self.password_val, MAX_ROOM_PASSWORD)
             
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
         try:
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
