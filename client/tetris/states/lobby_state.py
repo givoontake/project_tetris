@@ -9,6 +9,7 @@ from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
 from tetris.resources.resource_manager import *
 from tetris.resources.font_manager import *
+from tetris.resources.define_colors import *
 
 from tetris.ui.button import Button
 from tetris.ui.inputbox import InputBox
@@ -16,8 +17,8 @@ from tetris.ui.room_list import RoomList
 from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
 from tetris.ui.create_room_window import RoomCreateWindow
-from tetris.states.single_play import SinglePlayState
-from tetris.states.multi_play import MultiPlayState
+from tetris.states.single_play_state import SinglePlayState
+from tetris.states.multi_play_state import MultiPlayState
 from tetris.states.base_state import BaseState
 from tetris.net.packet_manager import *
 from tetris.animation.shutter_animaion import ShutterAnimation

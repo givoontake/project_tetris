@@ -2,6 +2,7 @@ import pygame
 from typing import Optional
 
 from tetris.resources.font_manager import FontManager
+from tetris.resources.define_colors import *
 from tetris.config.define import *
 
 PLACEHOLDER = (100, 100, 100)

@@ -6,6 +6,7 @@ from tetris.config.define import *
 from tetris.ui.rectangle import Rectangle
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
+from tetris.resources.define_colors import *
 from tetris.models.dataclass import RoomData
 
 # 행 하나(방 하나)를 표현하는 뷰-오브젝트

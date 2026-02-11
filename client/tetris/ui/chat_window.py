@@ -1,6 +1,7 @@
 import pygame
 from tetris.config.define import *
 from tetris.resources.font_manager import FontManager
+from tetris.resources.define_colors import *
 
 CHAT_WINDOW_WIDTH = 1000
 CHAT_WINDOW_HEIGHT = 250

@@ -1,6 +1,7 @@
 import pygame
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import *
+from tetris.resources.define_colors import *
 from tetris.config.define import *
 
 class Rectangle:

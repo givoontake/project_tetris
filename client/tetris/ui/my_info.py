@@ -2,6 +2,7 @@ import pygame
 from tetris.config.define import *
 from tetris.net.session import Session
 from tetris.resources.font_manager import FontManager
+from tetris.resources.define_colors import *
 
 class Profile:
     def __init__(self, screen: pygame.Surface, rect: pygame.Rect, fm: FontManager, session: Session):

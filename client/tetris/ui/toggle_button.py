@@ -1,6 +1,7 @@
 from tetris.net.define_format import *
 from tetris.resources.resource_manager import *
 from tetris.resources.font_manager import FontManager
+from tetris.resources.define_colors import *
 from tetris.ui.rectangle import Rectangle
 
 class ToggleButton(Rectangle):

@@ -1,14 +1,15 @@
 from tetris.config.define import *
+from tetris.resources.define_colors import *
 
 FALLBACK_COLORS = {
-    'I': (0, 240, 240),
-    'J': (0, 0, 240),
-    'L': (240, 160, 0),
-    'O': (240, 240, 0),
-    'S': (0, 240, 0),
-    'T': (160, 0, 240),
-    'Z': (240, 0, 0),
-    'G': GRAY
+    'I': CYAN,
+    'J': BLUE,
+    'L': ORANGE,
+    'O': YELLOW,
+    'S': GREEN,
+    'T': PURPLE,
+    'Z': RED,
+    'G': GRAY,
 }
 
 

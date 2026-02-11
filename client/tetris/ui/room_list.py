@@ -7,6 +7,7 @@ from tetris.ui.rectangle import Rectangle
 from tetris.ui.room_info import RoomInfo
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.font_manager import FontManager
+from tetris.resources.define_colors import *
 class RoomList:
     VISIBLE_ROOM = 8
     BACKGROUND_1 = GRAY
