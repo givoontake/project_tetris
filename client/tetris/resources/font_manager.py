@@ -6,6 +6,7 @@ MAX_SIZE = 50
 
 RECTANGLE_FONT_SIZE = 30
 POPUPBOX_FONT_SIZE = 40
+COMBO_FONT_SIZE = 40
 class FontManager:
     def __init__(self):
         self.fonts: dict[int, Optional[pygame.font.Font]] = {}

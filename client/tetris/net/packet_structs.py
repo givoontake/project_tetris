@@ -186,9 +186,10 @@ class S2C_CLEARLINE_PACKET(RecvPacketStruct):
     type: int = -1
     id: int = -1
     line_index: int = -1
+    combo: int = -1
     score: int = -1
 
-    FMT: ClassVar[str] = "<hbibi"
+    FMT: ClassVar[str] = "<hbibbi"
 
 
 @dataclass

@@ -30,6 +30,7 @@ class TetrisSession:
         self.controller = None
         self.state: TSessionState = TSessionState.EMPTY
         self.score = 0
+        self.prev_packet_type = None # clearline 1번 재생을 위한 변수
 
         self.set_layout()
 
@@ -41,14 +42,13 @@ class TetrisSession:
         else: self.nickname.set_text(self.session.nickname)
         self.state = TSessionState.WAIT
 
-
     def set_layout(self):
         board_rect = self.rect.copy()
         board_rect.h = self.rect.h*0.9
         self.board = TetrisBoard(self.screen, board_rect, self.rm, self.fm)
 
         if self.is_single:
-            ready_rect = self.board.grid_rect.copy()
+            ready_rect = self.board.valid_grid_rect.copy()
             ready_rect.y += ready_rect.h
             ready_rect.h = ready_rect.h*0.1
             self.ready = Button(self.screen, ready_rect, self.rm, self.fm, None, "게임시작")
@@ -60,7 +60,7 @@ class TetrisSession:
             self.score_box = Rectangle(self.screen, score_rect, self.fm, None, score_text, 1)
             self.score_box.set_text_size(24)
         else:
-            nickname_rect = self.board.grid_rect.copy()
+            nickname_rect = self.board.valid_grid_rect.copy()
             nickname_rect.y += nickname_rect.h
             nickname_rect.h = nickname_rect.h*0.1
             self.nickname = Rectangle(self.screen, nickname_rect, self.fm, None, "", 1)
@@ -108,6 +108,7 @@ class TetrisSession:
             self.board.next_tetromino_shape = SHAPES_INDEX[spawn_data.next_tetromino_type]
 
         elif data.type == S2C_FIX:
+            self.prev_packet_type = data.type # 서버는 clearline 전에 반드시 fix를 보냄. 그 점을 이용해 clearline 비교에 사용
             fix_data = cast(S2C_FIX_PACKET, data)
             if self.board.current_tetromino == None:
                 pass
@@ -118,6 +119,9 @@ class TetrisSession:
             clearline_data = cast(S2C_CLEARLINE_PACKET, data)
             self.board.clear_lines(clearline_data.line_index)
             self.set_score(clearline_data.score)
+            if self.prev_packet_type != S2C_CLEARLINE: # 애니메이션 1번 재생 -> 서버는 clearline을 여러번 연속해서 보내는 점을 이용
+                self.prev_packet_type = data.type
+                self.board.animate_combo(clearline_data.line_index, clearline_data.combo)
 
         # 멀티용 클리어라인 패킷 추가 필요 (스코어 제거 버전)
 
@@ -152,11 +156,13 @@ class TetrisSession:
     def update(self, dt_ms):
         if self.state == TSessionState.PLAY:
             if self.controller: self.controller.update(dt_ms)
+            self.board.update(dt_ms)
 
     def draw(self):
         self.board.draw_frame()
         if self.state == TSessionState.PLAY:
             self.board.draw_game()
+            self.board.draw_combo()
 
         if self.state == TSessionState.WAIT:
             self.ready.draw()

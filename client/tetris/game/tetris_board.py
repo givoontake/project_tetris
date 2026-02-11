@@ -1,16 +1,14 @@
 import pygame
 from typing import Optional
 
+from tetris.animation.combo_animation import ComboAnimation
 from tetris.config.define import *
-from tetris.net.session import Session
-from tetris.ui.my_info import Profile
 from tetris.game.tetromino import Tetromino
 from tetris.game.define import *
 from tetris.resources.resource_manager import *
 from tetris.resources.font_manager import FontManager
+from tetris.resources.define_colors import *
 from tetris.ui.rectangle import Rectangle
-from tetris.ui.button import Button
-from tetris.ui.toggle_button import ToggleButton
 
 # -------------------- 싱글 플레이 보드 --------------------
 class TetrisBoard:
@@ -45,6 +43,9 @@ class TetrisBoard:
         self.current_tetromino: Optional[Tetromino] = None
         self.next_tetromino_shape: Optional[str] = None
 
+        # self.combo = 0
+        self.combo_effects: Optional[list[ComboAnimation]] = []
+
         self.set_layout()
 
     def init(self, new_texture: Optional[dict]):
@@ -64,7 +65,8 @@ class TetrisBoard:
         draw_y = self.rect.y + HIDDEN_ROWS*self.cell_length
         draw_w = self.cell_length*self.cols
         draw_h = self.cell_length*VALID_ROWS
-        self.grid_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.valid_grid_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+        self.full_grid_rect = pygame.Rect(self.rect.x, self.rect.y, draw_w, self.cell_length*BOARD_ROWS)
 
         # profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         # self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
@@ -112,6 +114,12 @@ class TetrisBoard:
         del self.grid[row_index]
         self.grid.insert(0, [None for _ in range(self.cols)])
         self.rm.clearline_sound.play()
+
+    def animate_combo(self, row_index: int, combo: int):
+        draw_x = self.full_grid_rect.x
+        draw_y = self.full_grid_rect.y + self.cell_length*row_index
+        make_combo = ComboAnimation(self.screen, self.fm, combo, draw_x, draw_y)
+        self.combo_effects.append(make_combo)
 
     def add_line(self, hole_x: int):
         new_line = ['G' for _ in range(BOARD_COLS)]
@@ -170,11 +178,15 @@ class TetrisBoard:
         self._clear_board()
         self.current_tetromino = None
         self.next_tetromino_shape = None
+        self.combo = 0
+        self.combo_effects = []
 
     def clear(self):
         self._clear_board()
         self.current_tetromino = None
         self.next_tetromino_shape = None
+        self.combo = 0
+        self.combo_effects = []
         self.set_texture(None)
 
     # ------------ 서버 move_type에 대응하는 진입점 ------------ #
@@ -193,6 +205,11 @@ class TetrisBoard:
         elif move_type == MoveType.UP:
             self.move(0, -1)
 
+    def update(self, dt_ms: int):
+        for effect in self.combo_effects:
+            effect.update(dt_ms)
+
+        self.combo_effects = [effect for effect in self.combo_effects if effect.active] # 리스트 컴프리헨션으로 조건에 맞는 새 리스트 생성
     # ------------ 렌더링 ------------ #
     def draw_board_frame(self):
         """보드 전체 테두리."""
@@ -306,5 +323,9 @@ class TetrisBoard:
     def draw_game(self):
         self.draw_cells()
         self.draw_landing_blocks()
+
+    def draw_combo(self):
+        for effect in self.combo_effects:
+            effect.draw()
 
 
