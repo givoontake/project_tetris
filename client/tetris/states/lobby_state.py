@@ -13,6 +13,7 @@ from tetris.resources.define_colors import *
 
 from tetris.ui.button import Button
 from tetris.ui.inputbox import InputBox
+from tetris.ui.popupbox import PopupBox
 from tetris.ui.room_list import RoomList
 from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
@@ -42,6 +43,9 @@ class LobbyState(BaseState):
         # self.reactable_screen = LOBBY
         self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
+
+        self.reactable = True
+        self.exit_popup = None
     
         self.set_layout()
 
@@ -81,7 +85,20 @@ class LobbyState(BaseState):
         try:
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
-            print("[LoginState] send_login() error:", e)
+            print("[LobbyState] send_message() error:", e)
+
+    def send_disconnect(self):
+        data = C2S_DISCONNECT_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_DISCONNECT
+        values = self.net_worker._pm.struct_to_values(data)
+
+        packet_bytes = struct.pack(data.FMT, *values)
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[LobbyState] send_disconnect() error:", e)
 
     def handle_packet(self, data: RecvPacketStruct):
         if data:
@@ -114,7 +131,7 @@ class LobbyState(BaseState):
             raise SystemExit
         
         event = None
-        if self.room_create_window == None:
+        if self.reactable:
             for menu in self.top_menus:
                 if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
                     event = menu.idle.text
@@ -123,8 +140,14 @@ class LobbyState(BaseState):
             if event is not None:
                 if event == "방만들기":
                     self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.session)
+                    self.reactable = False
                     
                 # 나중에 메뉴별 상태 만들고 동작 추가
+                elif event == "게임종료":
+                    popup_texts = ["게임종료", "계속하기"]
+                    self.exit_popup = PopupBox(self.screen, self.rm, self.fm, "종료하시겠습니까?", popup_texts)
+                    self.reactable = False
+
                 return
 
             event = self.room_list.handle_event(ev)
@@ -138,9 +161,20 @@ class LobbyState(BaseState):
                 self.send_message(message)
 
         else:
-            str = self.room_create_window.handle_event(ev)
-            if str == "만들기" or str == "취소":
-                self.room_create_window = None
+            if self.room_create_window:
+                str = self.room_create_window.handle_event(ev)
+                if str == "만들기" or str == "취소":
+                    self.room_create_window = None
+                    self.reactable = True
+            elif self.exit_popup:
+                str2 = self.exit_popup.handle_event(ev)
+                if str2 == "게임종료":
+                    self.send_disconnect()
+                    pygame.quit()
+                    raise SystemExit
+                elif str2 == "계속하기":
+                    self.exit_popup = None
+                    self.reactable = True
 
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 
@@ -169,4 +203,5 @@ class LobbyState(BaseState):
         self.my_info_rect.draw()
 
         if self.room_create_window: self.room_create_window.draw()
+        if self.exit_popup: self.exit_popup.draw()
         if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()

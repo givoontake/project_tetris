@@ -63,7 +63,6 @@ struct C2S_TEST_PACKET {
 struct C2S_DISCONNECT_PACKET {
 	short size;
 	char type;
-	int id;
 };
 
 struct S2C_DISCONNECT_PACKET {

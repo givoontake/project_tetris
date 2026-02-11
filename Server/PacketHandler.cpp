@@ -99,8 +99,7 @@ void PacketHandler::HandlePacket(char* packet, int user_index)
 	}
 		
 	case C2S_DISCONNECT: { 
-		C2S_DISCONNECT_PACKET* recv_p = reinterpret_cast<C2S_DISCONNECT_PACKET*>(packet);
-		server->Disconnect(recv_p->id);
+		server->Disconnect(user_index);
 		break;
 	}
 

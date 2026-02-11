@@ -63,12 +63,10 @@ class S2C_MESSAGE_PACKET(RecvPacketStruct):
 
     FMT: ClassVar[str] = f"<hbi{MAX_USER_NAME}s{MAX_CHAT_BYTES}s"
 
-
 @dataclass
 class S2C_DISCONNECT_PACKET(RecvPacketStruct):
     size: int = -1
     type: int = -1
-    id: int = -1
 
     FMT: ClassVar[str] = "<hbi"
 
@@ -258,9 +256,8 @@ class C2S_MESSAGE_PACKET(SendPacketStruct):
 class C2S_DISCONNECT_PACKET(SendPacketStruct):
     size: int = -1
     type: int = -1
-    id: int = -1
 
-    FMT: ClassVar[str] = "<hbi"
+    FMT: ClassVar[str] = "<hb"
 
 
 @dataclass
