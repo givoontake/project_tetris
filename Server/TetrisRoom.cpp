@@ -302,8 +302,9 @@ void TetrisRoom::BuildBroadcastData(RoomSession& r_session, std::vector<TaskType
 			r_session.GetTetris().CheckGameover();
 
 			std::vector<char> index_lines = r_session.GetTetris().ClearLine();
+			CalculateScore(r_session, index_lines.size());
 			if (!index_lines.empty()) {
-				r_session.SetScore(r_session.GetScore() + (CLEAR_LINE_SCORE * index_lines.size() * index_lines.size()));
+				//r_session.SetScore(r_session.GetScore() + (CLEAR_LINE_SCORE * index_lines.size() * index_lines.size()));
 				for (int i = 0; i < index_lines.size(); i++) {
 					S2C_CLEARLINE_PACKET clear_line_p;
 					clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
@@ -311,6 +312,7 @@ void TetrisRoom::BuildBroadcastData(RoomSession& r_session, std::vector<TaskType
 					clear_line_p.id = r_session.GetSession()->GetId();
 					clear_line_p.score = r_session.GetScore();
 					clear_line_p.line_index = index_lines[i];
+					clear_line_p.combo = r_session.GetCombo();
 					r_session.AddToSendBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.size);
 				}
 			}
@@ -549,6 +551,36 @@ void TetrisRoom::ReduceTimeouts(int type, RoomSession& r_session)
 	default:
 		break;
 	}
+}
+
+void TetrisRoom::CalculateScore(RoomSession& r_session, int clear_line_count)
+{
+	int added_score = 0;
+	switch (clear_line_count) {
+	case 0:
+		r_session.SetCombo(0);
+		return;
+
+		break;
+	case 1:
+		added_score = 100;
+		break;
+	case 2:
+		added_score = 300;
+		break;
+	case 3:
+		added_score = 500;
+		break;
+	case 4:
+		added_score = 800;
+		break;
+	default:
+		break;
+	}
+	int combo = r_session.GetCombo();
+	r_session.SetCombo(combo + 1);
+	added_score += combo * (added_score / 10);
+	r_session.SetScore(r_session.GetScore() + added_score);
 }
 
 void TetrisRoom::MakeMovePacketData(RoomSession& r_session, int move_type)

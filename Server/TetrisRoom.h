@@ -99,6 +99,7 @@ public:
 	//bool CheckInputTick(RoomSession& r_session);
 	void ReduceTimeouts(int type, RoomSession& r_session);
 	//void SendToSelf(char* packet, Session* session);
+	void CalculateScore(RoomSession& r_session, int clear_line_count);
 
 	void MakeMovePacketData(RoomSession& r_session, int move_type);
 	void ClearEventsInTick();

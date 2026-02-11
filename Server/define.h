@@ -209,6 +209,7 @@ struct S2C_CLEARLINE_PACKET {
 	char type;
 	int id;
 	char line_index;
+	char combo;
 	int score;
 	// 클리어될 줄의 인덱스 수에 따라 뒤에 가변으로 붙여 보낸다.
 };
@@ -236,7 +237,6 @@ struct S2C_GAMEEND_PACKET {
 struct S2C_UPDATE_SCORE_PACKET {
 	short size;
 	char type;
-	int id;
 	int max_score;
 };
 #pragma pack(pop)

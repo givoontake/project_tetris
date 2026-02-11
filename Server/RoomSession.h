@@ -18,6 +18,7 @@ class RoomSession
 	int tetromino_index = 0;
 
 	int score = 0;
+	int combo = 0;
 
 public:
 	RoomSession();
@@ -29,9 +30,11 @@ public:
 	int GetTetrominoIndex() const { return tetromino_index; }
 	void AddTetrominoIndex() { ++tetromino_index; }
 	int GetScore() const { return score; }
+	int GetCombo() const { return combo; }
 
 	void SetRoomUserState(ROOM_USER_STATE new_state) { return r_user_state.Store(new_state); }
 	void SetScore(int val) { score = val; }	
+	void SetCombo(int val) { combo = val; }
 
 	void InitSession(Session* s);
 	void ClearSession();
