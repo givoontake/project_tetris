@@ -18,7 +18,7 @@ class GameLoop:
         # 초기 화면 생성
         w = int(BASE_SCREEN_WIDTH * INITIAL_SCALE)
         h = int(BASE_SCREEN_HEIGHT * INITIAL_SCALE)
-        self.screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode((w, h))
         pygame.display.set_caption("Tetris")
         pygame.key.start_text_input()
 
@@ -45,10 +45,10 @@ class GameLoop:
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 raise SystemExit
-            if ev.type == pygame.VIDEORESIZE:
-                self.screen = pygame.display.set_mode((ev.w, ev.h), pygame.RESIZABLE)
-                if hasattr(self.state, "on_resize"):
-                    self.state.on_resize(ev.w, ev.h, self.screen)
+            # if ev.type == pygame.VIDEORESIZE:
+            #     self.screen = pygame.display.set_mode((ev.w, ev.h))
+            #     if hasattr(self.state, "on_resize"):
+            #         self.state.on_resize(ev.w, ev.h, self.screen)
 
         return events
     
