@@ -10,7 +10,7 @@ class PopupBox:
                  message: str, buttons_text: list[str]):
         self.screen = screen
         self.message = message
-        self.visible = False
+        #self.visible = False
         self.buttons_text = buttons_text
         self.buttons: list[Button] = []
         self.message_window: Rectangle = None
@@ -63,29 +63,30 @@ class PopupBox:
             button_rect = pygame.Rect(draw_x + i*btn_w, btn_y, btn_w, btn_h)
             self.buttons.append(Button(self.screen, button_rect, self.rm, self.fm, None, self.buttons_text[i], True))
 
-    def handle_event(self, events: list[pygame.event.Event])-> Optional[str]: # 어떤 버튼이 눌렸는가
+    # def set_visible(self, value: bool):
+    #     self.visible = value
+
+    def handle_event(self, ev: pygame.event.Event)-> Optional[str]: # 어떤 버튼이 눌렸는가
         """
         - ESC 키로 닫힘
         - 각 버튼 클릭 시 닫힘
         """
-        if not self.visible:
-            return
+        # if not self.visible:
+        #     return
 
-        for ev in events:
-            # ESC로 닫기
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-                return "esc"
+        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+            return "esc"
 
-            # 버튼 이벤트 처리
-            for button in self.buttons:
-                if(button.handle_event(ev)):
-                    return button.idle.text
+        # 버튼 이벤트 처리
+        for button in self.buttons:
+            if(button.handle_event(ev)):
+                return button.idle.text
                 
         return None
 
     def draw(self):
-        if not self.visible:
-            return
+        # if not self.visible:
+        #     return
 
         sw, sh = self.screen.get_size()
 

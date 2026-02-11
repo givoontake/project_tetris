@@ -27,12 +27,15 @@ class LoginState(BaseState):
         self.id_label: Optional[LabelFrame] = None
         self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
-        self.popup: PopupBox = PopupBox(screen, rm, fm, "서버와의 연결이 원활하지 않습니다.", ["재시도", "종료"])
-        self.popup2: PopupBox = PopupBox(screen, rm, fm, "아이디 또는 비밀번호를 확인하세요.", ["재시도", "종료"])
+        self.reactable = True
+        self.fail_connect_popup = None
+        self.fail_login_popup = None
         self.set_layout()
 
     def connect(self):
-        if not self.net_worker.connect_to_server(): self.popup.visible = True
+        if not self.net_worker.connect_to_server():
+            self.fail_connect_popup = PopupBox(self.screen, self.rm, self.fm, "서버와의 연결이 원활하지 않습니다.", ["재시도", "종료"])
+            self.reactable = False
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
@@ -89,7 +92,8 @@ class LoginState(BaseState):
             if data.type == S2C_LOGIN:
                 login_data = cast(S2C_LOGIN_PACKET, data) # 코드 작성시 불편함을 줄이기 위한 힌트용, 논리적으로는 맞으므로 굳이 할 필요는 없음
                 if login_data.id == -1:
-                    self.popup2.visible = True
+                    self.fail_login_popup = PopupBox(self.screen, self.rm, self.fm, "아이디 또는 비밀번호를 확인하세요.", ["재시도", "종료"])
+                    self.reactable = False
                 
                 else:
                     id = login_data.id
@@ -109,41 +113,62 @@ class LoginState(BaseState):
         if ev.type == pygame.QUIT:
             pygame.quit(); raise SystemExit
         
-        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
-            id = self.id_label.input_box.handle_event(ev)
-            pw = self.pw_label.input_box.handle_event(ev)
-            self.send_login(id, pw)
-            return
-        
-        else:
-            self.id_label.input_box.handle_event(ev)
-            self.pw_label.input_box.handle_event(ev)
+        if self.reactable:
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
+                id = self.id_label.input_box.handle_event(ev)
+                pw = self.pw_label.input_box.handle_event(ev)
+                self.send_login(id, pw)
+                return
             
-        if self.btn_login.handle_event(ev):
-            id = self.id_label.input_box.extract_text()
-            pw = self.pw_label.input_box.extract_text()
-            self.send_login(id, pw)
+            else:
+                self.id_label.input_box.handle_event(ev)
+                self.pw_label.input_box.handle_event(ev)
+                
+            if self.btn_login.handle_event(ev):
+                id = self.id_label.input_box.extract_text()
+                pw = self.pw_label.input_box.extract_text()
+                self.send_login(id, pw)
+
+        else:
+            if self.fail_connect_popup:
+                str = self.fail_connect_popup.handle_event(ev)
+
+                if str == "재시도": 
+                    self.fail_connect_popup = None
+                    self.reactable = True
+                    self.connect()
+
+                elif str == "종료": pygame.quit(); raise SystemExit
+
+            elif self.fail_login_popup:
+                str2 = self.fail_login_popup.handle_event(ev)
+
+                if str2 == "재시도": 
+                    self.fail_login_popup = None
+                    self.reactable = True
+
+                elif str2 == "종료": pygame.quit(); raise SystemExit
 
     def update(self, dt_ms, events):
-        if self.popup.visible:
-            btn_name = self.popup.handle_event(events)
-            if btn_name == "재시도":
-                self.popup.visible = False
-                self.connect()
-            elif btn_name == "종료":
-                pygame.quit(); raise SystemExit
+        # if self.fail_connect_popup.visible:
+        #     btn_name = self.fail_connect_popup.handle_event(events)
+        #     if btn_name == "재시도":
+        #         self.fail_connect_popup.visible = False
+        #         self.connect()
+        #     elif btn_name == "종료":
+        #         pygame.quit(); raise SystemExit
 
-            return self  # 로그인 UI는 건드리지도 않음
+        #     return self  # 로그인 UI는 건드리지도 않음
         
-        if self.popup2.visible:
-            btn_name = self.popup2.handle_event(events)
-            if btn_name == "재시도":
-                self.popup2.visible = False
-                self.connect()
-            elif btn_name == "종료":
-                pygame.quit(); raise SystemExit
+        # if self.fail_login_popup.visible:
+        #     btn_name = self.fail_login_popup.handle_event(events)
+        #     if btn_name == "재시도":
+        #         self.fail_login_popup.visible = False
+        #         self.connect()
+        #     elif btn_name == "종료":
+        #         pygame.quit(); raise SystemExit
 
-            return self  # 로그인 UI는 건드리지도 않음
+        #     return self  # 로그인 UI는 건드리지도 않음
         
         for ev in events:
             self.handle_event(ev)
@@ -161,8 +186,8 @@ class LoginState(BaseState):
         self.id_label.draw()
         self.pw_label.draw()
         self.btn_login.draw()
-        if self.popup.visible:
-            self.popup.draw()
-        if self.popup2.visible:
-            self.popup2.draw()
+        if self.fail_connect_popup:
+            self.fail_connect_popup.draw()
+        if self.fail_login_popup:
+            self.fail_login_popup.draw()
 
