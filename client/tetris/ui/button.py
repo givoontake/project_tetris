@@ -2,7 +2,8 @@ import pygame
 
 from tetris.config.define import *
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import *
+from tetris.resources.fonts import *
+from tetris.resources.define import *
 from tetris.resources.define_colors import *
 from tetris.ui.rectangle import Rectangle
 
@@ -11,29 +12,27 @@ class Button:
         screen: pygame.Surface,
         rect: pygame.Rect, 
         rm: ResourceManager,
-        fm: FontManager,
         image: pygame.Surface = None, 
         text: str = "", 
         react: bool = True
     ):
         self.rm = rm
-        self.fm = fm
         self.react = react
         self.hovered = False
         self.pressed = False
         self.pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
         self.hover_sound_printed = False
-        self.idle = Rectangle(screen, rect, fm, image, text)
+        self.idle = Rectangle(screen, rect, rm, image, text)
         if image == None:
             self.hover = None
             self.press = None
         else: 
 
-            hover_rect = self._set_rect_scale(self.idle.rect, self.rm.HOVER_SCALE)
-            press_rect = self._set_rect_scale(self.idle.rect, self.rm.PRESS_SCALE)
+            hover_rect = self._set_rect_scale(self.idle.rect, self.rm.images.HOVER_SCALE)
+            press_rect = self._set_rect_scale(self.idle.rect, self.rm.images.PRESS_SCALE)
 
-            self.hover = Rectangle(screen, hover_rect, self.fm, image, text)
-            self.press = Rectangle(screen, press_rect, self.fm, image, text)
+            self.hover = Rectangle(screen, hover_rect, self.rm, image, text)
+            self.press = Rectangle(screen, press_rect, self.rm, image, text)
 
     def _set_rect_scale(self, rect: pygame.Rect, scale: float) -> pygame.Rect:
         if scale < 0.1 or scale > 1.1:
@@ -57,14 +56,14 @@ class Button:
             if self.hovered:
                 if self.hover_sound_printed == False:
                     self.hover_sound_printed = True
-                    self.rm.button_sound_hover.play()
+                    self.rm.sounds.sound_effects[EFFECT_BUTTON_HOVER].play()
             else: self.hover_sound_printed = False
 
         elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             if self.idle.rect.collidepoint(ev.pos):
                 self.pressed = True
                 self.pressed_inside = True
-                self.rm.button_sound_press.play()
+                self.rm.sounds.sound_effects[EFFECT_BUTTON_PRESS].play()
             else:
                 self.pressed = False
                 self.pressed_inside = False

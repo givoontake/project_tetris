@@ -10,7 +10,7 @@ from tetris.net.network import NetworkWorker
 from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import FontManager
+from tetris.resources.fonts import Fonts
 
 from tetris.ui.button import Button
 from tetris.game.tetris_board import *
@@ -19,9 +19,9 @@ from tetris.states.base_state import BaseState
 from tetris.states.define import *
 
 class SinglePlayState(BaseState):
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager,
                   net_worker: NetworkWorker, session: Session, room_title: str, room_password: str = None):
-        super().__init__(screen, rm, fm, net_worker, session)
+        super().__init__(screen, rm, net_worker, session)
         self.title = room_title
         self.password = room_password
 
@@ -43,7 +43,7 @@ class SinglePlayState(BaseState):
         tetris_x = ((sw - int(tetris_w*0.66)) // 2)
         tetris_y = header_h
         tetris_rect = pygame.Rect(tetris_x, tetris_y, tetris_w, tetris_h)
-        self.tetris_session = TetrisSession(self.screen, tetris_rect, self.rm, self.fm, self.net_worker, True)
+        self.tetris_session = TetrisSession(self.screen, tetris_rect, self.rm, self.net_worker, True)
         self.tetris_session.init_session(self.session)
         # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
 
@@ -53,7 +53,7 @@ class SinglePlayState(BaseState):
         draw_x, draw_y = 0, 0
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
-        self.title_box = Rectangle(self.screen, title_rect, self.fm, None, title)
+        self.title_box = Rectangle(self.screen, title_rect, self.rm, None, title)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -61,7 +61,7 @@ class SinglePlayState(BaseState):
             pw_val = "비밀번호: 없음"
         else:
             pw_val = f"비밀번호: {self.password}"
-        self.password_box = Rectangle(self.screen, password_rect, self.fm, None, pw_val)
+        self.password_box = Rectangle(self.screen, password_rect, self.rm, None, pw_val)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -69,7 +69,7 @@ class SinglePlayState(BaseState):
         draw_w = MENU_WIDTH
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.btn_exit = Button(self.screen, exit_rect, self.rm, self.fm, None, "나가기")
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
 
     def clear(self):
         self.tetris_session.clear()
@@ -102,7 +102,7 @@ class SinglePlayState(BaseState):
             delete_user = cast(S2C_DELETE_USER_PACKET, data)
             if delete_user.id == self.tetris_session.session.id:
                 pygame.mixer.music.stop()
-                return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session)
+                return LobbyState(self.screen, self.rm, self.net_worker, self.session)
 
         elif data.type == S2C_GAMEOVER:
             self.tetris_session.reset()

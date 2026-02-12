@@ -6,22 +6,21 @@ from tetris.config.define import *
 from tetris.ui.rectangle import Rectangle
 from tetris.ui.room_info import RoomInfo
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import FontManager
+from tetris.resources.fonts import Fonts
 from tetris.resources.define_colors import *
 class RoomList:
     VISIBLE_ROOM = 8
     BACKGROUND_1 = GRAY
     BACKGROUND_2 = DARK_GRAY
 
-    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, fm: FontManager):
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager):
         self.screen = screen
         self.rect = rect
         self.rm = rm
-        self.fm = fm
-        self.background = Rectangle(screen, rect, fm, None, "")
+        self.background = Rectangle(screen, rect, rm, None, "")
         header_rect = rect.copy()
         header_rect.h = rect.h / 8
-        self.header = RoomInfo(screen, header_rect, rm, fm, RoomData(), BLACK, False)
+        self.header = RoomInfo(screen, header_rect, rm, RoomData(), BLACK, False)
         self.base_room_rect = header_rect.copy()
         self.base_room_rect.y += header_rect.h
         self.rooms: list[RoomInfo] = []

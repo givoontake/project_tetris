@@ -8,8 +8,9 @@ from tetris.net.packet_types import *
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
 from tetris.resources.resource_manager import *
-from tetris.resources.font_manager import *
+from tetris.resources.fonts import *
 from tetris.resources.define_colors import *
+from tetris.resources.define import *
 
 from tetris.ui.button import Button
 from tetris.ui.inputbox import InputBox
@@ -28,16 +29,16 @@ MENU_WIDTH = 200
 MENU_HEIGHT = 100
 
 class LobbyState(BaseState):
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager,
                  net_worker: NetworkWorker, session: Session, is_animation: bool = False):
-        super().__init__(screen, rm, fm, net_worker, session)
+        super().__init__(screen, rm, net_worker, session)
         self.top_menus: list[Button] = []
-        self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm, fm)
+        self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm)
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
-        self.chat_input_box = InputBox(screen, input_box_rect, self.fm,
+        self.chat_input_box = InputBox(screen, input_box_rect, self.rm,
                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
         self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), self.chat_input_box.font)
-        self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), fm, session)
+        self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), rm, session)
 
         self.room_create_window = None
         # self.reactable_screen = LOBBY
@@ -54,15 +55,16 @@ class LobbyState(BaseState):
 
     def set_layout(self):
         draw_x, draw_y = 50, 0
-        logo_w, logo_h = self.rm.logo.get_size()
+        logo_img = self.rm.images.ui_images[UI_LOGO]
+        logo_w, logo_h = logo_img.get_size()
         logo_rect = pygame.Rect(draw_x, draw_y, logo_w, logo_h)
-        logo = Button(self.screen, logo_rect, self.rm, self.fm, self.rm.logo, "", False)
+        logo = Button(self.screen, logo_rect, self.rm, logo_img, "", False)
         self.top_menus.append(logo)
         draw_x += logo_rect.w
         menu_texts: list[str] = ["빠른시작", "방만들기", "상점", "설정", "", "게임종료"]
         for menu_text in menu_texts:
             menu_rect = pygame.Rect(draw_x, draw_y, MENU_WIDTH, MENU_HEIGHT) 
-            menu = Button(self.screen, menu_rect, self.rm, self.fm, None, menu_text, True)
+            menu = Button(self.screen, menu_rect, self.rm, None, menu_text, True)
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
 
@@ -109,19 +111,19 @@ class LobbyState(BaseState):
             elif data.type == S2C_ADD_OPEN_ROOM:
                 open_data = cast(S2C_ADD_OPEN_ROOM_PACKET, data)
                 if open_data.max_user == 1:
-                    return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                    return SinglePlayState(self.screen, self.rm, self.net_worker, 
                                            self.session, open_data.room_name)
                 elif open_data.max_user == 2 or open_data.max_user == 5:
-                    return MultiPlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                    return MultiPlayState(self.screen, self.rm, self.net_worker, 
                                           self.session, open_data.room_name, open_data.max_user)
 
             elif data.type == S2C_ADD_LOCK_ROOM:
                 lock_data = cast(S2C_ADD_LOCK_ROOM_PACKET, data)
                 if lock_data.max_user == 1:
-                    return SinglePlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                    return SinglePlayState(self.screen, self.rm, self.net_worker, 
                                            self.session, lock_data.room_name, lock_data.room_password)
                 elif lock_data.max_user == 2 or lock_data.max_user == 5:
-                    return MultiPlayState(self.screen, self.rm, self.fm, self.net_worker, 
+                    return MultiPlayState(self.screen, self.rm, self.net_worker, 
                                           self.session, lock_data.room_name, lock_data.max_user, lock_data.room_password)
         return self
 
@@ -139,13 +141,13 @@ class LobbyState(BaseState):
 
             if event is not None:
                 if event == "방만들기":
-                    self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.fm, self.net_worker, self.session)
+                    self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.net_worker, self.session)
                     self.reactable = False
                     
                 # 나중에 메뉴별 상태 만들고 동작 추가
                 elif event == "게임종료":
                     popup_texts = ["게임종료", "계속하기"]
-                    self.exit_popup = PopupBox(self.screen, self.rm, self.fm, "종료하시겠습니까?", popup_texts)
+                    self.exit_popup = PopupBox(self.screen, self.rm, "종료하시겠습니까?", popup_texts)
                     self.reactable = False
 
                 return

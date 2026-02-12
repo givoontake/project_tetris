@@ -1,19 +1,19 @@
 import pygame
 from tetris.config.define import *
 from tetris.net.session import Session
-from tetris.resources.font_manager import FontManager
+from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 
 class Profile:
-    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, fm: FontManager, session: Session):
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, session: Session):
         self.screen = screen
         self.rect = rect
         self.my_session = session
 
         # 폰트 설정
-        self.font_nickname = fm.load_font(40)
-        self.font_stat = fm.load_font(30)
-        self.font_max_score = fm.load_font(30)
+        self.font_nickname = rm.fonts.load_font(40)
+        self.font_stat = rm.fonts.load_font(30)
+        self.font_max_score = rm.fonts.load_font(30)
 
         self.text_color = WHITE
         self.padding = 20  # 닉네임과 승/패 간 간격

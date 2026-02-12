@@ -10,20 +10,18 @@ from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
 from tetris.net.packet_structs import *
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import FontManager
+from tetris.resources.define import *
 
 from tetris.ui.button import Button
-from tetris.ui.inputbox import InputBox
 from tetris.ui.popupbox import PopupBox
 from tetris.states.lobby_state import LobbyState
 from tetris.states.base_state import BaseState
 from tetris.ui.label_frame import LabelFrame
 
 class LoginState(BaseState):
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager, net_worker: NetworkWorker, session: Session):
-        super().__init__(screen, rm, fm, net_worker, session)
-        self.fm = fm
-        self.background_image = self.rm.shutter_image
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, session: Session):
+        super().__init__(screen, rm, net_worker, session)
+        self.background_image = self.rm.images.ui_images[UI_SHUTTER]
         self.id_label: Optional[LabelFrame] = None
         self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
@@ -34,7 +32,7 @@ class LoginState(BaseState):
 
     def connect(self):
         if not self.net_worker.connect_to_server():
-            self.fail_connect_popup = PopupBox(self.screen, self.rm, self.fm, "서버와의 연결이 원활하지 않습니다.", ["재시도", "종료"])
+            self.fail_connect_popup = PopupBox(self.screen, self.rm, "서버와의 연결이 원활하지 않습니다.", ["재시도", "종료"])
             self.reactable = False
 
     def set_layout(self):
@@ -44,9 +42,9 @@ class LoginState(BaseState):
         ADJUST_SCALE_Y = 0.7
         
         label_w, label_h = 400, 100
-        label_image = self.rm.scale_image(self.rm.login_label_frame, label_w, label_h)
+        label_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_LOGIN_LABEL_FRAME], label_w, label_h)
         button_w, button_h = 200, 100
-        button_image = self.rm.scale_image(self.rm.login_button, button_w, button_h)
+        button_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_LOGIN_BUTTON], button_w, button_h)
         adjust_x = (1-ADJUST_SCALE_X)*label_w
         adjust_y = (1-ADJUST_SCALE_Y)*label_h
         input_box_w, input_box_h = label_w - adjust_x*2, label_h - adjust_y*2
@@ -59,17 +57,17 @@ class LoginState(BaseState):
 
         id_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
         id_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
-        self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, self.fm, "아이디", MAX_INPUT, False, False)
+        self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, self.rm, "아이디", MAX_INPUT, False, False)
 
         draw_y += label_h
         pw_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
         pw_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
-        self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, self.fm, "비밀번호", MAX_INPUT, True, False)
+        self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, self.rm, "비밀번호", MAX_INPUT, True, False)
 
         draw_x += (label_w - button_w) // 2
         draw_y += label_h + (button_h // 2)
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
-        self.btn_login = Button(self.screen, btn_rect, self.rm, self.fm, button_image, "로그인", True)
+        self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인", True)
 
     def send_login(self, id: str, pw: str):
         data = C2S_LOGIN_PACKET()
@@ -92,7 +90,7 @@ class LoginState(BaseState):
             if data.type == S2C_LOGIN:
                 login_data = cast(S2C_LOGIN_PACKET, data) # 코드 작성시 불편함을 줄이기 위한 힌트용, 논리적으로는 맞으므로 굳이 할 필요는 없음
                 if login_data.id == -1:
-                    self.fail_login_popup = PopupBox(self.screen, self.rm, self.fm, "아이디 또는 비밀번호를 확인하세요.", ["재시도", "종료"])
+                    self.fail_login_popup = PopupBox(self.screen, self.rm, "아이디 또는 비밀번호를 확인하세요.", ["재시도", "종료"])
                     self.reactable = False
                 
                 else:
@@ -104,7 +102,7 @@ class LoginState(BaseState):
                     self.session.max_score = login_data.max_score
 
                     self.session.load_texture(self.rm)
-                    return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session, is_animation=True)
+                    return LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True)
             
             return self
         

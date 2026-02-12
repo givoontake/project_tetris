@@ -1,7 +1,7 @@
 import pygame
 from typing import Optional
 
-from tetris.resources.font_manager import FontManager
+from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 from tetris.config.define import *
 
@@ -12,7 +12,7 @@ class InputBox:
         self,
         screen: pygame.Surface,
         rect: pygame.Rect,
-        fm: FontManager,
+        rm: ResourceManager,
         placeholder: str = "",
         max_input_len: int | None = None,  # optional과 같음
         is_password: bool = False,
@@ -20,7 +20,7 @@ class InputBox:
     ):
         self.screen = screen
         self.rect = rect
-        self.fm = fm
+        self.rm = rm
         self.placeholder = placeholder
         self.text_h = int(rect.h*0.8)
         self.text = ""
@@ -31,7 +31,7 @@ class InputBox:
         self.max_input_len = max_input_len
         self.padding = int(self.text_h / 2)
         self.color = GRAY
-        self.font = self.fm.get_font(self.text_h)
+        self.font = self.rm.fonts.get_font(self.text_h)
 
         # 커서 점멸
         self.cursor_visible = True
@@ -65,11 +65,6 @@ class InputBox:
         self._reset_text()
         self._reset_cursor()
         return text
-    
-    def get_text_px(self, text: str) -> int:
-        """현재 폰트로 렌더링했을 때 text의 가로 픽셀 길이를 반환한다."""
-        width, _ = self.font.size(text)
-        return width
 
     def add_char(self, ch: str):
         if not self.active:

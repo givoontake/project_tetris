@@ -1,6 +1,6 @@
 import pygame
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import *
+from tetris.resources.fonts import *
 from tetris.resources.define_colors import *
 from tetris.config.define import *
 
@@ -8,15 +8,15 @@ class Rectangle:
     def __init__(self, 
         screen: pygame.Surface,
         rect: pygame.Rect, 
-        fm: FontManager,
+        rm: ResourceManager,
         image: pygame.Surface = None, 
         text: str = "", 
         border_width = 0
         ):
         self.screen = screen
         self.rect = rect
-        self.fm = fm
-        self.font = fm.get_font(RECTANGLE_FONT_SIZE)
+        self.rm = rm
+        self.font = rm.fonts.get_font(RECTANGLE_FONT_SIZE)
         self.image = None
         if image is not None: 
             self.set_image(image)
@@ -41,13 +41,17 @@ class Rectangle:
     def set_image(self, new_image: pygame.Surface):
         scaled_image = pygame.transform.smoothscale(new_image, (self.rect.w, self.rect.h))
         self.image = scaled_image
+
+    def set_font(self, new_font: pygame.font.Font):
+        self.font = new_font
+        self.font_surface = self.font.render(self.text, False, self.text_color)
         
     def set_text(self, new_text: str):
         self.text = new_text
         self.font_surface = self.font.render(self.text, False, self.text_color)
 
     def set_text_size(self, new_size: int):
-        self.font = self.fm.get_font(new_size)
+        self.font = self.rm.fonts.get_font(new_size)
         self.font_surface = self.font.render(self.text, False, self.text_color)
 
     def set_border(self, new_border_width: int): # 0이면 테두리 없음. 0보다 크면 그 두께만큼 테두리 생성

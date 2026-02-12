@@ -1,6 +1,6 @@
 import pygame
 from tetris.config.define import *
-from tetris.resources.font_manager import FontManager
+from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 
 CHAT_WINDOW_WIDTH = 1000
@@ -56,6 +56,11 @@ class ChatWindow:
         self.show_start = 0
         self.show_end = 0
 
+    def get_text_px(self, text: str) -> int:
+        """현재 폰트로 렌더링했을 때 text의 가로 픽셀 길이를 반환한다."""
+        width, _ = self.font.size(text)
+        return width
+
     def set_show_lines(self) -> int:
         lines = self.window_h // self.line_height
         if lines < 1:
@@ -87,7 +92,7 @@ class ChatWindow:
                 prev_offset = offset
                 offset += OPTIMIZED_OFFSET
 
-                part_px = self.chat_input_boxget_text_px(remain[:offset])
+                part_px = self.get_text_px(remain[:offset])
                 if part_px > self.window_w:
                     # 넘었으면 이전 offset으로 되돌리고 세밀 탐색으로 이동
                     offset = prev_offset
@@ -278,6 +283,6 @@ class ChatWindow:
 
         draw_text_y = self.window_y
         for i in range(self.show_start, self.show_end):
-            text_surf = self.font.render(self.texts[i], True, WHITE)
+            text_surf = self.rm.render(self.texts[i], True, WHITE)
             self.screen.blit(text_surf, (self.window_x, draw_text_y))
             draw_text_y += self.line_height

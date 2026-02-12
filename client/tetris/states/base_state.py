@@ -2,13 +2,11 @@ import pygame
 from tetris.resources.resource_manager import ResourceManager
 from tetris.net.network import NetworkWorker
 from tetris.net.session import Session
-from tetris.resources.font_manager import FontManager
 
 class BaseState:
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager, net_worker: NetworkWorker, session: Session):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, session: Session):
         self.screen = screen
         self.rm = rm
-        self.fm = fm
         self.net_worker = net_worker
         self.session = session
 

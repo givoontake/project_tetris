@@ -5,7 +5,7 @@ from tetris.ui.inputbox import InputBox
 from tetris.config.define import *
 from tetris.net.define_format import *
 from tetris.resources.resource_manager import *
-from tetris.resources.font_manager import FontManager
+from tetris.resources.fonts import Fonts
 from tetris.ui.rectangle import Rectangle
 from tetris.net.network import NetworkWorker
 from tetris.net.session import Session
@@ -32,10 +32,9 @@ class RoomCreateWindow:
     LEFT_PADDING = 20
     RIGHT_PADDING = 20
 
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager, net_worker: NetworkWorker, my_session: Session):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session):
         self.screen = screen
         self.rm = rm
-        self.fm = fm
         self.net_worker = net_worker
         self.my_session = my_session
         self.rect = pygame.Rect(0, 0, 0, 0)
@@ -77,8 +76,6 @@ class RoomCreateWindow:
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
-        # background_rect = pygame.Rect(0, 0, sw, sh)
-        # self.background = Rectangle(self.screen, background_rect, self.fm, None, "")
         
         self.rect.w = sw // 2
         self.rect.h = sh // 2
@@ -88,7 +85,7 @@ class RoomCreateWindow:
         outline_padding_h = self.rect.h // 10
         inner_padding_w = self.rect.w // 20 # 5%
         inner_padding_h = self.rect.h // 20
-        self.window = Rectangle(self.screen, self.rect, self.fm, None, "")
+        self.window = Rectangle(self.screen, self.rect, self.rm, None, "")
         # 각 h은 전체 줄수와 관련이 있다.
 
         # copy_rect = pygame.Rect(0, 0, 0, 0) # copy로 여러 복사본을 만들기 위해 값 복사용 rect 생성
@@ -99,14 +96,14 @@ class RoomCreateWindow:
         
         draw_w = self.rect.w - outline_padding_w*2
         title_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.title = InputBox(self.screen, title_rect, self.fm, "방 제목", MAX_INPUT, False, True)
+        self.title = InputBox(self.screen, title_rect, self.rm, "방 제목", MAX_INPUT, False, True)
         draw_y += draw_h + inner_padding_h
 
         op_player_texts = ["1인", "2인", "5인"]
         draw_w = (self.rect.w - (outline_padding_w*2 + inner_padding_w*(len(op_player_texts) - 1))) // len(op_player_texts)
         for op_text in op_player_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-            option = ToggleButton(self.screen, op_rect, self.rm, self.fm, None, op_text)
+            option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
             self.option_player.append(option)
             draw_x += (draw_w + inner_padding_w)
         draw_x = self.rect.x + outline_padding_w
@@ -117,7 +114,7 @@ class RoomCreateWindow:
         
         for op_text in op_open_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-            option = ToggleButton(self.screen, op_rect, self.rm, self.fm, None, op_text)
+            option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
             self.option_open.append(option)
             draw_x += (draw_w + inner_padding_w)
         draw_x = self.rect.x + outline_padding_w
@@ -125,7 +122,7 @@ class RoomCreateWindow:
 
         draw_w = self.rect.w - outline_padding_w*2
         pw_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.password = InputBox(self.screen, pw_rect, self.fm, "비밀번호", MAX_INPUT, False, True)
+        self.password = InputBox(self.screen, pw_rect, self.rm, "비밀번호", MAX_INPUT, False, True)
         draw_y += draw_h + inner_padding_h
 
         op_make_texts = ["만들기", "취소"]
@@ -133,7 +130,7 @@ class RoomCreateWindow:
         
         for op_text in op_make_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-            option = ToggleButton(self.screen, op_rect, self.rm, self.fm, None, op_text)
+            option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
             self.option_make.append(option)
             draw_x += (draw_w + inner_padding_w)
 

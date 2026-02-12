@@ -2,12 +2,11 @@ import pygame
 
 from tetris.ui.button import Button
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import *
+from tetris.resources.fonts import *
 from tetris.ui.rectangle import Rectangle
 
 class PopupBox:
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
-                 message: str, buttons_text: list[str]):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, message: str, buttons_text: list[str]):
         self.screen = screen
         self.message = message
         #self.visible = False
@@ -16,7 +15,6 @@ class PopupBox:
         self.message_window: Rectangle = None
         self.popup_window: Rectangle = None
         self.rm = rm
-        self.fm = fm
 
         # 색 / 스타일
         # self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
@@ -25,7 +23,7 @@ class PopupBox:
         # self.border_thickness = 2
 
         # 폰트 (기존 폰트와 동일 계열)
-        self.font_msg = self.fm.get_font(POPUPBOX_FONT_SIZE)
+        self.font_msg = self.rm.fonts.get_font(POPUPBOX_FONT_SIZE)
 
         # 레이아웃 계산
         self.set_layout()
@@ -43,15 +41,15 @@ class PopupBox:
         win_x = (sw - win_w) // 2
         win_y = (sh - win_h) // 2
         win_rect = pygame.Rect(win_x, win_y, win_w, win_h)
-        self.popup_window = Rectangle(self.screen, win_rect, self.fm, None, "")
+        self.popup_window = Rectangle(self.screen, win_rect, self.rm, None, "")
         
         msg_x = win_x
         msg_y = win_y
         msg_w = win_w
         msg_h = (win_h * 2) // 3
         msg_rect = pygame.Rect(msg_x, msg_y, msg_w, msg_h)
-        self.message_window = Rectangle(self.screen, msg_rect, self.fm, None, self.message)
-        self.message_window.fm.get_font(POPUPBOX_FONT_SIZE)
+        self.message_window = Rectangle(self.screen, msg_rect, self.rm, None, self.message)
+        self.message_window.set_font(self.rm.fonts.get_font(POPUPBOX_FONT_SIZE))
 
         btn_h = win_h // 3
         btn_w = win_w // len(self.buttons_text)
@@ -61,7 +59,7 @@ class PopupBox:
         draw_x = btn_x
         for i in range(len(self.buttons_text)):
             button_rect = pygame.Rect(draw_x + i*btn_w, btn_y, btn_w, btn_h)
-            self.buttons.append(Button(self.screen, button_rect, self.rm, self.fm, None, self.buttons_text[i], True))
+            self.buttons.append(Button(self.screen, button_rect, self.rm, None, self.buttons_text[i], True))
 
     # def set_visible(self, value: bool):
     #     self.visible = value

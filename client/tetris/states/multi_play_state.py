@@ -8,7 +8,7 @@ from tetris.net.packet_types import *
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import FontManager
+from tetris.resources.fonts import Fonts
 
 from tetris.ui.button import Button
 from tetris.game.tetris_board import *
@@ -17,9 +17,9 @@ from tetris.states.base_state import BaseState
 from tetris.states.define import *
 
 class MultiPlayState(BaseState):
-    def __init__(self, screen: pygame.Surface, rm: ResourceManager, fm: FontManager,
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager,
                   net_worker: NetworkWorker, session: Session, room_title: str, max_player: int, room_password: str = None):
-        super().__init__(screen, rm, fm, net_worker, session)
+        super().__init__(screen, rm, net_worker, session)
         self.title = room_title
         self.password = room_password
         self.max_player = max_player
@@ -53,13 +53,13 @@ class MultiPlayState(BaseState):
         tetris_x = (sw // 2) - (padding_w // 2) - tetris_w
         tetris_y = header_h
         tetris_rect1 = pygame.Rect(tetris_x, tetris_y, tetris_w, tetris_h)
-        tetris_player1 = TetrisSession(self.screen, tetris_rect1, self.rm, self.fm, self.net_worker, False)
+        tetris_player1 = TetrisSession(self.screen, tetris_rect1, self.rm, self.net_worker, False)
         tetris_player1.init_session(self.session)
         self.players.append(tetris_player1)
 
         tetris_rect2 = tetris_rect1.copy()
         tetris_rect2.x = (sw // 2) + (padding_w // 2)
-        tetris_player2 = TetrisSession(self.screen, tetris_rect2, self.rm, self.fm, self.net_worker, False)
+        tetris_player2 = TetrisSession(self.screen, tetris_rect2, self.rm, self.net_worker, False)
         self.players.append(tetris_player2)
         # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
 
@@ -69,7 +69,7 @@ class MultiPlayState(BaseState):
         draw_x, draw_y = 0, 0
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
-        self.title_box = Rectangle(self.screen, title_rect, self.fm, None, title)
+        self.title_box = Rectangle(self.screen, title_rect, None, title)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -77,7 +77,7 @@ class MultiPlayState(BaseState):
             pw_val = "비밀번호: 없음"
         else:
             pw_val = f"비밀번호: {self.password}"
-        self.password_box = Rectangle(self.screen, password_rect, self.fm, None, pw_val)
+        self.password_box = Rectangle(self.screen, password_rect, None, pw_val)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -85,7 +85,7 @@ class MultiPlayState(BaseState):
         draw_w = MENU_WIDTH
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.btn_exit = Button(self.screen, exit_rect, self.rm, self.fm, None, "나가기")
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
 
     def add_user(self, session: Session):
         for player in self.players:
@@ -151,7 +151,7 @@ class MultiPlayState(BaseState):
                 if delete_id == player.session.id:
                     if player.session.is_my:     
                         pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 플레이하면 안되니까
-                        return LobbyState(self.screen, self.rm, self.fm, self.net_worker, self.session)
+                        return LobbyState(self.screen, self.rm, self.net_worker, self.session)
                     else:
                         player.clear()
                         player.nickname.set_text("")

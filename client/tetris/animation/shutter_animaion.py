@@ -1,13 +1,14 @@
 import pygame
 from tetris.resources.resource_manager import ResourceManager
+from tetris.resources.define import *
 from tetris.config.define import *
 
 class ShutterAnimation:
-    def __init__(self, screen: pygame.surface, rm: ResourceManager):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         self.screen = screen
         self.rm = rm
-        self.shutter_image = self.rm.shutter_image
-        self.shutter_sound = self.rm.shutter_sound
+        self.shutter_image = self.rm.images.ui_images[UI_SHUTTER]
+        self.shutter_sound = self.rm.sounds.sound_effects[EFFECT_SHUTTER]
         self.x = 0
         self.y = 0
         self.dy = 0
@@ -20,7 +21,7 @@ class ShutterAnimation:
 
     def start_animation(self):
         self.is_active = True
-        self.rm.shutter_sound.play()
+        self.shutter_sound.play()
 
     def update(self, dt_ms):
         if self.is_active == False: return

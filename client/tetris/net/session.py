@@ -35,14 +35,14 @@ class Session:
 
     def load_texture(self, rm: ResourceManager):
        self.block_texture = {
-        'Z': rm.block_images[DEFAULT_RED],      
-        'L': rm.block_images[DEFAULT_ORANGE],  
-        'O': rm.block_images[DEFAULT_YELLOW],
-        'S': rm.block_images[DEFAULT_GREEN], 
-        'J': rm.block_images[DEFAULT_BLUE],   
-        'I': rm.block_images[DEFAULT_INDIGO],  
-        'T': rm.block_images[DEFAULT_PURPLE],
-        'G': rm.block_images[DEFAULT_GRAY],
+        'Z': rm.images.block_images[DEFAULT_RED],      
+        'L': rm.images.block_images[DEFAULT_ORANGE],  
+        'O': rm.images.block_images[DEFAULT_YELLOW],
+        'S': rm.images.block_images[DEFAULT_GREEN], 
+        'J': rm.images.block_images[DEFAULT_BLUE],   
+        'I': rm.images.block_images[DEFAULT_INDIGO],  
+        'T': rm.images.block_images[DEFAULT_PURPLE],
+        'G': rm.images.block_images[DEFAULT_GRAY],
     }
 
     # def set_id(self, new_id: int):

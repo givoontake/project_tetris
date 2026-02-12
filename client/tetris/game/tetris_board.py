@@ -6,7 +6,7 @@ from tetris.config.define import *
 from tetris.game.tetromino import Tetromino
 from tetris.game.define import *
 from tetris.resources.resource_manager import *
-from tetris.resources.font_manager import FontManager
+from tetris.resources.define import *
 from tetris.resources.define_colors import *
 from tetris.ui.rectangle import Rectangle
 
@@ -20,12 +20,10 @@ class TetrisBoard:
         screen: pygame.Surface,
         rect: pygame.Rect,
         rm: ResourceManager,
-        fm: FontManager
     ):
         self.screen = screen
         self.rect = rect
         self.rm = rm
-        self.fm = fm
         self.block_texture = None
         # self.is_single = is_single
         self.score = None # 싱글용
@@ -75,26 +73,26 @@ class TetrisBoard:
         draw_w = self.cell_length*PREVIEW_COLS
         draw_h = draw_w
         self.preview_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.preview_box = Rectangle(self.screen, self.preview_rect, self.fm, None, "", 1)
+        self.preview_box = Rectangle(self.screen, self.preview_rect, self.rm, None, "", 1)
 
     def set_texture(self, new_texture: Optional[dict]):
         if new_texture == None:
             self.block_texture = {
-            'Z': self.rm.block_images[DEFAULT_RED],      
-            'L': self.rm.block_images[DEFAULT_ORANGE],  
-            'O': self.rm.block_images[DEFAULT_YELLOW],
-            'S': self.rm.block_images[DEFAULT_GREEN], 
-            'J': self.rm.block_images[DEFAULT_BLUE],   
-            'I': self.rm.block_images[DEFAULT_INDIGO],  
-            'T': self.rm.block_images[DEFAULT_PURPLE],
-            'G': self.rm.block_images[DEFAULT_GRAY]
+            'Z': self.rm.images.block_images[DEFAULT_RED],      
+            'L': self.rm.images.block_images[DEFAULT_ORANGE],  
+            'O': self.rm.images.block_images[DEFAULT_YELLOW],
+            'S': self.rm.images.block_images[DEFAULT_GREEN], 
+            'J': self.rm.images.block_images[DEFAULT_BLUE],   
+            'I': self.rm.images.block_images[DEFAULT_INDIGO],  
+            'T': self.rm.images.block_images[DEFAULT_PURPLE],
+            'G': self.rm.images.block_images[DEFAULT_GRAY]
         }
         else: self.block_texture = new_texture
         self._set_texture_size(self.cell_length)
 
     def _set_texture_size(self, size: int):
         for key, texture in self.block_texture.items():
-            self.block_texture[key] = self.rm.scale_image(texture, size, size)
+            self.block_texture[key] = self.rm.images.scale_image(texture, size, size)
 
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
     def fix(self, fix_x, fix_y):
@@ -107,18 +105,18 @@ class TetrisBoard:
         for x, y in self.current_tetromino.blocks:
             self.grid[y][x] = self.current_tetromino.shape_key
 
-        self.rm.fix_sound.play()
+        self.rm.sounds.sound_effects[EFFECT_FIX].play()
         self.current_tetromino = None
 
     def clear_lines(self, row_index: int):
         del self.grid[row_index]
         self.grid.insert(0, [None for _ in range(self.cols)])
-        self.rm.clearline_sound.play()
+        self.rm.sounds.sound_effects[EFFECT_CLEARLINE].play()
 
     def animate_combo(self, row_index: int, combo: int):
         draw_x = self.full_grid_rect.x
         draw_y = self.full_grid_rect.y + self.cell_length*row_index
-        make_combo = ComboAnimation(self.screen, self.fm, combo, draw_x, draw_y)
+        make_combo = ComboAnimation(self.screen, self.rm, combo, draw_x, draw_y)
         self.combo_effects.append(make_combo)
 
     def add_line(self, hole_x: int):
@@ -126,7 +124,7 @@ class TetrisBoard:
         new_line[hole_x] = None
         self.grid.append(new_line)
         del self.grid[0]
-        self.rm.addline_sound.play()
+        self.rm.sounds.sound_effects[EFFECT_ADDLINE].play()
 
     # ------------ 로컬 이동/회전/하드드랍 (델타 기반) ------------ #
     def move(self, dx: int, dy: int):
@@ -136,7 +134,7 @@ class TetrisBoard:
         
         self.current_tetromino.x += dx
         self.current_tetromino.y += dy
-        self.rm.move_sound.play()
+        self.rm.sounds.sound_effects[EFFECT_MOVE].play()
 
     def rotate(self, delta: int = 1):
         """현재 테트로미노 회전."""

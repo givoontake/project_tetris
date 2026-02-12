@@ -1,18 +1,18 @@
 import pygame
 
-from tetris.resources.font_manager import *
+from tetris.resources.resource_manager import *
 from tetris.resources.define_colors import *
 
 class ComboAnimation:
-    def __init__(self, screen: pygame.Surface, fm: FontManager, combo: int, draw_x: int, draw_y: int):
+    def __init__(self, screen: pygame.Surface, rm: ResourceManager, combo: int, draw_x: int, draw_y: int):
         self.screen = screen
-        self.fm = fm
+        self.rm = rm
         self.draw_x = draw_x
         self.draw_y = draw_y
         self.elapsed_time = 0
         self.animation_time = 1000
         self.active = True
-        self.font = fm.get_font(COMBO_FONT_SIZE)
+        self.font = rm.fonts.get_font(COMBO_FONT_SIZE)
         self.text = f"Combo {combo}"
 
         if combo % 4 == 1:

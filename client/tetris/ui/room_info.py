@@ -5,7 +5,7 @@ from typing import Optional
 from tetris.config.define import *
 from tetris.ui.rectangle import Rectangle
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.font_manager import FontManager
+from tetris.resources.fonts import Fonts
 from tetris.resources.define_colors import *
 from tetris.models.dataclass import RoomData
 
@@ -15,17 +15,16 @@ class RoomInfo:
     TITLE_WIDTH_RATE = 0.35
     CAPACITY_WIDTH_DATE = 0.35
     STATUS_WIDTH_RATE = 0.15
-    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, fm: FontManager, 
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager,
                  data: RoomData, background_color: tuple[int, int, int], is_reactable: bool = False):
         self.screen = screen
         self.rect = rect
         self.rm = rm
-        self.fm = fm
         self.data = data
         self.background_color = background_color
         self.is_reactable = is_reactable
 
-        self.background = Rectangle(self.screen, self.rect, self.fm, None, "")
+        self.background = Rectangle(self.screen, self.rect, self.rm, None, "")
         self.info_rects: list[Rectangle] = []
 
         self.hovered = False
@@ -38,25 +37,25 @@ class RoomInfo:
         # [잠금아이콘, 제목, 인원, 상태]의 상대폭 비율
 
         locked_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.w*self.LOCKED_WIDTH_RATE, self.rect.h)       
-        self.locked = Rectangle(self.screen, locked_rect, self.fm, None, str(self.data.locked))
+        self.locked = Rectangle(self.screen, locked_rect, self.rm, None, str(self.data.locked))
         self.info_rects.append(self.locked)
 
         title_rect = locked_rect.copy()
         title_rect.x += locked_rect.w
         title_rect.w = self.rect.w*self.TITLE_WIDTH_RATE
-        self.title = Rectangle(self.screen, title_rect, self.fm, None, str(self.data.title))
+        self.title = Rectangle(self.screen, title_rect, self.rm, None, str(self.data.title))
         self.info_rects.append(self.title)
 
         capacity_rect = title_rect.copy()
         capacity_rect.x += title_rect.w
         capacity_rect.w = self.rect.w*self.CAPACITY_WIDTH_DATE
-        self.capacity = Rectangle(self.screen, capacity_rect, self.fm, None, f"{str(self.data.cur_user)}/{str(self.data.max_user)}")
+        self.capacity = Rectangle(self.screen, capacity_rect, self.rm, None, f"{str(self.data.cur_user)}/{str(self.data.max_user)}")
         self.info_rects.append(self.capacity)
 
         status_rect = capacity_rect.copy()
         status_rect.x += capacity_rect.w
         status_rect.w = self.rect.w*self.STATUS_WIDTH_RATE
-        self.status = Rectangle(self.screen, status_rect, self.fm, None, f"{str(self.data.status)}")
+        self.status = Rectangle(self.screen, status_rect, self.rm, None, f"{str(self.data.status)}")
         self.info_rects.append(self.status)
 
     def update_info(self, data: RoomData):

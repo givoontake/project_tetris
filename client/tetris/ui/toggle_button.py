@@ -1,6 +1,6 @@
 from tetris.net.define_format import *
 from tetris.resources.resource_manager import *
-from tetris.resources.font_manager import FontManager
+from tetris.resources.fonts import Fonts
 from tetris.resources.define_colors import *
 from tetris.ui.rectangle import Rectangle
 
@@ -10,11 +10,10 @@ class ToggleButton(Rectangle):
         screen: pygame.Surface,
         rect: pygame.Rect, 
         rm: ResourceManager,
-        fm: FontManager,
         image: pygame.Surface = None, 
         text: str = "", 
         ):
-        super().__init__(screen, rect, fm, image, text)
+        super().__init__(screen, rect, rm, image, text)
         self.rm = rm
         self.active = False
 
@@ -27,7 +26,7 @@ class ToggleButton(Rectangle):
                     pass
                 else:
                     self.pressed = True
-                    self.rm.button_sound_press.play()
+                    self.rm.sounds.sound_effects[EFFECT_BUTTON_PRESS].play()
                 return True
         return False
 
