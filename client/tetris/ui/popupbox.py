@@ -59,7 +59,7 @@ class PopupBox:
         draw_x = btn_x
         for i in range(len(self.buttons_text)):
             button_rect = pygame.Rect(draw_x + i*btn_w, btn_y, btn_w, btn_h)
-            self.buttons.append(Button(self.screen, button_rect, self.rm, None, self.buttons_text[i], True))
+            self.buttons.append(Button(self.screen, button_rect, self.rm, None, self.buttons_text[i]))
 
     # def set_visible(self, value: bool):
     #     self.visible = value

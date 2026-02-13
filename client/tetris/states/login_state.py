@@ -67,7 +67,7 @@ class LoginState(BaseState):
         draw_x += (label_w - button_w) // 2
         draw_y += label_h + (button_h // 2)
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
-        self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인", True)
+        self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인")
 
     def send_login(self, id: str, pw: str):
         data = C2S_LOGIN_PACKET()

@@ -50,7 +50,7 @@ class TetrisSession:
             ready_rect = self.board.valid_grid_rect.copy()
             ready_rect.y += ready_rect.h
             ready_rect.h = ready_rect.h*0.1
-            self.ready = Button(self.screen, ready_rect, self.rm, None, "게임시작")
+            self.ready = Button(self.screen, ready_rect, self.rm, None, "게임시작", 1)
 
             score_rect = self.board.preview_rect.copy()
             score_rect.y += score_rect.h
@@ -158,7 +158,6 @@ class TetrisSession:
             self.board.update(dt_ms)
 
     def draw(self):
-        self.board.draw_frame()
         if self.state == TSessionState.PLAY:
             self.board.draw_game()
             self.board.draw_combo()
@@ -170,4 +169,6 @@ class TetrisSession:
             self.score_box.draw()
         else:
             self.nickname.draw()
+
+        self.board.draw_frame()
 

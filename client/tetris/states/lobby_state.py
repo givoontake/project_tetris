@@ -60,13 +60,13 @@ class LobbyState(BaseState):
         logo_img = self.rm.images.ui_images[UI_LOGO]
         logo_w, logo_h = logo_img.get_size()
         logo_rect = pygame.Rect(draw_x, draw_y, logo_w, logo_h)
-        logo = Button(self.screen, logo_rect, self.rm, logo_img, "", False)
+        logo = Button(self.screen, logo_rect, self.rm, logo_img, "")
         self.top_menus.append(logo)
         draw_x += logo_rect.w
         menu_texts: list[str] = ["빠른시작", "방만들기", "상점", "설정", "", "게임종료"]
         for menu_text in menu_texts:
             menu_rect = pygame.Rect(draw_x, draw_y, MENU_WIDTH, MENU_HEIGHT) 
-            menu = Button(self.screen, menu_rect, self.rm, None, menu_text, True)
+            menu = Button(self.screen, menu_rect, self.rm, None, menu_text)
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
 

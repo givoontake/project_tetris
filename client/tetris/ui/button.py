@@ -21,12 +21,11 @@ class Button:
         self.pressed = False
         self.pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
         self.hover_sound_printed = False
-        self.idle = Rectangle(screen, rect, rm, image, text)
+        self.idle = Rectangle(screen, rect, rm, image, text, border_width)
         if image == None:
             self.hover = None
             self.press = None
-        else: 
-
+        else:
             hover_rect = self._set_rect_scale(self.idle.rect, self.rm.images.HOVER_SCALE)
             press_rect = self._set_rect_scale(self.idle.rect, self.rm.images.PRESS_SCALE)
 
