@@ -81,10 +81,10 @@ class Button:
             
         else:
             if self.pressed:
-                self.idle.set_background_color(ORANGE)   # ORANGE-ish
+                self.idle.set_background_color(ORANGE)
             elif self.hovered:
                 self.idle.set_background_color(GRAY)
             else:
-                self.idle.set_background_color(BLACK)
+                self.idle.set_background_color(DARK_GRAY)
 
             self.idle.draw()
