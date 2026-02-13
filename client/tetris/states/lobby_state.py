@@ -19,6 +19,7 @@ from tetris.ui.room_list import RoomList
 from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
 from tetris.ui.create_room_window import RoomCreateWindow
+from tetris.ui.setting_window import SettingWindow
 from tetris.states.single_play_state import SinglePlayState
 from tetris.states.multi_play_state import MultiPlayState
 from tetris.states.base_state import BaseState
@@ -40,13 +41,14 @@ class LobbyState(BaseState):
         self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), self.chat_input_box.font)
         self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), rm, session)
 
-        self.room_create_window = None
-        # self.reactable_screen = LOBBY
         self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
 
-        self.reactable = True
+        self.room_create_window = None
+        self.setting_window = None
         self.exit_popup = None
+        self.save_success_popup = None
+        self.reactable = True
     
         self.set_layout()
 
@@ -150,6 +152,16 @@ class LobbyState(BaseState):
                     self.exit_popup = PopupBox(self.screen, self.rm, "종료하시겠습니까?", popup_texts)
                     self.reactable = False
 
+                elif event == "설정":
+                    sw, sh = self.screen.get_size()
+                    setting_window_w = sw // 4
+                    setting_window_h = sh // 3
+                    setting_window_x = sw // 2 - setting_window_w // 2
+                    setting_window_y = sh // 2 - setting_window_h // 2
+                    setting_window_rect = pygame.Rect(setting_window_x, setting_window_y, setting_window_w, setting_window_h)
+                    self.setting_window = SettingWindow(self.screen, setting_window_rect, self.rm)
+                    self.reactable = False
+
                 return
 
             event = self.room_list.handle_event(ev)
@@ -164,19 +176,36 @@ class LobbyState(BaseState):
 
         else:
             if self.room_create_window:
-                str = self.room_create_window.handle_event(ev)
-                if str == "만들기" or str == "취소":
+                rcw_event = self.room_create_window.handle_event(ev)
+                if rcw_event == "만들기" or rcw_event == "취소":
                     self.room_create_window = None
                     self.reactable = True
+
             elif self.exit_popup:
-                str2 = self.exit_popup.handle_event(ev)
-                if str2 == "게임종료":
+                ep_event = self.exit_popup.handle_event(ev)
+                if ep_event == "게임종료":
                     self.send_disconnect()
                     pygame.quit()
                     raise SystemExit
-                elif str2 == "계속하기":
+                elif ep_event == "계속하기":
                     self.exit_popup = None
                     self.reactable = True
+
+            elif self.setting_window:
+                sw_event = self.setting_window.handle_event(ev)
+                if sw_event == "성공":
+                    self.save_success_popup = PopupBox(self.screen, self.rm, "저장에 성공했습니다.", ["확인"])
+                    self.setting_window = None
+            
+                elif sw_event == "취소":                    
+                    self.reactable = True
+                    self.setting_window = None
+
+            elif self.save_success_popup:
+                ssp_event = self.save_success_popup.handle_event(ev)
+                if ssp_event == "확인":
+                    self.reactable = True
+                    self.save_success_popup = None
 
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 
@@ -205,5 +234,7 @@ class LobbyState(BaseState):
         self.my_info_rect.draw()
 
         if self.room_create_window: self.room_create_window.draw()
+        if self.setting_window: self.setting_window.draw()
         if self.exit_popup: self.exit_popup.draw()
+        if self.save_success_popup: self.save_success_popup.draw()
         if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()

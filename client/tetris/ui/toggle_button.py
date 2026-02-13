@@ -11,9 +11,10 @@ class ToggleButton(Rectangle):
         rect: pygame.Rect, 
         rm: ResourceManager,
         image: pygame.Surface = None, 
-        text: str = "", 
+        text: str = "",
+        border_width: int = 0 
         ):
-        super().__init__(screen, rect, rm, image, text)
+        super().__init__(screen, rect, rm, image, text, border_width)
         self.rm = rm
         self.active = False
 

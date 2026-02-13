@@ -64,6 +64,12 @@ class Rectangle:
     
     def update_rect(self, new_rect: pygame.Rect):
         self.rect = new_rect
+
+    def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
+        if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+            if self.rect.collidepoint(ev.pos):
+                return self.text
+            else: return None
     
     def draw(self):
         if self.image == None:

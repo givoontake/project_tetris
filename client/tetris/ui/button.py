@@ -14,10 +14,9 @@ class Button:
         rm: ResourceManager,
         image: pygame.Surface = None, 
         text: str = "", 
-        react: bool = True
+        border_width: int = 0
     ):
         self.rm = rm
-        self.react = react
         self.hovered = False
         self.pressed = False
         self.pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
@@ -31,8 +30,8 @@ class Button:
             hover_rect = self._set_rect_scale(self.idle.rect, self.rm.images.HOVER_SCALE)
             press_rect = self._set_rect_scale(self.idle.rect, self.rm.images.PRESS_SCALE)
 
-            self.hover = Rectangle(screen, hover_rect, self.rm, image, text)
-            self.press = Rectangle(screen, press_rect, self.rm, image, text)
+            self.hover = Rectangle(screen, hover_rect, self.rm, image, text, border_width)
+            self.press = Rectangle(screen, press_rect, self.rm, image, text, border_width)
 
     def _set_rect_scale(self, rect: pygame.Rect, scale: float) -> pygame.Rect:
         if scale < 0.1 or scale > 1.1:
@@ -42,14 +41,7 @@ class Button:
         return temp_rect.scale_by(scale)
         
     def handle_event(self, ev: pygame.event.Event) -> bool:
-        if self.react == False:
-            return False
-        """
-        마우스 이벤트 처리:
-        - hover 상태 추적
-        - 눌림/뗌 추적
-        - '버튼 안에서 눌렀고 버튼 안에서 뗀 경우'만 True 반환
-        """
+ 
         clicked = False
         if ev.type == pygame.MOUSEMOTION:
             self.hovered = self.idle.rect.collidepoint(ev.pos)
