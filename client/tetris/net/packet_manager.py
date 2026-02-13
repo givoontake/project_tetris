@@ -58,11 +58,20 @@ class PacketManager:
 
     def bytes_to_struct(self, pkt: bytes) -> RecvPacketStruct:
         pkt_type = pkt[2]
-        struct_name = PACKET_REGISTRY[pkt_type]
-        packet_struct = struct_name()
+        struct_name = PACKET_REGISTRY[pkt_type] # 타입에 맞는 구조체 이름 가져오기
+        packet_struct = struct_name() # 구조체 생성
+        if pkt_type == S2C_MESSAGE:
+            offset = 0
+            unpacked_front_data = struct.unpack_from(packet_struct.FMT, pkt, offset)
+            packet_size = unpacked_front_data[0]
+            message_size = packet_size - struct.calcsize(packet_struct.FMT)
+            offset += struct.calcsize(packet_struct.FMT)
+            unpacked_message = struct.unpack_from(f"<{message_size}s", pkt, offset)
+            unpacked_data = unpacked_front_data + unpacked_message
 
-        bytes_data = struct.unpack(struct_name.FMT, pkt)
-        packet_struct.fill_data(bytes_data)
+        else:
+            unpacked_data = struct.unpack(struct_name.FMT, pkt)
+        packet_struct.fill_data(unpacked_data) # 구조체에 값 채우기
 
         return packet_struct
     

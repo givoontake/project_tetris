@@ -81,11 +81,12 @@ class LobbyState(BaseState):
         data.type = C2S_MESSAGE
         data.id = self.session.id
         data.message = message.encode("utf-8")
-        message_bytes = len(message)
+        message_bytes = len(data.message)
         data.size = 2 + 1 + 4 + message_bytes
         values = self.net_worker._pm.struct_to_values(data)
-
-        packet_bytes = struct.pack(data.FMT, *values)
+        fmt = data.FMT
+        fmt += f"{message_bytes}s"
+        packet_bytes = struct.pack(fmt, *values)
 
         try:
             self.net_worker.send_packet(packet_bytes)

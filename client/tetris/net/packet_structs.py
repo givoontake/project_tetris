@@ -29,7 +29,7 @@ class RecvPacketStruct:
                 head, _, _ = v.partition(b"\x00") # 처음 만나는 b"\x00"(널)을 기준으로 해당 문자의 앞, b"\x00", 뒤 3개로 나눈다. 널을 제거하는 용도
                 v = head.decode("utf-8", errors="ignore")
 
-            setattr(self, f.name, v) # (객체, 변수명, 값) -> 객체의 f.name라는 이름의 변수를 v로 바꾼다.
+            setattr(self, f.name, v) # (객체, 변수명, 값) -> 객체의 f.name라는 이름의 변수 값을 v로 바꾼다.
 
 
 class SendPacketStruct:
@@ -61,7 +61,8 @@ class S2C_MESSAGE_PACKET(RecvPacketStruct):
     user_name: str = ""
     message: str = ""
 
-    FMT: ClassVar[str] = f"<hbi{MAX_USER_NAME}s{MAX_CHAT_BYTES}s"
+    # 송신과 마찬가지로 마지막에 메세지 포맷 추가해서 언팩 필요(수신 길이와 데이터 버퍼 크기는 완전 일치해야 함)
+    FMT: ClassVar[str] = f"<hbi{MAX_USER_NAME}s" 
 
 @dataclass
 class S2C_DISCONNECT_PACKET(RecvPacketStruct):
@@ -249,7 +250,7 @@ class C2S_MESSAGE_PACKET(SendPacketStruct):
     id: int = -1
     message: str = ""
 
-    FMT: ClassVar[str] = f"<hbi{MAX_CHAT_BYTES}s"
+    FMT: ClassVar[str] = "<hbi" # 송신 시 뒤에 메세지 필드 포맷을 가변으로 반드시 추가해야 한다.
 
 
 @dataclass

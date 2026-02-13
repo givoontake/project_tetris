@@ -283,6 +283,6 @@ class ChatWindow:
 
         draw_text_y = self.window_y
         for i in range(self.show_start, self.show_end):
-            text_surf = self.rm.render(self.texts[i], True, WHITE)
+            text_surf = self.font.render(self.texts[i], True, WHITE)
             self.screen.blit(text_surf, (self.window_x, draw_text_y))
             draw_text_y += self.line_height
