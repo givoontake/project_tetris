@@ -12,6 +12,7 @@ from tetris.resources.fonts import *
 from tetris.resources.define_colors import *
 from tetris.resources.define import *
 
+from tetris.ui.rectangle import Rectangle
 from tetris.ui.button import Button
 from tetris.ui.inputbox import InputBox
 from tetris.ui.popupbox import PopupBox
@@ -60,8 +61,8 @@ class LobbyState(BaseState):
         logo_img = self.rm.images.ui_images[UI_LOGO]
         logo_w, logo_h = logo_img.get_size()
         logo_rect = pygame.Rect(draw_x, draw_y, logo_w, logo_h)
-        logo = Button(self.screen, logo_rect, self.rm, logo_img, "")
-        self.top_menus.append(logo)
+        self.logo = Rectangle(self.screen, logo_rect, self.rm, logo_img, "")
+        
         draw_x += logo_rect.w
         menu_texts: list[str] = ["빠른시작", "방만들기", "상점", "설정", "", "게임종료"]
         for menu_text in menu_texts:
@@ -224,7 +225,8 @@ class LobbyState(BaseState):
 
     def draw(self):
         self.screen.fill(BLACK)
-
+        self.logo.draw()
+        
         for menu in self.top_menus:
             menu.draw()
 
