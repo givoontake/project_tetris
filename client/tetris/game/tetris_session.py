@@ -96,7 +96,7 @@ class TetrisSession:
         if self.is_single: self.set_score(0)
         if self.controller: self.controller.clear()
 
-    def handle_packet(self, data: Optional[RecvPacketStruct]):
+    def handle_packet(self, data: Optional[IngamePacket]):
         if data.type == S2C_MOVE:
             move_data = cast(S2C_MOVE_PACKET, data)
             self.board.handle_move(move_data.move_type)

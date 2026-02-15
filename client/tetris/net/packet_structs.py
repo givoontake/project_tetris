@@ -43,6 +43,14 @@ class RecvPacketStruct:
                 v = head.decode("utf-8", errors="ignore")
 
             setattr(self, f.name, v)
+            
+
+@dataclass
+class IngamePacket(RecvPacketStruct):
+    id: int = -1
+
+    BODY_FMT: ClassVar[str] = "i"
+    HEADER_FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
@@ -51,7 +59,6 @@ class SendPacketStruct:
     type: int = -1
 
     HEADER_FMT: ClassVar[str] = "<hb"
-
 
 # ---------------------------
 # S2C (수신) : RecvPacketStruct
@@ -153,70 +160,61 @@ class S2C_KICK_PACKET(RecvPacketStruct):
 
 
 @dataclass
-class S2C_MOVE_PACKET(RecvPacketStruct):
-    id: int = -1
+class S2C_MOVE_PACKET(IngamePacket):
     move_type: int = -1
 
-    BODY_FMT: ClassVar[str] = "ib"
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+    BODY_FMT: ClassVar[str] = "b"
+    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
-class S2C_SPAWN_PACKET(RecvPacketStruct):
-    id: int = -1
+class S2C_SPAWN_PACKET(IngamePacket):
     tetromino_type: int = -1
     next_tetromino_type: int = -1
     spawn_x: int = -1
     spawn_y: int = -1
 
-    BODY_FMT: ClassVar[str] = "ibbbb"
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+    BODY_FMT: ClassVar[str] = "bbbb"
+    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
-class S2C_FIX_PACKET(RecvPacketStruct):
-    id: int = -1
+class S2C_FIX_PACKET(IngamePacket):
     fixed_x: int = -1
     fixed_y: int = -1
 
-    BODY_FMT: ClassVar[str] = "ibb"
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+    BODY_FMT: ClassVar[str] = "bb"
+    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
-class S2C_CLEARLINE_PACKET(RecvPacketStruct):
-    id: int = -1
+class S2C_CLEARLINE_PACKET(IngamePacket):
     line_index: int = -1
     combo: int = -1
     score: int = -1
 
-    BODY_FMT: ClassVar[str] = "ibbi"
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+    BODY_FMT: ClassVar[str] = "bbi"
+    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
-class S2C_ADDLINE_PACKET(RecvPacketStruct):
-    id: int = -1
+class S2C_ADDLINE_PACKET(IngamePacket):
     hole_x: int = -1
 
-    BODY_FMT: ClassVar[str] = "ib"
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+    BODY_FMT: ClassVar[str] = "b"
+    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
-class S2C_GAMEOVER_PACKET(RecvPacketStruct):
-    id: int = -1
-
-    BODY_FMT: ClassVar[str] = "i"
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+class S2C_GAMEOVER_PACKET(IngamePacket):
+    BODY_FMT: ClassVar[str] = ""
+    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
-class S2C_GAMEEND_PACKET(RecvPacketStruct):
-    id: int = -1
-
-    BODY_FMT: ClassVar[str] = "i"
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+class S2C_GAMEEND_PACKET(IngamePacket):
+    BODY_FMT: ClassVar[str] = ""
+    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass

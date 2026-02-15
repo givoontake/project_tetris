@@ -1,12 +1,13 @@
 import pygame
 import struct
-from typing import Optional
+from typing import Optional, cast
 
 from tetris.config.define import *
 from tetris.net.packet_types import *
 
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
+from tetris.net.packet_structs import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.fonts import Fonts
 
@@ -69,7 +70,7 @@ class MultiPlayState(BaseState):
         draw_x, draw_y = 0, 0
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
-        self.title_box = Rectangle(self.screen, title_rect, None, title)
+        self.title_box = Rectangle(self.screen, title_rect, self.rm, None, title)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -77,7 +78,7 @@ class MultiPlayState(BaseState):
             pw_val = "비밀번호: 없음"
         else:
             pw_val = f"비밀번호: {self.password}"
-        self.password_box = Rectangle(self.screen, password_rect, None, pw_val)
+        self.password_box = Rectangle(self.screen, password_rect, self.rm, None, pw_val)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -132,23 +133,21 @@ class MultiPlayState(BaseState):
             player.handle_event(ev)
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
-    def handle_packet(self, data: Optional[dict]):
-        packet_type = data.get("type")
-
-        if packet_type == S2C_START:
-            # 게임이 시작되었다고 서버가 알려줌
-            if data.get("is_start"):
+    def handle_packet(self, data: RecvPacketStruct):
+        if data.type == S2C_START:
+            start_data = cast(S2C_START_PACKET, data)
+            if start_data.is_start:
                 self.room_state = RoomState.PLAY
                 for player in self.players:
                     player.set_state(TSessionState.PLAY)
                 pygame.mixer.music.play(-1)
 
-        elif packet_type == S2C_DELETE_USER: 
+        elif data.type == S2C_DELETE_USER: 
             from tetris.states.lobby_state import LobbyState
-            delete_id = data.get("id")
+            delete_user = cast(S2C_DELETE_USER_PACKET, data)
             for player in self.players:
                 if player.state == TSessionState.EMPTY: continue
-                if delete_id == player.session.id:
+                if delete_user.id == player.session.id:
                     if player.session.is_my:     
                         pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 플레이하면 안되니까
                         return LobbyState(self.screen, self.rm, self.net_worker, self.session)
@@ -156,17 +155,18 @@ class MultiPlayState(BaseState):
                         player.clear()
                         player.nickname.set_text("")
 
-        elif packet_type == S2C_GAMEOVER:
-            gameover_id = data.get("id")
+        elif data.type == S2C_GAMEOVER:
+            gameover_data = cast(S2C_GAMEOVER_PACKET, data)
             for player in self.players:
                 if player.state == TSessionState.EMPTY: continue
-                if gameover_id == player.session.id:
+                if gameover_data.id == player.session.id:
                     player.set_state(TSessionState.GAMEOVER)
                     # 판정은 서버에서 해서 보내주니 뭐.. 게임오버 애니메이션 같은거 만들어서 보여주면 될 듯
             # pygame.mixer.music.stop() -> 이건 이제 엔드게임 패킷 받아야 함
 
         else:
-            id = data.get("id")
+            ingame_data = cast(IngamePacket, data)
+            id = ingame_data.id
             for player in self.players:
                 if player.state == TSessionState.EMPTY: continue
                 if id == player.session.id:
