@@ -13,6 +13,7 @@ RoomSession::~RoomSession()
 void RoomSession::InitSession(Session* s)
 {
 	session = s;
+	session->SetState(USER_STATE::ROOM);
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);
 	tetromino_index = 0;

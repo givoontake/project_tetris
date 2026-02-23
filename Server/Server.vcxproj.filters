@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Packets">
+      <UniqueIdentifier>{5c3ded7e-84c5-457c-b5ad-67be3685c583}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -43,6 +46,12 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Database.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SingleRoom.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="MultiRoom.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -102,6 +111,15 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="DBResult.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="SingleRoom.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="single_packets.h">
+      <Filter>Packets</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiRoom.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

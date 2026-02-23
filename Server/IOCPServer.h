@@ -22,14 +22,11 @@ class IOCPServer
 	SOCKADDR_IN server_addr;
 	IOOverlapped accept_over;
 	Database db;
-	//MQueue task_queue;
-	PacketHandler handler;
-	std::atomic<int> id_generator = -1;
+	std::atomic<int> user_id_generator = -1;
+	std::atomic<int> room_id_generator = -1;
 	std::atomic<long long> tick_count = 0;
-
-	//std::unique_ptr<PacketHandler> packet_handler; // 먼저 선언되어 있다면 해당 변수는 나중에 선언되는 변수에서 사용 가능하다.
 	std::array<Session*, MAX_USER> users;
-	std::array<TetrisRoom*, MAX_ROOM> rooms;
+	std::array<std::atomic<TetrisRoom*>, MAX_ROOM> rooms;
 	
 	// 변수-> 컨테이너 생성 시 객체 생성자에 인자 넣는게 안된다.
 	// 포인터 -> 생성자에서 인자 넣고 동적할당 하면 된다.
@@ -46,11 +43,12 @@ public:
 	int GetEmptyUserIndex();
 	int GetEmptyRoomIndex();
 	int GetNewUserId();
+	int GetNewRoomId();
 	bool GetRunning() const { return is_running; }
 	HANDLE GetHandle() const { return iocp_handle; }
 	Session* GetSession(int user_index) const { return users[user_index]; }
 	long long GetTickCount() const { return tick_count.load(); }
-	TetrisRoom* GetRoom(int room_index) const { return rooms[room_index]; }
+	TetrisRoom* GetRoom(int room_index) const { return rooms[room_index].load(); }
 	Database& GetDB() { return db; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
@@ -61,12 +59,15 @@ public:
 	void StartServer();
 	void ProcessGQCS();
 	void ProcessPacket(int recv_bytes, int user_index);
-	void RoutePacket(char* packet, int user_index);
+	void RoutePacket(char* packet, Session* request_session);
 	void BroadCastLobby(char* packet);
 	//void BroadCastRoom(char* packet, int room_id);
 	void SendToSelf(char* packet, int self_index);
-	void CreateRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
+	void CreateOpenRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
+	void CreateLockRoom(char* packet, int user_index);
+	void DeleteRoom(int room_index);
 	void ProcessDB(DBOverlapped* db_over, int user_index);
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
+	void HandlePacket(char* packet, Session* request_session);
 };

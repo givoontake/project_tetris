@@ -22,10 +22,12 @@
     <ClCompile Include="Database.cpp" />
     <ClCompile Include="IOCPServer.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MultiRoom.cpp" />
     <ClCompile Include="PacketHandler.cpp" />
     <ClCompile Include="RoomPacketHandler.cpp" />
     <ClCompile Include="RoomSession.cpp" />
     <ClCompile Include="Session.cpp" />
+    <ClCompile Include="SingleRoom.cpp" />
     <ClCompile Include="Tetris.cpp" />
     <ClCompile Include="TetrisRoom.cpp" />
     <ClCompile Include="TetrisTickData.cpp" />
@@ -36,7 +38,10 @@
     <ClInclude Include="DBResult.h" />
     <ClInclude Include="define.h" />
     <ClInclude Include="enum_class.h" />
+    <ClInclude Include="MultiRoom.h" />
     <ClInclude Include="settings.h" />
+    <ClInclude Include="SingleRoom.h" />
+    <ClInclude Include="single_packets.h" />
     <ClInclude Include="task_type.h" />
     <ClInclude Include="Tetromino.h" />
     <ClInclude Include="ExOverlapped.h" />
@@ -107,6 +112,10 @@
     <IncludePath>C:\Program Files\MySQL\MySQL Connector C++ 9.5\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Program Files\MySQL\MySQL Connector C++ 9.5\lib64\vs14;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>C:\Program Files\MySQL\MySQL Connector C++ 9.5\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\MySQL\MySQL Connector C++ 9.5\lib64\vs14;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -149,6 +158,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>mysqlcppconn.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

@@ -1,12 +1,12 @@
 #pragma once
 
-enum class OP_TYPE { SEND, RECV, ACCEPT, DB };
+enum class OP_TYPE { SEND, RECV, ACCEPT, DB, DELETE_ROOM };
 
 enum class DBOperationType { LOGIN, LOAD_SESSION_INFO, SCORE_UPDATE, DB_ERROR };
 
 enum class ROOM_USER_STATE { EMPTY, WAIT, READY, PLAY, GAMEOVER };
 
-enum class ROOM_STATE { EMPTY, WAIT, PLAY };
+enum class ROOM_STATE { EMPTY, WAIT, PLAY, WAITING_DELETE };
 
 enum class USER_STATE { NONE, LOGIN, LOBBY, ROOM };
 
