@@ -92,6 +92,8 @@ class SinglePlayState(BaseState):
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
         if data.type == S2C_SINGLE_START:
+            start = cast(S2C_SINGLE_START_PACKET, data)
+            self.tetris_session.set_score(start.score)
             self.tetris_session.set_state(TSessionState.PLAY)
             pygame.mixer.music.play(-1)
 
