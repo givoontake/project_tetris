@@ -134,8 +134,8 @@ class MultiPlayState(BaseState):
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
-        if data.type == S2C_START:
-            start_data = cast(S2C_START_PACKET, data)
+        if data.type == S2C_SINGLE_START:
+            start_data = cast(S2C_SINGLE_START_PACKET, data)
             if start_data.is_start:
                 self.room_state = RoomState.PLAY
                 for player in self.players:

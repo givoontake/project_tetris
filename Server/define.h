@@ -154,11 +154,16 @@ struct C2S_START_PACKET {
 	int id;
 };
 
-struct S2C_START_PACKET {
+struct S2C_SINGLE_START_PACKET {
+	short size;
+	char type;
+	int score;
+};
+
+struct S2C_MULTI_START_PACKET {
 	short size;
 	char type;
 	bool is_start;
-	int score;
 };
 
 struct C2S_KICK_PACKET {
@@ -229,8 +234,7 @@ struct S2C_GAMEOVER_PACKET {
 struct S2C_GAMEEND_PACKET {
 	short size;
 	char type;
-	int id;
-	bool is_winner;
+	int winner_id;
 };
 
 struct S2C_UPDATE_SCORE_PACKET {

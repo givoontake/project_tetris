@@ -24,7 +24,7 @@ C2S_READY         = 17
 S2C_READY         = 18
 
 C2S_START         = 19
-S2C_START         = 20
+S2C_SINGLE_START  = 20
 
 C2S_KICK          = 21
 S2C_KICK          = 22
@@ -45,6 +45,8 @@ S2C_FIX           = 33
 S2C_ADDLINE       = 35
 
 S2C_UPDATE_SCORE  = 37
+
+S2C_MULTI_START   = 39
 # # ---- Login ----
 # S2C_LOGIN_PACKET = ["size", "type", "id", "max_score", "win_count", "lose_count", "user_name"]
 # C2S_LOGIN_PACKET = ["size", "type", "user_id", "user_password"]

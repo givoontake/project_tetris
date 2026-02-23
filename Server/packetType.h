@@ -26,7 +26,7 @@ constexpr char C2S_READY = 17;
 constexpr char S2C_READY = 18;
 
 constexpr char C2S_START = 19;
-constexpr char S2C_START = 20;
+constexpr char S2C_SINGLE_START = 20;
 
 constexpr char C2S_KICK = 21;
 constexpr char S2C_KICK = 22;
@@ -47,6 +47,8 @@ constexpr char S2C_FIX = 33;
 constexpr char S2C_ADDLINE = 35;
 
 constexpr char S2C_UPDATE_SCORE = 37;
+
+constexpr char S2C_MULTI_START = 39;
 
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
@@ -85,7 +87,7 @@ inline void PrintPacketType(char type)
     case S2C_READY:          std::cout << "S2C_READY"; break;
 
     case C2S_START:          std::cout << "C2S_START"; break;
-    case S2C_START:          std::cout << "S2C_START"; break;
+    case S2C_SINGLE_START:          std::cout << "S2C_START"; break;
 
     case C2S_KICK:           std::cout << "C2S_KICK"; break;
     case S2C_KICK:           std::cout << "S2C_KICK"; break;

@@ -143,13 +143,17 @@ class S2C_READY_PACKET(RecvPacketStruct):
 
 
 @dataclass
-class S2C_START_PACKET(RecvPacketStruct):
-    is_start: int = -1
+class S2C_SINGLE_START_PACKET(RecvPacketStruct):
     score: int = -1
 
-    BODY_FMT: ClassVar[str] = "bi"
+    BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
+class S2C_MULTI_START_PACKET(RecvPacketStruct):
+    is_start: int = -1
+
+    BODY_FMT: ClassVar[str] = "b"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 @dataclass
 class S2C_KICK_PACKET(RecvPacketStruct):

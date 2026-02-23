@@ -37,7 +37,7 @@ PACKET_REGISTRY: dict[int, type] = {
     C2S_READY: C2S_READY_PACKET,
 
     # ---- Start ----
-    S2C_START: S2C_START_PACKET,
+    S2C_SINGLE_START: S2C_SINGLE_START_PACKET,
     C2S_START: C2S_START_PACKET,
 
     # ---- Kick ----
