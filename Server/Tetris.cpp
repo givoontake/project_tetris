@@ -199,6 +199,7 @@ void Tetris::AddGarbageLines(int line_num, std::vector<TaskType>& send_pending_t
             TaskType gameover;
             gameover.event_type = EVENT_TYPE::GAMEOVER;
 			gameover.task = TaskGameover{};
+            send_pending_tasks.emplace_back(gameover);
 			return;
         }
 
