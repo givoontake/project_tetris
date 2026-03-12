@@ -43,7 +43,6 @@ struct S2C_MESSAGE_PACKET {
 struct C2S_MESSAGE_PACKET {
 	short size;
 	char type;
-	int id;
 };
 
 struct S2C_TEST_PACKET {
@@ -56,7 +55,6 @@ struct S2C_TEST_PACKET {
 struct C2S_TEST_PACKET {
 	short size;
 	char type;
-	int id; // 테스트 프로그램도 다중 클라이언트를 관리중이므로 필요
 	long long last_time;
 };
 
@@ -74,7 +72,6 @@ struct S2C_DISCONNECT_PACKET {
 struct C2S_ADD_OPEN_ROOM_PACKET {
 	short size; // 나중에 방, 게임 등으로 메세지 패킷과 분리한다면 char로 바꿀 수도 있지 않을까..?
 	char type;
-	int id;
 	char max_user;
 	char room_name[MAX_ROOM_NAME];
 };
@@ -90,7 +87,6 @@ struct S2C_ADD_OPEN_ROOM_PACKET {
 struct C2S_ADD_LOCK_ROOM_PACKET {
 	short size; 
 	char type;
-	int id;
 	char max_user;
 	char room_name[MAX_ROOM_NAME];
 	char room_password[MAX_ROOM_PASSWORD];
@@ -108,7 +104,6 @@ struct S2C_ADD_LOCK_ROOM_PACKET {
 struct C2S_ADD_USER_PACKET {
 	short size;
 	char type;
-	int id;
 	int room_id;
 	char name[MAX_USER_NAME];
 };
@@ -124,21 +119,26 @@ struct S2C_ADD_USER_PACKET {
 struct C2S_DELETE_USER_PACKET {
 	short size;
 	char type;
-	int id;
+	//int id;
 };
 
 struct S2C_DELETE_USER_PACKET {
 	short size;
 	char type;
 	int id;
+};
+
+struct S2C_UPDATE_HOST_PACKET {
+	short size;
+	char type;
 	int new_host_id;
 };
 
 struct C2S_READY_PACKET {
 	short size;
 	char type;
-	int id;
-	bool is_ready;
+	//int id;
+	//bool is_ready;
 };
 
 struct S2C_READY_PACKET {
@@ -151,7 +151,6 @@ struct S2C_READY_PACKET {
 struct C2S_START_PACKET {
 	short size;
 	char type;
-	int id;
 };
 
 struct S2C_SINGLE_START_PACKET {
@@ -169,7 +168,6 @@ struct S2C_MULTI_START_PACKET {
 struct C2S_KICK_PACKET {
 	short size;
 	char type;
-	int id;
 	int kick_user_id;
 };
 
@@ -241,5 +239,12 @@ struct S2C_UPDATE_SCORE_PACKET {
 	short size;
 	char type;
 	int max_score;
+};
+
+struct S2C_MATCH_RECORD_PACKET {
+	short size;
+	char type;
+	int win_count;
+	int lose_count;
 };
 #pragma pack(pop)
