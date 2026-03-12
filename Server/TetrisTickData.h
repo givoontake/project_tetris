@@ -2,7 +2,7 @@
 #include "define.h"
 #include "settings.h"
 
-class TetrisTickData
+class TetrisTickCounters
 {
 	// 인풋
 	int left_tick_counter = 0;

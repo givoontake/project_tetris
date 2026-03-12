@@ -1,6 +1,6 @@
 #include "TetrisTickData.h"
 
-void TetrisTickData::InitTickData()
+void TetrisTickCounters::InitTickData()
 {
 	left_tick_counter = 0;
 	right_tick_counter = 0;
@@ -14,7 +14,7 @@ void TetrisTickData::InitTickData()
 	garbage_line_timeout = GARBAGE_LINE_TIMEOUT_TICK;
 }
 
-void TetrisTickData::UpdateTickData()
+void TetrisTickCounters::UpdateTickData()
 {
 	++left_tick_counter;
 	++right_tick_counter;
