@@ -26,7 +26,7 @@ class IOCPServer
 	std::atomic<int> room_id_generator = -1;
 	std::atomic<long long> tick_count = 0;
 	std::array<Session*, MAX_USER> users;
-	std::array<std::atomic<TetrisRoom*>, MAX_ROOM> rooms;
+	std::array<std::atomic<std::shared_ptr<TetrisRoom>>, MAX_ROOM> rooms;
 	
 	// 변수-> 컨테이너 생성 시 객체 생성자에 인자 넣는게 안된다.
 	// 포인터 -> 생성자에서 인자 넣고 동적할당 하면 된다.
@@ -48,7 +48,7 @@ public:
 	HANDLE GetHandle() const { return iocp_handle; }
 	Session* GetSession(int user_index) const { return users[user_index]; }
 	long long GetTickCount() const { return tick_count.load(); }
-	TetrisRoom* GetRoom(int room_index) const { return rooms[room_index].load(); }
+	std::shared_ptr<TetrisRoom> GetRoom(int room_index) const { return std::atomic_load(&rooms[room_index]); }
 	Database& GetDB() { return db; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
@@ -66,8 +66,9 @@ public:
 	void CreateOpenRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
 	void CreateLockRoom(char* packet, int user_index);
 	void DeleteRoom(int room_index);
-	void ProcessDB(DBOverlapped* db_over, int user_index);
+	void ProcessDBResult(DBOverlapped* db_over, int user_index);
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
 	void HandlePacket(char* packet, Session* request_session);
+	void JoinRoom(int user_index, int room_id);
 };

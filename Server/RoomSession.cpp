@@ -10,23 +10,26 @@ RoomSession::~RoomSession()
 
 }
 
-void RoomSession::InitSession(Session* s)
+void RoomSession::InitRoomSession(Session* s)
 {
 	session = s;
-	session->SetState(USER_STATE::ROOM);
+	session->StoreState(SESS_STATE::ROOM);
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
 	tetromino_index = 0;
 
 	score = 0;
 	ClearSendBuf();
 }
 
-void RoomSession::ClearSession()
+void RoomSession::ClearRoomSession()
 {
+	session->StoreState(SESS_STATE::LOBBY);
 	session = nullptr;
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::EMPTY);
+	prev_r_user_state.Store(ROOM_USER_STATE::EMPTY);
 	tetromino_index = 0;
 
 	score = 0;
@@ -37,6 +40,7 @@ void RoomSession::ClearData()
 {
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
 	tetromino_index = 0;
 
 	score = 0;
@@ -49,14 +53,12 @@ void RoomSession::AddToSendBuffer(const char* data, int data_size)
 	send_data_size += data_size;
 }
 
-void RoomSession::SendTickBatch(HANDLE iocp_handle)
-{
-	if (send_data_size >= 3) {
-		session->SendBoundPacket(send_buf, send_data_size, iocp_handle);
-		ClearSendBuf();
-	}
-	
-}
+//void RoomSession::SendTickData(HANDLE iocp_handle)
+//{
+//	if (send_data_size >= 3) {
+//		session->SendBoundPacket(send_buf, send_data_size, iocp_handle);
+//	}
+//}
 
 void RoomSession::ClearSendBuf()
 {

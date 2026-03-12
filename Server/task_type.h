@@ -17,8 +17,8 @@ struct TaskAddLine {
 };
 
 struct TaskFix{
-	//int fixed_x;
-	//int fixed_y;
+	int fixed_x;
+	int fixed_y;
 };;
 
 struct TaskGameover {
@@ -29,9 +29,17 @@ struct TaskUp {
 
 };
 
+struct TaskSpawn {
+
+};
+
+struct TaskGameEnd {
+	int winner_id;	
+};
+
 // 이벤트 타입 말고 따로 필요한 내용이 없다면 굳이 구조체로 안만든다
 
-using task_var = std::variant<TaskMove, TaskClearLine, TaskAddLine, TaskFix, TaskGameover, TaskUp>;
+using task_var = std::variant<TaskMove, TaskClearLine, TaskAddLine, TaskFix, TaskGameover, TaskUp, TaskGameEnd, TaskSpawn>;
 
 struct TaskType {
 	EVENT_TYPE event_type;

@@ -1,20 +1,21 @@
 #include <random>
+#include <algorithm>
 #include "SingleRoom.h"
 
-SingleRoom::SingleRoom(IOCPServer* server, Session* session, char max_user, char room_name[MAX_ROOM_NAME], char room_password[MAX_ROOM_PASSWORD])
-	: TetrisRoom(server, session, max_user, room_name, room_password)
+SingleRoom::SingleRoom(IOCPServer* server, Session* session, OpenRoomInitData data)
+	: TetrisRoom(server, session, data)
 {
 }
 
-SingleRoom::SingleRoom(IOCPServer* server, Session* session, char max_user, char room_name[MAX_ROOM_NAME])
-	: TetrisRoom(server, session, max_user, room_name)
+SingleRoom::SingleRoom(IOCPServer* server, Session* session, LockRoomInitData data)
+	: TetrisRoom(server, session, data)
 {
 }
 
 void SingleRoom::HandlePacket(char* packet, Session* request_session)
 {
-	std::cout << "SingleRoom::HandlePacket, Packet type: ";
-	PrintPacketType(packet[2]);
+	//std::cout << "SingleRoom::HandlePacket, Packet type: ";
+	//PrintPacketType(packet[2]);
 
 	switch (packet[2]) {
 
@@ -39,142 +40,91 @@ void SingleRoom::HandlePacket(char* packet, Session* request_session)
 	}
 }
 
-void SingleRoom::StartGame()
+void SingleRoom::ProcessPlayTasks()
 {
-	if (room_state == ROOM_STATE::PLAY) return;
+	{
+		// delete가 도중에 일어나면 문제가 되는 일이 많아진다.
+		// 싱글에서 유저 제거는 방 삭제를 동반한다. 클리어 작업 후 [0]에 접근할 수도 있고, 범위기반 반복문 진입 전에는 있었는데 막상 실행할 때는 없을 수도 있음. 즉 처음에 잡은 범위 스코프 메모리를 무효화된다.
+		// 따라서 삭제는 틱 처리 도중에 일어나서는 안된다.
+		std::lock_guard<std::mutex> lock(room_mutex);
+		if (room_state.Load() != ROOM_STATE::PLAY) return;
+		tasks.SwapTask();
+		while (!tasks.task_queue.IsEmpty()) {
+			TaskInfo task = tasks.GetTask();
+			for (auto& r_user : room_users) {
+				if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+				if (r_user.GetSession()->GetId() == task.id) {
+					// 각 작업들을 각 세션에 분배
+					r_user.GetTetris().GetInputTasks().emplace_back(task.type);
 
-	SetRoomState(ROOM_STATE::PLAY);
+					//r_user.GetTetris().DebugPrintBoard();
+					break;
+				}
+			}
+		}
 
-	// 모든 조건 통과->게임 시작
-	Add7BagTetrominoList();
-	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		r_user.SetRoomUserState(ROOM_USER_STATE::PLAY);
-		r_user.GetTetris().InitNewTetromino(tetromino_spawn_list[r_user.GetTetrominoIndex()], spawn_pos);
-	}
+		for (auto& r_user : room_users) {
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+			r_user.GetTetris().TickProcess();
+		}
 
-	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
-	InitGame();
+		AddGarbageLines();
+		bool is_over = false;
+		is_over = room_users[0].GetTetris().CheckGameover();
+		if (!is_over) AddSpawnTask();
 
-	S2C_SINGLE_START_PACKET start_p;
-	start_p.size = sizeof(S2C_SINGLE_START_PACKET);
-	start_p.type = S2C_SINGLE_START;
-	start_p.score = 0;
-	Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
+		auto tasks = room_users[0].GetTetris().GetSendTasks();
+		auto it = std::find_if(tasks.begin(), tasks.end(), [](const TaskType& t_type) {
+			return t_type.event_type == EVENT_TYPE::FIX;
+			});
 
-	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		S2C_SPAWN_PACKET spawn_p;
-		spawn_p.size = sizeof(S2C_SPAWN_PACKET);
-		spawn_p.type = S2C_SPAWN;
-		spawn_p.id = r_user.GetSession()->GetId();
-		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-		spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
-		spawn_p.spawn_x = spawn_pos.x;
-		spawn_p.spawn_y = spawn_pos.y;
-		Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
+		if (it != tasks.end()) { // 고정 이벤트가 있어야 점수 및 콤보계산
+			CalculateScore(room_users[0].GetTetris().GetClearedLines());
+		}
+		BoundPackets();
+
+		ResetUsersTickData();
+		BroadcastTickDataForUsers();
+		if (is_over) {
+			RequestUpdateScore();
+			ClearGame();
+		}
 	}
 }
 
-void SingleRoom::BoundPackets(RoomSession& r_session, std::vector<TaskType>& tasks)
+void SingleRoom::StartGame()
 {
-	for (auto& task : tasks) {
-		switch (task.event_type) {
-		case EVENT_TYPE::MOVE: {
-			// 각 무브별 틱 초기화 추가가 애매하므로, 무브 틱 값 초기화는 Tetris::HandleTetrominoKeyInput에서 처리
-			auto& t = std::get<TaskMove>(task.task);
-			MakeMovePacketData(r_session, static_cast<int>(t.move_type));
-			break;
+	{
+		std::lock_guard<std::mutex> lock(room_mutex);
+		if (room_state == ROOM_STATE::PLAY) return;
+		if (!TryChangeRoomState(ROOM_STATE::WAIT, ROOM_STATE::PLAY)) return;
+
+		// 모든 조건 통과->게임 시작
+		InitGame();
+		Add7BagTetrominoList();
+		for (auto& r_user : room_users) {
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+			r_user.SetRoomUserState(ROOM_USER_STATE::PLAY);
+			r_user.GetTetris().InitNewTetromino(tetromino_spawn_list[r_user.GetTetrominoIndex()], spawn_pos);
 		}
 
-		// fix는 항상 라인 클리어와 스폰을 동반한다.
-		case EVENT_TYPE::FIX: {
-			r_session.GetTetris().FixTetromino();
-			r_session.GetTetris().GetTickData().SetDownTick(0);
-			r_session.GetTetris().GetTickData().SetDownTimeoutTick(0);
-			r_session.GetTetris().GetTickData().SetDropTick(0);
+		S2C_SINGLE_START_PACKET start_p;
+		start_p.size = sizeof(S2C_SINGLE_START_PACKET);
+		start_p.type = S2C_SINGLE_START;
+		start_p.score = 0;
+		Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
 
-			S2C_FIX_PACKET fix_p;
-			fix_p.size = sizeof(S2C_FIX_PACKET);
-			fix_p.type = S2C_FIX;
-			fix_p.id = r_session.GetSession()->GetId();
-			fix_p.fixed_x = r_session.GetTetris().GetCurrentTetromino().moved_pos.x;
-			fix_p.fixed_y = r_session.GetTetris().GetCurrentTetromino().moved_pos.y;
-			r_session.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.size);
-
-			// 줄 추가시 게임 오버가 될 수도 있지만 블록 고정시에도 게임 오버가 될 수 있다. 이것 역시 fix와 동반되는 과정이다.
-			if (r_session.GetTetris().CheckGameover()) {
-				// 일단 종료 패킷을 보냄
-				r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
-				S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
-				send_p.size = sizeof(S2C_GAMEOVER_PACKET);
-				send_p.type = S2C_GAMEOVER;
-				send_p.id = r_session.GetSession()->GetId();
-				r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
-				r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
-				RequestUpdateScore(r_session);
-				ClearGame();
-				return;
-			}
-
-			std::vector<char> index_lines = r_session.GetTetris().ClearLine();
-			CalculateScore(r_session, index_lines.size());
-			if (!index_lines.empty()) {
-				//r_session.SetScore(r_session.GetScore() + (CLEAR_LINE_SCORE * index_lines.size() * index_lines.size()));
-				for (int i = 0; i < index_lines.size(); i++) {
-					S2C_CLEARLINE_PACKET clear_line_p;
-					clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
-					clear_line_p.type = S2C_CLEARLINE;
-					clear_line_p.id = r_session.GetSession()->GetId();
-					clear_line_p.score = r_session.GetScore();
-					clear_line_p.line_index = index_lines[i];
-					clear_line_p.combo = r_session.GetCombo();
-					r_session.AddToSendBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.size);
-				}
-			}
-
-			if (r_session.GetTetrominoIndex() == tetromino_spawn_list.size() - 2) Add7BagTetrominoList();
-			r_session.AddTetrominoIndex();
-
-			if (SetNewTetromino(r_session.GetSession()->GetId())) {
-				S2C_SPAWN_PACKET spawn_p;
-				spawn_p.size = sizeof(S2C_SPAWN_PACKET);
-				spawn_p.type = S2C_SPAWN;
-				spawn_p.id = r_session.GetSession()->GetId();
-				spawn_p.tetromino_type = tetromino_spawn_list[r_session.GetTetrominoIndex()];
-				spawn_p.next_tetromino_type = tetromino_spawn_list[r_session.GetTetrominoIndex() + 1];
-				spawn_p.spawn_x = static_cast<char>(spawn_pos.x);
-				spawn_p.spawn_y = static_cast<char>(spawn_pos.y);
-				r_session.AddToSendBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
-			}
-			break;
-		}
-
-		case EVENT_TYPE::ADDLINE: {
-			r_session.GetTetris().GetTickData().SetGarbageLineTick(0);
-			S2C_ADDLINE_PACKET add_line_p;
-			add_line_p.size = sizeof(S2C_ADDLINE_PACKET);
-			add_line_p.type = S2C_ADDLINE;
-			add_line_p.id = r_session.GetSession()->GetId();
-			auto& t = std::get<TaskAddLine>(task.task);
-			add_line_p.hole_x = static_cast<char>(t.hole_x);
-			r_session.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.size);
-			break;
-		}
-
-		case EVENT_TYPE::GAMEOVER: {
-			// 일단 종료 패킷을 보냄
-			r_session.SetRoomUserState(ROOM_USER_STATE::WAIT);
-			S2C_GAMEOVER_PACKET send_p; // 싱글은 게임오버 = 게임 끝
-			send_p.size = sizeof(S2C_GAMEOVER_PACKET);
-			send_p.type = S2C_GAMEOVER;
-			send_p.id = r_session.GetSession()->GetId();
-			r_session.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.size);
-			r_session.GetSession()->SendBoundPacket(reinterpret_cast<char*>(&send_p), send_p.size, server->GetHandle());
-			RequestUpdateScore(r_session);
-			ClearGame();
-			return;
-		}
+		for (auto& r_user : room_users) {
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+			S2C_SPAWN_PACKET spawn_p;
+			spawn_p.size = sizeof(S2C_SPAWN_PACKET);
+			spawn_p.type = S2C_SPAWN;
+			spawn_p.id = r_user.GetSession()->GetId();
+			spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
+			spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
+			spawn_p.spawn_x = spawn_pos.x;
+			spawn_p.spawn_y = spawn_pos.y;
+			Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 		}
 	}
 }
@@ -182,29 +132,37 @@ void SingleRoom::BoundPackets(RoomSession& r_session, std::vector<TaskType>& tas
 void SingleRoom::DeleteUser(const int id)
 {
 	//std::cout << "delete user id: " << id << std::endl;
-	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
-			//std::cout << "delete user id: " << id << std::endl;
-			//room_mutex.lock();
-			r_user.GetSession()->SetState(USER_STATE::LOBBY);
 
-			S2C_DELETE_USER_PACKET p;
-			p.size = sizeof(S2C_DELETE_USER_PACKET);
-			p.type = S2C_DELETE_USER;
-			p.id = id;
-			//room_mutex.unlock();
-			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
-			room_state.Store(ROOM_STATE::WAITING_DELETE);
-			ExOverlapped* delete_over = new ExOverlapped;
-			delete_over->op_type = OP_TYPE::DELETE_ROOM;
-			PostQueuedCompletionStatus(server->GetHandle(), 1, room_index, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
+	{
+		// 삭제 처리와 틱 시작 처리는 락으로 동기화, 
+		std::lock_guard<std::mutex> lock(room_mutex);
+		for (auto& r_user : room_users) {
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+			if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
+				//std::cout << "delete user id: " << id << std::endl;
+				//room_mutex.lock();
+				r_user.GetSession()->StoreState(SESS_STATE::LOBBY);
+				S2C_DELETE_USER_PACKET p;
+				p.size = sizeof(S2C_DELETE_USER_PACKET);
+				p.type = S2C_DELETE_USER;
+				p.id = id;
+
+				Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+
+				ClearRoom(); // 안하면 방 삭제 포스트 이후 세션이 재사용되면 문제가 될 수 있음.
+				room_state.Store(ROOM_STATE::WAITING_DELETE);
+				ExOverlapped* delete_over = new ExOverlapped;
+				delete_over->op_type = OP_TYPE::DELETE_ROOM;
+				PostQueuedCompletionStatus(server->GetHandle(), 1, room_index, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
+				break;
+			}
 		}
 	}
 }
 
-void SingleRoom::ReduceTimeouts(int type, RoomSession& r_session)
+void SingleRoom::ReduceTimeouts(int type)
 {
+	RoomSession r_session = room_users[0];
 	switch (type) {
 	case DOWN_TIMEOUT:
 		if (r_session.GetScore() <= 100) {
@@ -243,12 +201,12 @@ void SingleRoom::ReduceTimeouts(int type, RoomSession& r_session)
 	}
 }
 
-void SingleRoom::CalculateScore(RoomSession& r_session, int clear_line_count)
+void SingleRoom::CalculateScore(int clear_line_count)
 {
 	int added_score = 0;
 	switch (clear_line_count) {
 	case 0:
-		r_session.SetCombo(0);
+		room_users[0].ResetCombo();
 		return;
 
 		break;
@@ -267,38 +225,29 @@ void SingleRoom::CalculateScore(RoomSession& r_session, int clear_line_count)
 	default:
 		break;
 	}
-	int combo = r_session.GetCombo();
-	r_session.SetCombo(combo + 1);
+	room_users[0].AddCombo();
+	int combo = room_users[0].GetCombo();
 	added_score += combo * (added_score / 10);
-	r_session.SetScore(r_session.GetScore() + added_score);
+	room_users[0].AddScore(added_score);
 }
 
-void SingleRoom::MakeMovePacketData(RoomSession& r_session, int move_type)
+void SingleRoom::MakeMovePacketData(int move_type)
 {
 	S2C_MOVE_PACKET move_p;
 	move_p.size = sizeof(S2C_MOVE_PACKET);
 	move_p.type = S2C_MOVE;
-	move_p.id = r_session.GetSession()->GetId();
+	move_p.id = room_users[0].GetSession()->GetId();
 	move_p.move_type = static_cast<char>(move_type);
-	r_session.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
+	room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
 }
 
-void SingleRoom::ClearEventsInTick()
+void SingleRoom::RequestUpdateScore()
 {
-	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		r_user.GetTetris().ClearPendingMoves();
-		r_user.GetTetris().ClearTasks();
-	}
-}
-
-void SingleRoom::RequestUpdateScore(RoomSession& r_session)
-{
-	if (r_session.GetSession()->GetInfo().max_score < r_session.GetScore()) {
-		int id = r_session.GetSession()->GetId();
-		int index = r_session.GetSession()->GetIndex();
-		std::string login_id = r_session.GetSession()->GetInfo().login_id;
-		int new_score = r_session.GetScore();
+	if (room_users[0].GetSession()->GetInfo().max_score < room_users[0].GetScore()) {
+		int id = room_users[0].GetSession()->GetId();
+		int index = room_users[0].GetSession()->GetIndex();
+		std::string login_id = room_users[0].GetSession()->GetInfo().login_id;
+		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
 		auto task_update_score = [id, index, login_id, new_score, &db] {
 			db.ExecuteUpdateScore(id, index, login_id, new_score);
@@ -306,4 +255,3 @@ void SingleRoom::RequestUpdateScore(RoomSession& r_session)
 		server->GetDB().Enqueue(task_update_score);
 	}
 }
-

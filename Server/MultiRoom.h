@@ -14,22 +14,29 @@
 class MultiRoom : public TetrisRoom
 {
 	int host_id;
+	int winner_id = -1;
 public:
-	MultiRoom(IOCPServer* server, Session* session, char max_user, char room_name[MAX_ROOM_NAME], char room_password[MAX_ROOM_PASSWORD]);
-	MultiRoom(IOCPServer* server, Session* session, char max_user, char room_name[MAX_ROOM_NAME]);
+	MultiRoom(IOCPServer* server, Session* session, OpenRoomInitData data);
+	MultiRoom(IOCPServer* server, Session* session, LockRoomInitData data);
 	~MultiRoom();
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, Session* request_session) override;
-	virtual void BoundPackets(RoomSession& r_session, std::vector<TaskType>& tasks) override;
+	virtual void ProcessPlayTasks() override;
 	virtual void DeleteUser(const int id) override;
 
 	void StartGame(int id);
 
-	int FindNewHost(int delete_id); // 방장이 나갔을 때 새로운 방장 찾기
+	void FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
+	int FindHostIndex(int host_id); // 현재 호스트의 인덱스를 반환
 	void AddUser(Session* new_session);
 	void ReadyUser(int id);
 	void KickUser(int id, int kick_user_id);
-	bool CheckWinner();
+	bool FindWinner();
+	void CalcAttackLine();
+	int GetGarbageLinesFromAttack(int cleared_line_num);
+	void UpdatePrevUsersState();
+
+	void RequestUpdateMatchResult();
 };
 
