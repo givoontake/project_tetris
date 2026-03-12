@@ -30,3 +30,7 @@ struct DBResultLogin : public DBResultDefault {
 struct DBResultUpdateScore : public DBResultDefault {
 	int max_score;
 };
+
+struct DBResultUpdateMatchResult : public DBResultDefault {
+	bool is_winner;
+};

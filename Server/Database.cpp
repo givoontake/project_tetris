@@ -79,11 +79,11 @@ void Database::init(HANDLE iocp)
     iocp_handle = iocp;
 }
 
-void Database::Enqueue(Task job)
+void Database::Enqueue(Task db_task)
 {
     {
         std::lock_guard<std::mutex> lock(mutex);
-        pending_db_tasks.push(std::move(job));
+        pending_db_tasks.push(std::move(db_task));
     }
     cv.notify_one();
 }
@@ -277,23 +277,23 @@ void Database::ExecuteUpdateScore(int session_id, int session_index, const std::
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->type = DBOperationType::SCORE_UPDATE;
+    db_over->type = DBOperationType::UPDATE_SCORE;
     db_over->ex_over.operation_id = session_id;
     db_over->ok = false;
 
     try
     {
-        auto* stmt = caches.GetStmt(DBOperationType::SCORE_UPDATE);
+        auto* stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
         if (!stmt)
         {
             const char* SQL_UPDATE_SCORE =
                 "UPDATE users SET single_score=? WHERE login_id=?";
 
-            caches.stmt_cache[DBOperationType::SCORE_UPDATE].reset(caches.conn->prepareStatement(SQL_UPDATE_SCORE));
-            stmt = caches.GetStmt(DBOperationType::SCORE_UPDATE);
+            caches.stmt_cache[DBOperationType::UPDATE_SCORE].reset(caches.conn->prepareStatement(SQL_UPDATE_SCORE));
+            stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트느 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
                 return;
             }
         }
@@ -319,6 +319,69 @@ void Database::ExecuteUpdateScore(int session_id, int session_index, const std::
             std::cout << "score update fail!, new score: " << new_score << std::endl;
         }
     }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
+void Database::ExecuteUpdateMatchResult(int session_id, int session_index, const std::string& login_id, bool is_winner)
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->type = DBOperationType::UPDATE_MATCH_RESULT; // ⚠️ enum에 이 값이 있어야 함
+    db_over->ex_over.operation_id = session_id;
+    db_over->ok = false;
+
+    try
+    {
+        // 1) UPDATE stmt 확보(캐시 없으면 준비)
+        auto* stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
+        if (!stmt)
+        {
+            const char* SQL_UPDATE_MATCH_RESULT =
+                "UPDATE users "
+                "SET win_count  = win_count  + ?, "
+                "    lose_count = lose_count + ? "
+                "WHERE login_id=?";
+
+            caches.stmt_cache[DBOperationType::UPDATE_MATCH_RESULT]
+                .reset(caches.conn->prepareStatement(SQL_UPDATE_MATCH_RESULT));
+
+            stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
+            if (!stmt)
+            {
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), session_index,
+                    reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                return;
+            }
+        }
+
+        const int win_delta = is_winner ? 1 : 0;
+        const int lose_delta = is_winner ? 0 : 1;
+
+        // 2) 바인딩
+        stmt->setInt(1, win_delta);
+        stmt->setInt(2, lose_delta);
+        stmt->setString(3, login_id);
+
+        // 3) 실행
+        const int affected = stmt->executeUpdate();
+
+        if (affected > 0) {
+            std::cout << "match_result update success! " << std::endl;
+            db_over->ok = true;
+            db_over->result_data = std::make_unique<DBResultUpdateMatchResult>();
+            DBResultUpdateMatchResult* p = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
+			p->is_winner = is_winner;
+        }
+
+        else db_over->ok = false;           
+    }
+
     catch (const sql::SQLException& e)
     {
         PrintErrorLog(__func__, e);

@@ -96,6 +96,7 @@ public:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
     void ExecuteLogin(int session_id, int session_index, const std::string& login_id, const std::string& password);
     void ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int new_score);
+	void ExecuteUpdateMatchResult(int session_id, int session_index, const std::string& login_id, bool is_winner);
 
 private:
     // ---- 설정 파일 로드 ----
