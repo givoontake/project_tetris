@@ -79,17 +79,17 @@ class LobbyState(BaseState):
         if len(message) == 0: return
         data = C2S_MESSAGE_PACKET()
         data.type = C2S_MESSAGE
-        data.id = self.session.id
-        data.message = message.encode("utf-8")
-        message_bytes = len(data.message)
-        data.size = 2 + 1 + 4 + message_bytes
+        encoded = message.encode("utf-8")
+        message_bytes = len(encoded)
+        data.size = struct.calcsize(data.FMT) + message_bytes
         values = self.net_worker._pm.struct_to_values(data)
         fmt = data.FMT
-        fmt += f"{message_bytes}s"
-        packet_bytes = struct.pack(fmt, *values)
+        header = struct.pack(fmt, *values)
+        message = struct.pack(f"{message_bytes}s", encoded)
+        message_packet = header + message
 
         try:
-            self.net_worker.send_packet(packet_bytes)
+            self.net_worker.send_packet(message_packet)
         except Exception as e:
             print("[LobbyState] send_message() error:", e)
 

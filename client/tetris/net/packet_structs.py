@@ -72,7 +72,7 @@ class S2C_LOGIN_PACKET(RecvPacketStruct):
     lose_count: int = -1
     user_name: str = ""
 
-    BODY_FMT: ClassVar[str] = f"i iii {MAX_USER_NAME}s".replace(" ", "")
+    BODY_FMT: ClassVar[str] = f"iiii{MAX_USER_NAME}s".replace(" ", "")
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
@@ -80,15 +80,14 @@ class S2C_LOGIN_PACKET(RecvPacketStruct):
 class S2C_MESSAGE_PACKET(RecvPacketStruct):
     id: int = -1
     user_name: str = ""
-    message: str = ""
+    message: str = "" # 역직렬화 할 때 메세지 크기를 결정해야 하므로 포맷으로 따로 정의하지 않음
 
-    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s{MAX_CHAT_BYTES}s"
+    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class S2C_DISCONNECT_PACKET(RecvPacketStruct):
-    # (기존 코드에서는 "<hbi"였지만 필드/의도와 불일치였음)
     BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
@@ -117,28 +116,27 @@ class S2C_ADD_LOCK_ROOM_PACKET(RecvPacketStruct):
 @dataclass
 class S2C_ADD_USER_PACKET(RecvPacketStruct):
     id: int = -1
-    is_add: int = -1
+    is_add: bool = False
     name: str = ""
 
-    BODY_FMT: ClassVar[str] = f"ib{MAX_USER_NAME}s"
+    BODY_FMT: ClassVar[str] = f"i?{MAX_USER_NAME}s"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class S2C_DELETE_USER_PACKET(RecvPacketStruct):
     id: int = -1
-    new_host_id: int = -1
 
-    BODY_FMT: ClassVar[str] = "ii"
+    BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class S2C_READY_PACKET(RecvPacketStruct):
     id: int = -1
-    is_ready: int = -1
+    is_ready: bool = False
 
-    BODY_FMT: ClassVar[str] = "ib"
+    BODY_FMT: ClassVar[str] = "i?"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
@@ -150,9 +148,9 @@ class S2C_SINGLE_START_PACKET(RecvPacketStruct):
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 class S2C_MULTI_START_PACKET(RecvPacketStruct):
-    is_start: int = -1
+    is_start: bool = False
 
-    BODY_FMT: ClassVar[str] = "b"
+    BODY_FMT: ClassVar[str] = "?"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 @dataclass
@@ -244,10 +242,9 @@ class C2S_LOGIN_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_MESSAGE_PACKET(SendPacketStruct):
-    id: int = -1
-    message: str = ""
+    # message: str = ""
 
-    BODY_FMT: ClassVar[str] = f"i{MAX_CHAT_BYTES}s"
+    BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 
@@ -259,32 +256,29 @@ class C2S_DISCONNECT_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_ADD_OPEN_ROOM_PACKET(SendPacketStruct):
-    id: int = -1
     max_user: int = -1
     room_name: str = ""
 
-    BODY_FMT: ClassVar[str] = f"ib{MAX_ROOM_NAME}s"
+    BODY_FMT: ClassVar[str] = f"b{MAX_ROOM_NAME}s"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class C2S_ADD_LOCK_ROOM_PACKET(SendPacketStruct):
-    id: int = -1
     max_user: int = -1
     room_name: str = ""
     room_password: str = ""
 
-    BODY_FMT: ClassVar[str] = f"ib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
+    BODY_FMT: ClassVar[str] = f"b{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class C2S_ADD_USER_PACKET(SendPacketStruct):
-    id: int = -1
     room_id: int = -1
     name: str = ""
 
-    BODY_FMT: ClassVar[str] = f"ii{MAX_USER_NAME}s"
+    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 
@@ -308,10 +302,9 @@ class C2S_START_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_KICK_PACKET(SendPacketStruct):
-    id: int = -1
     kick_user_id: int = -1
 
-    BODY_FMT: ClassVar[str] = "ii"
+    BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 

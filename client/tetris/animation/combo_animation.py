@@ -15,7 +15,7 @@ class ComboAnimation:
         self.font = rm.fonts.get_font(COMBO_FONT_SIZE)
         self.text = f"Combo {combo}"
 
-        if combo % 5 == 1:
+        if combo % 5 == 0 or combo % 5 == 1:
             color = RED
         elif combo % 5 == 2:
             color = ORANGE
