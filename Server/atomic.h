@@ -73,9 +73,5 @@ public:
     bool Compare_exchange_strong(T& expected, T desired) noexcept {
         return value.compare_exchange_strong(expected, desired);
     }
-
-    T GetSelf() const noexcept {
-        return value.load();
-    }
 };
 
