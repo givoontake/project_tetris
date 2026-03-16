@@ -226,7 +226,20 @@ class S2C_UPDATE_SCORE_PACKET(RecvPacketStruct):
     BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
+@dataclass
+class S2C_MATCH_RECORD_PACKET(RecvPacketStruct):
+    win_count: int = -1
+    lose_count: int = -1
 
+    BODY_FMT: ClassVar[str] = "ii"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+@dataclass
+class S2C_UPDATE_HOST_PACKET(RecvPacketStruct):
+    new_host_id: int = -1
+
+    BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 # ---------------------------
 # C2S (송신) : SendPacketStruct
 # ---------------------------

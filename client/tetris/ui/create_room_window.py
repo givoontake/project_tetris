@@ -146,7 +146,6 @@ class RoomCreateWindow:
             data = C2S_ADD_OPEN_ROOM_PACKET()
             data.size = struct.calcsize(data.FMT)
             data.type = C2S_ADD_OPEN_ROOM
-            data.id = self.my_session.id
             data.max_user = self.player_val
             data.room_name = title
 
@@ -154,7 +153,6 @@ class RoomCreateWindow:
             data = C2S_ADD_LOCK_ROOM_PACKET()
             data.size = struct.calcsize(data.FMT)
             data.type = C2S_ADD_LOCK_ROOM
-            data.id = self.my_session.id
             data.max_user = self.player_val
             data.room_name = title
             data.room_password = self.net_worker._pm.str_to_bytes(self.password_val, MAX_ROOM_PASSWORD)
