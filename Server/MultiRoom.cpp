@@ -98,30 +98,49 @@ void MultiRoom::AddUser(Session* new_session, int request_sess_id)
 void MultiRoom::DeleteUser(const int id)
 {
 	//std::cout << "delete user id: " << id << std::endl;
-	int deleted_id = -1;
+	//int deleted_id = -1;
 	{
 		std::lock_guard<std::mutex> lock(room_mutex);
 		for (auto& r_user : room_users) {
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			if (r_user.GetSession()->GetSessionKey().id == id) { // 삭제할 아이디 검색
-				r_user.ClearRoomSession(); // 해당 아이디 세션 정리
-				deleted_id = id;
+				S2C_DELETE_USER_PACKET p;
+				p.size = sizeof(S2C_DELETE_USER_PACKET);
+				p.type = S2C_DELETE_USER;
+				p.id = id;
+
+				Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+				r_user.ClearRoomSession();
+				if (id == host_id) FindNewHost(); // 여기서 찾기 및 못찾을 경우 삭제까지 같이 함
 				break;
 			}
 		}
-
-		if (deleted_id != -1) {
-			S2C_DELETE_USER_PACKET p;
-			p.size = sizeof(S2C_DELETE_USER_PACKET);
-			p.type = S2C_DELETE_USER;
-			p.id = id;
-
-			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
-		}
-
-		if (deleted_id == host_id) FindNewHost(); // 여기서 찾기 및 못찾을 경우 삭제까지 같이 함
 	}
+}
 
+void MultiRoom::SendCreateRoom(Session* session)
+{
+	if (!room_password) {
+		S2C_ADD_OPEN_ROOM_PACKET open_p;
+		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
+		open_p.type = S2C_ADD_OPEN_ROOM;
+		open_p.id = session->GetSessionKey().id;
+		open_p.max_user = max_user;
+		memcpy(open_p.room_name, room_name, sizeof(room_name));
+		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
+	}
+	else {
+		S2C_ADD_LOCK_ROOM_PACKET lock_p;
+		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
+		lock_p.type = S2C_ADD_LOCK_ROOM;
+		lock_p.id = session->GetSessionKey().id;
+		lock_p.max_user = max_user;
+		memcpy(lock_p.room_name, room_name, sizeof(room_name));
+		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
+		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
+	}
+	FindNewHost();
+	std::cout << "Room[: " << room_index << "] created by : " << session->GetInfo().nickname << "\n";
 }
 
 void MultiRoom::ReadyUser(int id)
@@ -447,9 +466,7 @@ void MultiRoom::FindNewHost()
 			room_state.Store(ROOM_STATE::WAITING_DELETE);
 			ExOverlapped* delete_over = new ExOverlapped;
 			delete_over->op_type = OP_TYPE::DELETE_ROOM;
-			SessionKey* key = new SessionKey;
-			key->index = room_index;
-			PostQueuedCompletionStatus(server->GetHandle(), 1, reinterpret_cast<ULONG_PTR>(&key), reinterpret_cast<WSAOVERLAPPED*>(delete_over));
+			PostQueuedCompletionStatus(server->GetHandle(), 1, room_index, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
 		}
 	}
 }

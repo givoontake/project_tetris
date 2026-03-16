@@ -6,7 +6,7 @@
 #include "RoomSession.h"
 #include "Session.h"
 #include "define.h"
-#include "packetType.h"
+#include "packet_type.h"
 #include "RoomPacketHandler.h"
 #include "IOCPServer.h"
 #include "TetrisRoom.h"
@@ -24,6 +24,7 @@ public:
 	virtual void HandlePacket(char* packet, Session* request_session) override;
 	virtual void ProcessPlayTasks() override;
 	virtual void DeleteUser(const int id) override;
+	virtual void SendCreateRoom(Session* session) override;
 
 	void StartGame(int id);
 
