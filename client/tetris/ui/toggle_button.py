@@ -16,11 +16,12 @@ class ToggleButton(Rectangle):
         ):
         super().__init__(screen, rect, rm, image, text, border_width)
         self.rm = rm
-        self.active = False
+        self.reactable = True
 
         self.pressed = False
 
     def handle_event(self, ev: pygame.event.Event) -> bool:
+        if self.reactable == False: return
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             if self.rect.collidepoint(ev.pos):
                 if self.pressed:
