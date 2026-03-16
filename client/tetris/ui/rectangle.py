@@ -27,6 +27,7 @@ class Rectangle:
         self.font_surface = self.font.render(self.text, False, self.text_color)
 
         self.border_width = border_width
+        self.visible = True
 
     # def get_rect(self) -> pygame.Rect: 
     #     return self.rect
@@ -72,6 +73,7 @@ class Rectangle:
             else: return None
     
     def draw(self):
+        if self.visible == False: return
         if self.image == None:
             pygame.draw.rect(self.screen, self.background_color, self.rect)
             if self.border_width > 0:
