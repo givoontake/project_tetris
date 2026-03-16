@@ -36,6 +36,8 @@ void Session::ClearSession()
 		closesocket(socket);
 		info.clear();
 		key.id = -1;
+		// tcp에서 패킷을 나누어 보낼 때 비정상 종료되면 일부만 보내고 끝날 수도 있다고 한다
+		// 따라서 remain_data_size는 항상 초기화가 필요하다
 		remain_data_size = 0;
 		room_index = -1;
 		state.Store(SESS_STATE::NONE);
@@ -58,7 +60,8 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 {
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);
-	short packet_size = GetPacketSize(packet);
+	short packet_size;
+	memcpy(&packet_size, packet, sizeof(packet_size));
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
@@ -72,7 +75,8 @@ void Session::SendPacket(int reqeust_sess_id, char* packet, const HANDLE iocp_ha
 {
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);
-	short packet_size = GetPacketSize(packet);
+	short packet_size;
+	memcpy(&packet_size, packet, sizeof(packet_size));
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	{
@@ -129,32 +133,6 @@ void Session::RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle)
 			return;
 		}
 	}
-}
-
-short Session::GetPacketSize(char* packet)
-{
-	//switch (packet[2]) {
-	//case S2C_TEST: {
-	//	S2C_TEST_PACKET* p = reinterpret_cast<S2C_TEST_PACKET*>(packet);
-	//	short packet_size;
-	//	memcpy(&packet_size, packet, sizeof(packet_size));
-	//	packet_size += p->message_size;
-	//	return packet_size;
-	//}
-	//case C2S_TEST: {
-	//	C2S_TEST_PACKET* p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
-	//	short packet_size;
-	//	memcpy(&packet_size, packet, sizeof(packet_size));
-	//	packet_size += p->message_size;
-	//	return packet_size;
-	//}
-	//default: {
-	//}
-	//}
-
-	short packet_size;
-	memcpy(&packet_size, packet, sizeof(packet_size));
-	return packet_size;
 }
 
 bool Session::TryChangeState(SESS_STATE expected, SESS_STATE desired)

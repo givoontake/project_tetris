@@ -274,34 +274,53 @@ void IOCPServer::ProcessGQCS()
 }
 
 void IOCPServer::ProcessPacket(Session* session, int request_sess_id, int recv_bytes)
-{
-	std::lock_guard<std::mutex> lock(session->GetMutex()); // 락 범위가 너무 큰 것 같기는 한데..
-	if (session->GetState() == SESS_STATE::NONE) return;
-	if (session->GetSessionKey().id != request_sess_id) return;
+{   
+	short packet_size;
+	int offset = 0;
+	char p_buffer[BUF_SIZE];
+	int remain_data_size = 0;
 
-	if (recv_bytes + session->GetRemainDataSize() > BUF_SIZE) {
-		PostQueuedCompletionStatus(iocp_handle, 0, request_sess_id, nullptr);
-		return;
-	}
-		 
-	else session->SetRemainDataSize(recv_bytes);
-
-	if (session->GetRemainDataSize() < sizeof(short)) return;
-
-	short packet_size = session->GetPacketSize(session->GetExOver().packet_buf);
-
-	while (session->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
+	// 작업에 사용해야 할 세션 내의 값들을 세션 락을 걸고 안전하게 복사해온다.
+	// 복사한 값을 그 다음에 처리하는 것은 문제 없다. 처리 도중 재사용된다고 해도 어차피 같은 세션인지 계속 검증하므로 걸러진다
+	// 작업을 완료하면 세션에 반영되어야 하는 remain_data_size만 락을 걸고 세팅한다.
 	{
-		char p_buffer[BUF_SIZE];
-		// 패킷 분리: packet_buffer에 복사 후 처리
-		memcpy(p_buffer, session->GetExOver().packet_buf, packet_size);
-		RoutePacket(p_buffer, session, request_sess_id);
+		std::lock_guard<std::mutex> lock(session->GetMutex());
 
-		// 처리한 패킷은 남은 데이터에서 제거
-		session->SetRemainDataSize(-packet_size);
-		memmove(session->GetExOver().packet_buf, session->GetExOver().packet_buf + packet_size, session->GetRemainDataSize());
-		if (session->GetRemainDataSize() <= sizeof(short)) break;
-		packet_size = session->GetPacketSize(session->GetExOver().packet_buf);
+		if (session->GetState() == SESS_STATE::NONE) return;
+		if (session->GetSessionKey().id != request_sess_id) return;
+
+		if (recv_bytes + session->GetRemainDataSize() > BUF_SIZE) {
+			PostQueuedCompletionStatus(iocp_handle, 0, request_sess_id, nullptr);
+			return;
+		}
+		
+		else session->AddDataSize(recv_bytes);
+
+		if (session->GetRemainDataSize() < sizeof(short)) return;
+
+		remain_data_size = session->GetRemainDataSize();
+		memcpy(&packet_size, session->GetExOver().packet_buf, sizeof(packet_size));
+		memcpy(p_buffer, session->GetExOver().packet_buf, remain_data_size);
+	}
+
+	while (remain_data_size - offset >= packet_size)
+	{
+		char* packet = new char[packet_size];
+		memcpy(packet, p_buffer + offset, packet_size);
+		RoutePacket(packet, session, request_sess_id);
+		delete[] packet;
+
+		offset += packet_size;
+		if (remain_data_size - offset < sizeof(short)) break;
+		memcpy(&packet_size, p_buffer + offset, sizeof(packet_size));
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(session->GetMutex());
+		if (session->GetState() == SESS_STATE::NONE) return;
+		if (session->GetSessionKey().id != request_sess_id) return;
+		session->AddDataSize(-offset);
+		memmove(session->GetExOver().packet_buf, session->GetExOver().packet_buf + offset, session->GetRemainDataSize());
 	}
 }
 

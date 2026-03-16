@@ -40,8 +40,6 @@ public:
 	void SendPacket(int reqeust_sess_id, char* packet, const HANDLE iocp_handle);
 	void SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp_handle);
 	void RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle);
-	
-	short GetPacketSize(char* packet);
 
 	//getters
 	SOCKET GetSocket() const { return socket; }
@@ -60,7 +58,7 @@ public:
 	void SetId(int new_id) { key.id = new_id; }
 	void SetIndex(int new_index) { key.index = new_index; }
 	void SetRoomIndex(int new_room_id) { room_index = new_room_id; }
-	void SetRemainDataSize(int new_data_size) { remain_data_size += new_data_size; }
+	void AddDataSize(int new_data_size) { remain_data_size += new_data_size; }
 	void StoreState(SESS_STATE new_state) { state.Store(new_state); }
 	bool TryChangeState(SESS_STATE expected, SESS_STATE desired);
 	void StoreDisconnectFlag(bool new_flag) { disconnect_flag.Store(new_flag); }
