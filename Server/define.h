@@ -128,12 +128,6 @@ struct S2C_DELETE_USER_PACKET {
 	int id;
 };
 
-struct S2C_UPDATE_HOST_PACKET {
-	short size;
-	char type;
-	int new_host_id;
-};
-
 struct C2S_READY_PACKET {
 	short size;
 	char type;
@@ -246,5 +240,11 @@ struct S2C_MATCH_RECORD_PACKET {
 	char type;
 	int win_count;
 	int lose_count;
+};
+
+struct S2C_UPDATE_HOST_PACKET {
+	short size;
+	char type;
+	int new_host_id;
 };
 #pragma pack(pop)
