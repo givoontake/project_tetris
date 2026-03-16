@@ -27,6 +27,7 @@ class Images:
             UI_LOGIN_BUTTON: self.load_image(UI_IMAGE_PATHS[UI_LOGIN_BUTTON], 200, 100),
             UI_LOGIN_LABEL_FRAME: self.load_image(UI_IMAGE_PATHS[UI_LOGIN_LABEL_FRAME], 400, 100),
             UI_LOGO: self.load_image(UI_IMAGE_PATHS[UI_LOGO], 250, 100),
+            UI_HOST: self.load_image(UI_IMAGE_PATHS[UI_HOST], 100, 100),
         })
 
 

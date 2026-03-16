@@ -34,6 +34,7 @@ UI_IMAGE_PATHS = {
     UI_LOGIN_BUTTON: "button/login_button.png",
     UI_LOGIN_LABEL_FRAME: "labels/login_label_frame.png",
     UI_LOGO: "button/new_tetris_logo.png",
+    UI_HOST: "ui/crown.png",
 }
 
 # ===== Sound Paths =====
