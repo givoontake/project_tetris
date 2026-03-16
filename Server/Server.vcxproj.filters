@@ -86,7 +86,7 @@
     <ClInclude Include="TetrisRoom.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="packetType.h">
+    <ClInclude Include="packet_type.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="RoomPacketHandler.h">

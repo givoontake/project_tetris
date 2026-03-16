@@ -48,7 +48,7 @@
     <ClInclude Include="IOCPServer.h" />
     <ClInclude Include="MQueue.h" />
     <ClInclude Include="PacketHandler.h" />
-    <ClInclude Include="packetType.h" />
+    <ClInclude Include="packet_type.h" />
     <ClInclude Include="RoomPacketHandler.h" />
     <ClInclude Include="RoomSession.h" />
     <ClInclude Include="Session.h" />

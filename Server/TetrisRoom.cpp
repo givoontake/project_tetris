@@ -1,6 +1,7 @@
 #include <random>
 #include "TetrisRoom.h"
 #include "IOCPServer.h"
+#include "packet_type.h"
 
 TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, OpenRoomInitData data)
 {
@@ -44,30 +45,6 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, LockRoomInitData d
 TetrisRoom::~TetrisRoom()
 {
 	if (room_password) delete[] room_password;
-}
-
-void TetrisRoom::SendAddRoom(Session* session) // 외부에서 세션 락 걸고 함수로 들어오는 구조라 세션 접근은 안전함
-{
-	if (!room_password) {
-		S2C_ADD_OPEN_ROOM_PACKET open_p;
-		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
-		open_p.type = S2C_ADD_OPEN_ROOM;
-		open_p.id = session->GetSessionKey().id;
-		open_p.max_user = max_user;
-		memcpy(open_p.room_name, room_name, sizeof(room_name));
-		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
-	}
-	else {
-		S2C_ADD_LOCK_ROOM_PACKET lock_p;
-		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
-		lock_p.type = S2C_ADD_LOCK_ROOM;
-		lock_p.id = session->GetSessionKey().id;
-		lock_p.max_user = max_user;
-		memcpy(lock_p.room_name, room_name, sizeof(room_name));
-		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
-		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
-	}
-	std::cout << "Room[: " << room_index << "] created by : " << session->GetInfo().nickname << "\n";
 }
 
 void TetrisRoom::InitGame()

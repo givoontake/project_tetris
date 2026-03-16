@@ -5,7 +5,6 @@
 #include "RoomSession.h"
 #include "Session.h"
 #include "define.h"
-#include "packetType.h"
 #include "MQueue.h"
 
 constexpr int ADD_TIMEOUT = 1;
@@ -96,6 +95,7 @@ public:
 	virtual void HandlePacket(char* packet, Session* request_session) = 0;
 	virtual void ProcessPlayTasks() = 0;
 	virtual void DeleteUser(const int id) = 0;	
+	virtual void SendCreateRoom(Session* session) = 0;
 	// 공통
 	void SetRoomIndex(const int val);
 	void SetRoomId(const int val);
@@ -110,7 +110,7 @@ public:
 	void ClearRoom(); // 이제 재사용이 아니라 아예 없앨거라서 굳이 방이 비워진 상태를 관리할 필요는 없다. 나중에 없애면 될 듯
 	void UpdateTick();
 	void BoundPackets();
-	void SendAddRoom(Session* session);
+	//void SendAddRoom(Session* session);
 	void MakeMovePacket(RoomSession& r_session, int move_type);
 	void AddGarbageLines();
 	void AddSpawnTask();
