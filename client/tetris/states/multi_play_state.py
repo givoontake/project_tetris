@@ -134,13 +134,20 @@ class MultiPlayState(BaseState):
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
-        if data.type == S2C_SINGLE_START:
-            start_data = cast(S2C_SINGLE_START_PACKET, data)
+        if data.type == S2C_MULTI_START:
+            start_data = cast(S2C_MULTI_START_PACKET, data)
             if start_data.is_start:
                 self.room_state = RoomState.PLAY
                 for player in self.players:
                     player.set_state(TSessionState.PLAY)
                 pygame.mixer.music.play(-1)
+
+        elif data.type == S2C_UPDATE_HOST:
+            host_data = cast(S2C_UPDATE_HOST_PACKET, data)
+            for player in self.players:
+                if player.session:
+                    if player.session.id == host_data.new_host_id:
+                        player.set_is_host()
 
         elif data.type == S2C_DELETE_USER: 
             from tetris.states.lobby_state import LobbyState
@@ -148,8 +155,8 @@ class MultiPlayState(BaseState):
             for player in self.players:
                 if player.state == TSessionState.EMPTY: continue
                 if delete_user.id == player.session.id:
-                    if player.session.is_my:     
-                        pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 플레이하면 안되니까
+                    if player.session.is_self:     
+                        pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 음악나오면 안되니까
                         return LobbyState(self.screen, self.rm, self.net_worker, self.session)
                     else:
                         player.clear()

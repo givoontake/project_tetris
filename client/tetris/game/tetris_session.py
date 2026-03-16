@@ -12,6 +12,7 @@ from tetris.game.tetris_board import TetrisBoard
 from tetris.game.tetris_controller import TetrisController
 from tetris.game.define import *
 from tetris.resources.resource_manager import ResourceManager
+from tetris.resources.images import *
 from tetris.resources.fonts import Fonts
 from tetris.ui.rectangle import Rectangle
 from tetris.ui.button import Button
@@ -35,7 +36,8 @@ class TetrisSession:
 
     def init_session(self, session: Session):
         self.session = session
-        if session.is_my: self.controller = TetrisController(self.net_worker)
+        if self.session.is_self == False: self.ready.reactable = False
+        if session.is_self: self.controller = TetrisController(self.net_worker)
         self.board.init(session.block_texture)
         if self.is_single: self.set_score(0)
         else: self.nickname.set_text(self.session.nickname)
@@ -69,6 +71,12 @@ class TetrisSession:
             ready_rect.w = self.board.preview_rect.w
             self.ready = ToggleButton(self.screen, ready_rect, self.rm, None, "준비")
 
+            crown_rect = ready_rect.copy()
+            crown_image = self.rm.images.ui_images[UI_HOST]
+            self.crown = Rectangle(self.screen, crown_rect, self.rm, crown_image, "")
+
+            self.is_host = False
+
     def set_score(self, new_score: Optional[int]):
         if self.is_single == False: return
         self.score = new_score
@@ -79,7 +87,12 @@ class TetrisSession:
         self.nickname.set_text(nickname)
 
     def set_ready(self, ready: bool):
-        self.ready.active = ready
+        self.ready.reactable = ready
+
+    def set_is_host(self):
+        self.is_host = True # 방장 양도는 계획에 없다.
+        if self.session.is_self == False: self.ready.visible = False # 방장인데 자기 세션이 아니면 준비버튼 없이 왕관만 그려야 함. 당연히 상호작용도 불가
+        else: self.ready.set_text("게임시작")
 
     def set_state(self, new_state: TSessionState):
         self.state = new_state
@@ -93,6 +106,8 @@ class TetrisSession:
         self.state = TSessionState.EMPTY
         self.nickname.set_text("")
         self.session = None
+        self.is_host = False
+        self.ready.visible = True
         if self.is_single: self.set_score(0)
         if self.controller: self.controller.clear()
 
@@ -130,7 +145,7 @@ class TetrisSession:
 
     def handle_event(self, ev: pygame.event.Event):
         if self.session == None: return
-        if self.session.is_my == False: # 내꺼 아니면 할 필요가 없음
+        if self.session.is_self == False: # 내꺼 아니면 할 필요가 없음
             return
         
         if self.state == TSessionState.PLAY:
@@ -158,10 +173,13 @@ class TetrisSession:
             self.board.update(dt_ms)
 
     def draw(self):
+        self.board.draw_frame()
+        if self.session == None: return
         if self.state == TSessionState.PLAY:
             self.board.draw_game()
-            self.board.draw_combo()
+            if self.is_single: self.board.draw_combo()
 
+        # 준비는 호스트가 아니면 일단 그리고, 본인이 아닌 호스트면 상호작용만 끄고 위에 왕
         if self.state == TSessionState.WAIT:
             self.ready.draw()
 
@@ -169,6 +187,5 @@ class TetrisSession:
             self.score_box.draw()
         else:
             self.nickname.draw()
-
-        self.board.draw_frame()
+        if self.session.is_self == False and self.is_host: self.crown.draw() #본인이 아닌 방장의 경우 위에 덧그려지는 형태
 
