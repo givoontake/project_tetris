@@ -198,7 +198,7 @@ void IOCPServer::ProcessGQCS()
 			if (ex_over->op_type == OP_TYPE::ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
 			else { // 클라이언트 강제 종료일 경우
 				session->StoreDisconnectFlag(true);
-				Disconnect(static_cast<int>(session->GetSessionKey().id));
+				Disconnect(static_cast<int>(session->GetSessionKey().index));
 				if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
 			}
 			continue;
@@ -207,7 +207,7 @@ void IOCPServer::ProcessGQCS()
 		// 클라이언트 정상 종료일 경우
 		if (transferred_bytes == 0 && ex_over->op_type != OP_TYPE::ACCEPT) {
 			session->StoreDisconnectFlag(true);
-			Disconnect(static_cast<int>(session->GetSessionKey().id));
+			Disconnect(static_cast<int>(session->GetSessionKey().index));
 			if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
 			continue;
 		}
@@ -392,7 +392,7 @@ void IOCPServer::CreateOpenRoom(char* packet, Session* session, int request_sess
 				else new_room = std::make_shared<MultiRoom>(this, session, data);
 				std::shared_ptr<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
-					new_room->SendAddRoom(session);
+					new_room->SendCreateRoom(session);
 					return;
 				}
 			}
