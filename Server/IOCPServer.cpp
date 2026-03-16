@@ -10,6 +10,7 @@ IOCPServer::IOCPServer()
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		users[i] = new Session();
+		users[i]->SetIndex(i);
 	}
 
 	// load는 객체 복사가 아니라 컨트롤 블록을 가리키는 핸들(shared_ptr)만 복사하는 것, 접근 흐름은 shared_ptr -> controll block(카운터, 실제 객체 포인터 등 존재) -> 실제 객체 이다.
@@ -54,44 +55,30 @@ IOCPServer::~IOCPServer()
 	WSACleanup();
 }
 
-void IOCPServer::HandlePacket(char* packet, Session* request_session) 
+void IOCPServer::HandlePacket(char* packet, Session* session, int request_sess_id)
 {
 	// 작업에 필요한 데이터는 락으로 잡고 전송에 필요한 본인 정보만 복사(전송에 필요한 본인 정보를 읽을 때 연결이 끊기면 데이터 레이스 발생 가능)
 	switch (packet[2]) {
 
 	case C2S_LOGIN: {
 		C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
-
-		int id;
-		int index;
-		std::lock_guard<std::mutex> lock(request_session->GetMutex());
-		if (request_session->GetState() == SESS_STATE::LOGIN) {
-			id = request_session->GetId();
-			index = request_session->GetIndex();
+		SessionKey key;
+		{
+			std::lock_guard<std::mutex> lock(session->GetMutex());
+			if (session->GetSessionKey().id != request_sess_id) return;
+			if (session->GetState() != SESS_STATE::LOGIN) return;
+			key = session->GetSessionKey();
 		}
-		else return;
 		
 		// null은 있을수도, 없을수도 있음. 그래서 일단 전체를 받아야함. strnlen(buf, max_size) -> null 직전까지 길이 반환, 안만나면 최대길이 반환
 		std::string login_id = CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
 		std::string password = CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
 		Database& repr_db = db; // condition_variable 객체 때문에 복사가 불가능함. 참조로 넘기는 방법밖에 없음
-		auto task_login = [&repr_db, id, index, login_id, password]() {
-			repr_db.ExecuteLogin(id, index, login_id, password);
+		auto task_login = [&repr_db, key, login_id, password]() {
+			repr_db.ExecuteLogin(key, login_id, password);
 			};
 
 		db.Enqueue(task_login);
-		//server->GetDB().Enqueue
-		//// 우선은 연결 요청이 들어오는 즉시 세션을 사용하도록 함. -> 나중에 반드시 바꿔야함
-		//S2C_LOGIN_PACKET send_p;
-		//send_p.size = sizeof(S2C_LOGIN_PACKET);
-		//send_p.type = S2C_LOGIN;
-		//memcpy(send_p.user_name, temp_name, MAX_USER_NAME);
-		//if (!memcmp(temp_id, recv_p->user_id, MAX_USER_ID) && !memcmp(temp_password, recv_p->user_password, MAX_USER_PASSWORD)) send_p.id = server->GetSession(user_index)->GetId();	
-		//else send_p.id = -1;
-
-		//std::cout << "size: " << recv_p->size << ", type: " << (int)recv_p->type << ", id: " << recv_p->user_id << ", pw: " << recv_p->user_password << std::endl;
-
-		//server->SendToSelf((char*)&send_p, user_index);
 
 		break;
 	}
@@ -106,13 +93,12 @@ void IOCPServer::HandlePacket(char* packet, Session* request_session)
 		std::string nickname;
 		int id;
 		{
-			// 본인 메세지 전송시 연결이 끊겼다면 메시지 무시, 아니라면 필요 정보만 복사
-			std::lock_guard<std::mutex> lock(request_session->GetMutex());
-			if (request_session->GetState() == SESS_STATE::LOBBY) {
-				nickname = request_session->GetInfo().nickname;
-				id = request_session->GetId();
-			}
-			else return;
+			// 본인 메세지 전송시 연결이 끊겼다면 메시지 무시, 정상이라면 뒤 상황 관계없이 무조건 전송
+			std::lock_guard<std::mutex> lock(session->GetMutex());
+			if (session->GetSessionKey().id != request_sess_id) return;
+			if (session->GetState() != SESS_STATE::LOBBY) return;
+			nickname = session->GetInfo().nickname;
+			id = session->GetSessionKey().id;
 		}
 
 		// 본인 포함 살아있는 세션에게만 전송 시도
@@ -124,7 +110,7 @@ void IOCPServer::HandlePacket(char* packet, Session* request_session)
 		memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET)); // 구조체 부분 복사
 		memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size); // 가변데이터 복사
 
-		BroadCastLobby(send_p);
+		BroadCastToLobby(send_p);
 
 		delete[] send_p;
 
@@ -140,12 +126,12 @@ void IOCPServer::HandlePacket(char* packet, Session* request_session)
 		S2C_TEST_PACKET front_p;
 		front_p.size = recv_p->size;
 		front_p.type = S2C_TEST;
-		front_p.id = request_session->GetId();
+		front_p.id = session->GetSessionKey().id;
 		front_p.last_time = recv_p->last_time;
 		memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET)); // 구조체 부분 복사
 		memcpy(send_p + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_TEST_PACKET), msg_size); // 가변데이터 복사
 
-		BroadCastLobby(send_p);
+		BroadCastToLobby(send_p);
 
 		delete[] send_p;
 
@@ -153,23 +139,25 @@ void IOCPServer::HandlePacket(char* packet, Session* request_session)
 	}
 
 	case C2S_DISCONNECT: {
-		request_session->StoreDisconnectFlag(true);
-		Disconnect(request_session->GetIndex());
+		session->StoreDisconnectFlag(true);
+		Disconnect(session->GetSessionKey().index);
 		break;
 	}
 
 	case C2S_ADD_OPEN_ROOM: {
-		CreateOpenRoom(packet, request_session->GetIndex());
+		CreateOpenRoom(packet, session, request_sess_id);
 		break;
 	}
 
 	case C2S_ADD_LOCK_ROOM: {
-		CreateLockRoom(packet, request_session->GetIndex());
+		CreateLockRoom(packet, session, request_sess_id);
 		break;
 	}
 
 	case C2S_ADD_USER: {
 		C2S_ADD_USER_PACKET* add_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
+		// adduser을 호출해도.. 락 잡기 전에 방 날아가면 어쩔거임??
+		// 방 참가 구현 필요
 		break;
 	}
 	}
@@ -194,22 +182,23 @@ void IOCPServer::ProcessGQCS()
 {
 	while (is_running){
 		DWORD transferred_bytes = 0;
-		ULONG_PTR key = 0;
+		ULONG_PTR completion_key = 0;
 		WSAOVERLAPPED* over = nullptr;
 		BOOL result = GetQueuedCompletionStatus( // 인자로 넘긴 주소 변수의 값을 채워준다.
 			iocp_handle,
 			&transferred_bytes,
-			&key,
+			&completion_key,
 			&over,
 			INFINITE);
 
 		ExOverlapped* ex_over = reinterpret_cast<ExOverlapped*>(over);
+		Session* session = users[completion_key];
 
 		if (!result){
 			if (ex_over->op_type == OP_TYPE::ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
 			else { // 클라이언트 강제 종료일 경우
-				users[key]->StoreDisconnectFlag(true);
-				Disconnect(static_cast<int>(key));
+				session->StoreDisconnectFlag(true);
+				Disconnect(static_cast<int>(session->GetSessionKey().id));
 				if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
 			}
 			continue;
@@ -217,8 +206,8 @@ void IOCPServer::ProcessGQCS()
 
 		// 클라이언트 정상 종료일 경우
 		if (transferred_bytes == 0 && ex_over->op_type != OP_TYPE::ACCEPT) {
-			users[key]->StoreDisconnectFlag(true);
-			Disconnect(static_cast<int>(key));
+			session->StoreDisconnectFlag(true);
+			Disconnect(static_cast<int>(session->GetSessionKey().id));
 			if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
 			continue;
 		}
@@ -228,11 +217,13 @@ void IOCPServer::ProcessGQCS()
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 			int new_index = GetEmptyUserIndex();
 			if (new_index != -1) {
-				users[new_index]->InitSession(new_index, GetNewUserId(), client_socket);
-				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
-				users[new_index]->RecvPacket(iocp_handle);
+				int id = GetNewUserId();
+				users[new_index]->InitSession(id, client_socket);
+				SessionKey key = users[new_index]->GetSessionKey();
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, key.id, 0);
+				users[new_index]->RecvPacket(session->GetSessionKey().id, iocp_handle);
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED); // 커널 내 새 소켓을 생성하고 그것을 가리키는 핸들을 받음, 기존 핸들은 이미 initsession 되어 세션 내부에 가지고 있다.
-				std::cout << "Session[" << new_index << "] connect/Id: " << users[new_index]->GetId() << std::endl;
+				std::cout << "Session[" << new_index << "] connect/Id: " << users[new_index]->GetSessionKey().id << std::endl;
 			}
 
 			else {
@@ -254,10 +245,9 @@ void IOCPServer::ProcessGQCS()
 
 		case OP_TYPE::RECV: {
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
-			if (io_over->ex_over.operation_id == users[key]->GetId()) {
-				ProcessPacket(transferred_bytes, key);
-				users[key]->RecvPacket(iocp_handle);
-			}
+			int reqeust_id = io_over->ex_over.request_id;
+			ProcessPacket(users[completion_key], reqeust_id, transferred_bytes);
+			users[completion_key]->RecvPacket(reqeust_id, iocp_handle);
 			
 			break;
 		}
@@ -268,86 +258,89 @@ void IOCPServer::ProcessGQCS()
 
 			break;
 		}
-		case OP_TYPE::DELETE_ROOM:
+		case OP_TYPE::DELETE_ROOM: // 이 작업이 올 때 키는 방 인덱스임
 			delete ex_over;
-			DeleteRoom(static_cast<int>(key));
+			DeleteRoom(static_cast<int>(completion_key));
 
 			break;
 		case OP_TYPE::DB:
 			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
-			ProcessDBResult(db_over, key);
+
+			ProcessDBResult(db_over, session, db_over->ex_over.request_id);
+
+			break;
 		}
 	}
 }
 
-void IOCPServer::ProcessPacket(int recv_bytes, int user_index)
+void IOCPServer::ProcessPacket(Session* session, int request_sess_id, int recv_bytes)
 {
-	//{
-	//	std::lock_guard<std::mutex> lock(users[user_index]->GetMutex());
-	//	if(users[user_index]->GetState() == NONE)
-	//}
-	if (recv_bytes + users[user_index]->GetRemainDataSize() > BUF_SIZE) {
-		Disconnect(user_index);
+	std::lock_guard<std::mutex> lock(session->GetMutex()); // 락 범위가 너무 큰 것 같기는 한데..
+	if (session->GetState() == SESS_STATE::NONE) return;
+	if (session->GetSessionKey().id != request_sess_id) return;
+
+	if (recv_bytes + session->GetRemainDataSize() > BUF_SIZE) {
+		PostQueuedCompletionStatus(iocp_handle, 0, request_sess_id, nullptr);
 		return;
 	}
+		 
+	else session->SetRemainDataSize(recv_bytes);
 
-	else users[user_index]->SetRemainDataSize(recv_bytes);
+	if (session->GetRemainDataSize() < sizeof(short)) return;
 
-	if (users[user_index]->GetRemainDataSize() < sizeof(short)) return;
+	short packet_size = session->GetPacketSize(session->GetExOver().packet_buf);
 
-	short packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
-
-	while (users[user_index]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
+	while (session->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
 	{
 		char p_buffer[BUF_SIZE];
 		// 패킷 분리: packet_buffer에 복사 후 처리
-		memcpy(p_buffer, users[user_index]->GetExOver().packet_buf, packet_size);
-		RoutePacket(p_buffer, users[user_index]);
+		memcpy(p_buffer, session->GetExOver().packet_buf, packet_size);
+		RoutePacket(p_buffer, session, request_sess_id);
 
-		 // 처리한 패킷은 남은 데이터에서 제거
-		users[user_index]->SetRemainDataSize(-packet_size);
-		memmove(users[user_index]->GetExOver().packet_buf, users[user_index]->GetExOver().packet_buf + packet_size, users[user_index]->GetRemainDataSize());
-		if (users[user_index]->GetRemainDataSize() <= sizeof(short)) break;
-		packet_size = users[user_index]->GetPacketSize(users[user_index]->GetExOver().packet_buf);
+		// 처리한 패킷은 남은 데이터에서 제거
+		session->SetRemainDataSize(-packet_size);
+		memmove(session->GetExOver().packet_buf, session->GetExOver().packet_buf + packet_size, session->GetRemainDataSize());
+		if (session->GetRemainDataSize() <= sizeof(short)) break;
+		packet_size = session->GetPacketSize(session->GetExOver().packet_buf);
 	}
 }
 
-void IOCPServer::RoutePacket(char* packet, Session* request_session)
+void IOCPServer::RoutePacket(char* packet, Session* session, int request_sess_id)
 {
 	PrintPacketType(packet[2]);
-	switch (request_session->GetState()) {
+	switch (session->GetState()) {
 	case SESS_STATE::NONE:
 		return;
 	case SESS_STATE::LOGIN:
-		HandlePacket(packet, request_session);
+		HandlePacket(packet, session, request_sess_id);
 		break;
 	case SESS_STATE::LOBBY:
-		HandlePacket(packet, request_session);
+		HandlePacket(packet, session, request_sess_id);
 		break;
 	case SESS_STATE::ROOM: {
-		auto room_ptr = rooms[request_session->GetRoomIndex()].load();
-		if (room_ptr) room_ptr->HandlePacket(packet, request_session);
+		auto room_ptr = rooms[session->GetRoomIndex()].load();
+		if (room_ptr) room_ptr->HandlePacket(packet, session); // 방에 들어가있는 상태라면 내부에서 세션은 키 없이도 안전하게 관리된다.
 		break;
 	}
 	}
 
 }
 
-void IOCPServer::BroadCastLobby(char* packet)
+void IOCPServer::BroadCastToLobby(char* packet)
 {
 	for (auto& user : users) {
-		if (user->GetState() == SESS_STATE::LOBBY) {// 현재 이 상태는 서버에 연결되어 있는 상태이므로, 나중에 로비, 방에 따라 구분 필요
+		if (user->GetState() == SESS_STATE::LOBBY) {
 			user->SendPacket(packet, iocp_handle);
 		}
 	}
 }
 
-void IOCPServer::SendToSelf(char* packet, int self_index)
-{
-	users[self_index]->SendPacket(packet, iocp_handle);
-}
+//void IOCPServer::SendToSelf(char* packet, int self_index)
+//{
+//	users[self_index]->SendPacket(packet, iocp_handle);
+//}
 
-void IOCPServer::CreateOpenRoom(char* packet, int user_index)
+void IOCPServer::CreateOpenRoom(char* packet, Session* session, int request_sess_id)
 {
 	C2S_ADD_OPEN_ROOM_PACKET* open_p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
 	OpenRoomInitData data;
@@ -372,12 +365,18 @@ void IOCPServer::CreateOpenRoom(char* packet, int user_index)
 	for (int i = 0; i < MAX_ROOM; ++i) {
 		if (rooms[i].load() == nullptr) {
 			data.room_index = i;
-			if (is_single) new_room = std::make_shared<SingleRoom>(this, users[user_index], data);
-			else new_room = std::make_shared<MultiRoom>(this, users[user_index], data);
-			std::shared_ptr<TetrisRoom> expected = nullptr;
-			if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
-				//std::cout << "Open Room created, Room index: " << i << ", Room id: " << room_id << std::endl;
-				return;
+			{
+				std::lock_guard<std::mutex> lock(session->GetMutex());
+				if (session->GetState() == SESS_STATE::NONE) return;
+				if (session->GetSessionKey().id != request_sess_id) return;
+
+				if (is_single) new_room = std::make_shared<SingleRoom>(this, session, data);
+				else new_room = std::make_shared<MultiRoom>(this, session, data);
+				std::shared_ptr<TetrisRoom> expected = nullptr;
+				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
+					new_room->SendAddRoom(session);
+					return;
+				}
 			}
 		}
 	}
@@ -385,7 +384,7 @@ void IOCPServer::CreateOpenRoom(char* packet, int user_index)
 	// 나중에 방 못찾으면 추후 처리 필요
 }
 
-void IOCPServer::CreateLockRoom(char* packet, int user_index)
+void IOCPServer::CreateLockRoom(char* packet, Session* session, int request_sess_id)
 {
 	C2S_ADD_LOCK_ROOM_PACKET* lock_p = reinterpret_cast<C2S_ADD_LOCK_ROOM_PACKET*>(packet);
 	LockRoomInitData data;
@@ -411,12 +410,18 @@ void IOCPServer::CreateLockRoom(char* packet, int user_index)
 	for (int i = 0; i < MAX_ROOM; ++i) {
 		if (rooms[i].load() == nullptr) {
 			data.room_index = i;
-			if (is_single) new_room = std::make_shared<SingleRoom>(this, users[user_index], data);
-			else new_room = std::make_shared<MultiRoom>(this, users[user_index], data);
-			std::shared_ptr<TetrisRoom> expected = nullptr;
-			if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
-				//std::cout << "Open Room created, Room index: " << i << ", Room id: " << room_id << std::endl;
-				return;
+			{
+				std::lock_guard<std::mutex> lock(session->GetMutex());
+				if (session->GetState() == SESS_STATE::NONE) return;
+				if (session->GetSessionKey().id != request_sess_id) return;
+
+				if (is_single) new_room = std::make_shared<SingleRoom>(this, session, data);
+				else new_room = std::make_shared<MultiRoom>(this, session, data);
+				std::shared_ptr<TetrisRoom> expected = nullptr;
+				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
+					//std::cout << "Open Room created, Room index: " << i << ", Room id: " << room_id << std::endl;
+					return;
+				}
 			}
 		}
 	}
@@ -463,16 +468,17 @@ int IOCPServer::GetEmptyRoomIndex()
 
 void IOCPServer::Disconnect(int user_index)
 {
-	if (users[user_index]->GetState() == SESS_STATE::NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
+	Session* target = users[user_index];
+	if (target->GetState() == SESS_STATE::NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
 
-	if (users[user_index]->TryChangeDisconnectFlag(true, false)) {
-		if (users[user_index]->GetState() == SESS_STATE::ROOM) {
-			auto room = rooms[users[user_index]->GetRoomIndex()].load();
-			if (room) room->DeleteUser(users[user_index]->GetId());
+	if (target->TryChangeDisconnectFlag(true, false)) {
+		if (target->GetState() == SESS_STATE::ROOM) {
+			auto room = rooms[target->GetRoomIndex()].load();
+			if (room) room->DeleteUser(target->GetSessionKey().id);
 		}
 
-		std::cout << "Session index[" << users[user_index]->GetIndex() << "] disconnect/Id: " << users[user_index]->GetId() << std::endl;
-		users[user_index]->ClearSession();
+		std::cout << "Session index[" << target->GetSessionKey().index << "] disconnect/Id: " << target->GetSessionKey().id << std::endl;
+		target->ClearSession();
 	}
 	
 	//S2C_DISCONNECT_PACKET p;
@@ -482,15 +488,15 @@ void IOCPServer::Disconnect(int user_index)
 
 }
 
-void IOCPServer::ProcessDBResult(DBOverlapped* db_over, int user_index)
+void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session* session, int request_sess_id)
 {
 	// DB 작업 이후 결과를 세션에 통지하기 전에, 세션이 종료되었을 수 있다.
 	// 만약 세션이 즉시 재사용된다면, 우연히 세션을 초기화하는 과정에서 아이디가 바뀌기 전에 다른 부분이 먼저 변경되었을 가능성이 있다.
 	// DB 작업만 문제가 되는게 아니다. 일반 IO도 오퍼레이션 아이디를 넣기는 하지만, 위와 같이 다른 세션인데 우연히 아이디는 바뀌지 않았을 가능성이 있다.
 	// 따라서 세션의 초기화는 뮤텍스로 처리해야 한다. 클리어는 굳이 뮤텍스로 처리하지 않아도 될 것 같다. 세션이 비었다는 상태를 클리어 맨 마지막에 저장하면 즉시 재사용된다고 해도 문제는 생기지 않는다.
-
-	if (users[user_index]->GetId() != db_over->ex_over.operation_id) return;
-
+	
+	// IOCP에서 작업 완료하고 얻어온 key만 계속 넘어가면 된다. 최종 검증은 send 직전에 한다.
+	// 만약 재사용됐다? -> GQCS에서 받아온 키가 send 전까지 계속 넘어가므로, 최종 검증은 거기서만 하면 된다.
 	switch (db_over->type) {
 	case DBOperationType::LOGIN: {
 		S2C_LOGIN_PACKET login_p;
@@ -499,19 +505,22 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, int user_index)
 		login_p.type = S2C_LOGIN;
 		if (db_over->ok) {
 			if (db_over->result_data) { // nullptr이 아니면, 즉 포인터가 존재하면
-				users[user_index]->InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
-				users[user_index]->StoreState(SESS_STATE::LOBBY);
-				login_p.id = users[user_index]->GetId();
-				login_p.max_score = users[user_index]->GetInfo().max_score;
-				login_p.win_count = users[user_index]->GetInfo().win_count;
-				login_p.lose_count = users[user_index]->GetInfo().lose_count;
-				StringToCharBuf(users[user_index]->GetInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
+				std::lock_guard<std::mutex> lock(session->GetMutex());
+				if (request_sess_id != session->GetSessionKey().id) return;
+				if (session->GetState() == SESS_STATE::NONE) return;
+				session->InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
+				session->StoreState(SESS_STATE::LOBBY);
+				login_p.id = session->GetSessionKey().id;
+				login_p.max_score = session->GetInfo().max_score;
+				login_p.win_count = session->GetInfo().win_count;
+				login_p.lose_count = session->GetInfo().lose_count;
+				StringToCharBuf(session->GetInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
 			}
 		}
 		else {
 			login_p.id = -1; // 근데 로그인 실패일경우 나머지 패킷도 다같이 가는건 낭비같은데.. 결국 로그인 성공과 세션 데이터 전송은 분리 해야할듯
 		}
-		users[user_index]->SendPacket(reinterpret_cast<char*>(&login_p), iocp_handle);
+		session->SendPacket(request_sess_id, reinterpret_cast<char*>(&login_p), iocp_handle);
 		break;
 	}
 	case DBOperationType::UPDATE_SCORE:
@@ -519,27 +528,39 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, int user_index)
 			// void*는 사용할 때 타입을 명시해야함(컴파일러가 알아들을 수 있도록)
 			// 보이드 유니크 포인터인 db_over->info를 get 함수로 raw 포인터를 가져와 사용할 포인터로 static_cast, void* <-> T* 간에는 static_cast가 허용되고, void*에는 T*를 대입할 수 있다.
 			DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
-			users[user_index]->GetInfo().max_score = res->max_score;
+			{
+				std::lock_guard<std::mutex> lock(session->GetMutex());
+				if (request_sess_id != session->GetSessionKey().id) return;
+				if (session->GetState() == SESS_STATE::NONE) return;
+				session->GetInfo().max_score = res->max_score;
+			}
 			S2C_UPDATE_SCORE_PACKET us_p;
 			us_p.size = sizeof(S2C_UPDATE_SCORE_PACKET);
 			us_p.type = S2C_UPDATE_SCORE;
 			us_p.max_score = res->max_score;
-			users[user_index]->SendPacket(reinterpret_cast<char*>(&us_p), iocp_handle);
+			session->SendPacket(request_sess_id, reinterpret_cast<char*>(&us_p), iocp_handle);
 		} 
 		break;
 
 	case DBOperationType::UPDATE_MATCH_RESULT:
 		if (db_over->ok) {
-			DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
-			if (res->is_winner) ++users[user_index]->GetInfo().win_count;
-			else ++users[user_index]->GetInfo().lose_count;
-
 			S2C_MATCH_RECORD_PACKET record_p;
 			record_p.size = sizeof(S2C_MATCH_RECORD_PACKET);
 			record_p.type = S2C_MATCH_RECORD;
-			record_p.win_count = users[user_index]->GetInfo().win_count;
-			record_p.lose_count = users[user_index]->GetInfo().lose_count;
-			users[user_index]->SendPacket(reinterpret_cast<char*>(&record_p), iocp_handle);
+			DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
+			{
+				std::lock_guard<std::mutex> lock(session->GetMutex());
+				if (request_sess_id != session->GetSessionKey().id) return;
+				if (session->GetState() == SESS_STATE::NONE) return;
+
+				if (res->is_winner) ++session->GetInfo().win_count;
+				else ++session->GetInfo().lose_count;
+
+				record_p.win_count = session->GetInfo().win_count;
+				record_p.lose_count = session->GetInfo().lose_count;
+			}
+
+			session->SendPacket(request_sess_id, reinterpret_cast<char*>(&record_p), iocp_handle);
 		}
 		break;
 	}

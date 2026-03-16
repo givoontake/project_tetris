@@ -25,6 +25,7 @@
 #include "enum_class.h"
 #include "define.h"
 #include "DBResult.h"
+#include "Session.h"
 
 // 반환형은 void, 실행 시 인자를 받지 않는다.
 // 실제로는 callable 객체(std::function)이며, 람다(closure object)를 담아 사용한다.
@@ -94,9 +95,9 @@ public:
     // ⚠️ 이 함수들은 "DB 스레드에서만" 호출되어야 한다.
     // 외부는 보통 아래처럼 람다에 넣어 Enqueue 한다:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
-    void ExecuteLogin(int session_id, int session_index, const std::string& login_id, const std::string& password);
-    void ExecuteUpdateScore(int session_id, int session_index, const std::string& login_id, int new_score);
-	void ExecuteUpdateMatchResult(int session_id, int session_index, const std::string& login_id, bool is_winner);
+    void ExecuteLogin(SessionKey key, const std::string login_id, const std::string password);
+    void ExecuteUpdateScore(SessionKey key, const std::string login_id, int new_score);
+	void ExecuteUpdateMatchResult(SessionKey key, const std::string login_id, bool is_winner);
 
 private:
     // ---- 설정 파일 로드 ----

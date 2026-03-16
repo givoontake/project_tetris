@@ -4,6 +4,7 @@
 
 TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, OpenRoomInitData data)
 {
+	// 생성과 소멸은 스레드 세이프하지는 않지만, 어차피 make_shared하고 CAS해서 룸 리스트에 할당하기 전에는 접근되지 않는다.
 	server = _server;
 	max_user = data.max_user;
 	memcpy(this->room_name, data.room_name, sizeof(this->room_name));
@@ -18,7 +19,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, OpenRoomInitData d
 
 	session->SetRoomIndex(room_index);
 	room_users[0].InitRoomSession(session);
-	SendAddRoom(session);
+	//SendAddRoom(session);
 }
 
 TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, LockRoomInitData data)
@@ -37,7 +38,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, LockRoomInitData d
 	}
 	session->SetRoomIndex(room_index);
 	room_users[0].InitRoomSession(session);
-	SendAddRoom(session);
+	//SendAddRoom(session);
 }
 
 TetrisRoom::~TetrisRoom()
@@ -45,13 +46,13 @@ TetrisRoom::~TetrisRoom()
 	if (room_password) delete[] room_password;
 }
 
-void TetrisRoom::SendAddRoom(Session* session) // 네트워크 절약을 위해 비밀번호 포함 여부를 다르게 하여 패킷을 두 개로 구분, 같은 역할이므로 하나의 함수로 받아 케이스로 처리
+void TetrisRoom::SendAddRoom(Session* session) // 외부에서 세션 락 걸고 함수로 들어오는 구조라 세션 접근은 안전함
 {
 	if (!room_password) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
-		open_p.id = session->GetId();
+		open_p.id = session->GetSessionKey().id;
 		open_p.max_user = max_user;
 		memcpy(open_p.room_name, room_name, sizeof(room_name));
 		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
@@ -60,13 +61,13 @@ void TetrisRoom::SendAddRoom(Session* session) // 네트워크 절약을 위해 
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
 		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 		lock_p.type = S2C_ADD_LOCK_ROOM;
-		lock_p.id = session->GetId();
+		lock_p.id = session->GetSessionKey().id;
 		lock_p.max_user = max_user;
 		memcpy(lock_p.room_name, room_name, sizeof(room_name));
 		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
 		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
-	std::cout << "Session id: " << session->GetId() << " Create room. room id(index): " << room_id;
+	std::cout << "Room[: " << room_index << "] created by : " << session->GetInfo().nickname << "\n";
 }
 
 void TetrisRoom::InitGame()
@@ -104,7 +105,7 @@ bool TetrisRoom::SpawnTetromino(int id) // 내가 이걸 왜 반환형을 bool�
 {
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		if (r_user.GetSession()->GetId() == id){
+		if (r_user.GetSession()->GetSessionKey().id == id){
 			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]), spawn_pos);
 			return true;
 		}
@@ -149,7 +150,7 @@ void TetrisRoom::BoundPackets()
 				S2C_FIX_PACKET fix_p;
 				fix_p.size = sizeof(S2C_FIX_PACKET);
 				fix_p.type = S2C_FIX;
-				fix_p.id = r_user.GetSession()->GetId();
+				fix_p.id = r_user.GetSession()->GetSessionKey().id;
 				fix_p.fixed_x = t.fixed_x; // 실시간 반영된 값을 읽는게 아니라 작업 목록을 가져와서 패킷을 구성하므로, 작업 당시의 값을 가져와야 함. addline과 동시 틱에 처리되면 클라는 공중에 떠 있는 것으로 보이는 버그 발생
 				fix_p.fixed_y = t.fixed_y;
 				r_user.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.size);
@@ -161,7 +162,7 @@ void TetrisRoom::BoundPackets()
 				S2C_CLEARLINE_PACKET clear_line_p;
 				clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
 				clear_line_p.type = S2C_CLEARLINE;
-				clear_line_p.id = r_user.GetSession()->GetId();
+				clear_line_p.id = r_user.GetSession()->GetSessionKey().id;
 				clear_line_p.score = r_user.GetScore();
 				clear_line_p.line_index = t.line_index;
 				clear_line_p.combo = r_user.GetCombo();
@@ -173,11 +174,11 @@ void TetrisRoom::BoundPackets()
 				if (r_user.GetTetrominoIndex() == (tetromino_spawn_list.size() - 2)) Add7BagTetrominoList();
 				r_user.AddTetrominoIndex();
 
-				if (SpawnTetromino(r_user.GetSession()->GetId())) {
+				if (SpawnTetromino(r_user.GetSession()->GetSessionKey().id)) {
 					S2C_SPAWN_PACKET spawn_p;
 					spawn_p.size = sizeof(S2C_SPAWN_PACKET);
 					spawn_p.type = S2C_SPAWN;
-					spawn_p.id = r_user.GetSession()->GetId();
+					spawn_p.id = r_user.GetSession()->GetSessionKey().id;
 					spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 					spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 					spawn_p.spawn_x = static_cast<char>(spawn_pos.x);
@@ -192,7 +193,7 @@ void TetrisRoom::BoundPackets()
 				S2C_ADDLINE_PACKET add_line_p;
 				add_line_p.size = sizeof(S2C_ADDLINE_PACKET);
 				add_line_p.type = S2C_ADDLINE;
-				add_line_p.id = r_user.GetSession()->GetId();
+				add_line_p.id = r_user.GetSession()->GetSessionKey().id;
 				auto& t = std::get<TaskAddLine>(task.task);
 				add_line_p.hole_x = static_cast<char>(t.hole_x);
 				r_user.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.size);
@@ -205,7 +206,7 @@ void TetrisRoom::BoundPackets()
 				S2C_GAMEOVER_PACKET gameover_p;
 				gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
 				gameover_p.type = S2C_GAMEOVER;
-				gameover_p.id = r_user.GetSession()->GetId();
+				gameover_p.id = r_user.GetSession()->GetSessionKey().id;
 				r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameover_p), gameover_p.size);
 
 				break;
@@ -231,7 +232,7 @@ void TetrisRoom::MakeMovePacket(RoomSession& r_session, int move_type)
 	S2C_MOVE_PACKET move_p;
 	move_p.size = sizeof(S2C_MOVE_PACKET);
 	move_p.type = S2C_MOVE;
-	move_p.id = r_session.GetSession()->GetId();
+	move_p.id = r_session.GetSession()->GetSessionKey().id;
 	move_p.move_type = static_cast<char>(move_type);
 	r_session.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
 }
@@ -279,14 +280,18 @@ void TetrisRoom::ResetUsersTickData()
 void TetrisRoom::BroadcastTickDataForUsers()
 {
 	for (int i = 0; i < room_users.size(); ++i) {
-		if (room_users[i].GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		RoomSession& source = room_users[i];
+		if (source.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		//IOKey key = source.GetSession()->GetIOKey();
+		char* send_buffer = source.GetSendBuf();
+		int data_size = source.GetSendDataSize();
+
 		for (int j = 0; j < room_users.size(); ++j) {
-			if (room_users[j].GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-			char* send_buffer = room_users[j].GetSendBuf();
-			int data_size = room_users[j].GetSendDataSize();
-			// 0이 IOCP로 들어가면 연결이 종료되는 것에 주의해야함
+			RoomSession& target = room_users[j];
+			if (target.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+			// data_size = 0이 IOCP로 들어가면 연결이 종료되는 것에 주의해야함
 			// 게임 시작 시 틱마다 자동 전송하므로 조건이 꼭 필요
-			if (data_size > 0) room_users[i].GetSession()->SendBoundPacket(send_buffer, data_size, server->GetHandle());
+			if (data_size > 0) target.GetSession()->SendBoundPacket(send_buffer, data_size, server->GetHandle());
 		}
 	}
 

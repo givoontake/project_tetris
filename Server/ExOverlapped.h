@@ -7,13 +7,14 @@
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;
-	int operation_id; // 세션 id와 같다.
 	OP_TYPE op_type;
+	int request_id = -1;
 
 	ExOverlapped() {
 		ZeroMemory(&over, sizeof(over));
-		operation_id = -1;
 	}
+
+	void SetRequestId(int new_id) { request_id = new_id; }
 };
 
 struct IOOverlapped {
@@ -29,10 +30,6 @@ struct IOOverlapped {
 
 	void SetOperationType(OP_TYPE type) {
 		ex_over.op_type = type;
-	}
-
-	void SetOperationId(int id) {
-		ex_over.operation_id = id;
 	}
 
 	//void SetExOverlapped(OP_TYPE type, char* packet) {

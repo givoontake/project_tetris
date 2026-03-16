@@ -63,6 +63,8 @@ struct LockRoomInitData {
 
 // 현재 룸 세션 내부에 session*를 유지중이라, 유저가 삭제되면 범위기반 스코프 접근 시 해당 참조의 세션이 널일 수 있고, 방이 삭제되어 버리면 범위 자체가 손상되어 범위기반 작업은 모두 뮤텍스로 묶어놓은 상태이다.
 // 포인터가 아니라 다르게 관리한다면 이 문제를 좀 더 효율적으로 해결할 수 있을 것 같다.
+
+// 룸 내부의 세션은 Disconnect 로직 및 방 내부 뮤텍스에 의해 100% 유효한 상태
 class TetrisRoom
 {
 protected:
@@ -115,9 +117,4 @@ public:
 	void ResetUsersTickData();
 	void BroadcastTickDataForUsers();
 	void Broadcast(char* packet, const HANDLE iocp_handle);
-
-	// 싱글 전용
-	void CalculateScore(RoomSession& r_session, int clear_line_count);
-	void RequestUpdateScore(RoomSession& r_session);
-
 };

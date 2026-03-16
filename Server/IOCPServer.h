@@ -58,17 +58,17 @@ public:
 	void Disconnect(int user_index);
 	void StartServer();
 	void ProcessGQCS();
-	void ProcessPacket(int recv_bytes, int user_index);
-	void RoutePacket(char* packet, Session* request_session);
-	void BroadCastLobby(char* packet);
+	void ProcessPacket(Session* session, int reqeust_sess_id, int recv_bytes);
+	void RoutePacket(char* packet, Session* session, int request_sess_id);
+	void BroadCastToLobby(char* packet);
 	//void BroadCastRoom(char* packet, int room_id);
-	void SendToSelf(char* packet, int self_index);
-	void CreateOpenRoom(char* packet, int user_index); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
-	void CreateLockRoom(char* packet, int user_index);
+	//void SendToSelf(char* packet, int self_index);
+	void CreateOpenRoom(char* packet, Session* session, int request_sess_id); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
+	void CreateLockRoom(char* packet, Session* session, int request_sess_id);
 	void DeleteRoom(int room_index);
-	void ProcessDBResult(DBOverlapped* db_over, int user_index);
+	void ProcessDBResult(DBOverlapped* db_over, Session* session, int request_sess_id);
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
-	void HandlePacket(char* packet, Session* request_session);
+	void HandlePacket(char* packet, Session* session, int request_sess_id);
 	void JoinRoom(int user_index, int room_id);
 };

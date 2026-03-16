@@ -12,7 +12,7 @@ SingleRoom::SingleRoom(IOCPServer* server, Session* session, LockRoomInitData da
 {
 }
 
-void SingleRoom::HandlePacket(char* packet, Session* request_session)
+void SingleRoom::HandlePacket(char* packet, Session* request_session) 
 {
 	//std::cout << "SingleRoom::HandlePacket, Packet type: ";
 	//PrintPacketType(packet[2]);
@@ -25,14 +25,14 @@ void SingleRoom::HandlePacket(char* packet, Session* request_session)
 	}
 
 	case C2S_DELETE_USER: {
-		DeleteUser(request_session->GetId());
+		DeleteUser(request_session->GetSessionKey().id);
 		break;
 	}
 
 	case C2S_MOVE: {
 		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
 		TaskInfo new_task;
-		new_task.id = room_users[0].GetSession()->GetId();
+		new_task.id = room_users[0].GetSession()->GetSessionKey().id;
 		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
 		GetTasks().AddTask(new_task);
 		break;
@@ -53,7 +53,7 @@ void SingleRoom::ProcessPlayTasks()
 			TaskInfo task = tasks.GetTask();
 			for (auto& r_user : room_users) {
 				if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-				if (r_user.GetSession()->GetId() == task.id) {
+				if (r_user.GetSession()->GetSessionKey().id == task.id) {
 					// 각 작업들을 각 세션에 분배
 					r_user.GetTetris().GetInputTasks().emplace_back(task.type);
 
@@ -119,7 +119,7 @@ void SingleRoom::StartGame()
 			S2C_SPAWN_PACKET spawn_p;
 			spawn_p.size = sizeof(S2C_SPAWN_PACKET);
 			spawn_p.type = S2C_SPAWN;
-			spawn_p.id = r_user.GetSession()->GetId();
+			spawn_p.id = r_user.GetSession()->GetSessionKey().id;
 			spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 			spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 			spawn_p.spawn_x = spawn_pos.x;
@@ -138,7 +138,7 @@ void SingleRoom::DeleteUser(const int id)
 		std::lock_guard<std::mutex> lock(room_mutex);
 		for (auto& r_user : room_users) {
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-			if (r_user.GetSession()->GetId() == id) { // 삭제할 아이디 검색
+			if (r_user.GetSession()->GetSessionKey().id == id) { // 삭제할 아이디 검색
 				//std::cout << "delete user id: " << id << std::endl;
 				//room_mutex.lock();
 				r_user.GetSession()->StoreState(SESS_STATE::LOBBY);
@@ -236,7 +236,7 @@ void SingleRoom::MakeMovePacketData(int move_type)
 	S2C_MOVE_PACKET move_p;
 	move_p.size = sizeof(S2C_MOVE_PACKET);
 	move_p.type = S2C_MOVE;
-	move_p.id = room_users[0].GetSession()->GetId();
+	move_p.id = room_users[0].GetSession()->GetSessionKey().id;
 	move_p.move_type = static_cast<char>(move_type);
 	room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
 }
@@ -244,13 +244,14 @@ void SingleRoom::MakeMovePacketData(int move_type)
 void SingleRoom::RequestUpdateScore()
 {
 	if (room_users[0].GetSession()->GetInfo().max_score < room_users[0].GetScore()) {
-		int id = room_users[0].GetSession()->GetId();
-		int index = room_users[0].GetSession()->GetIndex();
+		SessionKey key;
+		key.id = room_users[0].GetSession()->GetSessionKey().id;
+		key.index = room_users[0].GetSession()->GetSessionKey().index;
 		std::string login_id = room_users[0].GetSession()->GetInfo().login_id;
 		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
-		auto task_update_score = [id, index, login_id, new_score, &db] {
-			db.ExecuteUpdateScore(id, index, login_id, new_score);
+		auto task_update_score = [key, login_id, new_score, &db] {
+			db.ExecuteUpdateScore(key, login_id, new_score);
 			};
 		server->GetDB().Enqueue(task_update_score);
 	}
