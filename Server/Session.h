@@ -26,7 +26,7 @@ class Session
 	int remain_data_size = 0;
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
-	Atomic<bool> disconnect_flag = false;
+	Atomic<bool> disconnect_flag = false; // 상태에 추가하려고 해도 DISCONNECT 전에 어떤 상태인지 알 수가 없어서 CAS가 불가능해 따로 추가한 값
 	Atomic<SESS_STATE> state = SESS_STATE::NONE;
 	DBResultLogin info;
 	std::mutex sess_mutex; // send 작업 도중 disconnect를 막기 위한 것, 제너레이션은 send 성공 이후 ~ iocp 결과 처리 사이에 발생한 disconnect에 의한 예외를 막기 위한 것

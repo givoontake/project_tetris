@@ -19,8 +19,8 @@ void Session::InitSession(int new_id, SOCKET new_socket)
 	info.clear();
 	key.id = new_id;
 	remain_data_size = 0; // 얘 기준으로 버퍼에 쓰니까 굳이 버퍼 자체를 초기화할 필요는 없어 보임.
-	room_index = -1;
 	disconnect_flag.Store(false);
+	recv_over.ex_over.request_id = key.id;
 
 	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
@@ -39,7 +39,7 @@ void Session::ClearSession()
 		// tcp에서 패킷을 나누어 보낼 때 비정상 종료되면 일부만 보내고 끝날 수도 있다고 한다
 		// 따라서 remain_data_size는 항상 초기화가 필요하다
 		remain_data_size = 0;
-		room_index = -1;
+		recv_over.ex_over.request_id = -1;
 		state.Store(SESS_STATE::NONE);
 	}
 }
@@ -90,7 +90,7 @@ void Session::SendPacket(int reqeust_sess_id, char* packet, const HANDLE iocp_ha
 			}
 		}
 		else {
-			std::cerr << "Session index[" << key.index << "]slot has been reused." << std::endl;
+			std::cerr << "Session::SendPacket, Session index[" << key.index << "]slot has been reused." << std::endl;
 			return;
 		}
 	}
@@ -120,16 +120,13 @@ void Session::RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle)
 			recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
 			recv_over.wsabuf.buf = recv_over.packet_buf + remain_data_size;
 			int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag, &recv_over.ex_over.over, 0);
-
 			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-				SessionKey* s_key = new SessionKey;
-				*s_key = key;
-				PostQueuedCompletionStatus(iocp_handle, 0, reinterpret_cast<ULONG_PTR>(&s_key), reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
+				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
 				std::cerr << key.id << " Session::RecvPacket() WSARecv error\n";
 			}
 		}
 		else {
-			std::cerr << "Session index[" << key.index << "]slot has been reused." << std::endl;
+			std::cerr << "Session::RecvPacket, Session index[" << key.index << "]slot has been reused." << std::endl;
 			return;
 		}
 	}

@@ -219,9 +219,8 @@ void IOCPServer::ProcessGQCS()
 			if (new_index != -1) {
 				int id = GetNewUserId();
 				users[new_index]->InitSession(id, client_socket);
-				SessionKey key = users[new_index]->GetSessionKey();
-				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, key.id, 0);
-				users[new_index]->RecvPacket(session->GetSessionKey().id, iocp_handle);
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
+				users[new_index]->RecvPacket(users[new_index]->GetSessionKey().id, iocp_handle);
 				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED); // 커널 내 새 소켓을 생성하고 그것을 가리키는 핸들을 받음, 기존 핸들은 이미 initsession 되어 세션 내부에 가지고 있다.
 				std::cout << "Session[" << new_index << "] connect/Id: " << users[new_index]->GetSessionKey().id << std::endl;
 			}
