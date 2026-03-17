@@ -1,7 +1,7 @@
 # define.py
 # Network
 BUF_SIZE = 10240
-SERVER_HOST = '127.0.0.1'
+SERVER_HOST = '1.241.29.227'
 SERVER_PORT = 12345
 
 # Screen dimensions (FHD)
