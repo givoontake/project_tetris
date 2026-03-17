@@ -328,4 +328,8 @@ class C2S_MOVE_PACKET(SendPacketStruct):
     BODY_FMT: ClassVar[str] = "b"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
+@dataclass
+class C2S_GIVEUP_PACKET(SendPacketStruct):
+    BODY_FMT: ClassVar[str] = ""
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 # ===== FILE END: tetris\net\packet_structs.py =====

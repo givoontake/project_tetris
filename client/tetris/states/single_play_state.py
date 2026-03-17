@@ -70,6 +70,9 @@ class SinglePlayState(BaseState):
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
+        giveup_rect = exit_rect.copy()
+        giveup_rect.x -= MENU_WIDTH
+        self.btn_giveup = Button(self.screen, giveup_rect, self.rm, None, "포기")
 
     def clear(self):
         self.tetris_session.clear()
@@ -88,6 +91,18 @@ class SinglePlayState(BaseState):
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
             print("[SinglePlayState] send_delete_user() error:", e)
+
+    def send_giveup(self):
+        data = C2S_GIVEUP_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_GIVEUP
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[SinglePlayState] giveup_user() error:", e)
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
@@ -123,22 +138,27 @@ class SinglePlayState(BaseState):
         self.title_box.draw()
         self.password_box.draw()
 
+    def handle_event(self, ev: pygame.event.Event):
+        self.tetris_session.handle_event(ev)
+
+        if self.btn_exit.handle_event(ev):
+            self.send_delete_user()
+
+        if self.btn_giveup.handle_event(ev):
+            if self.tetris_session.state == TSessionState.PLAY:
+                self.send_giveup()
+
     # ------------ 이벤트 처리 ------------ #
     def update(self, dt_ms, events):
         for ev in events:
-            if ev.type == pygame.QUIT:
-                # 상위 루프에서 처리
-                continue
+            self.handle_event(ev)
 
             # if (ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP) and self.tetris_session.board.game_started:
             #     self.handle_event(ev)
 
             # # 게임 시작 버튼 클릭
             # elif ev.type == pygame.MOUSEBUTTONDOWN == 1:
-            self.tetris_session.handle_event(ev)
 
-            if self.btn_exit.handle_event(ev):
-                self.send_delete_user()
                 
         self.tetris_session.update(dt_ms)
 
@@ -153,6 +173,7 @@ class SinglePlayState(BaseState):
         # 상단 방 제목/비밀번호
         self.draw_room_header()
         self.btn_exit.draw()
+        self.btn_giveup.draw()
 
         # 보드 및 미리보기/프로필/블록
         self.tetris_session.draw()

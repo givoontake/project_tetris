@@ -38,6 +38,20 @@ void SingleRoom::HandlePacket(char* packet, Session* request_session)
 		GetTasks().AddTask(new_task);
 		break;
 	}
+
+	case C2S_GIVEUP: {
+		std::lock_guard<std::mutex> lock(room_mutex);
+
+		if (room_state == ROOM_STATE::PLAY) {
+			S2C_GAMEOVER_PACKET gameover_p;
+			gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
+			gameover_p.type = S2C_GAMEOVER;
+			gameover_p.id = room_users[0].GetSession()->GetSessionKey().id;
+			room_users[0].GetSession()->SendPacket(reinterpret_cast<char*>(&gameover_p), server->GetHandle());
+			RequestUpdateScore();
+			ClearGame();
+		}
+	}
 	}
 }
 

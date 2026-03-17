@@ -247,4 +247,9 @@ struct S2C_UPDATE_HOST_PACKET {
 	char type;
 	int new_host_id;
 };
+
+struct C2S_GIVEUP_PACKET {
+	short size;
+	char type;
+};
 #pragma pack(pop)

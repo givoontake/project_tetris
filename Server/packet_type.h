@@ -54,6 +54,8 @@ constexpr char S2C_MATCH_RECORD = 41;
 
 constexpr char S2C_UPDATE_HOST = 43;
 
+constexpr char C2S_GIVEUP = 45;
+
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
 

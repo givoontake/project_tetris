@@ -148,6 +148,7 @@ class MultiPlayState(BaseState):
                 if player.session:
                     if player.session.id == host_data.new_host_id:
                         player.set_is_host()
+                        break
 
         elif data.type == S2C_DELETE_USER: 
             from tetris.states.lobby_state import LobbyState
@@ -161,6 +162,7 @@ class MultiPlayState(BaseState):
                     else:
                         player.clear()
                         player.nickname.set_text("")
+                    break
 
         elif data.type == S2C_GAMEOVER:
             gameover_data = cast(S2C_GAMEOVER_PACKET, data)
@@ -168,6 +170,7 @@ class MultiPlayState(BaseState):
                 if player.state == TSessionState.EMPTY: continue
                 if gameover_data.id == player.session.id:
                     player.set_state(TSessionState.GAMEOVER)
+                    break
                     # 판정은 서버에서 해서 보내주니 뭐.. 게임오버 애니메이션 같은거 만들어서 보여주면 될 듯
             # pygame.mixer.music.stop() -> 이건 이제 엔드게임 패킷 받아야 함
 
@@ -178,6 +181,7 @@ class MultiPlayState(BaseState):
                 if player.state == TSessionState.EMPTY: continue
                 if id == player.session.id:
                     player.handle_packet(data)
+                    break
 
         return self
 
