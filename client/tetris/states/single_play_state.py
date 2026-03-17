@@ -33,6 +33,10 @@ class SinglePlayState(BaseState):
         self.password_box: Optional[Rectangle] = None
         self.btn_exit: Optional[Button] = None
 
+        self.anim_elapsed_ms = 0
+        self.anim_target_line = BOARD_ROWS
+        self.is_animate = False
+
         self.set_layout()
 
     def set_layout(self):
@@ -77,9 +81,27 @@ class SinglePlayState(BaseState):
     def clear(self):
         self.tetris_session.clear()
 
-    def handle_event(self, ev):
-        self.tetris_session.handle_event(ev)
+    def reset(self):
+        self.tetris_session.reset()
+        self.anim_target_line = BOARD_ROWS
+        self.anim_elapsed_ms = 0
 
+    def play_gameover_anim(self, dt_ms) -> bool:
+        if self.is_animate == False: return False
+    
+        self.anim_elapsed_ms += dt_ms
+        grid = self.tetris_session.board.grid
+        if self.anim_elapsed_ms > 100:
+            self.anim_elapsed_ms -= 100
+            self.anim_target_line -= 1
+            done_flag = True
+            for y in range(BOARD_COLS): # 1줄(가로)이 다 None이면 끝.
+                if grid[self.anim_target_line][y] != None:
+                    grid[self.anim_target_line][y] = 'G'
+                    done_flag = False
+
+            return done_flag
+        return False
     def send_delete_user(self):
         data = C2S_DELETE_USER_PACKET()
         data.size = struct.calcsize(data.FMT)
@@ -120,7 +142,7 @@ class SinglePlayState(BaseState):
                 return LobbyState(self.screen, self.rm, self.net_worker, self.session)
 
         elif data.type == S2C_GAMEOVER:
-            self.tetris_session.reset()
+            self.is_animate = True
             pygame.mixer.music.stop()
 
         elif data.type == S2C_UPDATE_SCORE:
@@ -150,16 +172,15 @@ class SinglePlayState(BaseState):
 
     # ------------ 이벤트 처리 ------------ #
     def update(self, dt_ms, events):
+        if self.is_animate:
+            if self.play_gameover_anim(dt_ms):
+                self.is_animate = False
+                self.reset()
+            return
+
         for ev in events:
             self.handle_event(ev)
-
-            # if (ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP) and self.tetris_session.board.game_started:
-            #     self.handle_event(ev)
-
-            # # 게임 시작 버튼 클릭
-            # elif ev.type == pygame.MOUSEBUTTONDOWN == 1:
-
-                
+     
         self.tetris_session.update(dt_ms)
 
         return self
