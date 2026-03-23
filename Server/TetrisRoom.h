@@ -75,14 +75,14 @@ protected:
 	std::vector<char> tetromino_spawn_list;
 	Position spawn_pos{ 3, 0 };
 
-	int room_index;	
+	int room_index;
 	int room_id;
 	char room_name[MAX_ROOM_NAME];
 	char* room_password;
 	char max_user;
 
 	std::mutex room_mutex;
-	
+
 public:
 	TetrisRoom(IOCPServer* server, Session* session, OpenRoomInitData data);
 	TetrisRoom(IOCPServer* server, Session* session, LockRoomInitData data);
@@ -90,6 +90,11 @@ public:
 
 	ROOM_STATE GetRoomState() const { return room_state.Load(); }
 	Tasks& GetTasks() { return tasks; }
+	std::mutex& GetRoomMutex() { return room_mutex; }
+	int GetRoomId() { return room_id; }
+	int GetRoomIndex() { return room_index; }
+	int GetMaxUser() { return static_cast<int>(max_user); }
+	const char* GetRoomName() const { return room_name; }
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, Session* request_session) = 0;

@@ -4,6 +4,12 @@
 
 #pragma pack(push, 1)
 
+struct S2C_ERROR_PACKET {
+	short size;
+	char type;
+	int error_code;
+};
+
 struct S2C_TEST_LOGIN_PACKET {
 	short size;
 	char type;
@@ -105,14 +111,12 @@ struct C2S_ADD_USER_PACKET {
 	short size;
 	char type;
 	int room_id;
-	char name[MAX_USER_NAME];
 };
 
 struct S2C_ADD_USER_PACKET {
 	short size;
 	char type;
 	int id;
-	bool is_add;
 	char name[MAX_USER_NAME];
 };
 
@@ -252,4 +256,19 @@ struct C2S_GIVEUP_PACKET {
 	short size;
 	char type;
 };
+
+struct C2S_REQEUST_ROOM_LIST_PACKET {
+	short size;
+	char type;
+};
+
+struct S2C_ROOM_INFO_PACKET {
+	short size;
+	char type;
+	int room_id;
+	char room_name[MAX_ROOM_NAME];
+	char max_user;
+	bool is_joinable;
+};
+
 #pragma pack(pop)

@@ -70,7 +70,7 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 	}
 }
 
-void Session::SendPacket(int reqeust_sess_id, char* packet, const HANDLE iocp_handle)
+void Session::SendPacket(int request_sess_id, char* packet, const HANDLE iocp_handle)
 {
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);
@@ -80,7 +80,7 @@ void Session::SendPacket(int reqeust_sess_id, char* packet, const HANDLE iocp_ha
 	send_over->wsabuf.len = packet_size;
 	{
 		std::lock_guard<std::mutex> lock(sess_mutex);
-		if (key.id == reqeust_sess_id) {
+		if (key.id == request_sess_id) {
 			// 같다면 재사용되지 않았다는 것이고 중간에 NONE이 된 적이 없다는 말이므로 굳이 상태 비교는 필요없다.
 			int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
 			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
@@ -105,6 +105,29 @@ void Session::SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { 
 		PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
 		std::cerr << key.id << " Session::SendBoundPacket() WSASend error\n";
+	}
+}
+
+void Session::SendBoundPacket(int request_sess_id, char* packet_buf, int data_size, const HANDLE iocp_handle)
+{
+	IOOverlapped* send_over = new IOOverlapped;
+	send_over->SetOperationType(OP_TYPE::SEND);
+	memcpy(send_over->packet_buf, packet_buf, data_size);
+	send_over->wsabuf.len = data_size;
+	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
+	{
+		std::lock_guard<std::mutex> lock(sess_mutex);
+		if (key.id == request_sess_id) {
+			int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
+			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { 
+				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+				std::cerr << key.id << " Session::SendPacket() WSASend error\n";
+			}
+		}
+		else {
+			std::cerr << "Session::SendPacket, Session index[" << key.index << "]slot has been reused." << std::endl;
+			return;
+		}
 	}
 }
 

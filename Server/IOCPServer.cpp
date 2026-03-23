@@ -156,16 +156,94 @@ void IOCPServer::HandlePacket(char* packet, Session* session, int request_sess_i
 
 	case C2S_ADD_USER: {
 		C2S_ADD_USER_PACKET* add_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
-		// adduser을 호출해도.. 락 잡기 전에 방 날아가면 어쩔거임??
-		// 방 참가 구현 필요
+		TryJoinRoom(session, request_sess_id, add_p->room_id);
 		break;
 	}
 	}
 }
 
-void IOCPServer::JoinRoom(int user_index, int room_id)
+void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 {
-	 
+	char packet_buf[BUF_SIZE];
+	int packet_size = 0;
+	for (auto& room : rooms) {
+		auto room_sp = room.load(); // 먼저 참조 카운트를 늘려야함
+		if (!room_sp) continue;
+		TetrisRoom* room_p = room_sp.get();
+		S2C_ROOM_INFO_PACKET info_p;
+		if (room_p->GetRoomState() == ROOM_STATE::EMPTY) continue;
+		if (room_p->GetRoomState() == ROOM_STATE::WAIT) info_p.is_joinable = true;
+		else info_p.is_joinable = false;
+		info_p.size = sizeof(S2C_ROOM_INFO_PACKET);
+		info_p.type = S2C_ROOM_INFO;
+		info_p.room_id = room_p->GetRoomId();
+		const char* name = room_p->GetRoomName();
+		memcpy(&info_p.room_name, name, MAX_USER_NAME);
+
+		if (packet_size + sizeof(info_p) > BUF_SIZE) { 
+			session->SendBoundPacket(reqeust_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
+			packet_size = 0;
+		}
+
+		{
+			std::lock_guard<std::mutex> lock(session->GetMutex()); // 조건 불일치시 바로 리턴을 위해 체크만 하자, sendpacket()내에 뮤텍스 있어서 넣으면 데드락
+			if (session->GetSessionKey().id != reqeust_sess_id) return;
+			if (session->GetState() == SESS_STATE::NONE) return;
+		}
+		memcpy(&packet_buf, &info_p, sizeof(info_p));
+		packet_size += sizeof(info_p);
+	}
+}
+
+// 
+void IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id)
+{	
+	int result = -1;
+	int room_index = FindRoom(room_id);
+	if (room_index != -1) {
+		std::shared_ptr<TetrisRoom> room_sp = rooms[room_index].load();
+		if (room_sp) {
+			std::lock_guard<std::mutex> lock(room_sp->GetRoomMutex());
+			if (room_sp->GetMaxUser() != 1) { // 싱글이 아닌 경우
+				auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
+				if (!multi_sp) result = ERROR_CODE::SERVER_ERROR;
+				else {
+					result = multi_sp->AddUser(session, request_sess_id); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
+				}
+			}
+			else {
+				result = ERROR_CODE::INVALID_REQUEST;
+			}
+		}
+		else {
+			result = ERROR_CODE::ROOM_NOT_FOUND;
+		}
+	}
+
+	if (result == SUCCESS) return;
+
+	SendError(session, request_sess_id, result);
+}
+
+int IOCPServer::FindRoom(int room_id)
+{
+	for (auto& room : rooms) {
+		auto room_sp = room.load();
+		if (room_sp) {
+			if (room_sp->GetRoomId() == room_id) return room_sp->GetRoomIndex();
+		}
+	}
+	return -1;
+}
+
+void IOCPServer::SendError(Session* session, int request_sess_id, int error_code)
+{
+	S2C_ERROR_PACKET error_p;
+	error_p.size = sizeof(S2C_ERROR_PACKET);
+	error_p.type = S2C_ERROR;
+	error_p.error_code = error_code;
+
+	session->SendPacket(request_sess_id, reinterpret_cast<char*>(&error_p), iocp_handle);
 }
 
 void IOCPServer::StartServer()
@@ -534,11 +612,19 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session* session, int re
 				login_p.lose_count = session->GetInfo().lose_count;
 				StringToCharBuf(session->GetInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
 			}
+			else {
+				login_p.id = -1; // 나중에 오류 케이스별로 따로 나누자
+			}
 		}
 		else {
 			login_p.id = -1; // 근데 로그인 실패일경우 나머지 패킷도 다같이 가는건 낭비같은데.. 결국 로그인 성공과 세션 데이터 전송은 분리 해야할듯
 		}
 		session->SendPacket(request_sess_id, reinterpret_cast<char*>(&login_p), iocp_handle);
+
+		if (login_p.id > 0) {
+			SendRoomList(session, request_sess_id);
+		}
+
 		break;
 	}
 	case DBOperationType::UPDATE_SCORE:

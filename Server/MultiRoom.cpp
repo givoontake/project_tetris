@@ -58,41 +58,45 @@ void MultiRoom::HandlePacket(char* packet, Session* request_session)
 }
 
 // add는 외부에서 추가되므로 아직 세션이 안전하지 않음. 방에 완전히 들어와야 안전해짐.
-void MultiRoom::AddUser(Session* new_session, int request_sess_id)
+int MultiRoom::AddUser(Session* new_session, int request_sess_id)
 {
 	//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
-	bool is_added = false;
-	{
-		std::lock_guard<std::mutex> lock(room_mutex);
-		if (room_state == ROOM_STATE::WAIT) {
-			for (auto& r_user : room_users) {
-				if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
+	int result = ERROR_CODE::ROOM_FULL;
+	//std::lock_guard<std::mutex> lock(room_mutex); 외부에서 걸 예정
+	if (room_state == ROOM_STATE::WAIT) {
+		for (auto& r_user : room_users) {
+			if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
 
-				else {
-					std::lock_guard<std::mutex> lock(new_session->GetMutex());
-					if (new_session->GetState() == SESS_STATE::NONE) return;
-					if (new_session->GetSessionKey().id != request_sess_id) return;
+			else {
+				std::lock_guard<std::mutex> lock(new_session->GetMutex());
+				if (new_session->GetState() == SESS_STATE::NONE) return ERROR_CODE::INVALID_REQUEST; // 반환값이 있어야 해서 일단 억지로 넣은 느낌..
+				if (new_session->GetSessionKey().id != request_sess_id) return ERROR_CODE::INVALID_REQUEST;
 
-					new_session->StoreState(SESS_STATE::ROOM);
-					new_session->SetRoomIndex(room_index);
-					r_user.InitRoomSession(new_session);
-					is_added = true;
-					break;
-				}
+				new_session->StoreState(SESS_STATE::ROOM);
+				new_session->SetRoomIndex(room_index);
+				r_user.InitRoomSession(new_session);
+				result = SUCCESS;
+				break;
 			}
 		}
 	}
 
-	// 성공과 실패에 따라 패킷을 나눌까? 사실 방이 다 차 있다면 클라이언트 수준에서 송신 자체를 막아야 할 것 같기는 한데..
-	// 아니지. 클라에서 실제로 방이 빈 것으로 보였어도, 누군가가 먼저 차지했다면 그건 알 수가 없으니까 처리가 필요
-	S2C_ADD_USER_PACKET p;
-	p.size = sizeof(S2C_ADD_USER_PACKET);
-	p.type = S2C_ADD_USER;
-	// p.name = 세션에 이름 변수 추가 필요
-	p.id = new_session->GetSessionKey().id;
-	p.is_add = is_added;
-	if (is_added) Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
-	else new_session->SendPacket(request_sess_id, reinterpret_cast<char*>(&p), server->GetHandle()); // 방이 꽉 찼을 경우 본인에게만 실패 전송
+	if (result == SUCCESS) {
+		S2C_ADD_USER_PACKET add_p;
+		add_p.size = sizeof(S2C_ADD_USER_PACKET);
+		add_p.type = S2C_ADD_USER;
+		// p.name = 세션에 이름 변수 추가 필요
+		add_p.id = new_session->GetSessionKey().id;
+
+		Broadcast(reinterpret_cast<char*>(&add_p), server->GetHandle());
+		return result;
+	}
+
+	else if (room_state == ROOM_STATE::PLAY) result = ERROR_CODE::ROOM_INGAME;
+
+	else if (room_state == ROOM_STATE::WAITING_DELETE) result = ERROR_CODE::ROOM_NOT_FOUND;
+
+	return result;
 }
 
 void MultiRoom::DeleteUser(const int id)

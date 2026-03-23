@@ -1,6 +1,6 @@
 #pragma once
 #include <iostream>
-
+constexpr char S2C_ERROR = 0;
 constexpr char S2C_LOGIN = 1;
 constexpr char C2S_LOGIN = 2;
 constexpr char S2C_MESSAGE = 3;
@@ -55,6 +55,10 @@ constexpr char S2C_MATCH_RECORD = 41;
 constexpr char S2C_UPDATE_HOST = 43;
 
 constexpr char C2S_GIVEUP = 45;
+
+constexpr char C2S_REQUEST_ROOM_LIST = 47;
+
+constexpr char S2C_ROOM_INFO = 49;
 
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;

@@ -70,5 +70,8 @@ public:
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
 	void HandlePacket(char* packet, Session* session, int request_sess_id);
-	void JoinRoom(int user_index, int room_id);
+	void SendRoomList(Session* session, int reqeust_sess_id);
+	void TryJoinRoom(Session* session, int request_sess_id, int room_id);
+	int FindRoom(int room_id);
+	void SendError(Session* session, int request_sess_id, int error_code);
 };

@@ -39,6 +39,7 @@ public:
 	void SendPacket(char* packet, const HANDLE iocp_handle);
 	void SendPacket(int reqeust_sess_id, char* packet, const HANDLE iocp_handle);
 	void SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp_handle);
+	void SendBoundPacket(int request_sess_id, char* packet_buf, int data_size, const HANDLE iocp_handle);
 	void RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle);
 
 	//getters
