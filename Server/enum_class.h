@@ -1,4 +1,5 @@
 #pragma once
+#include "error_code.h"
 
 enum class OP_TYPE { SEND, RECV, ACCEPT, DB, DELETE_ROOM };
 
