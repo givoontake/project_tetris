@@ -94,6 +94,7 @@ public:
 	std::mutex& GetRoomMutex() { return room_mutex; }
 	int GetRoomId() const { return room_id; }
 	int GetRoomIndex() const { return room_index; }
+	bool GetIsPrivate() const { return room_password ? true : false; }
 	int GetMaxUser() const { return static_cast<int>(max_user); }
 	int GetCurrentUser() const { return static_cast<int>(max_user); }
 	const char* GetRoomName() const { return room_name; }

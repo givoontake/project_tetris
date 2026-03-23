@@ -4,6 +4,7 @@ from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 
 PACKET_REGISTRY: dict[int, type] = {
+    S2C_ERROR: S2C_ERROR_PACKET,
     # ---- Login ----
     S2C_LOGIN: S2C_LOGIN_PACKET,
     C2S_LOGIN: C2S_LOGIN_PACKET,
@@ -26,7 +27,8 @@ PACKET_REGISTRY: dict[int, type] = {
 
     # ---- Add User ----
     S2C_ADD_USER: S2C_ADD_USER_PACKET,
-    C2S_ADD_USER: C2S_ADD_USER_PACKET,
+    C2S_JOIN_OPEN_ROOM: C2S_JOIN_OPEN_ROOM_PACKET,
+    C2S_JOIN_LOCK_ROOM: C2S_JOIN_LOCK_ROOM_PACKET,
 
     # ---- Delete User ----
     S2C_DELETE_USER: S2C_DELETE_USER_PACKET,
@@ -58,4 +60,6 @@ PACKET_REGISTRY: dict[int, type] = {
     S2C_MATCH_RECORD: S2C_MATCH_RECORD_PACKET,
     S2C_UPDATE_HOST: S2C_UPDATE_HOST_PACKET,
     C2S_GIVEUP: C2S_GIVEUP_PACKET,
+    C2S_REQUEST_ROOM_LIST: C2S_REQEUST_ROOM_LIST_PACKET,
+    S2C_ROOM_INFO: S2C_ROOM_INFO_PACKET,
 }

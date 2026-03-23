@@ -154,9 +154,14 @@ void IOCPServer::HandlePacket(char* packet, Session* session, int request_sess_i
 		break;
 	}
 
-	case C2S_ADD_USER: {
-		C2S_ADD_USER_PACKET* add_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
-		TryJoinRoom(session, request_sess_id, add_p->room_id);
+	case C2S_JOIN_OPEN_ROOM: {
+		C2S_JOIN_OPEN_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_OPEN_ROOM_PACKET*>(packet);
+		TryJoinRoom(session, request_sess_id, join_p->room_id, nullptr);
+		break;
+	}
+	case C2S_JOIN_LOCK_ROOM: {
+		C2S_JOIN_LOCK_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_LOCK_ROOM_PACKET*>(packet);
+		TryJoinRoom(session, request_sess_id, join_p->room_id, join_p->room_password);
 		break;
 	}
 	}
@@ -171,8 +176,6 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 		if (!room_sp) continue;
 		S2C_ROOM_INFO_PACKET info_p;
 		if (room_sp->GetRoomState() == ROOM_STATE::EMPTY) continue;
-		if (room_sp->GetRoomState() == ROOM_STATE::WAIT) info_p.is_joinable = true;
-		else info_p.is_joinable = false;
 		info_p.size = sizeof(S2C_ROOM_INFO_PACKET);
 		info_p.type = S2C_ROOM_INFO;
 		info_p.room_id = room_sp->GetRoomId();
@@ -180,6 +183,10 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 		info_p.max_user = room_sp->GetMaxUser();
 		info_p.cur_user = room_sp->GetCurrentUser();
 		memcpy(&info_p.room_name, name, MAX_USER_NAME);
+		info_p.is_private = room_sp->GetIsPrivate();
+		bool is_play;
+		if (room_sp->GetRoomState() == ROOM_STATE::WAIT) is_play = false;
+		else is_play = true;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) { 
 			session->SendBoundPacket(reqeust_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
@@ -197,7 +204,7 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 }
 
 // 
-void IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id)
+void IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password)
 {	
 	int result = -1;
 	int room_index = FindRoom(room_id);
@@ -209,7 +216,7 @@ void IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id)
 				auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
 				if (!multi_sp) result = ERROR_CODE::SERVER_ERROR;
 				else {
-					result = multi_sp->AddUser(session, request_sess_id); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
+					result = multi_sp->AddUser(session, request_sess_id, room_password); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
 				}
 			}
 			else {
@@ -404,7 +411,7 @@ void IOCPServer::ProcessPacket(Session* session, int request_sess_id, int recv_b
 
 void IOCPServer::RoutePacket(char* packet, Session* session, int request_sess_id)
 {
-	PrintPacketType(packet[2]);
+	//PrintPacketType(packet[2]);
 	switch (session->GetState()) {
 	case SESS_STATE::NONE:
 		return;

@@ -3,8 +3,8 @@ from dataclasses import dataclass
 @dataclass
 class RoomData:
     room_id: int = -1
-    locked: str = "방 제목"
-    title: str = "공개"
+    is_private: str = "공개여부"
+    title: str = "방 제목"
     cur_user: str = "현재 인원"
     max_user: str = "최대 인원"
-    status: str = "방 상태"
+    is_play: str = "방 상태"

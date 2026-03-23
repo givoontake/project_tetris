@@ -32,7 +32,7 @@ class PopupBox:
         """현재 screen 사이즈를 기준으로 팝업 사각형을 다시 계산한다."""
         if len(self.buttons_text) < 1:
             raise ValueError("팝업은 최소 1개의 버튼을 포함해야 합니다.")
-        elif len(self.buttons_text) > 3:
+        elif len(self.buttons_text) > 2:
             raise ValueError("팝업은 최대 3개의 버튼을 포함할 수 있습니다.")
 
         sw, sh = self.screen.get_size()
@@ -65,19 +65,10 @@ class PopupBox:
     #     self.visible = value
 
     def handle_event(self, ev: pygame.event.Event)-> Optional[str]: # 어떤 버튼이 눌렸는가
-        """
-        - ESC 키로 닫힘
-        - 각 버튼 클릭 시 닫힘
-        """
-        # if not self.visible:
-        #     return
-
-        if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
-            return "esc"
 
         # 버튼 이벤트 처리
         for button in self.buttons:
-            if(button.handle_event(ev)):
+            if button.handle_event(ev):
                 return button.idle.text
                 
         return None

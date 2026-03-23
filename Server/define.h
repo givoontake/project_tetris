@@ -107,10 +107,17 @@ struct S2C_ADD_LOCK_ROOM_PACKET {
 	char room_password[MAX_ROOM_PASSWORD];
 };
 
-struct C2S_ADD_USER_PACKET {
+struct C2S_JOIN_OPEN_ROOM_PACKET {
 	short size;
 	char type;
 	int room_id;
+};
+
+struct C2S_JOIN_LOCK_ROOM_PACKET {
+	short size;
+	char type;
+	int room_id;
+	char room_password[MAX_ROOM_PASSWORD];
 };
 
 struct S2C_ADD_USER_PACKET {
@@ -268,7 +275,8 @@ struct S2C_ROOM_INFO_PACKET {
 	char room_name[MAX_ROOM_NAME];
 	char max_user;
 	char cur_user;
-	bool is_joinable;
+	bool is_private;
+	bool is_play;
 };
 
 #pragma pack(pop)

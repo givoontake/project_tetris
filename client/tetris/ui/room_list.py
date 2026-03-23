@@ -3,6 +3,7 @@ from typing import Optional
 
 from tetris.models.dataclass import *
 from tetris.config.define import *
+from tetris.net.packet_structs import S2C_ROOM_INFO_PACKET
 from tetris.ui.rectangle import Rectangle
 from tetris.ui.room_info import RoomInfo
 from tetris.resources.resource_manager import ResourceManager
@@ -20,7 +21,7 @@ class RoomList:
         self.background = Rectangle(screen, rect, rm, None, "")
         header_rect = rect.copy()
         header_rect.h = rect.h / 8
-        self.header = RoomInfo(screen, header_rect, rm, RoomData(), BLACK, False)
+        self.header = RoomInfo(screen, header_rect, rm, BLACK)
         self.base_room_rect = header_rect.copy()
         self.base_room_rect.y += header_rect.h
         self.rooms: list[RoomInfo] = []
@@ -62,14 +63,15 @@ class RoomList:
             self.rooms[index].update_info_rects(room_rect.y)
             self.rooms[index].set_background_color(color)
 
-    def add_room(self, info: RoomData | RoomData):
+    def add_room(self, info: S2C_ROOM_INFO_PACKET):
         add_index = len(self.rooms) # 추가되는 부분의 인덱스는 길이와 같다.
         if add_index % 2: color = GRAY
         else: color = DARK_GRAY
         rect_index = add_index % self.VISIBLE_ROOM
         room_rect = self.base_room_rect.copy()
         room_rect.y = self.base_room_rect.y + rect_index*self.base_room_rect.h
-        room = RoomInfo(self.screen, room_rect, self.rm, self.fm, info, color, True)
+
+        room = RoomInfo(self.screen, room_rect, self.rm, color, info)
         self.rooms.append(room)
         self.update_show_rooms()
 
@@ -82,11 +84,11 @@ class RoomList:
 
         self.update_show_rooms()
 
-    def handle_event(self, ev: pygame.event.Event) -> Optional[int]:
-        for room in self.show_rooms:
-            result = room.handle_event(ev)
-            if result is not None:
-                return result
+    def handle_event(self, ev: pygame.event.Event) -> Optional[int]: # 인덱스 반환
+        rooms = self.show_rooms
+        for i in range(len(rooms)):
+            if rooms[i].handle_event(ev):
+                return i
         return None
 
     def draw(self):

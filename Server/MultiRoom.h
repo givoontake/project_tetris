@@ -30,7 +30,7 @@ public:
 
 	void FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
 	int FindHostIndex(int host_id); // 현재 호스트의 인덱스를 반환
-	int AddUser(Session* new_session, int request_sess_id);
+	int AddUser(Session* new_session, int request_sess_id, const char* room_password);
 	void ReadyUser(int id);
 	void KickUser(int id, int kick_user_id);
 	bool FindWinner();

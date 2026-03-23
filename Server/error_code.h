@@ -13,4 +13,5 @@ enum ERROR_CODE // 이거 이넘 클래스 쓰면 static_cast ㅈㄴ 써야해�
 
 	ROOM_NOT_ALL_READY = 20,
 	ROOM_NOT_ENOUGH_PLAYERS = 21,
+	ROOM_INVALID_PASSWORD = 22,
 };

@@ -58,8 +58,13 @@ void MultiRoom::HandlePacket(char* packet, Session* request_session)
 }
 
 // add는 외부에서 추가되므로 아직 세션이 안전하지 않음. 방에 완전히 들어와야 안전해짐. 락은 외부에서 건다
-int MultiRoom::AddUser(Session* new_session, int request_sess_id)
+int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* input_password)
 {
+	if (room_password) {
+		if (memcmp(room_password, input_password, MAX_ROOM_PASSWORD) != 0) {
+			return ERROR_CODE::ROOM_INVALID_PASSWORD;
+		}
+	}
 	//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
 	int result = ERROR_CODE::ROOM_FULL;
 	//std::lock_guard<std::mutex> lock(room_mutex); 외부에서 걸 예정

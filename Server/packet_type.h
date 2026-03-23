@@ -16,7 +16,7 @@ constexpr char S2C_ADD_OPEN_ROOM = 10;
 constexpr char C2S_ADD_LOCK_ROOM = 11;
 constexpr char S2C_ADD_LOCK_ROOM = 12;
 
-constexpr char C2S_ADD_USER = 13;
+constexpr char C2S_JOIN_OPEN_ROOM = 13;
 constexpr char S2C_ADD_USER = 14;
 
 constexpr char C2S_DELETE_USER = 15;
@@ -59,66 +59,67 @@ constexpr char C2S_GIVEUP = 45;
 constexpr char C2S_REQUEST_ROOM_LIST = 47;
 
 constexpr char S2C_ROOM_INFO = 49;
+constexpr char C2S_JOIN_LOCK_ROOM = 50;
 
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
 
-inline void PrintPacketType(char type)
-{
-    std::cout << "Packet Type: ";
-
-    switch (type)
-    {
-    case S2C_LOGIN:          std::cout << "S2C_LOGIN"; break;
-    case C2S_LOGIN:          std::cout << "C2S_LOGIN"; break;
-
-    case S2C_MESSAGE:        std::cout << "S2C_MESSAGE"; break;
-    case C2S_MESSAGE:        std::cout << "C2S_MESSAGE"; break;
-
-    case S2C_TEST:           std::cout << "S2C_TEST"; break;
-    case C2S_TEST:           std::cout << "C2S_TEST"; break;
-
-    case S2C_DISCONNECT:     std::cout << "S2C_DISCONNECT"; break;
-    case C2S_DISCONNECT:     std::cout << "C2S_DISCONNECT"; break;
-
-    case C2S_ADD_OPEN_ROOM:  std::cout << "C2S_ADD_OPEN_ROOM"; break;
-    case S2C_ADD_OPEN_ROOM:  std::cout << "S2C_ADD_OPEN_ROOM"; break;
-
-    case C2S_ADD_LOCK_ROOM:  std::cout << "C2S_ADD_LOCK_ROOM"; break;
-    case S2C_ADD_LOCK_ROOM:  std::cout << "S2C_ADD_LOCK_ROOM"; break;
-
-    case C2S_ADD_USER:       std::cout << "C2S_ADD_USER"; break;
-    case S2C_ADD_USER:       std::cout << "S2C_ADD_USER"; break;
-
-    case C2S_DELETE_USER:    std::cout << "C2S_DELETE_USER"; break;
-    case S2C_DELETE_USER:    std::cout << "S2C_DELETE_USER"; break;
-
-    case C2S_READY:          std::cout << "C2S_READY"; break;
-    case S2C_READY:          std::cout << "S2C_READY"; break;
-
-    case C2S_START:          std::cout << "C2S_START"; break;
-    case S2C_SINGLE_START:          std::cout << "S2C_START"; break;
-
-    case C2S_KICK:           std::cout << "C2S_KICK"; break;
-    case S2C_KICK:           std::cout << "S2C_KICK"; break;
-
-    case C2S_MOVE:           std::cout << "C2S_MOVE"; break;
-    case S2C_MOVE:           std::cout << "S2C_MOVE"; break;
-
-    case S2C_SPAWN:          std::cout << "S2C_SPAWN"; break;
-
-    case S2C_GAMEOVER:       std::cout << "S2C_GAMEOVER"; break;
-    case S2C_GAMEEND:        std::cout << "S2C_GAMEEND"; break;
-
-    case S2C_CLEARLINE:      std::cout << "S2C_CLEARLINE"; break;
-
-    case S2C_TEST_LOGIN:     std::cout << "S2C_TEST_LOGIN"; break;
-    case C2S_TEST_LOGIN:     std::cout << "C2S_TEST_LOGIN"; break;
-
-    default:                 std::cout << "UNKNOWN_PACKET_TYPE"; break;
-    }
-
-    std::cout << std::endl;
-}
+//inline void PrintPacketType(char type)
+//{
+//    std::cout << "Packet Type: ";
+//
+//    switch (type)
+//    {
+//    case S2C_LOGIN:          std::cout << "S2C_LOGIN"; break;
+//    case C2S_LOGIN:          std::cout << "C2S_LOGIN"; break;
+//
+//    case S2C_MESSAGE:        std::cout << "S2C_MESSAGE"; break;
+//    case C2S_MESSAGE:        std::cout << "C2S_MESSAGE"; break;
+//
+//    case S2C_TEST:           std::cout << "S2C_TEST"; break;
+//    case C2S_TEST:           std::cout << "C2S_TEST"; break;
+//
+//    case S2C_DISCONNECT:     std::cout << "S2C_DISCONNECT"; break;
+//    case C2S_DISCONNECT:     std::cout << "C2S_DISCONNECT"; break;
+//
+//    case C2S_ADD_OPEN_ROOM:  std::cout << "C2S_ADD_OPEN_ROOM"; break;
+//    case S2C_ADD_OPEN_ROOM:  std::cout << "S2C_ADD_OPEN_ROOM"; break;
+//
+//    case C2S_ADD_LOCK_ROOM:  std::cout << "C2S_ADD_LOCK_ROOM"; break;
+//    case S2C_ADD_LOCK_ROOM:  std::cout << "S2C_ADD_LOCK_ROOM"; break;
+//
+//    case C2S_ADD_USER:       std::cout << "C2S_ADD_USER"; break;
+//    case S2C_ADD_USER:       std::cout << "S2C_ADD_USER"; break;
+//
+//    case C2S_DELETE_USER:    std::cout << "C2S_DELETE_USER"; break;
+//    case S2C_DELETE_USER:    std::cout << "S2C_DELETE_USER"; break;
+//
+//    case C2S_READY:          std::cout << "C2S_READY"; break;
+//    case S2C_READY:          std::cout << "S2C_READY"; break;
+//
+//    case C2S_START:          std::cout << "C2S_START"; break;
+//    case S2C_SINGLE_START:          std::cout << "S2C_START"; break;
+//
+//    case C2S_KICK:           std::cout << "C2S_KICK"; break;
+//    case S2C_KICK:           std::cout << "S2C_KICK"; break;
+//
+//    case C2S_MOVE:           std::cout << "C2S_MOVE"; break;
+//    case S2C_MOVE:           std::cout << "S2C_MOVE"; break;
+//
+//    case S2C_SPAWN:          std::cout << "S2C_SPAWN"; break;
+//
+//    case S2C_GAMEOVER:       std::cout << "S2C_GAMEOVER"; break;
+//    case S2C_GAMEEND:        std::cout << "S2C_GAMEEND"; break;
+//
+//    case S2C_CLEARLINE:      std::cout << "S2C_CLEARLINE"; break;
+//
+//    case S2C_TEST_LOGIN:     std::cout << "S2C_TEST_LOGIN"; break;
+//    case C2S_TEST_LOGIN:     std::cout << "C2S_TEST_LOGIN"; break;
+//
+//    default:                 std::cout << "UNKNOWN_PACKET_TYPE"; break;
+//    }
+//
+//    std::cout << std::endl;
+//}
 
 

@@ -2,6 +2,7 @@ import pygame
 import struct
 from typing import Optional, cast
 
+from tetris.models.dataclass import *
 from tetris.config.define import *
 from tetris.net.packet_types import *
 
@@ -16,6 +17,7 @@ from tetris.ui.rectangle import Rectangle
 from tetris.ui.button import Button
 from tetris.ui.inputbox import InputBox
 from tetris.ui.popupbox import PopupBox
+from tetris.ui.input_window import InputWindow
 from tetris.ui.room_list import RoomList
 from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
@@ -49,7 +51,10 @@ class LobbyState(BaseState):
         self.setting_window = None
         self.exit_popup = None
         self.save_success_popup = None
+        self.input_pw_window = None
         self.reactable = True
+
+        self.join_room_id = None
     
         self.set_layout()
 
@@ -93,6 +98,30 @@ class LobbyState(BaseState):
         except Exception as e:
             print("[LobbyState] send_message() error:", e)
 
+    def send_join_room(self, room_pw: Optional[str]):
+        if room_pw: 
+            data = C2S_JOIN_OPEN_ROOM_PACKET()
+            data.size = struct.calcsize(data.FMT)
+            data.type = C2S_JOIN_OPEN_ROOM
+            data.room_id = self.join_room_id
+            
+        else: 
+            data = C2S_JOIN_LOCK_ROOM_PACKET()
+            data.size = struct.calcsize(data.FMT)
+            data.type = C2S_JOIN_LOCK_ROOM
+            data.room_id = self.join_room_id
+            data.room_password = room_pw
+
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[LobbyState] send_join_room() error:", e)
+            
+        self.join_room_id = None
+
     def send_disconnect(self):
         data = C2S_DISCONNECT_PACKET()
         data.size = struct.calcsize(data.FMT)
@@ -111,6 +140,11 @@ class LobbyState(BaseState):
             if data.type == S2C_MESSAGE:
                 message_data = cast(S2C_MESSAGE_PACKET, data)
                 self.chat_window.add_new_message(message_data.user_name, message_data.message)
+
+            elif data.type == S2C_ROOM_INFO:
+                info_data = cast(S2C_ROOM_INFO_PACKET, data)
+                self.room_list.add_room(RoomData(info_data.room_id, info_data.is_private, info_data.room_name,
+                                                 info_data.cur_user, info_data.max_user))
 
             elif data.type == S2C_ADD_OPEN_ROOM:
                 open_data = cast(S2C_ADD_OPEN_ROOM_PACKET, data)
@@ -142,7 +176,8 @@ class LobbyState(BaseState):
                 if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
                     event = menu.idle.text
                     break
-
+            
+            # 리스트로 만들어놔서 각 버튼마다 이름이 없어서 텍스트로 접근
             if event is not None:
                 if event == "방만들기":
                     self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.net_worker, self.session)
@@ -166,14 +201,18 @@ class LobbyState(BaseState):
 
                 return
 
-            event = self.room_list.handle_event(ev)
-            if event is not None:
-                # 나중에 방 참가 패킷 전송 추가
-                pass
-            # return
+            index = self.room_list.handle_event(ev)
+            if index != None:
+                room = self.room_list.show_rooms[index]
+                self.join_room_id = room.room_id
+                buttons_text = ["참가", "취소"]
+                if room.data.is_private: 
+                    self.input_pw_window = InputWindow(self.screen, self.rm, buttons_text) 
+                    self.reactable = False
+                    
             self.chat_window.handle_event(ev) # 보여주기만 하므로 반환값은 없음
             message = self.chat_input_box.handle_event(ev)
-            if message is not None:
+            if message != None:
                 self.send_message(message)
 
         else:
@@ -208,6 +247,14 @@ class LobbyState(BaseState):
                 if ssp_event == "확인":
                     self.reactable = True
                     self.save_success_popup = None
+
+            elif self.input_pw_window:
+                ipw_event = self.input_pw_window.handle_event(ev)
+                if ipw_event == "참가":
+                    self.send_join_room(self.input_pw_window.input.extract_text())
+                # 참가/취소는 send 유무의 차이
+                self.reactable = True
+                self.input_pw_window = None
 
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 

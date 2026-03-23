@@ -65,6 +65,13 @@ class SendPacketStruct:
 # ---------------------------
 
 @dataclass
+class S2C_ERROR_PACKET(RecvPacketStruct):
+    error_code: int = -1
+
+    BODY_FMT: ClassVar[str] = f"i"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+@dataclass
 class S2C_LOGIN_PACKET(RecvPacketStruct):
     id: int = -1
     max_score: int = -1
@@ -116,7 +123,6 @@ class S2C_ADD_LOCK_ROOM_PACKET(RecvPacketStruct):
 @dataclass
 class S2C_ADD_USER_PACKET(RecvPacketStruct):
     id: int = -1
-    is_add: bool = False
     name: str = ""
 
     BODY_FMT: ClassVar[str] = f"i?{MAX_USER_NAME}s"
@@ -148,9 +154,7 @@ class S2C_SINGLE_START_PACKET(RecvPacketStruct):
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 class S2C_MULTI_START_PACKET(RecvPacketStruct):
-    is_start: bool = False
-
-    BODY_FMT: ClassVar[str] = "?"
+    BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 @dataclass
@@ -240,6 +244,18 @@ class S2C_UPDATE_HOST_PACKET(RecvPacketStruct):
 
     BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+@dataclass
+class S2C_ROOM_INFO_PACKET(RecvPacketStruct):
+    room_id: int = -1
+    room_name: str = ""
+    max_user: int = -1
+    cur_user: int = -1
+    is_private: bool = False
+    is_play: bool = False
+
+    BODY_FMT: ClassVar[str] = f"i{MAX_ROOM_NAME}sbb??"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 # ---------------------------
 # C2S (송신) : SendPacketStruct
 # ---------------------------
@@ -287,13 +303,19 @@ class C2S_ADD_LOCK_ROOM_PACKET(SendPacketStruct):
 
 
 @dataclass
-class C2S_ADD_USER_PACKET(SendPacketStruct):
+class C2S_JOIN_OPEN_ROOM_PACKET(SendPacketStruct):
     room_id: int = -1
-    name: str = ""
 
-    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
+    BODY_FMT: ClassVar[str] = f"i"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
+@dataclass
+class C2S_JOIN_LOCK_ROOM_PACKET(SendPacketStruct):
+    room_id: int = -1
+    room_password: str = ""
+
+    BODY_FMT: ClassVar[str] = f"i{MAX_ROOM_PASSWORD}s"
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 @dataclass
 class C2S_DELETE_USER_PACKET(SendPacketStruct):
@@ -332,4 +354,9 @@ class C2S_MOVE_PACKET(SendPacketStruct):
 class C2S_GIVEUP_PACKET(SendPacketStruct):
     BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+@dataclass
+class C2S_REQEUST_ROOM_LIST_PACKET(RecvPacketStruct):
+    BODY_FMT: ClassVar[str] = ""
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 # ===== FILE END: tetris\net\packet_structs.py =====

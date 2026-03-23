@@ -1,5 +1,6 @@
 # # packet_types.py
 # # C++ packetType.h와 "이름/값" 완전 일치
+S2C_ERROR         = 0
 S2C_LOGIN         = 1
 C2S_LOGIN         = 2
 S2C_MESSAGE       = 3
@@ -14,7 +15,7 @@ S2C_ADD_OPEN_ROOM = 10
 C2S_ADD_LOCK_ROOM = 11
 S2C_ADD_LOCK_ROOM = 12
 
-C2S_ADD_USER      = 13
+C2S_JOIN_OPEN_ROOM      = 13
 S2C_ADD_USER      = 14
 
 C2S_DELETE_USER   = 15
@@ -53,3 +54,8 @@ S2C_MATCH_RECORD = 41
 S2C_UPDATE_HOST = 43
 
 C2S_GIVEUP = 45
+
+C2S_REQUEST_ROOM_LIST = 47
+
+S2C_ROOM_INFO = 49
+C2S_JOIN_LOCK_ROOM = 50
