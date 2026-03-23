@@ -4,14 +4,12 @@ MultiRoom::MultiRoom(IOCPServer* server, Session* session, OpenRoomInitData data
 	: TetrisRoom(server, session, data)
 {
 	host_id = session->GetSessionKey().id;
-	cur_user = 1;
 }
 
 MultiRoom::MultiRoom(IOCPServer* server, Session* session, LockRoomInitData data)
 	: TetrisRoom(server, session, data)
 {
 	host_id = session->GetSessionKey().id;
-	cur_user = 1;
 }
 
 MultiRoom::~MultiRoom()

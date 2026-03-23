@@ -267,6 +267,7 @@ struct S2C_ROOM_INFO_PACKET {
 	int room_id;
 	char room_name[MAX_ROOM_NAME];
 	char max_user;
+	char cur_user;
 	bool is_joinable;
 };
 

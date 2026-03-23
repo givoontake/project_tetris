@@ -169,15 +169,16 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 	for (auto& room : rooms) {
 		auto room_sp = room.load(); // 먼저 참조 카운트를 늘려야함
 		if (!room_sp) continue;
-		TetrisRoom* room_p = room_sp.get();
 		S2C_ROOM_INFO_PACKET info_p;
-		if (room_p->GetRoomState() == ROOM_STATE::EMPTY) continue;
-		if (room_p->GetRoomState() == ROOM_STATE::WAIT) info_p.is_joinable = true;
+		if (room_sp->GetRoomState() == ROOM_STATE::EMPTY) continue;
+		if (room_sp->GetRoomState() == ROOM_STATE::WAIT) info_p.is_joinable = true;
 		else info_p.is_joinable = false;
 		info_p.size = sizeof(S2C_ROOM_INFO_PACKET);
 		info_p.type = S2C_ROOM_INFO;
-		info_p.room_id = room_p->GetRoomId();
-		const char* name = room_p->GetRoomName();
+		info_p.room_id = room_sp->GetRoomId();
+		const char* name = room_sp->GetRoomName();
+		info_p.max_user = room_sp->GetMaxUser();
+		info_p.cur_user = room_sp->GetCurrentUser();
 		memcpy(&info_p.room_name, name, MAX_USER_NAME);
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) { 

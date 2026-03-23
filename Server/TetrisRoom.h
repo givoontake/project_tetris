@@ -80,6 +80,7 @@ protected:
 	char room_name[MAX_ROOM_NAME];
 	char* room_password;
 	char max_user;
+	char cur_user;
 
 	std::mutex room_mutex;
 
@@ -91,9 +92,10 @@ public:
 	ROOM_STATE GetRoomState() const { return room_state.Load(); }
 	Tasks& GetTasks() { return tasks; }
 	std::mutex& GetRoomMutex() { return room_mutex; }
-	int GetRoomId() { return room_id; }
-	int GetRoomIndex() { return room_index; }
-	int GetMaxUser() { return static_cast<int>(max_user); }
+	int GetRoomId() const { return room_id; }
+	int GetRoomIndex() const { return room_index; }
+	int GetMaxUser() const { return static_cast<int>(max_user); }
+	int GetCurrentUser() const { return static_cast<int>(max_user); }
 	const char* GetRoomName() const { return room_name; }
 
 	// 공통(오버라이드)

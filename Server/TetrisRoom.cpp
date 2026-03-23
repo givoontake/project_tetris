@@ -20,6 +20,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, OpenRoomInitData d
 
 	session->SetRoomIndex(room_index);
 	room_users[0].InitRoomSession(session);
+	cur_user = 1;
 	//SendAddRoom(session);
 }
 
@@ -39,6 +40,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, LockRoomInitData d
 	}
 	session->SetRoomIndex(room_index);
 	room_users[0].InitRoomSession(session);
+	cur_user = 1;
 	//SendAddRoom(session);
 }
 
