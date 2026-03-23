@@ -154,13 +154,12 @@ struct C2S_START_PACKET {
 struct S2C_SINGLE_START_PACKET {
 	short size;
 	char type;
-	int score;
+	int score; // 이걸 왜 보냈을까?
 };
 
 struct S2C_MULTI_START_PACKET {
 	short size;
 	char type;
-	bool is_start;
 };
 
 struct C2S_KICK_PACKET {
