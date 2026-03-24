@@ -198,9 +198,10 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 			if (session->GetSessionKey().id != reqeust_sess_id) return;
 			if (session->GetState() == SESS_STATE::NONE) return;
 		}
-		memcpy(&packet_buf, &info_p, sizeof(info_p));
+		memcpy(&packet_buf + packet_size , &info_p, sizeof(info_p));
 		packet_size += sizeof(info_p);
 	}
+	session->SendBoundPacket(reqeust_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
 }
 
 // 

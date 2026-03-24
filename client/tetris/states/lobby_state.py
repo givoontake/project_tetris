@@ -143,8 +143,7 @@ class LobbyState(BaseState):
 
             elif data.type == S2C_ROOM_INFO:
                 info_data = cast(S2C_ROOM_INFO_PACKET, data)
-                self.room_list.add_room(RoomData(info_data.room_id, info_data.is_private, info_data.room_name,
-                                                 info_data.cur_user, info_data.max_user))
+                self.room_list.add_room(info_data)
 
             elif data.type == S2C_ADD_OPEN_ROOM:
                 open_data = cast(S2C_ADD_OPEN_ROOM_PACKET, data)

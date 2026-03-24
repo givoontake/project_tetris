@@ -110,6 +110,7 @@ void Session::SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp
 
 void Session::SendBoundPacket(int request_sess_id, char* packet_buf, int data_size, const HANDLE iocp_handle)
 {
+	if (data_size == 0) return;
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);
 	memcpy(send_over->packet_buf, packet_buf, data_size);
