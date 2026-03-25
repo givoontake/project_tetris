@@ -100,17 +100,16 @@ class LobbyState(BaseState):
 
     def send_join_room(self, room_pw: Optional[str]):
         if room_pw: 
-            data = C2S_JOIN_OPEN_ROOM_PACKET()
-            data.size = struct.calcsize(data.FMT)
-            data.type = C2S_JOIN_OPEN_ROOM
-            data.room_id = self.join_room_id
-            
-        else: 
             data = C2S_JOIN_LOCK_ROOM_PACKET()
             data.size = struct.calcsize(data.FMT)
             data.type = C2S_JOIN_LOCK_ROOM
             data.room_id = self.join_room_id
             data.room_password = room_pw
+        else: 
+            data = C2S_JOIN_OPEN_ROOM_PACKET()
+            data.size = struct.calcsize(data.FMT)
+            data.type = C2S_JOIN_OPEN_ROOM
+            data.room_id = self.join_room_id
 
         values = self.net_worker._pm.struct_to_values(data)
         packet_bytes = struct.pack(data.FMT, *values)
@@ -203,11 +202,12 @@ class LobbyState(BaseState):
             index = self.room_list.handle_event(ev)
             if index != None:
                 room = self.room_list.show_rooms[index]
-                self.join_room_id = room.room_id
+                self.join_room_id = room.data.room_id
                 buttons_text = ["참가", "취소"]
                 if room.data.is_private: 
                     self.input_pw_window = InputWindow(self.screen, self.rm, buttons_text) 
                     self.reactable = False
+                self.send_join_room(room.data)
                     
             self.chat_window.handle_event(ev) # 보여주기만 하므로 반환값은 없음
             message = self.chat_input_box.handle_event(ev)

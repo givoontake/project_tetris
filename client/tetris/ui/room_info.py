@@ -111,3 +111,5 @@ class RoomInfo:
     def draw(self):
         for info in self.info_rects:
             info.draw()
+
+        if self.join_button: self.join_button.draw()
