@@ -259,8 +259,6 @@ void MultiRoom::StartGame(int request_id)
 		else if (r_user.GetRoomUserState() == ROOM_USER_STATE::READY) ++ready_user_count;
 	}
 
-	TryChangeRoomState(ROOM_STATE::WAIT, ROOM_STATE::PLAY); // 잘못된 요청(동시 요청 등)에 대한 방어 코드 -> CAS에 성공해야만 시작
-
 	if (ready_user_count == cur_user) {
 		if (cur_user == 1) {
 			result = ERROR_CODE::ROOM_NOT_ENOUGH_PLAYERS;
@@ -277,7 +275,10 @@ void MultiRoom::StartGame(int request_id)
 		error_p.type = S2C_ERROR;
 		error_p.error_code = result;
 		room_users[FindHostIndex(host_id)].GetSession()->SendPacket(reinterpret_cast<char*>(&error_p), server->GetHandle());
+		return;
 	}
+
+	if(!TryChangeRoomState(ROOM_STATE::WAIT, ROOM_STATE::PLAY)) return; // 잘못된 요청(동시 요청 등)에 대한 방어 코드 -> CAS에 성공해야만 시작
 	
 	S2C_MULTI_START_PACKET start_p;
 	start_p.size = sizeof(S2C_MULTI_START_PACKET);
@@ -478,6 +479,7 @@ void MultiRoom::FindNewHost()
 	
 	if (cur_user != 0) {
 		for (auto& r_user : room_users) {
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			if ((r_user.GetRoomUserState() == ROOM_USER_STATE::READY) || (r_user.GetRoomUserState() == ROOM_USER_STATE::WAIT)) {
 				host_id = r_user.GetSession()->GetSessionKey().id;
 				r_user.SetRoomUserState(ROOM_USER_STATE::WAIT); // 호스트가 나갔을 때 레디 상태인 사람이 호스트가 되면, 레디 상태를 풀어줘야함
