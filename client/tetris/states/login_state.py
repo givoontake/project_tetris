@@ -3,7 +3,6 @@ import struct
 from typing import Optional, cast
 
 from tetris.config.define import *
-from tetris.net.define_format import *
 from tetris.net.packet_types import *
 
 from tetris.net.session import Session

@@ -2,7 +2,6 @@ import pygame
 from typing import Optional
 from tetris.ui.inputbox import InputBox
 from tetris.resources.resource_manager import ResourceManager
-from tetris.net.define_format import *
 
 class LabelFrame:
     def __init__(

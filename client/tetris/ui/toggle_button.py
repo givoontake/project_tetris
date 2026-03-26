@@ -1,4 +1,4 @@
-from tetris.net.define_format import *
+
 from tetris.resources.resource_manager import *
 from tetris.resources.fonts import Fonts
 from tetris.resources.define_colors import *

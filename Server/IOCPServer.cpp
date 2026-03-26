@@ -527,7 +527,7 @@ void IOCPServer::CreateLockRoom(char* packet, Session* session, int request_sess
 				else new_room = std::make_shared<MultiRoom>(this, session, data);
 				std::shared_ptr<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
-					//std::cout << "Open Room created, Room index: " << i << ", Room id: " << room_id << std::endl;
+					new_room->SendCreateRoom(session);
 					return;
 				}
 			}

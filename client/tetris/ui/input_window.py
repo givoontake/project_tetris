@@ -1,5 +1,6 @@
 import pygame
 
+from tetris.net.packet_structs import MAX_ROOM_PASSWORD
 from tetris.ui.popupbox import PopupBox
 from tetris.ui.inputbox import InputBox
 from tetris.resources.resource_manager import ResourceManager
@@ -21,10 +22,14 @@ class InputWindow:
         input_x = sw // 2 - input_w // 2
         input_y = sh // 2 - input_h // 2
         input_rect = pygame.Rect(input_x, input_y, input_w, input_h)
-        self.input = InputBox(self.screen, input_rect, self.rm, "비밀번호 입력", None, False, False)
+        self.input = InputBox(self.screen, input_rect, self.rm, "비밀번호 입력", MAX_ROOM_PASSWORD, False, False)
 
     def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
+        self.input.handle_event(ev)
         return self.window.handle_event(ev)
+
+    def update(self, dt_ms: int):
+        self.input.update(dt_ms)
     
     def draw(self):
         self.window.draw()

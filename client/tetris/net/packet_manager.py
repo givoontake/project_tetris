@@ -1,7 +1,5 @@
 import struct
 import queue
-
-from tetris.net.define_format import *             # 포맷 문자열 모음 (MAX_* 포함)
 from tetris.net.packet_types import *    
 from tetris.net.packet_structs import *
 from tetris.net.packet_registry import *

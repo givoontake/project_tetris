@@ -3,7 +3,6 @@ from typing import Optional
 from tetris.ui.button import Button
 from tetris.ui.inputbox import InputBox
 from tetris.config.define import *
-from tetris.net.define_format import *
 from tetris.resources.resource_manager import *
 from tetris.resources.fonts import Fonts
 from tetris.ui.rectangle import Rectangle
@@ -13,15 +12,6 @@ from tetris.ui.toggle_button import ToggleButton
 from tetris.net.packet_manager import *
 
 class RoomCreateWindow:
-    """
-    방 만들기 창.
-
-    - 제목: InputBox
-    - 인원: 1인 / 2인 / 5인 (ToggleButton 그룹)
-    - 공개 / 비공개: ToggleButton 그룹
-    - 암호: InputBox (비공개일 때만 보이고 사용됨)
-    - 하단: Button("방 만들기"), Button("취소")
-    """
     TOP_PADDING = 50
     BOTTOM_PADDING = 50
     ROW_HEIGHT = 50

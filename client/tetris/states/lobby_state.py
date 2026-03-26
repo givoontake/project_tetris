@@ -221,7 +221,6 @@ class LobbyState(BaseState):
                 if room.data.is_private: 
                     self.input_pw_window = InputWindow(self.screen, self.rm, buttons_text) 
                     self.reactable = False
-                self.send_join_room(room.data)
                 return
             
             if self.btn_refresh.handle_event(ev):
@@ -267,11 +266,12 @@ class LobbyState(BaseState):
 
             elif self.input_pw_window:
                 ipw_event = self.input_pw_window.handle_event(ev)
-                if ipw_event == "참가":
-                    self.send_join_room(self.input_pw_window.input.extract_text())
-                # 참가/취소는 send 유무의 차이
-                self.reactable = True
-                self.input_pw_window = None
+                if ipw_event != None:
+                    if ipw_event == "참가":
+                        self.send_join_room(self.input_pw_window.input.extract_text())
+                    # 참가/취소는 send 유무의 차이
+                    self.reactable = True
+                    self.input_pw_window = None
 
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 
@@ -285,6 +285,9 @@ class LobbyState(BaseState):
 
         if self.room_create_window:
             self.room_create_window.update(dt_ms)
+
+        if self.input_pw_window:
+            self.input_pw_window.update(dt_ms)
         
         return self
 
@@ -306,3 +309,4 @@ class LobbyState(BaseState):
         if self.exit_popup: self.exit_popup.draw()
         if self.save_success_popup: self.save_success_popup.draw()
         if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()
+        if self.input_pw_window: self.input_pw_window.draw()
