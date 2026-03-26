@@ -41,6 +41,7 @@ class TetrisSession:
         self.board.init()
         if self.is_single: self.set_score(0)
         else: self.nickname.set_text(self.session.nickname)
+        self.board.set_textures(self.session.block_textures) # 텍스쳐를 TSession에 두는 것이 지금보다 더 좋아 보인다
         self.state = TSessionState.WAIT
 
     def set_layout(self):
@@ -48,7 +49,7 @@ class TetrisSession:
         board_rect.h = self.rect.h*0.9
         self.board = TetrisBoard(self.screen, board_rect, self.rm)
         self.btn_start = None
-        self.btn_readt = None
+        self.btn_ready = None
 
         if self.is_single:
             ready_rect = self.board.valid_grid_rect.copy()
@@ -156,7 +157,7 @@ class TetrisSession:
 
         else:
             if self.btn_start: 
-                if self.btn_ready.handle_event(ev):
+                if self.btn_start.handle_event(ev):
                     self.send_start()
             if self.btn_ready:
                 if self.btn_ready.handle_event(ev):

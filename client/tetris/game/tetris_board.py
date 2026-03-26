@@ -24,7 +24,7 @@ class TetrisBoard:
         self.screen = screen
         self.rect = rect
         self.rm = rm
-        self.block_texture = None
+        self.block_textures = None
         # self.is_single = is_single
         self.score = None # 싱글용
 
@@ -51,6 +51,10 @@ class TetrisBoard:
 
         self.current_tetromino = None
         self.next_tetromino_shape = None
+
+    def set_textures(self, block_textures: dict):
+        self.block_textures = block_textures
+        self._set_texture_size()
 
     def set_layout(self):
         cell_w1 = self.rect.w // BOARD_WIDTH
@@ -88,9 +92,9 @@ class TetrisBoard:
     #     else: self.block_texture = new_texture
     #     self._set_texture_size(self.cell_length)
 
-    def _set_texture_size(self, size: int):
-        for key, texture in self.block_texture.items():
-            self.block_texture[key] = self.rm.images.scale_image(texture, size, size)
+    def _set_texture_size(self):
+        for key, texture in self.block_textures.items():
+            self.block_textures[key] = self.rm.images.scale_image(texture, self.cell_length, self.cell_length)
 
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
     def fix(self, fix_x, fix_y):
@@ -218,7 +222,7 @@ class TetrisBoard:
         pygame.draw.line(self.screen, WHITE, (valid_x + valid_w, valid_y + valid_h), (valid_x + valid_w, valid_y))
 
     def draw_cells(self):
-        tex_map = self.block_texture
+        tex_map = self.block_textures
 
         # 현재 테트로미노 좌표 (grid 렌더에서 제외)
         falling_cells = set()
@@ -262,7 +266,7 @@ class TetrisBoard:
 
         shape_key = self.next_tetromino_shape
         shape = SHAPES[shape_key][0]
-        tex = self.block_texture[shape_key]
+        tex = self.block_textures[shape_key]
 
         xs = [cx for (cx, _) in shape]
         ys = [cy for (_, cy) in shape]
@@ -298,7 +302,7 @@ class TetrisBoard:
         if landing.y == self.current_tetromino.y:
             return
 
-        tex = self.block_texture[landing.shape_key]
+        tex = self.block_textures[landing.shape_key]
 
         bx = self.rect.x
         by = self.rect.y
