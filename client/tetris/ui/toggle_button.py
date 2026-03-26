@@ -31,6 +31,12 @@ class ToggleButton(Rectangle):
                     self.rm.sounds.sound_effects[EFFECT_BUTTON_PRESS].play()
                 return True
         return False
+    
+    def set_pressed(self, is_pressed: bool):
+        self.pressed = is_pressed
+
+    def set_reactable(self, is_reactable: bool):
+        self.reactable = is_reactable
 
     def draw(self):
         if self.pressed:

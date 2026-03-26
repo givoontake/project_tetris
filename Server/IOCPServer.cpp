@@ -411,7 +411,7 @@ void IOCPServer::ProcessPacket(Session* session, int request_sess_id, int recv_b
 
 void IOCPServer::RoutePacket(char* packet, Session* session, int request_sess_id)
 {
-	//PrintPacketType(packet[2]);
+	PrintPacketType(packet[2]);
 	switch (session->GetState()) {
 	case SESS_STATE::NONE:
 		return;

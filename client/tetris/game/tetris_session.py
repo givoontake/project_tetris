@@ -89,9 +89,9 @@ class TetrisSession:
     def set_nickname(self, nickname: str):
         self.nickname.set_text(nickname)
 
-    def set_ready(self, ready: bool):
+    def set_ready(self, is_ready: bool):
         if self.is_single: return
-        self.btn_ready.reactable = ready
+        self.btn_ready.set_pressed(is_ready)
 
     def set_is_host(self):
         self.is_host = True # 방장 양도는 계획에 없다.
@@ -161,7 +161,10 @@ class TetrisSession:
                     self.send_start()
             if self.btn_ready:
                 if self.btn_ready.handle_event(ev):
-                    self.send_ready()
+                    if self.is_host:
+                        self.send_start()
+                    else: 
+                        self.send_ready()
 
     def send_start(self):
         data = C2S_START_PACKET()

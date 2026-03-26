@@ -156,6 +156,12 @@ class MultiPlayState(BaseState):
             new_session.set_is_not_my_session(add_data.id, add_data.name)
             self.add_user(new_session)
 
+        elif data.type == S2C_READY:
+            ready_data = cast(S2C_READY_PACKET, data)
+            for player in self.players:
+                if player.session.id == ready_data.id:
+                    player.set_ready(ready_data.is_ready)
+
         elif data.type == S2C_DELETE_USER: 
             from tetris.states.lobby_state import LobbyState
             delete_user = cast(S2C_DELETE_USER_PACKET, data)
