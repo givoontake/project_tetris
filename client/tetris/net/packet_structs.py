@@ -125,7 +125,7 @@ class S2C_ADD_USER_PACKET(RecvPacketStruct):
     id: int = -1
     name: str = ""
 
-    BODY_FMT: ClassVar[str] = f"i?{MAX_USER_NAME}s"
+    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 

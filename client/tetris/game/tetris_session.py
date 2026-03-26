@@ -36,9 +36,9 @@ class TetrisSession:
 
     def init_session(self, session: Session):
         self.session = session
-        if self.session.is_self == False: self.ready.reactable = False
+        if self.session.is_self == False: self.btn_ready.reactable = False
         if session.is_self: self.controller = TetrisController(self.net_worker)
-        self.board.init(session.block_texture)
+        self.board.init()
         if self.is_single: self.set_score(0)
         else: self.nickname.set_text(self.session.nickname)
         self.state = TSessionState.WAIT
@@ -47,12 +47,14 @@ class TetrisSession:
         board_rect = self.rect.copy()
         board_rect.h = self.rect.h*0.9
         self.board = TetrisBoard(self.screen, board_rect, self.rm)
+        self.btn_start = None
+        self.btn_readt = None
 
         if self.is_single:
             ready_rect = self.board.valid_grid_rect.copy()
             ready_rect.y += ready_rect.h
             ready_rect.h = ready_rect.h*0.1
-            self.ready = Button(self.screen, ready_rect, self.rm, None, "게임시작", 1)
+            self.btn_start = Button(self.screen, ready_rect, self.rm, None, "게임시작", 1)
 
             score_rect = self.board.preview_rect.copy()
             score_rect.y += score_rect.h
@@ -69,7 +71,7 @@ class TetrisSession:
             ready_rect = nickname_rect.copy()
             ready_rect.x += nickname_rect.w
             ready_rect.w = self.board.preview_rect.w
-            self.ready = ToggleButton(self.screen, ready_rect, self.rm, None, "준비")
+            self.btn_ready = ToggleButton(self.screen, ready_rect, self.rm, None, "준비")
 
             crown_rect = ready_rect.copy()
             crown_image = self.rm.images.ui_images[UI_HOST]
@@ -87,12 +89,13 @@ class TetrisSession:
         self.nickname.set_text(nickname)
 
     def set_ready(self, ready: bool):
-        self.ready.reactable = ready
+        if self.is_single: return
+        self.btn_ready.reactable = ready
 
     def set_is_host(self):
         self.is_host = True # 방장 양도는 계획에 없다.
-        if self.session.is_self == False: self.ready.visible = False # 방장인데 자기 세션이 아니면 준비버튼 없이 왕관만 그려야 함. 당연히 상호작용도 불가
-        else: self.ready.set_text("게임시작")
+        if self.session.is_self == False: self.btn_ready.visible = False # 방장인데 자기 세션이 아니면 준비버튼 없이 왕관만 그려야 함. 당연히 상호작용도 불가
+        else: self.btn_ready.set_text("게임시작")
 
     def set_state(self, new_state: TSessionState):
         self.state = new_state
@@ -107,7 +110,7 @@ class TetrisSession:
         self.nickname.set_text("")
         self.session = None
         self.is_host = False
-        self.ready.visible = True
+        self.btn_ready.visible = True
         if self.is_single: self.set_score(0)
         if self.controller: self.controller.clear()
 
@@ -152,8 +155,12 @@ class TetrisSession:
             if self.controller: self.controller.handle_event(ev)
 
         else:
-            if self.ready.handle_event(ev):
-                self.send_start()
+            if self.btn_start: 
+                if self.btn_ready.handle_event(ev):
+                    self.send_start()
+            if self.btn_ready:
+                if self.btn_ready.handle_event(ev):
+                    self.send_ready()
 
     def send_start(self):
         data = C2S_START_PACKET()
@@ -166,6 +173,19 @@ class TetrisSession:
             self.net_worker.send_packet(packet_bytes)
         except Exception as e:
             print("[TetrisSession] send_start() error:", e)
+
+    def send_ready(self):
+        data = C2S_READY_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_READY
+
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[TetrisSession] send_ready() error:", e)
 
     def update(self, dt_ms):
         if self.state == TSessionState.PLAY:
@@ -181,7 +201,10 @@ class TetrisSession:
 
         # 준비는 호스트가 아니면 일단 그리고, 본인이 아닌 호스트면 상호작용만 끄고 위에 왕
         if self.state == TSessionState.WAIT:
-            self.ready.draw()
+            if self.btn_start: 
+                self.btn_start.draw()
+            else:
+                self.btn_ready.draw()
 
         if self.is_single:
             self.score_box.draw()

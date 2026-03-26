@@ -40,7 +40,10 @@ class RoomInfo:
         # [잠금아이콘, 제목, 인원, 상태]의 상대폭 비율
 
         if self.data == None: is_private = "공개여부"
-        else: is_private = str(self.data.is_private)
+        else: 
+            if self.data.is_private: is_private = "비공개"
+            else: is_private = "공개"
+            
         locked_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.w*self.LOCKED_WIDTH_RATE, self.rect.h)       
         self.is_private = Rectangle(self.screen, locked_rect, self.rm, None, is_private)
         self.info_rects.append(self.is_private)

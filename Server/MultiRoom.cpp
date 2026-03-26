@@ -67,9 +67,11 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 	}
 	//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
 	int result = ERROR_CODE::ROOM_FULL;
+	int added_slot = -1;
 	//std::lock_guard<std::mutex> lock(room_mutex); 외부에서 걸 예정
 	if (room_state == ROOM_STATE::WAIT) {
-		for (auto& r_user : room_users) {
+		for (int i = 0; i < room_users.size(); ++i) {
+			auto& r_user = room_users[i];
 			if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
 
 			else {
@@ -82,19 +84,63 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 				r_user.InitRoomSession(new_session);
 				++cur_user;
 				result = SUCCESS;
+				added_slot = i;
 				break;
 			}
 		}
 	}
 
 	if (result == SUCCESS) {
-		S2C_ADD_USER_PACKET add_p;
-		add_p.size = sizeof(S2C_ADD_USER_PACKET);
-		add_p.type = S2C_ADD_USER;
-		// p.name = 세션에 이름 변수 추가 필요
-		add_p.id = new_session->GetSessionKey().id;
+		if (!room_password) {
+			S2C_ADD_OPEN_ROOM_PACKET open_p;
+			open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
+			open_p.type = S2C_ADD_OPEN_ROOM;
+			open_p.id = room_id;
+			open_p.max_user = max_user;
+			memcpy(&open_p.room_name, room_name, MAX_ROOM_NAME);
+			room_users[added_slot].GetSession()->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
+		}
+		else {
+			S2C_ADD_LOCK_ROOM_PACKET lock_p;
+			lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
+			lock_p.type = S2C_ADD_LOCK_ROOM;
+			lock_p.id = room_id;
+			lock_p.max_user = max_user;
+			memcpy(&lock_p.room_name, room_name, MAX_ROOM_NAME);
+			memcpy(&lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
+			room_users[added_slot].GetSession()->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
+		}
 
-		Broadcast(reinterpret_cast<char*>(&add_p), server->GetHandle());
+		// 본인의 입장을 본인 제외 나머지에게(방 생성 시 본인은 방에 추가된다)
+		for (int i = 0; i < room_users.size(); ++i) {
+			if (i == added_slot) continue;
+			auto& r_user = room_users[i];
+			S2C_ADD_USER_PACKET add_p;
+			add_p.size = sizeof(S2C_ADD_USER_PACKET);
+			add_p.type = S2C_ADD_USER;
+			add_p.id = new_session->GetSessionKey().id;
+			memcpy(&add_p.name, &new_session->GetInfo().nickname, MAX_USER_NAME);
+			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
+		}
+
+		// 본인 제외 나머지 유저를 본인에게
+		for (int i = 0; i < room_users.size(); ++i)	{
+			if (i == added_slot) continue;
+			auto& r_user = room_users[i];
+			S2C_ADD_USER_PACKET add_p;
+			add_p.size = sizeof(S2C_ADD_USER_PACKET);
+			add_p.type = S2C_ADD_USER;
+			add_p.id = r_user.GetSession()->GetSessionKey().id;
+			memcpy(&add_p.name, &r_user.GetSession()->GetInfo().nickname, MAX_USER_NAME);
+			new_session->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
+		}
+
+		// 새로 입장한 세션에게 방장이 누구인지
+		S2C_UPDATE_HOST_PACKET host_p;
+		host_p.size = sizeof(S2C_UPDATE_HOST_PACKET);
+		host_p.type = S2C_UPDATE_HOST;
+		host_p.new_host_id = host_id;
+		new_session->SendPacket(reinterpret_cast<char*>(&host_p), server->GetHandle());
 		return result;
 	}
 

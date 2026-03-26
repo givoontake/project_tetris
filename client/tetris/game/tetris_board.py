@@ -46,8 +46,7 @@ class TetrisBoard:
 
         self.set_layout()
 
-    def init(self, new_texture: Optional[dict]):
-        self.set_texture(new_texture)
+    def init(self):
         self._clear_board()
 
         self.current_tetromino = None
@@ -57,7 +56,6 @@ class TetrisBoard:
         cell_w1 = self.rect.w // BOARD_WIDTH
         cell_w2 = self.rect.h // BOARD_HEIGHT
         self.cell_length = min(cell_w1, cell_w2)
-        self.set_texture(None)
         
         draw_x = self.rect.x
         draw_y = self.rect.y + HIDDEN_ROWS*self.cell_length
@@ -75,20 +73,20 @@ class TetrisBoard:
         self.preview_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.preview_box = Rectangle(self.screen, self.preview_rect, self.rm, None, "", 1)
 
-    def set_texture(self, new_texture: Optional[dict]):
-        if new_texture == None:
-            self.block_texture = {
-            'Z': self.rm.images.block_images[DEFAULT_RED],      
-            'L': self.rm.images.block_images[DEFAULT_ORANGE],  
-            'O': self.rm.images.block_images[DEFAULT_YELLOW],
-            'S': self.rm.images.block_images[DEFAULT_GREEN], 
-            'J': self.rm.images.block_images[DEFAULT_BLUE],   
-            'I': self.rm.images.block_images[DEFAULT_INDIGO],  
-            'T': self.rm.images.block_images[DEFAULT_PURPLE],
-            'G': self.rm.images.block_images[DEFAULT_GRAY]
-        }
-        else: self.block_texture = new_texture
-        self._set_texture_size(self.cell_length)
+    # def set_texture(self, new_texture: Optional[dict]):
+    #     if new_texture == None:
+    #         self.block_texture = {
+    #         'Z': self.rm.images.block_images[DEFAULT_RED],      
+    #         'L': self.rm.images.block_images[DEFAULT_ORANGE],  
+    #         'O': self.rm.images.block_images[DEFAULT_YELLOW],
+    #         'S': self.rm.images.block_images[DEFAULT_GREEN], 
+    #         'J': self.rm.images.block_images[DEFAULT_BLUE],   
+    #         'I': self.rm.images.block_images[DEFAULT_INDIGO],  
+    #         'T': self.rm.images.block_images[DEFAULT_PURPLE],
+    #         'G': self.rm.images.block_images[DEFAULT_GRAY]
+    #     }
+    #     else: self.block_texture = new_texture
+    #     self._set_texture_size(self.cell_length)
 
     def _set_texture_size(self, size: int):
         for key, texture in self.block_texture.items():
@@ -185,7 +183,6 @@ class TetrisBoard:
         self.next_tetromino_shape = None
         self.combo = 0
         self.combo_effects = []
-        self.set_texture(None)
 
     # ------------ 서버 move_type에 대응하는 진입점 ------------ #
     def handle_move(self, move_type: int):

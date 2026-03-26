@@ -135,12 +135,12 @@ class MultiPlayState(BaseState):
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
         if data.type == S2C_MULTI_START:
-            start_data = cast(S2C_MULTI_START_PACKET, data)
-            if start_data.is_start:
-                self.room_state = RoomState.PLAY
-                for player in self.players:
-                    player.set_state(TSessionState.PLAY)
-                pygame.mixer.music.play(-1)
+            # start_data = cast(S2C_MULTI_START_PACKET, data)
+            # if start_data.is_start:
+            self.room_state = RoomState.PLAY
+            for player in self.players:
+                player.set_state(TSessionState.PLAY)
+            pygame.mixer.music.play(-1)
 
         elif data.type == S2C_UPDATE_HOST:
             host_data = cast(S2C_UPDATE_HOST_PACKET, data)
@@ -149,6 +149,12 @@ class MultiPlayState(BaseState):
                     if player.session.id == host_data.new_host_id:
                         player.set_is_host()
                         break
+
+        elif data.type == S2C_ADD_USER:
+            add_data = cast(S2C_ADD_USER_PACKET, data)
+            new_session = Session(self.rm)
+            new_session.set_is_not_my_session(add_data.id, add_data.name)
+            self.add_user(new_session)
 
         elif data.type == S2C_DELETE_USER: 
             from tetris.states.lobby_state import LobbyState

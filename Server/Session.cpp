@@ -115,7 +115,6 @@ void Session::SendBoundPacket(int request_sess_id, char* packet_buf, int data_si
 	send_over->SetOperationType(OP_TYPE::SEND);
 	memcpy(send_over->packet_buf, packet_buf, data_size);
 	send_over->wsabuf.len = data_size;
-	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
 	{
 		std::lock_guard<std::mutex> lock(sess_mutex);
 		if (key.id == request_sess_id) {

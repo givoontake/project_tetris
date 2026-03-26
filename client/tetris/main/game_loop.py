@@ -25,7 +25,7 @@ class GameLoop:
         self.rm = ResourceManager()
         self.fm = Fonts()
         self.net_worker = NetworkWorker()
-        self.session = Session()
+        self.session = Session(self.rm)
         self.session.set_my_session()
         self.state = LoginState(self.screen, self.rm, self.net_worker, self.session)
         self.state.connect()

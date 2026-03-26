@@ -4,45 +4,41 @@ import threading
 from tetris.resources.resource_manager import *
 
 class Session:
-    """
-    클라이언트 자신의 최소 상태.
-    - 현재 요구사항: id만 유지
-    - 로그인 완료 판단: id가 None이 아니면 True
-    """
-    _shared = None
-    _lock = threading.Lock()
-
-    def __init__(self):
+    def __init__(self, rm: ResourceManager):
+        self.rm = rm
         self.id = -1
         self.is_self = False
         self.nickname = ""
         self.win = 0
         self.lose = 0
         self.max_score = 0
-        self.block_texture = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None, 'G': None}
-        # self.update_texture({'I': DEFAULT_RED, 'J': DEFAULT_ORANGE, 'L': DEFAULT_YELLOW, 'O': DEFAULT_GREEN, 'S': DEFAULT_BLUE, 'T': DEFAULT_INDIGO, 'Z': DEFAULT_PURPLE})
-
-    @classmethod
-    def shared(cls) -> "Session":
-        if cls._shared is None:
-            with cls._lock:
-                if cls._shared is None:
-                    cls._shared = Session()
-        return cls._shared
+        self.block_textures = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None, 'G': None}
+        
+        self.load_default_textures()
     
     def set_my_session(self):
         self.is_self = True
 
-    def load_texture(self, rm: ResourceManager):
-       self.block_texture = {
-        'Z': rm.images.block_images[DEFAULT_RED],      
-        'L': rm.images.block_images[DEFAULT_ORANGE],  
-        'O': rm.images.block_images[DEFAULT_YELLOW],
-        'S': rm.images.block_images[DEFAULT_GREEN], 
-        'J': rm.images.block_images[DEFAULT_BLUE],   
-        'I': rm.images.block_images[DEFAULT_INDIGO],  
-        'T': rm.images.block_images[DEFAULT_PURPLE],
-        'G': rm.images.block_images[DEFAULT_GRAY],
+    def set_is_not_my_session(self, id: int, nickname: str):
+        self.id = id
+        self.nickname = nickname
+
+    def set_new_textures(self, new_textures: dict):
+        if set(self.block_textures.keys()) != new_textures: # 키가 전부 일치하는지
+            return 
+        
+        self.block_textures = new_textures # 텍스쳐 가져올 때 실제로 있는건지 검증하는 코드가 필요할 것 같기는 한데.. 일단 패스
+
+    def load_default_textures(self):
+       self.block_textures = {
+        'Z': self.rm.images.block_images[DEFAULT_RED],      
+        'L': self.rm.images.block_images[DEFAULT_ORANGE],  
+        'O': self.rm.images.block_images[DEFAULT_YELLOW],
+        'S': self.rm.images.block_images[DEFAULT_GREEN], 
+        'J': self.rm.images.block_images[DEFAULT_BLUE],   
+        'I': self.rm.images.block_images[DEFAULT_INDIGO],  
+        'T': self.rm.images.block_images[DEFAULT_PURPLE],
+        'G': self.rm.images.block_images[DEFAULT_GRAY],
     }
 
     # def set_id(self, new_id: int):

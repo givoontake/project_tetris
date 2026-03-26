@@ -187,19 +187,18 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 		bool is_play;
 		if (room_sp->GetRoomState() == ROOM_STATE::WAIT) is_play = false;
 		else is_play = true;
+		info_p.is_play = is_play;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) { 
 			session->SendBoundPacket(reqeust_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
 			packet_size = 0;
 		}
 
-		{
-			std::lock_guard<std::mutex> lock(session->GetMutex()); // 조건 불일치시 바로 리턴을 위해 체크만 하자, sendpacket()내에 뮤텍스 있어서 넣으면 데드락
-			if (session->GetSessionKey().id != reqeust_sess_id) return;
-			if (session->GetState() == SESS_STATE::NONE) return;
-		}
-		memcpy(&packet_buf + packet_size , &info_p, sizeof(info_p));
+		memcpy(packet_buf + packet_size, &info_p, sizeof(info_p));
 		packet_size += sizeof(info_p);
+		//std::lock_guard<std::mutex> lock(session->GetMutex()); // 조건 불일치시 바로 리턴을 위해 체크만 하자, sendpacket()내에 뮤텍스 있어서 넣으면 데드락
+		//if (session->GetSessionKey().id != reqeust_sess_id) return;
+		//if (session->GetState() == SESS_STATE::NONE) return;
 	}
 	session->SendBoundPacket(reqeust_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
 }

@@ -104,7 +104,7 @@ class LobbyState(BaseState):
             data.size = struct.calcsize(data.FMT)
             data.type = C2S_JOIN_LOCK_ROOM
             data.room_id = self.join_room_id
-            data.room_password = room_pw
+            data.room_password = self.net_worker._pm.str_to_bytes(room_pw, MAX_ROOM_PASSWORD)
         else: 
             data = C2S_JOIN_OPEN_ROOM_PACKET()
             data.size = struct.calcsize(data.FMT)
