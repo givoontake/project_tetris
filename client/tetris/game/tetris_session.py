@@ -52,10 +52,10 @@ class TetrisSession:
         self.btn_ready = None
 
         if self.is_single:
-            ready_rect = self.board.valid_grid_rect.copy()
-            ready_rect.y += ready_rect.h
-            ready_rect.h = ready_rect.h*0.1
-            self.btn_start = Button(self.screen, ready_rect, self.rm, None, "게임시작", 1)
+            start_rect = self.board.valid_grid_rect.copy()
+            start_rect.y += start_rect.h
+            start_rect.h = start_rect.h*0.1
+            self.btn_start = Button(self.screen, start_rect, self.rm, None, "게임시작", 1)
 
             score_rect = self.board.preview_rect.copy()
             score_rect.y += score_rect.h
@@ -69,12 +69,12 @@ class TetrisSession:
             nickname_rect.h = nickname_rect.h*0.1
             self.nickname = Rectangle(self.screen, nickname_rect, self.rm, None, "", 1)
 
-            ready_rect = nickname_rect.copy()
-            ready_rect.x += nickname_rect.w
-            ready_rect.w = self.board.preview_rect.w
-            self.btn_ready = ToggleButton(self.screen, ready_rect, self.rm, None, "준비")
+            self.ready_rect = nickname_rect.copy()
+            self.ready_rect.x += nickname_rect.w
+            self.ready_rect.w = self.board.preview_rect.w
+            self.btn_ready = ToggleButton(self.screen, self.ready_rect, self.rm, None, "준비")
 
-            crown_rect = ready_rect.copy()
+            crown_rect = self.ready_rect.copy()
             crown_image = self.rm.images.ui_images[UI_HOST]
             self.crown = Rectangle(self.screen, crown_rect, self.rm, crown_image, "")
 
@@ -96,7 +96,9 @@ class TetrisSession:
     def set_is_host(self):
         self.is_host = True # 방장 양도는 계획에 없다.
         if self.session.is_self == False: self.btn_ready.visible = False # 방장인데 자기 세션이 아니면 준비버튼 없이 왕관만 그려야 함. 당연히 상호작용도 불가
-        else: self.btn_ready.set_text("게임시작")
+        else: 
+            self.btn_ready = None
+            self.btn_start = Button(self.screen, self.ready_rect, self.rm, None, "게임시작", 1)
 
     def set_state(self, new_state: TSessionState):
         self.state = new_state
@@ -161,10 +163,7 @@ class TetrisSession:
                     self.send_start()
             if self.btn_ready:
                 if self.btn_ready.handle_event(ev):
-                    if self.is_host:
-                        self.send_start()
-                    else: 
-                        self.send_ready()
+                    self.send_ready()
 
     def send_start(self):
         data = C2S_START_PACKET()

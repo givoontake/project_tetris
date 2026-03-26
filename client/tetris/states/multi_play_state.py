@@ -8,10 +8,12 @@ from tetris.net.packet_types import *
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
 from tetris.net.packet_structs import *
+from tetris.net.error_types import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.fonts import Fonts
 
 from tetris.ui.button import Button
+from tetris.ui.popupbox import PopupBox
 from tetris.game.tetris_board import *
 from tetris.game.tetris_session import TetrisSession
 from tetris.states.base_state import BaseState
@@ -32,6 +34,7 @@ class MultiPlayState(BaseState):
         self.btn_exit: Optional[Button] = None
 
         self.room_state: RoomState = RoomState.WAIT
+        self.error_popup = None
 
         self.set_layout()
 
@@ -128,13 +131,24 @@ class MultiPlayState(BaseState):
             print("[MultiPlayState] send_delete_user() error:", e)
 
     def handle_event(self, ev):
+        if self.error_popup: 
+            if self.error_popup.handle_event(ev) == "확인":
+                self.error_popup = None
+            return
+
         for player in self.players:
             if player.state == TSessionState.EMPTY: continue
             player.handle_event(ev)
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
-        if data.type == S2C_MULTI_START:
+        if data.type == S2C_ERROR:
+            error_data = cast(S2C_ERROR_PACKET, data)
+            error_message = ERROR_MESSAGES[error_data.error_code]
+            self.error_popup = PopupBox(self.screen, self.rm, error_message, ["확인"])
+            self.reactable = False
+            
+        elif data.type == S2C_MULTI_START:
             # start_data = cast(S2C_MULTI_START_PACKET, data)
             # if start_data.is_start:
             self.room_state = RoomState.PLAY
@@ -220,7 +234,6 @@ class MultiPlayState(BaseState):
         return self
 
     def draw(self):
-
         self.screen.fill((0, 0, 0))
 
         # 상단 방 제목/비밀번호
@@ -230,3 +243,6 @@ class MultiPlayState(BaseState):
         # 보드 및 미리보기/프로필/블록
         for player in self.players:
             player.draw()
+
+        if self.error_popup:
+            self.error_popup.draw()
