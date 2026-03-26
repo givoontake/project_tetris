@@ -356,7 +356,7 @@ class C2S_GIVEUP_PACKET(SendPacketStruct):
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 @dataclass
-class C2S_REQEUST_ROOM_LIST_PACKET(RecvPacketStruct):
+class C2S_REQUEST_ROOM_LIST_PACKET(RecvPacketStruct):
     BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 # ===== FILE END: tetris\net\packet_structs.py =====

@@ -38,6 +38,7 @@ class LobbyState(BaseState):
         super().__init__(screen, rm, net_worker, session)
         self.top_menus: list[Button] = []
         self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm)
+        self.btn_refresh = Button(screen, pygame.Rect(950, 100, 100, 50), rm, None, "새로고침")
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
         self.chat_input_box = InputBox(screen, input_box_rect, self.rm,
                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
@@ -121,6 +122,20 @@ class LobbyState(BaseState):
             
         self.join_room_id = None
 
+    def send_request_room_list(self):
+        data = C2S_REQUEST_ROOM_LIST_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_REQUEST_ROOM_LIST
+
+        values = self.net_worker._pm.struct_to_values(data)
+        packet_bytes = struct.pack(data.FMT, *values)
+
+        try:
+            self.net_worker.send_packet(packet_bytes)
+        except Exception as e:
+            print("[LobbyState] send_request_room_list() error:", e)
+
+
     def send_disconnect(self):
         data = C2S_DISCONNECT_PACKET()
         data.size = struct.calcsize(data.FMT)
@@ -196,7 +211,6 @@ class LobbyState(BaseState):
                     setting_window_rect = pygame.Rect(setting_window_x, setting_window_y, setting_window_w, setting_window_h)
                     self.setting_window = SettingWindow(self.screen, setting_window_rect, self.rm)
                     self.reactable = False
-
                 return
 
             index = self.room_list.handle_event(ev)
@@ -208,6 +222,10 @@ class LobbyState(BaseState):
                     self.input_pw_window = InputWindow(self.screen, self.rm, buttons_text) 
                     self.reactable = False
                 self.send_join_room(room.data)
+                return
+            
+            if self.btn_refresh.handle_event(ev):
+                self.send_request_room_list()
                     
             self.chat_window.handle_event(ev) # 보여주기만 하므로 반환값은 없음
             message = self.chat_input_box.handle_event(ev)
@@ -277,6 +295,7 @@ class LobbyState(BaseState):
         for menu in self.top_menus:
             menu.draw()
 
+        self.btn_refresh.draw()
         self.room_list.draw()
         self.chat_window.draw()
         self.chat_input_box.draw()

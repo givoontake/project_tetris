@@ -164,6 +164,10 @@ void IOCPServer::HandlePacket(char* packet, Session* session, int request_sess_i
 		TryJoinRoom(session, request_sess_id, join_p->room_id, join_p->room_password);
 		break;
 	}
+	case C2S_REQUEST_ROOM_LIST: {
+		SendRoomList(session, request_sess_id);
+		break;
+	}
 	}
 }
 
