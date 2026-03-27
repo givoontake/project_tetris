@@ -44,6 +44,9 @@ class TetrisBoard:
         # self.combo = 0
         self.combo_effects: Optional[list[ComboAnimation]] = []
 
+        self.anim_elapsed_ms = 0
+        self.anim_target_line = BOARD_ROWS - 1
+
         self.set_layout()
 
     def init(self):
@@ -77,24 +80,39 @@ class TetrisBoard:
         self.preview_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.preview_box = Rectangle(self.screen, self.preview_rect, self.rm, None, "", 1)
 
-    # def set_texture(self, new_texture: Optional[dict]):
-    #     if new_texture == None:
-    #         self.block_texture = {
-    #         'Z': self.rm.images.block_images[DEFAULT_RED],      
-    #         'L': self.rm.images.block_images[DEFAULT_ORANGE],  
-    #         'O': self.rm.images.block_images[DEFAULT_YELLOW],
-    #         'S': self.rm.images.block_images[DEFAULT_GREEN], 
-    #         'J': self.rm.images.block_images[DEFAULT_BLUE],   
-    #         'I': self.rm.images.block_images[DEFAULT_INDIGO],  
-    #         'T': self.rm.images.block_images[DEFAULT_PURPLE],
-    #         'G': self.rm.images.block_images[DEFAULT_GRAY]
-    #     }
-    #     else: self.block_texture = new_texture
-    #     self._set_texture_size(self.cell_length)
-
     def _set_texture_size(self):
         for key, texture in self.block_textures.items():
             self.block_textures[key] = self.rm.images.scale_image(texture, self.cell_length, self.cell_length)
+
+    def find_anim_start_line(self):
+        grid = self.grid
+
+        while True: # 애니메이션 적용할 첫 라인 찾기(첫 컬러 블록이 포함된 줄 찾기)
+            escape = False 
+            for y in range(BOARD_COLS):
+                if grid[self.anim_target_line][y] == None or grid[self.anim_target_line][y] == 'G':
+                    pass
+                else:
+                    escape = True
+            if escape:
+                break
+            else:
+                if self.anim_target_line > 0: self.anim_target_line -= 1
+
+    def animate_gameover(self, dt_ms) -> bool:
+        self.anim_elapsed_ms += dt_ms
+        grid = self.grid
+        if self.anim_elapsed_ms > 100:
+            self.anim_elapsed_ms -= 100
+            done_flag = True
+                
+            for y in range(BOARD_COLS): # 1줄(가로)이 다 None이면 끝.
+                if grid[self.anim_target_line][y] != None:
+                    grid[self.anim_target_line][y] = 'G'
+                    done_flag = False
+            self.anim_target_line -= 1
+            return done_flag
+        return False
 
     # ------------ 현재 블록을 고정 + 라인 삭제 ------------ #
     def fix(self, fix_x, fix_y):
@@ -180,6 +198,8 @@ class TetrisBoard:
         self.next_tetromino_shape = None
         self.combo = 0
         self.combo_effects = []
+        self.anim_elapsed_ms = 0
+        self.anim_target_line = BOARD_ROWS - 1
 
     def clear(self):
         self._clear_board()
@@ -187,6 +207,8 @@ class TetrisBoard:
         self.next_tetromino_shape = None
         self.combo = 0
         self.combo_effects = []
+        self.anim_elapsed_ms = 0
+        self.anim_target_line = BOARD_ROWS - 1
 
     # ------------ 서버 move_type에 대응하는 진입점 ------------ #
     def handle_move(self, move_type: int):

@@ -102,6 +102,10 @@ class TetrisSession:
 
     def set_state(self, new_state: TSessionState):
         self.state = new_state
+    
+    def process_gameover(self):
+        self.state = TSessionState.GAMEOVER_ANIMATING
+        self.board.find_anim_start_line()
 
     def reset(self):
         self.board.reset()
@@ -191,14 +195,20 @@ class TetrisSession:
             print("[TetrisSession] send_ready() error:", e)
 
     def update(self, dt_ms):
-        if self.state == TSessionState.PLAY:
+        if self.state == TSessionState.PLAY: 
             if self.controller: self.controller.update(dt_ms)
             self.board.update(dt_ms)
+        
+        # 상태 관리를 여기서 하다 보니 생기는 구조..
+        if self.state == TSessionState.GAMEOVER_ANIMATING:
+            if self.board.animate_gameover(dt_ms):
+                if self.is_single: self.reset()
+                else: self.state = TSessionState.GAMEOVER
 
     def draw(self):
         self.board.draw_frame()
         if self.session == None: return
-        if self.state == TSessionState.PLAY:
+        if self.state == TSessionState.PLAY or TSessionState.GAMEOVER_ANIMATING:
             self.board.draw_game()
             if self.is_single: self.board.draw_combo()
 

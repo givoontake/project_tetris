@@ -21,4 +21,5 @@ class TSessionState(IntEnum):
     WAIT = 0
     PLAY = 1
     GAMEOVER = 2
+    GAMEOVER_ANIMATING = 4
     EMPTY = 3
