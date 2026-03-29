@@ -221,7 +221,8 @@ class LobbyState(BaseState):
                 if room.data.is_private: 
                     self.input_pw_window = InputWindow(self.screen, self.rm, buttons_text) 
                     self.reactable = False
-                return
+                else:
+                    self.send_join_room(None)
             
             if self.btn_refresh.handle_event(ev):
                 self.send_request_room_list()

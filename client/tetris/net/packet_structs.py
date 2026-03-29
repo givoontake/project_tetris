@@ -213,13 +213,15 @@ class S2C_ADDLINE_PACKET(IngamePacket):
 
 @dataclass
 class S2C_GAMEOVER_PACKET(IngamePacket):
-    BODY_FMT: ClassVar[str] = ""
+    id: int = -1 # 멀티는 아이디 필요함.
+    BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class S2C_GAMEEND_PACKET(IngamePacket):
-    BODY_FMT: ClassVar[str] = ""
+    winner_id: int = -1
+    BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 

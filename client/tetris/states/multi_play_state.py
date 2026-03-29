@@ -195,10 +195,16 @@ class MultiPlayState(BaseState):
             for player in self.players:
                 if player.state == TSessionState.EMPTY: continue
                 if gameover_data.id == player.session.id:
-                    player.set_state(TSessionState.GAMEOVER)
+                    player.process_gameover()
                     break
-                    # 판정은 서버에서 해서 보내주니 뭐.. 게임오버 애니메이션 같은거 만들어서 보여주면 될 듯
-            # pygame.mixer.music.stop() -> 이건 이제 엔드게임 패킷 받아야 함
+                    
+        elif data.type == S2C_GAMEEND:
+            gameend_data = cast(S2C_GAMEEND_PACKET, data)
+            for player in self.players:
+                if player.state == TSessionState.EMPTY: continue
+                if gameend_data.id != player.session.id: # 일단은 위너가 아니면(위너 관련 애니메이션 등은 우선 보류)
+                    if player.state == TSessionState.PLAY:
+                        player.process_gameover()
 
         else:
             ingame_data = cast(IngamePacket, data)
