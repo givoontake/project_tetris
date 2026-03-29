@@ -77,6 +77,8 @@ class LobbyState(BaseState):
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
 
+        self.send_request_room_list()
+
     # def on_resize(self, w, h, screen):
     #     self.screen = screen
     #     self.set_layout()

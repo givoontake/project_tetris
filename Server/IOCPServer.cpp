@@ -173,6 +173,13 @@ void IOCPServer::HandlePacket(char* packet, Session* session, int request_sess_i
 
 void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 {
+	{
+		// 어차피 send의 세션 조건에서 걸러지지만, 방이 많아지면 작업 자체가 길어질 수 있으므로 미리 체크
+		std::lock_guard<std::mutex> lock(session->GetMutex());
+		if (session->GetSessionKey().id != reqeust_sess_id) return;
+		if (session->GetState() != SESS_STATE::LOBBY) return;
+	}
+	
 	char packet_buf[BUF_SIZE];
 	int packet_size = 0;
 	for (auto& room : rooms) {
@@ -632,10 +639,6 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session* session, int re
 			login_p.id = -1; // 근데 로그인 실패일경우 나머지 패킷도 다같이 가는건 낭비같은데.. 결국 로그인 성공과 세션 데이터 전송은 분리 해야할듯
 		}
 		session->SendPacket(request_sess_id, reinterpret_cast<char*>(&login_p), iocp_handle);
-
-		if (login_p.id > 0) {
-			SendRoomList(session, request_sess_id);
-		}
 
 		break;
 	}
