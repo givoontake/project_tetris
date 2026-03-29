@@ -92,9 +92,15 @@ class MultiPlayState(BaseState):
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
 
+    def reset_room(self):
+        pygame.mixer.music.stop()
+        for player in self.players:
+            if player.session == None: continue
+            player.reset()
+
     def add_user(self, session: Session):
         for player in self.players:
-            if player.state == TSessionState.EMPTY:
+            if player.session == None:
                 player.init_session(session)
 
     # def clear(self): # 방 나가면 그냥 없는거임
@@ -144,7 +150,7 @@ class MultiPlayState(BaseState):
                     self.reactable = True
 
         for player in self.players:
-            if player.state == TSessionState.EMPTY: continue
+            if player.session == None: continue
             player.handle_event(ev)
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
@@ -160,6 +166,7 @@ class MultiPlayState(BaseState):
             # if start_data.is_start:
             self.room_state = RoomState.PLAY
             for player in self.players:
+                if player.session == None: continue
                 player.set_state(TSessionState.PLAY)
             pygame.mixer.music.play(-1)
 
@@ -180,14 +187,16 @@ class MultiPlayState(BaseState):
         elif data.type == S2C_READY:
             ready_data = cast(S2C_READY_PACKET, data)
             for player in self.players:
+                if player.session == None: continue
                 if player.session.id == ready_data.id:
                     player.set_ready(ready_data.is_ready)
+                    break
 
         elif data.type == S2C_DELETE_USER: 
             from tetris.states.lobby_state import LobbyState
             delete_user = cast(S2C_DELETE_USER_PACKET, data)
             for player in self.players:
-                if player.state == TSessionState.EMPTY: continue
+                if player.session == None: continue
                 if delete_user.id == player.session.id:
                     if player.session.is_self:     
                         pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 음악나오면 안되니까
@@ -200,21 +209,21 @@ class MultiPlayState(BaseState):
         elif data.type == S2C_GAMEOVER:
             gameover_data = cast(S2C_GAMEOVER_PACKET, data)
             for player in self.players:
-                if player.state == TSessionState.EMPTY: continue
+                if player.session == None: continue
                 if gameover_data.id == player.session.id:
                     player.process_gameover()
-                    pygame.mixer.music.stop()
                     break
                     
         elif data.type == S2C_GAMEEND:
             gameend_data = cast(S2C_GAMEEND_PACKET, data)
             winner_nickname = "?"
             for player in self.players:
-                if player.session.id == gameend_data.winner_id:
+                if player.session == None: continue # 세션이 None이면 상태도 EMPTY임. 따라서 상태가 EMPTY이 아니라 세션의 존재 여부를 따져야 안터짐
+                if player.session.id == gameend_data.winner_id:  
                     winner_nickname = player.session.nickname
+                    break
 
-            for player in self.players: # 패킷 처리에서 리셋하지 않으면 값의 안전 보장이 불가능
-                player.reset() 
+            self.reset_room() # 패킷 처리에서 리셋하지 않으면 값의 안전 보장이 불가능
 
             message = f"{winner_nickname} 승리!"
             self.winner_popup = PopupBox(self.screen, self.rm, message, ["확인"])
@@ -223,15 +232,17 @@ class MultiPlayState(BaseState):
         elif data.type == S2C_MATCH_RECORD:
             match_data = cast(S2C_MATCH_RECORD_PACKET, data)
             for player in self.players:
+                if player.session == None: continue
                 if player.session.is_self: 
                     player.session.win = match_data.win_count
                     player.session.lose = match_data.lose_count
+                    break
 
         else:
             ingame_data = cast(IngamePacket, data)
             id = ingame_data.id
             for player in self.players:
-                if player.state == TSessionState.EMPTY: continue
+                if player.session == None: continue
                 if id == player.session.id:
                     player.handle_packet(data)
                     break

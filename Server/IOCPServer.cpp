@@ -585,7 +585,7 @@ void IOCPServer::Disconnect(int user_index)
 			if (room) room->DeleteUser(target->GetSessionKey().id);
 		}
 
-		std::cout << "Session index[" << target->GetSessionKey().index << "] disconnect/Id: " << target->GetSessionKey().id << std::endl;
+		std::cout << "Session index[" << target->GetSessionKey().index << "] disconnect/Id: " << target->GetSessionKey().id << "nickname: " << target->GetInfo().nickname << std::endl;
 		target->ClearSession();
 	}
 	

@@ -479,13 +479,11 @@ void MultiRoom::FindNewHost()
 	
 	if (cur_user != 0) {
 		for (auto& r_user : room_users) {
-			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-			if ((r_user.GetRoomUserState() == ROOM_USER_STATE::READY) || (r_user.GetRoomUserState() == ROOM_USER_STATE::WAIT)) {
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue; 
 				host_id = r_user.GetSession()->GetSessionKey().id;
-				r_user.SetRoomUserState(ROOM_USER_STATE::WAIT); // 호스트가 나갔을 때 레디 상태인 사람이 호스트가 되면, 레디 상태를 풀어줘야함
+				if (room_state == ROOM_STATE::WAIT) r_user.SetRoomUserState(ROOM_USER_STATE::WAIT); // 게임 중이 아닐 때, 호스트가 나갔을 때 레디 상태인 사람이 호스트가 되면, 레디 상태를 풀어줘야함
 				find_host = true;
 				break;
-			}
 		}
 	}
 
