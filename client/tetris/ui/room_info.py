@@ -85,9 +85,9 @@ class RoomInfo:
             join_rect.w = self.rect.w*self.JOIN_WIDTH_RATE
             self.join_button = Button(self.screen, join_rect, self.rm, None, "참가")
 
-    def update_info(self, data: RoomData):
+    def update_info(self, data: S2C_ROOM_INFO_PACKET):
         self.room_id = data.room_id
-        self.title = data.title
+        self.title = data.room_name
         self.is_private = data.is_private
         self.cur_user = data.cur_user
         self.max_user = data.max_user

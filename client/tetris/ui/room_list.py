@@ -45,23 +45,8 @@ class RoomList:
     # ---------------- 외부 API ---------------- #
     def clear(self):
         self.rooms.clear()
+        self.show_rooms.clear()
         self.page_index = 0
-
-    def update_room(self, info: RoomData | RoomData): # 기존 방에 대한 업데이트만 수행
-        for room in self.rooms:
-            if room.room_id == info.room_id:
-                room.update_info(info)
-                break
-
-    def update_rooms(self, start_index: int):
-        for index in range(start_index, len(self.rooms)):
-            if index % 2: color = GRAY
-            else: color = DARK_GRAY
-            rect_index = index % self.VISIBLE_ROOM
-            room_rect = self.base_room_rect.copy()
-            room_rect.y = self.base_room_rect.y + rect_index*self.base_room_rect.h
-            self.rooms[index].update_info_rects(room_rect.y)
-            self.rooms[index].set_background_color(color)
 
     def add_room(self, info: S2C_ROOM_INFO_PACKET):
         add_index = len(self.rooms) # 추가되는 부분의 인덱스는 길이와 같다.
@@ -73,15 +58,6 @@ class RoomList:
 
         room = RoomInfo(self.screen, room_rect, self.rm, color, info)
         self.rooms.append(room)
-        self.update_show_rooms()
-
-    def delete_room(self, delete_room_id: int):
-        for index in range(len(self.rooms)):
-            if self.rooms[index].room_id == delete_room_id:
-                del self.rooms[index]
-                self.update_rooms(index)
-                break
-
         self.update_show_rooms()
 
     def handle_event(self, ev: pygame.event.Event) -> Optional[int]: # 인덱스 반환

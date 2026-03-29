@@ -123,6 +123,7 @@ class LobbyState(BaseState):
         self.join_room_id = None
 
     def send_request_room_list(self):
+        self.room_list.clear()
         data = C2S_REQUEST_ROOM_LIST_PACKET()
         data.size = struct.calcsize(data.FMT)
         data.type = C2S_REQUEST_ROOM_LIST
