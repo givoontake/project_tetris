@@ -343,8 +343,8 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, const std::string login_
         {
             const char* SQL_UPDATE_MATCH_RESULT =
                 "UPDATE users "
-                "SET win_count  = win_count  + ?, "
-                "    lose_count = lose_count + ? "
+                "SET win = win + ?, "
+                "    lose = lose + ? "
                 "WHERE login_id=?";
 
             caches.stmt_cache[DBOperationType::UPDATE_MATCH_RESULT]
