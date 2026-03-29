@@ -35,7 +35,8 @@ class MultiPlayState(BaseState):
 
         self.room_state: RoomState = RoomState.WAIT
         self.error_popup = None
-
+        self.winner_popup = None
+        self.reactable = True
         self.set_layout()
 
     def set_layout(self):
@@ -131,10 +132,16 @@ class MultiPlayState(BaseState):
             print("[MultiPlayState] send_delete_user() error:", e)
 
     def handle_event(self, ev):
-        if self.error_popup: 
-            if self.error_popup.handle_event(ev) == "확인":
-                self.error_popup = None
-            return
+        if self.reactable == False:
+            if self.error_popup: 
+                if self.error_popup.handle_event(ev) == "확인":
+                    self.error_popup = None
+                    self.reactable = True
+            
+            elif self.winner_popup:
+                if self.winner_popup.handle_event(ev) == "확인":
+                    self.winner_popup = None
+                    self.reactable = True
 
         for player in self.players:
             if player.state == TSessionState.EMPTY: continue
@@ -196,15 +203,29 @@ class MultiPlayState(BaseState):
                 if player.state == TSessionState.EMPTY: continue
                 if gameover_data.id == player.session.id:
                     player.process_gameover()
+                    pygame.mixer.music.stop()
                     break
                     
         elif data.type == S2C_GAMEEND:
             gameend_data = cast(S2C_GAMEEND_PACKET, data)
+            winner_nickname = "?"
             for player in self.players:
-                if player.state == TSessionState.EMPTY: continue
-                if gameend_data.id != player.session.id: # 일단은 위너가 아니면(위너 관련 애니메이션 등은 우선 보류)
-                    if player.state == TSessionState.PLAY:
-                        player.process_gameover()
+                if player.session.id == gameend_data.winner_id:
+                    winner_nickname = player.session.nickname
+
+            for player in self.players: # 패킷 처리에서 리셋하지 않으면 값의 안전 보장이 불가능
+                player.reset() 
+
+            message = f"{winner_nickname} 승리!"
+            self.winner_popup = PopupBox(self.screen, self.rm, message, ["확인"])
+            self.reactable = False
+                    
+        elif data.type == S2C_MATCH_RECORD:
+            match_data = cast(S2C_MATCH_RECORD_PACKET, data)
+            for player in self.players:
+                if player.session.is_self: 
+                    player.session.win = match_data.win_count
+                    player.session.lose = match_data.lose_count
 
         else:
             ingame_data = cast(IngamePacket, data)
@@ -252,3 +273,6 @@ class MultiPlayState(BaseState):
 
         if self.error_popup:
             self.error_popup.draw()
+
+        elif self.winner_popup:
+            self.winner_popup.draw()

@@ -46,7 +46,7 @@ class RecvPacketStruct:
             
 
 @dataclass
-class IngamePacket(RecvPacketStruct):
+class IngamePacket(RecvPacketStruct): # id 공통필드
     id: int = -1
 
     BODY_FMT: ClassVar[str] = "i"
@@ -213,16 +213,15 @@ class S2C_ADDLINE_PACKET(IngamePacket):
 
 @dataclass
 class S2C_GAMEOVER_PACKET(IngamePacket):
-    id: int = -1 # 멀티는 아이디 필요함.
-    BODY_FMT: ClassVar[str] = "i"
+    BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
 
 
 @dataclass
-class S2C_GAMEEND_PACKET(IngamePacket):
+class S2C_GAMEEND_PACKET(RecvPacketStruct):
     winner_id: int = -1
     BODY_FMT: ClassVar[str] = "i"
-    FMT: ClassVar[str] = IngamePacket.HEADER_FMT + BODY_FMT
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass

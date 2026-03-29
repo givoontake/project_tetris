@@ -109,6 +109,7 @@ class TetrisSession:
 
     def reset(self):
         self.board.reset()
+        if self.btn_ready: self.btn_ready.set_pressed(False)
         self.state = TSessionState.WAIT
 
     def clear(self):
