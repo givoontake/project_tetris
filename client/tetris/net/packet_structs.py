@@ -257,6 +257,14 @@ class S2C_ROOM_INFO_PACKET(RecvPacketStruct):
 
     BODY_FMT: ClassVar[str] = f"i{MAX_ROOM_NAME}sbb??"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+@dataclass
+class S2C_INFO_PACKET(RecvPacketStruct):
+    info_type: int = -1
+    BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+
 # ---------------------------
 # C2S (송신) : SendPacketStruct
 # ---------------------------

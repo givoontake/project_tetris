@@ -61,6 +61,7 @@ constexpr char C2S_REQUEST_ROOM_LIST = 47;
 constexpr char S2C_ROOM_INFO = 49;
 constexpr char C2S_JOIN_LOCK_ROOM = 50;
 
+constexpr char S2C_INFO = 100;
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;
 

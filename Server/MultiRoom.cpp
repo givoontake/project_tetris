@@ -237,8 +237,14 @@ void MultiRoom::KickUser(int id, int kick_user_id)
 			p.size = sizeof(S2C_DELETE_USER_PACKET);
 			p.type = S2C_DELETE_USER;
 			p.id = kick_user_id;
-
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+
+			S2C_INFO_PACKET info_p;
+			info_p.size = sizeof(S2C_INFO_PACKET);
+			info_p.type = S2C_INFO;
+			info_p.info_code = INFO_CODE::KICKED;
+			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&info_p), server->GetHandle());
+
 			r_user.ClearRoomSession();
 			--cur_user;
 		}

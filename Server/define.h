@@ -279,4 +279,10 @@ struct S2C_ROOM_INFO_PACKET {
 	bool is_play;
 };
 
+struct S2C_INFO_PACKET {
+	short size;
+	char type;
+	int info_code;
+};
+
 #pragma pack(pop)

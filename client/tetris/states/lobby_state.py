@@ -8,6 +8,7 @@ from tetris.net.packet_types import *
 
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
+from tetris.net.info_types import *
 from tetris.resources.resource_manager import *
 from tetris.resources.fonts import *
 from tetris.resources.define_colors import *
@@ -55,6 +56,8 @@ class LobbyState(BaseState):
         self.input_pw_window = None
         self.reactable = True
 
+        self.info_popup = None
+
         self.join_room_id = None
     
         self.set_layout()
@@ -86,7 +89,13 @@ class LobbyState(BaseState):
 
     def handle_packet(self, data: RecvPacketStruct):
         if data:
-            if data.type == S2C_MESSAGE:
+            if data.type == S2C_INFO:
+                info_data = cast(S2C_INFO_PACKET, data)
+                info_message = INFO_MESSAGES[info_data.info_type]
+                self.info_popup = PopupBox(self.screen, self.rm, info_message, ["확인"])
+                self.reactable = False
+
+            elif data.type == S2C_MESSAGE:
                 message_data = cast(S2C_MESSAGE_PACKET, data)
                 self.chat_window.add_new_message(message_data.user_name, message_data.message)
 
@@ -219,6 +228,11 @@ class LobbyState(BaseState):
                     self.input_pw_window = None
                     self.join_room_id = None
 
+            elif self.info_popup:
+                if self.info_popup.handle_event(ev) == "확인":
+                    self.info_popup = None
+                    self.reactable = True
+
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 
             self.open_shutter.update(dt_ms)
@@ -256,3 +270,4 @@ class LobbyState(BaseState):
         if self.save_success_popup: self.save_success_popup.draw()
         if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()
         if self.input_pw_window: self.input_pw_window.draw()
+        if self.info_popup: self.info_popup.draw()
