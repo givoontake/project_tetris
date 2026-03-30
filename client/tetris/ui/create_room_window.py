@@ -124,37 +124,6 @@ class RoomCreateWindow:
             self.option_make.append(option)
             draw_x += (draw_w + inner_padding_w)
 
-    def _send_create_room(self):
-        if self.title_val == None: return
-        if self.player_val == None: return
-        if self.is_open == None: return
-        if self.is_open == False: 
-            if self.password_val == None: return
-
-        title = self.net_worker._pm.str_to_bytes(self.title_val, MAX_ROOM_NAME)
-        if self.is_open:
-            data = C2S_ADD_OPEN_ROOM_PACKET()
-            data.size = struct.calcsize(data.FMT)
-            data.type = C2S_ADD_OPEN_ROOM
-            data.max_user = self.player_val
-            data.room_name = title
-
-        else:
-            data = C2S_ADD_LOCK_ROOM_PACKET()
-            data.size = struct.calcsize(data.FMT)
-            data.type = C2S_ADD_LOCK_ROOM
-            data.max_user = self.player_val
-            data.room_name = title
-            data.room_password = self.net_worker._pm.str_to_bytes(self.password_val, MAX_ROOM_PASSWORD)
-            
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[LoginState] send_create_room() error:", e)
-
-
     # -------- 내부 상태 보조 -------- #
     def _set_player_value(self, val: str):
         for option in self.option_player:
@@ -207,7 +176,8 @@ class RoomCreateWindow:
                 if option.text == "만들기":
                     self.title_val = self.title.extract_text()
                     self.password_val = self.password.extract_text()
-                    self._send_create_room()
+                    packet = self.net_worker.builder.build_create_room(self.title_val, self.player_val, self.is_open, self.password_val)
+                    self.net_worker.send_packet(packet)
 
                 # elif option.text == "취소":
                 #     pass

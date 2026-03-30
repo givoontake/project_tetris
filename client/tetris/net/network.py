@@ -3,6 +3,7 @@ import socket
 import threading
 
 from tetris.config.define import *
+from tetris.net.packet_builder import PacketBuilder
 from tetris.net.packet_manager import PacketManager
 
 class NetworkWorker:
@@ -19,6 +20,7 @@ class NetworkWorker:
         self.socket_lock = threading.Lock()
 
         self._pm = PacketManager()
+        self.builder = PacketBuilder()
 
     # ---- 메인 스레드에서 사용할 접근자 ----
     # def get_packet_manager(self) -> PacketManager:

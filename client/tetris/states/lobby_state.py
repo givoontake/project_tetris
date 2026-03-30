@@ -77,80 +77,12 @@ class LobbyState(BaseState):
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
 
-        self.send_request_room_list()
+        packet = self.net_worker.builder.build_request_room_list_pkt()
+        self.net_worker.send_packet(packet)
 
     # def on_resize(self, w, h, screen):
     #     self.screen = screen
     #     self.set_layout()
-
-    def send_message(self, message: str): # 메세지는 가변이라 문자열 포맷을 크기만큼 만들어 직접 전송
-        if len(message) == 0: return
-        data = C2S_MESSAGE_PACKET()
-        data.type = C2S_MESSAGE
-        encoded = message.encode("utf-8")
-        message_bytes = len(encoded)
-        data.size = struct.calcsize(data.FMT) + message_bytes
-        values = self.net_worker._pm.struct_to_values(data)
-        fmt = data.FMT
-        header = struct.pack(fmt, *values)
-        message = struct.pack(f"{message_bytes}s", encoded)
-        message_packet = header + message
-
-        try:
-            self.net_worker.send_packet(message_packet)
-        except Exception as e:
-            print("[LobbyState] send_message() error:", e)
-
-    def send_join_room(self, room_pw: Optional[str]):
-        if room_pw: 
-            data = C2S_JOIN_LOCK_ROOM_PACKET()
-            data.size = struct.calcsize(data.FMT)
-            data.type = C2S_JOIN_LOCK_ROOM
-            data.room_id = self.join_room_id
-            data.room_password = self.net_worker._pm.str_to_bytes(room_pw, MAX_ROOM_PASSWORD)
-        else: 
-            data = C2S_JOIN_OPEN_ROOM_PACKET()
-            data.size = struct.calcsize(data.FMT)
-            data.type = C2S_JOIN_OPEN_ROOM
-            data.room_id = self.join_room_id
-
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[LobbyState] send_join_room() error:", e)
-            
-        self.join_room_id = None
-
-    def send_request_room_list(self):
-        self.room_list.clear()
-        data = C2S_REQUEST_ROOM_LIST_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_REQUEST_ROOM_LIST
-
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[LobbyState] send_request_room_list() error:", e)
-
-
-    def send_disconnect(self):
-        data = C2S_DISCONNECT_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_DISCONNECT
-        values = self.net_worker._pm.struct_to_values(data)
-
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[LobbyState] send_disconnect() error:", e)
 
     def handle_packet(self, data: RecvPacketStruct):
         if data:
@@ -225,15 +157,20 @@ class LobbyState(BaseState):
                     self.input_pw_window = InputWindow(self.screen, self.rm, buttons_text) 
                     self.reactable = False
                 else:
-                    self.send_join_room(None)
+                    packet = self.net_worker.builder.build_join_room_pkt(self.join_room_id, None)
+                    self.net_worker.send_packet(packet)
+                    self.join_room_id = None
             
             if self.btn_refresh.handle_event(ev):
-                self.send_request_room_list()
+                self.room_list.clear()
+                packet = self.net_worker.builder.build_request_room_list_pkt()
+                self.net_worker.send_packet(packet)
                     
             self.chat_window.handle_event(ev) # 보여주기만 하므로 반환값은 없음
             message = self.chat_input_box.handle_event(ev)
             if message != None:
-                self.send_message(message)
+                packet = self.net_worker.builder.build_message_pkt(message)
+                self.net_worker.send_packet(packet)
 
         else:
             if self.room_create_window:
@@ -245,9 +182,11 @@ class LobbyState(BaseState):
             elif self.exit_popup:
                 ep_event = self.exit_popup.handle_event(ev)
                 if ep_event == "게임종료":
-                    self.send_disconnect()
+                    packet = self.net_worker.builder.build_disconnect_pkt()
+                    self.net_worker.send_packet(packet)
                     pygame.quit()
                     raise SystemExit
+                
                 elif ep_event == "계속하기":
                     self.exit_popup = None
                     self.reactable = True
@@ -272,10 +211,13 @@ class LobbyState(BaseState):
                 ipw_event = self.input_pw_window.handle_event(ev)
                 if ipw_event != None:
                     if ipw_event == "참가":
-                        self.send_join_room(self.input_pw_window.input.extract_text())
+                        packet = self.net_worker.builder.build_join_room_pkt(self.join_room_id, self.input_pw_window.input.extract_text())
+                        self.net_worker.send_packet(packet)
+
                     # 참가/취소는 send 유무의 차이
                     self.reactable = True
                     self.input_pw_window = None
+                    self.join_room_id = None
 
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 

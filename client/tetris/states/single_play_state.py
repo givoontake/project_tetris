@@ -77,30 +77,6 @@ class SinglePlayState(BaseState):
     def clear(self):
         self.tetris_session.clear()
 
-    def send_delete_user(self):
-        data = C2S_DELETE_USER_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_DELETE_USER
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[SinglePlayState] send_delete_user() error:", e)
-
-    def send_giveup(self):
-        data = C2S_GIVEUP_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_GIVEUP
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[SinglePlayState] giveup_user() error:", e)
-
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
         if data.type == S2C_SINGLE_START:
@@ -139,11 +115,13 @@ class SinglePlayState(BaseState):
         self.tetris_session.handle_event(ev)
 
         if self.btn_exit.handle_event(ev):
-            self.send_delete_user()
+            packet = self.net_worker.builder.build_delete_user_pkt()
+            self.net_worker.send_packet(packet)
 
         if self.btn_giveup.handle_event(ev):
             if self.tetris_session.state == TSessionState.PLAY:
-                self.send_giveup()
+                packet = self.net_worker.builder.build_giveup_pkt()
+                self.net_worker.send_packet(packet)
 
     # ------------ 이벤트 처리 ------------ #
     def update(self, dt_ms, events):

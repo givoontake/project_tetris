@@ -139,20 +139,8 @@ class TetrisController:
             self.drop_pressed = False
 
     def send_move(self, move_type):
-        data = C2S_MOVE_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_MOVE
-        data.move_type = move_type
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        # MOVE_NAME = {LEFT: "LEFT", RIGHT: "RIGHT", DOWN: "DOWN", DROP: "DROP", ROTATE: "ROTATE"}
-        # print("[C2S_MOVE] Send move_type =", MOVE_NAME.get(self.move_type, self.move_type))
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[TetrisController] send_move() error:", e)
+        packet = self.net_worker.builder.build_move_pkt(move_type)
+        self.net_worker.send_packet(packet)
 
     def clear(self):
         self.left_pressed = False

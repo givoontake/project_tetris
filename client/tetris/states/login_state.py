@@ -68,21 +68,6 @@ class LoginState(BaseState):
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
         self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인")
 
-    def send_login(self, id: str, pw: str):
-        data = C2S_LOGIN_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_LOGIN
-        data.user_id = self.net_worker._pm.str_to_bytes(id, MAX_USER_ID)
-        data.user_password = self.net_worker._pm.str_to_bytes(pw, MAX_USER_PASSWORD)
-        values = self.net_worker._pm.struct_to_values(data)
-        packet = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet)
-            self.active_loading = True
-        except Exception as e:
-            print("[LoginState] send_login error:", e)
-
     def handle_packet(self, data: Optional[RecvPacketStruct]):
         if data:
             # print(", ".join(f"{k}: {v}" for k, v in data.items()))
@@ -113,7 +98,8 @@ class LoginState(BaseState):
             if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
                 id = self.id_label.input_box.handle_event(ev)
                 pw = self.pw_label.input_box.handle_event(ev)
-                self.send_login(id, pw)
+                packet = self.net_worker.builder.build_login_pkt(id, pw)
+                self.net_worker.send_packet(packet)
                 return
             
             else:
@@ -123,7 +109,8 @@ class LoginState(BaseState):
             if self.btn_login.handle_event(ev):
                 id = self.id_label.input_box.extract_text()
                 pw = self.pw_label.input_box.extract_text()
-                self.send_login(id, pw)
+                packet = self.net_worker.builder.build_login_pkt(id, pw)
+                self.net_worker.send_packet(packet)
 
         else:
             if self.fail_connect_popup:

@@ -107,36 +107,6 @@ class MultiPlayState(BaseState):
     #     for player in self.players:
     #         player.clear()
 
-    def send_start(self):
-        size = 2 + 1
-        type = C2S_START
-
-        packet_bytes = struct.pack(
-            "<hb",
-            size,
-            type,
-        )
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[SinglePlayState] send_start() error:", e)
-
-    def send_delete_user(self):
-        size = 2 + 1
-        type = C2S_DELETE_USER
-
-        packet_bytes = struct.pack(
-            "<hb",
-            size,
-            type,
-        )
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[MultiPlayState] send_delete_user() error:", e)
-
     def handle_event(self, ev):
         if self.reactable == False:
             if self.error_popup: 
@@ -264,7 +234,8 @@ class MultiPlayState(BaseState):
             self.handle_event(ev)
 
             if self.btn_exit.handle_event(ev):
-                self.send_delete_user()
+                packet = self.net_worker.builder.build_delete_user_pkt()
+                self.net_worker.send_packet(packet)
         
         for player in self.players:
             player.update(dt_ms)

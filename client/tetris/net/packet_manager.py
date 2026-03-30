@@ -13,18 +13,6 @@ class PacketManager:
         # 메인 스레드로 넘길 '완성 패킷' 큐 (thread-safe)
         self.queue: "queue.Queue[dict]"= queue.Queue(maxsize=MAX_QUEUE_SIZE)
 
-    def str_to_bytes(self, s: str, array_len: int) -> bytearray:
-        return str(s).encode("utf-8")[:array_len].ljust(array_len, b"\x00")
-    
-    def struct_to_values(self, data: SendPacketStruct):
-        values: list = []
-        flds = fields(data)
-        for fld in flds:
-            value = getattr(data, fld.name)
-            values.append(value)
-
-        return values
-
     def struct_to_bytes(self, data: SendPacketStruct) -> bytes:
         fmts = data.FMT 
         flds = fields(data) # 들어온 필드의 변수 선언 순서를 따른다.

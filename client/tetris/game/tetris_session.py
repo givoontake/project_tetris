@@ -165,35 +165,13 @@ class TetrisSession:
         else:
             if self.btn_start: 
                 if self.btn_start.handle_event(ev):
-                    self.send_start()
+                    packet = self.net_worker.builder.build_start_pkt()
+                    self.net_worker.send_packet(packet)
+
             if self.btn_ready:
                 if self.btn_ready.handle_event(ev):
-                    self.send_ready()
-
-    def send_start(self):
-        data = C2S_START_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_START
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[TetrisSession] send_start() error:", e)
-
-    def send_ready(self):
-        data = C2S_READY_PACKET()
-        data.size = struct.calcsize(data.FMT)
-        data.type = C2S_READY
-
-        values = self.net_worker._pm.struct_to_values(data)
-        packet_bytes = struct.pack(data.FMT, *values)
-
-        try:
-            self.net_worker.send_packet(packet_bytes)
-        except Exception as e:
-            print("[TetrisSession] send_ready() error:", e)
+                    packet = self.net_worker.builder.build_ready_pkt()
+                    self.net_worker.send_packet(packet)
 
     def update(self, dt_ms):
         if self.state == TSessionState.PLAY: 
