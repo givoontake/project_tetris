@@ -635,7 +635,7 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session* session, int re
 	switch (db_over->type) {
 	case DBOperationType::LOGIN: {
 		S2C_LOGIN_PACKET login_p;
-		ZeroMemory(&login_p, sizeof(login_p));
+		S2C_ERROR_PACKET error_p;
 		login_p.size = sizeof(S2C_LOGIN_PACKET);
 		login_p.type = S2C_LOGIN;
 		if (db_over->ok) {
@@ -658,7 +658,15 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session* session, int re
 		else {
 			login_p.id = -1; // 근데 로그인 실패일경우 나머지 패킷도 다같이 가는건 낭비같은데.. 결국 로그인 성공과 세션 데이터 전송은 분리 해야할듯
 		}
-		session->SendPacket(request_sess_id, reinterpret_cast<char*>(&login_p), iocp_handle);
+
+		if (login_p.id == -1) {
+			error_p.size = sizeof(S2C_ERROR_PACKET);
+			error_p.type = S2C_ERROR;
+			error_p.error_code = ERROR_CODE::LOGIN_FAILED;
+			session->SendPacket(request_sess_id, reinterpret_cast<char*>(&error_p), iocp_handle);
+		}
+
+		else session->SendPacket(request_sess_id, reinterpret_cast<char*>(&login_p), iocp_handle);
 
 		break;
 	}

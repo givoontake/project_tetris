@@ -8,6 +8,7 @@ from tetris.net.packet_types import *
 from tetris.net.session import Session
 from tetris.net.network import NetworkWorker
 from tetris.net.packet_structs import *
+from tetris.net.error_types import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define import *
 
@@ -71,21 +72,22 @@ class LoginState(BaseState):
     def handle_packet(self, data: Optional[RecvPacketStruct]):
         if data:
             # print(", ".join(f"{k}: {v}" for k, v in data.items()))
-            if data.type == S2C_LOGIN:
-                login_data = cast(S2C_LOGIN_PACKET, data) # 코드 작성시 불편함을 줄이기 위한 힌트용, 논리적으로는 맞으므로 굳이 할 필요는 없음
-                if login_data.id == -1:
-                    self.fail_login_popup = PopupBox(self.screen, self.rm, "아이디 또는 비밀번호를 확인하세요.", ["재시도", "종료"])
-                    self.reactable = False
-                
-                else:
-                    id = login_data.id
-                    self.session.id = id
-                    self.session.nickname = login_data.user_name
-                    self.session.win = login_data.win_count
-                    self.session.lose = login_data.lose_count
-                    self.session.max_score = login_data.max_score
+            if data.type == S2C_ERROR:
+                error_data = cast(S2C_ERROR_PACKET, data)
+                error_message = ERROR_MESSAGES[error_data.error_code]
+                self.fail_login_popup = PopupBox(self.screen, self.rm, error_message, ["확인"])
+                self.reactable = False
 
-                    return LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True)
+            elif data.type == S2C_LOGIN:
+                login_data = cast(S2C_LOGIN_PACKET, data) # 코드 작성시 불편함을 줄이기 위한 힌트용, 논리적으로는 맞으므로 굳이 할 필요는 없음
+                id = login_data.id
+                self.session.id = id
+                self.session.nickname = login_data.user_name
+                self.session.win = login_data.win_count
+                self.session.lose = login_data.lose_count
+                self.session.max_score = login_data.max_score
+
+                return LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True)
             
             return self
         
@@ -124,35 +126,12 @@ class LoginState(BaseState):
                 elif str == "종료": pygame.quit(); raise SystemExit
 
             elif self.fail_login_popup:
-                str2 = self.fail_login_popup.handle_event(ev)
-
-                if str2 == "재시도": 
+                if self.fail_login_popup.handle_event(ev) == "확인":
                     self.fail_login_popup = None
                     self.reactable = True
 
-                elif str2 == "종료": pygame.quit(); raise SystemExit
 
     def update(self, dt_ms, events):
-        # if self.fail_connect_popup.visible:
-        #     btn_name = self.fail_connect_popup.handle_event(events)
-        #     if btn_name == "재시도":
-        #         self.fail_connect_popup.visible = False
-        #         self.connect()
-        #     elif btn_name == "종료":
-        #         pygame.quit(); raise SystemExit
-
-        #     return self  # 로그인 UI는 건드리지도 않음
-        
-        # if self.fail_login_popup.visible:
-        #     btn_name = self.fail_login_popup.handle_event(events)
-        #     if btn_name == "재시도":
-        #         self.fail_login_popup.visible = False
-        #         self.connect()
-        #     elif btn_name == "종료":
-        #         pygame.quit(); raise SystemExit
-
-        #     return self  # 로그인 UI는 건드리지도 않음
-        
         for ev in events:
             self.handle_event(ev)
 
@@ -163,9 +142,6 @@ class LoginState(BaseState):
     def draw(self):
         background_rect = pygame.Rect(0,0,BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT)
         self.screen.blit(self.background_image, background_rect)
-        sw, _ = self.screen.get_size()
-        #title = self.title_font.render("로그인", True, (255, 255, 255))
-        #self.screen.blit(title, title.get_rect(center=(sw // 2, 90)))
         self.id_label.draw()
         self.pw_label.draw()
         self.btn_login.draw()

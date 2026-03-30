@@ -39,6 +39,7 @@
     <ClInclude Include="define.h" />
     <ClInclude Include="enum_class.h" />
     <ClInclude Include="error_code.h" />
+    <ClInclude Include="info_code.h" />
     <ClInclude Include="MultiRoom.h" />
     <ClInclude Include="settings.h" />
     <ClInclude Include="SingleRoom.h" />
