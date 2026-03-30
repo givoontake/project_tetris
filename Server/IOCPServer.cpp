@@ -171,12 +171,32 @@ void IOCPServer::HandlePacket(char* packet, Session* session, int request_sess_i
 	}
 }
 
-void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
+void IOCPServer::SendRoomList(Session* session, int request_sess_id)
 {
+	// 더미 방 생성
+	for (int i = 0; i < 20; ++i) {
+		S2C_ROOM_INFO_PACKET p{};
+		p.size = sizeof(S2C_ROOM_INFO_PACKET);
+		p.type = S2C_ROOM_INFO;
+
+		p.room_id = 1,000,000 + i;
+
+		std::string name = "DummyRoom_" + std::to_string(i);
+		StringToCharBuf(name, p.room_name, sizeof(p.room_name));
+
+		p.max_user = 2;
+		p.cur_user = 1; 
+
+		p.is_private = false;
+		p.is_play = false;
+
+		session->SendPacket(request_sess_id, reinterpret_cast<char*>(&p), iocp_handle);
+	}
+
 	{
 		// 어차피 send의 세션 조건에서 걸러지지만, 방이 많아지면 작업 자체가 길어질 수 있으므로 미리 체크
 		std::lock_guard<std::mutex> lock(session->GetMutex());
-		if (session->GetSessionKey().id != reqeust_sess_id) return;
+		if (session->GetSessionKey().id != request_sess_id) return;
 		if (session->GetState() != SESS_STATE::LOBBY) return;
 	}
 	
@@ -201,7 +221,7 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 		info_p.is_play = is_play;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) { 
-			session->SendBoundPacket(reqeust_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
+			session->SendBoundPacket(request_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
 			packet_size = 0;
 		}
 
@@ -211,7 +231,7 @@ void IOCPServer::SendRoomList(Session* session, int reqeust_sess_id)
 		//if (session->GetSessionKey().id != reqeust_sess_id) return;
 		//if (session->GetState() == SESS_STATE::NONE) return;
 	}
-	session->SendBoundPacket(reqeust_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
+	session->SendBoundPacket(request_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
 }
 
 // 
