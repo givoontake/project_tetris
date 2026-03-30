@@ -37,6 +37,8 @@ class MultiPlayState(BaseState):
         self.error_popup = None
         self.winner_popup = None
         self.reactable = True
+
+        self.host_index: int = -1
         self.set_layout()
 
     def set_layout(self):
@@ -102,10 +104,14 @@ class MultiPlayState(BaseState):
         for player in self.players:
             if player.session == None:
                 player.init_session(session)
+                if self.players[self.host_index].session.is_self:
+                    player.make_btn_kick()
 
-    # def clear(self): # 방 나가면 그냥 없는거임
-    #     for player in self.players:
-    #         player.clear()
+    def find_host_index(self) -> int:
+        for i in range(len(self.players)):
+            if self.players[i].is_host: return i
+
+        return -1
 
     def handle_event(self, ev):
         if self.reactable == False:
@@ -121,7 +127,18 @@ class MultiPlayState(BaseState):
 
         for player in self.players:
             if player.session == None: continue
-            player.handle_event(ev)
+            res = player.handle_event(ev)
+            if res == "start":
+                packet = self.net_worker.builder.build_start_pkt()
+                self.net_worker.send_packet(packet)
+
+            elif res == "ready":
+                packet = self.net_worker.builder.build_ready_pkt()
+                self.net_worker.send_packet(packet)
+
+            elif res == "kick":
+                packet = self.net_worker.builder.build_kick_pkt(player.session.id)
+                self.net_worker.send_packet(packet)
 
     # ------------ 서버 → 클라 패킷 처리 ------------ #
     def handle_packet(self, data: RecvPacketStruct):
@@ -142,17 +159,25 @@ class MultiPlayState(BaseState):
 
         elif data.type == S2C_UPDATE_HOST:
             host_data = cast(S2C_UPDATE_HOST_PACKET, data)
-            for player in self.players:
-                if player.session:
-                    if player.session.id == host_data.new_host_id:
-                        player.set_is_host()
+            
+            for i in range(len(self.players)): # 먼저 방장을 찾아 호스트로 세팅하고
+                if self.players[i].session:
+                    if self.players[i].session.id == host_data.new_host_id:
+                        self.players[i].set_is_host()
+                        self.host_index = i
                         break
+            
+            if self.players[self.host_index].session.is_self: # 방장이 본인이면 나머지 세션들에 강퇴버튼 추가
+                for i in range(len(self.players)):
+                    if self.players[i].session:
+                        if i != self.host_index: self.players[i].make_btn_kick()
 
         elif data.type == S2C_ADD_USER:
             add_data = cast(S2C_ADD_USER_PACKET, data)
             new_session = Session(self.rm)
             new_session.set_is_not_my_session(add_data.id, add_data.name)
             self.add_user(new_session)
+
 
         elif data.type == S2C_READY:
             ready_data = cast(S2C_READY_PACKET, data)

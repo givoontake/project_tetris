@@ -232,14 +232,15 @@ void MultiRoom::KickUser(int id, int kick_user_id)
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		if (r_user.GetSession()->GetSessionKey().id == kick_user_id) { // 삭제할 아이디 검색
-			r_user.ClearRoomSession(); // 해당 아이디 세션 정리
 
-			S2C_KICK_PACKET p;
-			p.size = sizeof(S2C_KICK_PACKET);
-			p.type = S2C_KICK;
-			p.kick_user_id = kick_user_id;
+			S2C_DELETE_USER_PACKET p;
+			p.size = sizeof(S2C_DELETE_USER_PACKET);
+			p.type = S2C_DELETE_USER;
+			p.id = kick_user_id;
+
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
-			break;
+			r_user.ClearRoomSession();
+			--cur_user;
 		}
 	}
 }

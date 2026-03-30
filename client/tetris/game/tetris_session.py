@@ -50,6 +50,7 @@ class TetrisSession:
         self.board = TetrisBoard(self.screen, board_rect, self.rm)
         self.btn_start = None
         self.btn_ready = None
+        self.btn_kick = None
 
         if self.is_single:
             start_rect = self.board.valid_grid_rect.copy()
@@ -102,6 +103,14 @@ class TetrisSession:
 
     def set_state(self, new_state: TSessionState):
         self.state = new_state
+
+    def make_btn_kick(self):
+        kick_rect_h = self.ready_rect.h // 2
+        kick_rect_w = kick_rect_h
+        kick_rect_x = self.ready_rect.x - kick_rect_w
+        kick_rect_y = self.ready_rect.y
+        kick_rect = pygame.Rect(kick_rect_x, kick_rect_y, kick_rect_w, kick_rect_h)
+        self.btn_kick = Button(self.screen, kick_rect, self.rm, None, "X", 1)
     
     def process_gameover(self):
         self.state = TSessionState.GAMEOVER_ANIMATING
@@ -156,22 +165,21 @@ class TetrisSession:
 
     def handle_event(self, ev: pygame.event.Event):
         if self.session == None: return
-        if self.session.is_self == False: # 내꺼 아니면 할 필요가 없음
-            return
         
         if self.state == TSessionState.PLAY:
             if self.controller: self.controller.handle_event(ev)
 
         else:
             if self.btn_start: 
-                if self.btn_start.handle_event(ev):
-                    packet = self.net_worker.builder.build_start_pkt()
-                    self.net_worker.send_packet(packet)
+                if self.btn_start.handle_event(ev): return "start"
 
             if self.btn_ready:
-                if self.btn_ready.handle_event(ev):
-                    packet = self.net_worker.builder.build_ready_pkt()
-                    self.net_worker.send_packet(packet)
+                if self.btn_ready.handle_event(ev): return "ready"
+            
+            if self.btn_kick:
+                if self.btn_kick.handle_event(ev): return "kick"
+
+            return None
 
     def update(self, dt_ms):
         if self.state == TSessionState.PLAY: 
@@ -191,16 +199,17 @@ class TetrisSession:
             self.board.draw_game()
             if self.is_single: self.board.draw_combo()
 
-        # 준비는 호스트가 아니면 일단 그리고, 본인이 아닌 호스트면 상호작용만 끄고 위에 왕
-        if self.state == TSessionState.WAIT:
-            if self.btn_start: 
-                self.btn_start.draw()
-            else:
-                self.btn_ready.draw()
-
         if self.is_single:
             self.score_box.draw()
         else:
             self.nickname.draw()
         if self.session.is_self == False and self.is_host: self.crown.draw() #본인이 아닌 방장의 경우 위에 덧그려지는 형태
 
+        # 준비는 호스트가 아니면 일단 그리고, 본인이 아닌 호스트면 상호작용만 끄고 위에 왕
+        if self.state == TSessionState.WAIT:
+            if self.btn_start: 
+                self.btn_start.draw()
+            if self.btn_ready:
+                self.btn_ready.draw()
+            if self.btn_kick:
+                self.btn_kick.draw()

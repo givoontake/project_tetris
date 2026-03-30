@@ -111,7 +111,7 @@ class PacketBuilder:
             data.room_password = self.str_to_bytes(pw, MAX_ROOM_PASSWORD)
             
         values = self.struct_to_values(data)
-        
+
         return struct.pack(data.FMT, *values)
     
     # tetris_session
@@ -150,3 +150,11 @@ class PacketBuilder:
         return struct.pack(data.FMT, *values)
 
     # multi 전용
+    def build_kick_pkt(self, target_id: int) -> bytes:
+        data = C2S_KICK_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_KICK
+        data.kick_user_id = target_id
+        values = self.struct_to_values(data)
+
+        return struct.pack(data.FMT, *values)
