@@ -285,6 +285,22 @@ void IOCPServer::SendError(Session* session, int request_sess_id, int error_code
 	session->SendPacket(request_sess_id, reinterpret_cast<char*>(&error_p), iocp_handle);
 }
 
+bool IOCPServer::CheckDuplicateLoginId(const std::string& login_id)
+{
+	for (auto& user : users) {
+		std::lock_guard<std::mutex> lock(user->GetMutex());
+		if (user->GetState() == SESS_STATE::NONE) continue;
+		if (user->GetInfo().login_id == login_id) return true;
+	}
+
+	return false;
+}
+
+void IOCPServer::FindMatch(Session* session, int request_sess_id, int max_user)
+{
+	
+}
+
 void IOCPServer::StartServer()
 {
 	bind(listen_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
@@ -640,29 +656,40 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session* session, int re
 		login_p.type = S2C_LOGIN;
 		if (db_over->ok) {
 			if (db_over->result_data) { // nullptr이 아니면, 즉 포인터가 존재하면
-				std::lock_guard<std::mutex> lock(session->GetMutex());
-				if (request_sess_id != session->GetSessionKey().id) return;
-				if (session->GetState() == SESS_STATE::NONE) return;
-				session->InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
-				session->StoreState(SESS_STATE::LOBBY);
-				login_p.id = session->GetSessionKey().id;
-				login_p.max_score = session->GetInfo().max_score;
-				login_p.win_count = session->GetInfo().win_count;
-				login_p.lose_count = session->GetInfo().lose_count;
-				StringToCharBuf(session->GetInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
+				if (CheckDuplicateLoginId(static_cast<DBResultLogin*>(db_over->result_data.get())->login_id)) login_p.id = -2;
+				else {
+					std::lock_guard<std::mutex> lock(session->GetMutex());
+					if (request_sess_id != session->GetSessionKey().id) return;
+					if (session->GetState() == SESS_STATE::NONE) return;
+				
+					session->InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
+					session->StoreState(SESS_STATE::LOBBY);
+					login_p.id = session->GetSessionKey().id;
+					login_p.max_score = session->GetInfo().max_score;
+					login_p.win_count = session->GetInfo().win_count;
+					login_p.lose_count = session->GetInfo().lose_count;
+					StringToCharBuf(session->GetInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
+				}
 			}
 			else {
-				login_p.id = -1; // 나중에 오류 케이스별로 따로 나누자
+				login_p.id = -1; 
 			}
 		}
 		else {
-			login_p.id = -1; // 근데 로그인 실패일경우 나머지 패킷도 다같이 가는건 낭비같은데.. 결국 로그인 성공과 세션 데이터 전송은 분리 해야할듯
+			login_p.id = -1;
 		}
 
 		if (login_p.id == -1) {
 			error_p.size = sizeof(S2C_ERROR_PACKET);
 			error_p.type = S2C_ERROR;
 			error_p.error_code = ERROR_CODE::LOGIN_FAILED;
+			session->SendPacket(request_sess_id, reinterpret_cast<char*>(&error_p), iocp_handle);
+		}
+
+		else if (login_p.id == -2) {
+			error_p.size = sizeof(S2C_ERROR_PACKET);
+			error_p.type = S2C_ERROR;
+			error_p.error_code = ERROR_CODE::DUPLICATE_LOGIN_ID;
 			session->SendPacket(request_sess_id, reinterpret_cast<char*>(&error_p), iocp_handle);
 		}
 

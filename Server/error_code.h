@@ -6,6 +6,7 @@ enum ERROR_CODE // 이거 이넘 클래스 쓰면 static_cast ㅈㄴ 써야해�
 	SERVER_ERROR = 1,
 	INVALID_REQUEST = 2,
 	LOGIN_FAILED = 3,
+	DUPLICATE_LOGIN_ID = 4,
 
 	ROOM_NOT_FOUND = 10,
 	ROOM_FULL = 11,

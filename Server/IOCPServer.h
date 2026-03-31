@@ -26,6 +26,7 @@ class IOCPServer
 	std::atomic<int> room_id_generator = -1;
 	std::atomic<long long> tick_count = 0;
 	std::array<Session*, MAX_USER> users;
+	
 	std::array<std::atomic<std::shared_ptr<TetrisRoom>>, MAX_ROOM> rooms;
 	
 	// 변수-> 컨테이너 생성 시 객체 생성자에 인자 넣는게 안된다.
@@ -74,4 +75,6 @@ public:
 	void TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password);
 	int FindRoom(int room_id);
 	void SendError(Session* session, int request_sess_id, int error_code);
+	bool CheckDuplicateLoginId(const std::string& login_id);
+	void FindMatch(Session* session, int request_sess_id, int max_user);
 };

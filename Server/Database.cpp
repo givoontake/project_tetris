@@ -194,15 +194,15 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
             }
             else
             {
-                std::cerr << "잘못된 비밀번호입니다. " << std::endl;
+                /*std::cerr << "잘못된 비밀번호입니다. " << std::endl;
                 std::cerr << "id: " << login_id << std::endl;
-                std::cerr << "pw: " << password << std::endl;
+                std::cerr << "pw: " << password << std::endl;*/
                 db_over->ok = false;
             }
         }
         else
         {
-            std::cerr << "일치하는 아이디가 없습니다. id: " << login_id << std::endl;
+            //std::cerr << "일치하는 아이디가 없습니다. id: " << login_id << std::endl;
             db_over->ok = false;
         }
     }
@@ -251,10 +251,10 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
                     p->win_count = info_rs->getInt(3);
                     p->lose_count = info_rs->getInt(4);        
 
-                    std::cout << "로그인 성공. " << std::endl;
-                    std::cout << "id: " << login_id << std::endl;
-                    //std::cout << "pw: " << password << std::endl;
-                    std::cout << "nickname: " << p->nickname << std::endl;
+                    //std::cout << "로그인 성공. " << std::endl;
+                    //std::cout << "id: " << login_id << std::endl;
+                    ////std::cout << "pw: " << password << std::endl;
+                    //std::cout << "nickname: " << p->nickname << std::endl;
                 }
                 else
                 {

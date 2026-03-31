@@ -1,6 +1,7 @@
 SERVER_ERROR = 1
 INVALID_REQUEST = 2
 LOGIN_FAILED = 3
+DUPLICATE_LOGIN_ID = 4
 
 ROOM_NOT_FOUND = 10
 ROOM_FULL = 11
@@ -14,6 +15,7 @@ ERROR_MESSAGES = {
     SERVER_ERROR: "서버와의 상태가 원활하지 않습니다.",
     INVALID_REQUEST: "잘못된 요청입니다.",
     LOGIN_FAILED: "아이디나 비밀번호를 다시 확인하세요",
+    DUPLICATE_LOGIN_ID: "이미 로그인된 계정입니다.",
     
     ROOM_NOT_FOUND: "존재하지 않는 방입니다.",
     ROOM_FULL: "방이 꽉 찼습니다.",
