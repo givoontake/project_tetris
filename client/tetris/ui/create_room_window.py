@@ -11,7 +11,7 @@ from tetris.net.session import Session
 from tetris.ui.toggle_button import ToggleButton
 from tetris.net.packet_manager import *
 
-class RoomCreateWindow:
+class CreateRoomWindow:
     TOP_PADDING = 50
     BOTTOM_PADDING = 50
     ROW_HEIGHT = 50

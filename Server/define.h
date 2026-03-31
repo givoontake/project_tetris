@@ -285,4 +285,10 @@ struct S2C_INFO_PACKET {
 	int info_code;
 };
 
+struct C2S_FAST_MATCHING_PACKET {
+	short size;
+	char type;
+	char max_user;
+};
+
 #pragma pack(pop)

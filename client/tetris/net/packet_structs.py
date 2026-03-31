@@ -1,4 +1,3 @@
-# ===== FILE BEGIN: tetris\net\packet_structs.py =====
 from dataclasses import dataclass, fields
 from typing import ClassVar
 
@@ -365,7 +364,13 @@ class C2S_GIVEUP_PACKET(SendPacketStruct):
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 @dataclass
-class C2S_REQUEST_ROOM_LIST_PACKET(RecvPacketStruct):
+class C2S_REQUEST_ROOM_LIST_PACKET(SendPacketStruct):
     BODY_FMT: ClassVar[str] = ""
-    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
-# ===== FILE END: tetris\net\packet_structs.py =====
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+@dataclass
+class C2S_FAST_MATCHING_PACKET(SendPacketStruct):
+    max_user: int = -1
+
+    BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT

@@ -168,6 +168,10 @@ void IOCPServer::HandlePacket(char* packet, Session* session, int request_sess_i
 		SendRoomList(session, request_sess_id);
 		break;
 	}
+	case C2S_FAST_MATCHING:
+		C2S_FAST_MATCHING_PACKET* matching_p = reinterpret_cast<C2S_FAST_MATCHING_PACKET*>(packet);
+		FindMatch(session, request_sess_id, matching_p->max_user);
+		break;
 	}
 }
 
@@ -235,7 +239,7 @@ void IOCPServer::SendRoomList(Session* session, int request_sess_id)
 }
 
 // 
-void IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password)
+bool IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password)
 {	
 	int result = -1;
 	int room_index = FindRoom(room_id);
@@ -243,15 +247,18 @@ void IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id,
 		std::shared_ptr<TetrisRoom> room_sp = rooms[room_index].load();
 		if (room_sp) {
 			std::lock_guard<std::mutex> lock(room_sp->GetRoomMutex());
-			if (room_sp->GetMaxUser() != 1) { // 싱글이 아닌 경우
-				auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
-				if (!multi_sp) result = ERROR_CODE::SERVER_ERROR;
-				else {
-					result = multi_sp->AddUser(session, request_sess_id, room_password); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
-				}
-			}
+			if (room_sp->GetRoomState() == ROOM_STATE::WAITING_DELETE) result = ERROR_CODE::ROOM_NOT_FOUND;
 			else {
-				result = ERROR_CODE::INVALID_REQUEST;
+				if (room_sp->GetMaxUser() != 1) { // 싱글이 아닌 경우
+					auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
+					if (!multi_sp) result = ERROR_CODE::SERVER_ERROR;
+					else {
+						result = multi_sp->AddUser(session, request_sess_id, room_password); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
+					}
+				}
+				else {
+					result = ERROR_CODE::INVALID_REQUEST;
+				}
 			}
 		}
 		else {
@@ -259,9 +266,10 @@ void IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id,
 		}
 	}
 
-	if (result == SUCCESS) return;
+	if (result == SUCCESS) return true;
 
 	SendError(session, request_sess_id, result);
+	return false;
 }
 
 int IOCPServer::FindRoom(int room_id)
@@ -298,7 +306,44 @@ bool IOCPServer::CheckDuplicateLoginId(const std::string& login_id)
 
 void IOCPServer::FindMatch(Session* session, int request_sess_id, int max_user)
 {
+	if (max_user == 0) {
+		for (auto& room : rooms) {
+			// 방에 접근할 때는 무조건 Shared_ptr을 로드해서 참조 카운트를 늘려야 한다. 방이 삭제되더라도 안전하게 동작하기 위해서이다.
+			// 단순히 널을 체크하고 들어가도 그 다음 내부 객체 접근 시 그 객체가 삭제되었을 수 있다.
+			auto room_sp = room.load();
+			if (room_sp) {
+				if (room_sp->GetMaxUser() == 2 or room_sp->GetMaxUser() == 5) { // 공개 멀티 방 중 아무 방이나 찾기
+					if (TryJoinRoom(session, request_sess_id, room_sp->GetRoomId(), nullptr)) return;
+				}
+			}
+		}
+	}
+
+	else if (max_user == 2) {
+		for (auto& room : rooms) {
+			auto room_sp = room.load();
+			if (room_sp) {
+				if (room_sp->GetMaxUser() == max_user) {
+					if (TryJoinRoom(session, request_sess_id, room_sp->GetRoomId(), nullptr)) return;
+				}
+			}
+		}
+	}
+
+	else if (max_user == 5) {
+		for (auto& room : rooms) {
+			auto room_sp = room.load();
+			if (room_sp) {
+				if (room_sp->GetMaxUser() == max_user) {
+					if (TryJoinRoom(session, request_sess_id, room_sp->GetRoomId(), nullptr)) return;
+				}
+			}
+		}
+	}
+
+	else SendError(session, request_sess_id, ERROR_CODE::INVALID_REQUEST);
 	
+	SendError(session, request_sess_id, ERROR_CODE::NOT_FOUND_JOINABLE_ROOM);
 }
 
 void IOCPServer::StartServer()

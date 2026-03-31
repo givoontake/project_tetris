@@ -114,6 +114,16 @@ class PacketBuilder:
 
         return struct.pack(data.FMT, *values)
     
+    # fast_matching_window
+    def build_fast_matching(self, max_user: int):
+        data = C2S_FAST_MATCHING_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_FAST_MATCHING
+        data.max_user = max_user
+        values = self.struct_to_values(data)
+
+        return struct.pack(data.FMT, *values)
+    
     # tetris_session
     def build_start_pkt(self) -> bytes:
         data = C2S_START_PACKET()

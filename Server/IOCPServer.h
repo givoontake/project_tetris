@@ -72,7 +72,7 @@ public:
 	std::string CharBufToString(const char* buf, int buf_size);
 	void HandlePacket(char* packet, Session* session, int request_sess_id);
 	void SendRoomList(Session* session, int reqeust_sess_id);
-	void TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password);
+	bool TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password);
 	int FindRoom(int room_id);
 	void SendError(Session* session, int request_sess_id, int error_code);
 	bool CheckDuplicateLoginId(const std::string& login_id);

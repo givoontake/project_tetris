@@ -22,12 +22,15 @@ from tetris.ui.input_window import InputWindow
 from tetris.ui.room_list import RoomList
 from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
-from tetris.ui.create_room_window import RoomCreateWindow
+from tetris.ui.fast_matching_window import FastMatchingWindow
+from tetris.ui.create_room_window import CreateRoomWindow
 from tetris.ui.setting_window import SettingWindow
 from tetris.states.single_play_state import SinglePlayState
 from tetris.states.multi_play_state import MultiPlayState
 from tetris.states.base_state import BaseState
 from tetris.net.packet_manager import *
+from tetris.net.error_types import *
+from tetris.net.info_types import *
 from tetris.animation.shutter_animaion import ShutterAnimation
 
 MENU_WIDTH = 200
@@ -48,7 +51,9 @@ class LobbyState(BaseState):
 
         self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
-
+        
+        self.error_popup = None
+        self.fast_matching_window = None
         self.room_create_window = None
         self.setting_window = None
         self.exit_popup = None
@@ -89,7 +94,13 @@ class LobbyState(BaseState):
 
     def handle_packet(self, data: RecvPacketStruct):
         if data:
-            if data.type == S2C_INFO:
+            if data.type == S2C_ERROR:
+                error_data = cast(S2C_ERROR_PACKET, data)
+                error_message = ERROR_MESSAGES[error_data.error_code]
+                self.error_popup = PopupBox(self.screen, self.rm, error_message, ["확인"])
+                self.reactable = False
+
+            elif data.type == S2C_INFO:
                 info_data = cast(S2C_INFO_PACKET, data)
                 info_message = INFO_MESSAGES[info_data.info_type]
                 self.info_popup = PopupBox(self.screen, self.rm, info_message, ["확인"])
@@ -136,8 +147,12 @@ class LobbyState(BaseState):
             
             # 리스트로 만들어놔서 각 버튼마다 이름이 없어서 텍스트로 접근
             if event is not None:
-                if event == "방만들기":
-                    self.room_create_window = RoomCreateWindow(self.screen, self.rm, self.net_worker, self.session)
+                if event == "빠른시작":
+                    self.fast_matching_window = FastMatchingWindow(self.screen, self.rm, self.net_worker)
+                    self.reactable = False
+
+                elif event == "방만들기":
+                    self.room_create_window = CreateRoomWindow(self.screen, self.rm, self.net_worker, self.session)
                     self.reactable = False
                     
                 # 나중에 메뉴별 상태 만들고 동작 추가
@@ -182,7 +197,17 @@ class LobbyState(BaseState):
                 self.net_worker.send_packet(packet)
 
         else:
-            if self.room_create_window:
+            if self.error_popup:
+                if self.error_popup.handle_event(ev):
+                    self.error_popup = None
+                    self.reactable = True
+
+            elif self.fast_matching_window:
+                if self.fast_matching_window.handle_event(ev): 
+                    self.fast_matching_window = None
+                    self.reactable = True
+
+            elif self.room_create_window:
                 rcw_event = self.room_create_window.handle_event(ev)
                 if rcw_event == "만들기" or rcw_event == "취소":
                     self.room_create_window = None
@@ -264,6 +289,8 @@ class LobbyState(BaseState):
         self.chat_input_box.draw()
         self.my_info_rect.draw()
 
+        if self.error_popup: self.error_popup.draw()
+        if self.fast_matching_window: self.fast_matching_window.draw()
         if self.room_create_window: self.room_create_window.draw()
         if self.setting_window: self.setting_window.draw()
         if self.exit_popup: self.exit_popup.draw()

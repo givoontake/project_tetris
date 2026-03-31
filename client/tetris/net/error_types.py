@@ -6,6 +6,7 @@ DUPLICATE_LOGIN_ID = 4
 ROOM_NOT_FOUND = 10
 ROOM_FULL = 11
 ROOM_INGAME = 12
+NOT_FOUND_JOINABLE_ROOM = 13
 
 ROOM_NOT_ALL_READY = 20
 ROOM_NOT_ENOUGH_PLAYERS = 21
@@ -20,6 +21,7 @@ ERROR_MESSAGES = {
     ROOM_NOT_FOUND: "존재하지 않는 방입니다.",
     ROOM_FULL: "방이 꽉 찼습니다.",
     ROOM_INGAME: "이미 시작된 방입니다.",
+    NOT_FOUND_JOINABLE_ROOM: "참가 가능한 방을 찾을 수 없습니다.",
 
     ROOM_NOT_ALL_READY: "모두 준비해야 시작할 수 있습니다.",
     ROOM_NOT_ENOUGH_PLAYERS: "최소 2명이 모여야 시작할 수 있습니다.",
