@@ -79,7 +79,7 @@ class RoomInfo:
         self.info_rects.append(self.is_play)
 
         self.join_button = None
-        if self.is_reactable: 
+        if self.is_reactable and self.data.is_play == False: 
             join_rect = status_rect.copy()
             join_rect.x += status_rect.w
             join_rect.w = self.rect.w*self.JOIN_WIDTH_RATE
