@@ -241,7 +241,7 @@ void IOCPServer::SendRoomList(Session* session, int request_sess_id)
 // 
 bool IOCPServer::TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password)
 {	
-	int result = -1;
+	int result = ERROR_CODE::ROOM_NOT_FOUND;
 	int room_index = FindRoom(room_id);
 	if (room_index != -1) {
 		std::shared_ptr<TetrisRoom> room_sp = rooms[room_index].load();
