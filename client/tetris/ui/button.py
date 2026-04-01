@@ -6,85 +6,73 @@ from tetris.resources.fonts import *
 from tetris.resources.define import *
 from tetris.resources.define_colors import *
 from tetris.ui.rectangle import Rectangle
+from tetris.game.define import *
+
+class ButtonState(IntEnum):
+    IDLE = 0
+    HOVER = 1
+    PRESS = 2
 
 class Button:
-    def __init__(self, 
-        screen: pygame.Surface,
-        rect: pygame.Rect, 
-        rm: ResourceManager,
-        image: pygame.Surface = None, 
-        text: str = "", 
-        border_width: int = 0
-    ):
+    def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager, image: pygame.Surface = None, text: str = "", border_width: int = 0):
+        self.state = ButtonState.IDLE
         self.rm = rm
-        self.hovered = False
-        self.pressed = False
-        self.pressed_inside = False  # 마우스 다운이 버튼 내부에서 시작했는지
-        self.hover_sound_printed = False
-        self.idle = Rectangle(screen, rect, rm, image, text, border_width)
-        if image == None:
-            self.hover = None
-            self.press = None
-        else:
-            hover_rect = self._set_rect_scale(self.idle.rect, self.rm.images.HOVER_SCALE)
-            press_rect = self._set_rect_scale(self.idle.rect, self.rm.images.PRESS_SCALE)
+        self.button = Rectangle(screen, rect, rm, image, text, border_width)
+        self.idle_color: tuple = DARK_GRAY
+        self.hover_color: tuple = GRAY
+        self.press_color: tuple = ORANGE
 
-            self.hover = Rectangle(screen, hover_rect, self.rm, image, text, border_width)
-            self.press = Rectangle(screen, press_rect, self.rm, image, text, border_width)
-
-    def _set_rect_scale(self, rect: pygame.Rect, scale: float) -> pygame.Rect:
-        if scale < 0.1 or scale > 1.1:
-            raise ValueError("scale must be between 0.1 and 1.1")
-        
-        temp_rect = rect.copy() 
-        return temp_rect.scale_by(scale)
+        if image != None:
+            self.idle = Rectangle(screen, rect, rm, image, text, border_width)
+            self.hover = Rectangle(screen, rect.scale_by(1.05), self.rm, image, text, border_width)
+            self.press = Rectangle(screen, rect.scale_by(0.95), self.rm, image, text, border_width)
+    
+    def set_btn_color(self, new_color: tuple, state: str): # state: idle, hover, press
+        if state == "idle":
+            self.idle_color = new_color
+        elif state == "hover":
+            self.hover_color = new_color
+        elif state == "press":
+            self.press_color = new_color
         
     def handle_event(self, ev: pygame.event.Event) -> bool:
- 
-        clicked = False
-        if ev.type == pygame.MOUSEMOTION:
-            self.hovered = self.idle.rect.collidepoint(ev.pos)
-            if self.hovered:
-                if self.hover_sound_printed == False:
-                    self.hover_sound_printed = True
-                    self.rm.sounds.sound_effects[EFFECT_BUTTON_HOVER].play()
-            else: self.hover_sound_printed = False
+        if ev.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP): # ev.pos는 마우스 이벤트 전용
+            if self.button.rect.collidepoint(ev.pos):
+                if ev.type == pygame.MOUSEMOTION:
+                    if self.state == ButtonState.IDLE:
+                        self.state = ButtonState.HOVER
+                        self.rm.sounds.sound_effects[EFFECT_BUTTON_HOVER].play()
+                        if self.button.image != None:
+                            self.button = self.hover
 
-        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
-            if self.idle.rect.collidepoint(ev.pos):
-                self.pressed = True
-                self.pressed_inside = True
-                self.rm.sounds.sound_effects[EFFECT_BUTTON_PRESS].play()
+                elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                    if self.state == ButtonState.HOVER:
+                        self.state = ButtonState.PRESS
+                        self.rm.sounds.sound_effects[EFFECT_BUTTON_PRESS].play()
+                        if self.button.image != None:
+                            self.button = self.press
+
+                elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
+                    if self.state == ButtonState.PRESS:
+                        self.state = ButtonState.IDLE
+                        if self.button.image != None:
+                            self.button = self.idle
+                    return True # 버튼이 눌렀다 떼져야 클릭 이벤트 처리
+                
             else:
-                self.pressed = False
-                self.pressed_inside = False
-
-        elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
-            if self.pressed and self.pressed_inside and self.idle.rect.collidepoint(ev.pos):
-                clicked = True
-            self.pressed = False
-            self.pressed_inside = False
-
-        return clicked
+                self.state = ButtonState.IDLE
+                if self.button.image != None:
+                    self.button = self.idle
+            
+        return False
 
     def draw(self):
-        button = None
-        if self.pressed and self.press is not None:
-            button = self.press
-        elif self.hovered and self.hover is not None:
-            button = self.hover
-        elif button is not None:
-            button = self.idle
-
-        if button is not None:
-            button.draw()
-            
-        else:
-            if self.pressed:
-                self.idle.set_background_color(ORANGE)
-            elif self.hovered:
-                self.idle.set_background_color(GRAY)
-            else:
-                self.idle.set_background_color(DARK_GRAY)
-
-            self.idle.draw()
+        if self.button.image == None:
+            if self.state == ButtonState.IDLE:
+                self.button.set_background_color(self.idle_color)
+            elif self.state == ButtonState.HOVER:
+                self.button.set_background_color(self.hover_color)
+            elif self.state == ButtonState.PRESS:
+                self.button.set_background_color(self.press_color)
+        
+        self.button.draw()

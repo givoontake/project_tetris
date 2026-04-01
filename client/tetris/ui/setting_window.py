@@ -72,12 +72,12 @@ class SettingWindow:
         event = None
         for buttom_menu in self.buttom_menus:
             if buttom_menu.handle_event(ev):
-                if buttom_menu.idle.text == "적용":
+                if buttom_menu.button.text == "적용":
                     if self.setting_types[self.activated_setting].apply_settings():
                         event = "성공" 
                     else:
                         event = None
-                elif buttom_menu.idle.text == "취소":
+                elif buttom_menu.button.text == "취소":
                     event = "취소"
 
         return event

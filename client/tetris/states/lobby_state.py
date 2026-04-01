@@ -142,7 +142,7 @@ class LobbyState(BaseState):
         if self.reactable:
             for menu in self.top_menus:
                 if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
-                    event = menu.idle.text
+                    event = menu.button.text
                     break
             
             # 리스트로 만들어놔서 각 버튼마다 이름이 없어서 텍스트로 접근

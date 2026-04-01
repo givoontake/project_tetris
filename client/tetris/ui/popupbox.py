@@ -69,7 +69,7 @@ class PopupBox:
         # 버튼 이벤트 처리
         for button in self.buttons:
             if button.handle_event(ev):
-                return button.idle.text
+                return button.button.text
                 
         return None
 
