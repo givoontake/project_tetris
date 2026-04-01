@@ -163,7 +163,7 @@ class TetrisSession:
             addline_data = cast(S2C_ADDLINE_PACKET, data)
             self.board.add_line(addline_data.hole_x)
 
-    def handle_event(self, ev: pygame.event.Event):
+    def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
         if self.session == None: return
         
         if self.state == TSessionState.PLAY:
@@ -173,13 +173,13 @@ class TetrisSession:
             if self.btn_start: 
                 if self.btn_start.handle_event(ev): return "start"
 
-            if self.btn_ready:
+            elif self.btn_ready:
                 if self.btn_ready.handle_event(ev): return "ready"
             
-            if self.btn_kick:
+            elif self.btn_kick:
                 if self.btn_kick.handle_event(ev): return "kick"
 
-            return None
+        return None
 
     def update(self, dt_ms):
         if self.state == TSessionState.PLAY: 

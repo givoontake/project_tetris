@@ -112,7 +112,9 @@ class SinglePlayState(BaseState):
         self.password_box.draw()
 
     def handle_event(self, ev: pygame.event.Event):
-        self.tetris_session.handle_event(ev)
+        if self.tetris_session.handle_event(ev) == "start":
+            packet = self.net_worker.builder.build_start_pkt()
+            self.net_worker.send_packet(packet)
 
         if self.btn_exit.handle_event(ev):
             packet = self.net_worker.builder.build_delete_user_pkt()
