@@ -42,7 +42,7 @@ class LobbyState(BaseState):
         super().__init__(screen, rm, net_worker, session)
         self.top_menus: list[Button] = []
         self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm)
-        self.btn_refresh = Button(screen, pygame.Rect(950, 100, 100, 50), rm, None, "새로고침")
+        self.btn_refresh = Button(screen, pygame.Rect(950, 150, 100, 50), rm, None, "새로고침") # 참가 버튼처럼 취급하려면 room_info에 net_worker가 넘어가야 하는데.. 그러기 싫어서 여기에 둠
         input_box_rect = pygame.Rect(50, 810, 1000, 30)
         self.chat_input_box = InputBox(screen, input_box_rect, self.rm,
                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
@@ -244,7 +244,7 @@ class LobbyState(BaseState):
             elif self.input_pw_window:
                 ipw_event = self.input_pw_window.handle_event(ev)
                 if ipw_event != None:
-                    if ipw_event == "참가":
+                    if ipw_event == "참가": # 내부 즉시 전송은 패스워드를 입력할 경우 복잡해진다
                         packet = self.net_worker.builder.build_join_room_pkt(self.join_room_id, self.input_pw_window.input.extract_text())
                         self.net_worker.send_packet(packet)
 
@@ -283,8 +283,8 @@ class LobbyState(BaseState):
         for menu in self.top_menus:
             menu.draw()
 
-        self.btn_refresh.draw()
         self.room_list.draw()
+        self.btn_refresh.draw()
         self.chat_window.draw()
         self.chat_input_box.draw()
         self.my_info_rect.draw()
