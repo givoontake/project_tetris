@@ -286,11 +286,11 @@ void SingleRoom::RequestUpdateScore()
 		SessionKey key;
 		key.id = room_users[0].GetSession()->GetSessionKey().id;
 		key.index = room_users[0].GetSession()->GetSessionKey().index;
-		std::string login_id = room_users[0].GetSession()->GetInfo().login_id;
+		int db_PK = room_users[0].GetSession()->GetInfo().db_PK;
 		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
-		auto task_update_score = [key, login_id, new_score, &db] {
-			db.ExecuteUpdateScore(key, login_id, new_score);
+		auto task_update_score = [key, db_PK, new_score, &db] {
+			db.ExecuteUpdateScore(key, db_PK, new_score);
 			};
 		server->GetDB().Enqueue(task_update_score);
 	}

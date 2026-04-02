@@ -223,7 +223,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
             if (!info_stmt)
             {
                 const char* SQL_LOAD_INFO =
-                    "SELECT nickname, single_score, win, lose "
+                    "SELECT user_id, nickname, single_score, win, lose "
                     "FROM users "
                     "WHERE login_id=? "
                     "LIMIT 1";
@@ -246,10 +246,11 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
                 if (info_rs && info_rs->next()) // 가져온 결과(행)이 있는지 판별
                 {
                     p->login_id = login_id;
-                    p->nickname = info_rs->getString(1);
-                    p->max_score = info_rs->getInt(2);
-                    p->win_count = info_rs->getInt(3);
-                    p->lose_count = info_rs->getInt(4);        
+					p->db_PK = info_rs->getInt(1);
+                    p->nickname = info_rs->getString(2);
+                    p->max_score = info_rs->getInt(3);
+                    p->win_count = info_rs->getInt(4);
+                    p->lose_count = info_rs->getInt(5);        
 
                     //std::cout << "로그인 성공. " << std::endl;
                     //std::cout << "id: " << login_id << std::endl;
@@ -273,7 +274,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteUpdateScore(SessionKey key, const std::string login_id, int new_score)
+void Database::ExecuteUpdateScore(SessionKey key, const int db_PK, int new_score)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
@@ -287,7 +288,7 @@ void Database::ExecuteUpdateScore(SessionKey key, const std::string login_id, in
         if (!stmt)
         {
             const char* SQL_UPDATE_SCORE =
-                "UPDATE users SET single_score=? WHERE login_id=?";
+                "UPDATE users SET single_score=? WHERE user_id=?";
 
             caches.stmt_cache[DBOperationType::UPDATE_SCORE].reset(caches.conn->prepareStatement(SQL_UPDATE_SCORE));
             stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
@@ -300,14 +301,14 @@ void Database::ExecuteUpdateScore(SessionKey key, const std::string login_id, in
 
         // 바인딩
         stmt->setInt(1, new_score);
-        stmt->setString(2, login_id);
-        std::cout << "ExecuteUpdateScore() login_id: " << login_id << std::endl;
+        stmt->setInt(2, db_PK);
+        //std::cout << "ExecuteUpdateScore() login_id: " << db_PK << std::endl;
 
         // 실행
         const int affected = stmt->executeUpdate();
         if (affected > 0) {
             // 1이면 업데이트 성공
-            std::cout << "score update success!, new score: " << new_score << std::endl;
+            //std::cout << "score update success!, new score: " << new_score << std::endl;
             db_over->ok = true;
             db_over->result_data = std::make_unique<DBResultUpdateScore>();
             DBResultUpdateScore* p = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
@@ -316,7 +317,7 @@ void Database::ExecuteUpdateScore(SessionKey key, const std::string login_id, in
         
         else {
             db_over->ok = false;
-            std::cout << "score update fail!, new score: " << new_score << std::endl;
+            //std::cout << "score update fail!, new score: " << new_score << std::endl;
         }
     }
     catch (const sql::SQLException& e)
@@ -328,7 +329,7 @@ void Database::ExecuteUpdateScore(SessionKey key, const std::string login_id, in
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteUpdateMatchResult(SessionKey key, const std::string login_id, bool is_winner)
+void Database::ExecuteUpdateMatchResult(SessionKey key, const int db_PK, bool is_winner)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
@@ -345,7 +346,7 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, const std::string login_
                 "UPDATE users "
                 "SET win = win + ?, "
                 "    lose = lose + ? "
-                "WHERE login_id=?";
+                "WHERE user_id=?";
 
             caches.stmt_cache[DBOperationType::UPDATE_MATCH_RESULT]
                 .reset(caches.conn->prepareStatement(SQL_UPDATE_MATCH_RESULT));
@@ -363,12 +364,12 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, const std::string login_
 
         stmt->setInt(1, win_delta);
         stmt->setInt(2, lose_delta);
-        stmt->setString(3, login_id);
+        stmt->setInt(3, db_PK);
 
         const int affected = stmt->executeUpdate();
 
         if (affected > 0) {
-            std::cout << "match_result update success! " << std::endl;
+            //std::cout << "match_result update success! " << std::endl;
             db_over->ok = true;
             db_over->result_data = std::make_unique<DBResultUpdateMatchResult>();
             DBResultUpdateMatchResult* p = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());

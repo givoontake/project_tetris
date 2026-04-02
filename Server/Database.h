@@ -96,8 +96,8 @@ public:
     // 외부는 보통 아래처럼 람다에 넣어 Enqueue 한다:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
     void ExecuteLogin(SessionKey key, const std::string login_id, const std::string password);
-    void ExecuteUpdateScore(SessionKey key, const std::string login_id, int new_score);
-	void ExecuteUpdateMatchResult(SessionKey key, const std::string login_id, bool is_winner);
+    void ExecuteUpdateScore(SessionKey key, const int db_PK, int new_score);
+	void ExecuteUpdateMatchResult(SessionKey key, const int db_PK, bool is_winner);
 
 private:
     // ---- 설정 파일 로드 ----

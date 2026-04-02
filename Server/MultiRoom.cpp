@@ -471,9 +471,9 @@ void MultiRoom::RequestUpdateMatchResult()
 			SessionKey key;
 			key.id = r_user.GetSession()->GetSessionKey().id;
 			key.index = r_user.GetSession()->GetSessionKey().index;
-			std::string login_id = r_user.GetSession()->GetInfo().login_id;
-			auto task_update_match_result = [key, login_id, is_winner, &db] {
-				db.ExecuteUpdateMatchResult(key, login_id, is_winner);
+			int db_PK = r_user.GetSession()->GetInfo().db_PK;
+			auto task_update_match_result = [key, db_PK, is_winner, &db] {
+				db.ExecuteUpdateMatchResult(key, db_PK, is_winner);
 				};
 			db.Enqueue(task_update_match_result);
 		}

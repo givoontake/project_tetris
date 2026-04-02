@@ -11,6 +11,7 @@ struct DBResultDefault {
 };
 
 struct DBResultLogin : public DBResultDefault {
+	int db_PK;
 	int max_score;
 	int win_count;
 	int lose_count;
@@ -19,6 +20,7 @@ struct DBResultLogin : public DBResultDefault {
 
 	void clear()
 	{
+		db_PK = -1;
 		max_score = 0;
 		win_count = 0;
 		lose_count = 0;
