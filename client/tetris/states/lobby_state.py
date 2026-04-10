@@ -49,7 +49,7 @@ class LobbyState(BaseState):
                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
         self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), self.chat_input_box.font)
         self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), rm, session)
-        self.user_tabs = UserTabs(screen, pygame.Rect(1050, 150, 300, 400), rm, ["유저", "친구"])
+        self.user_tabs = UserTabs(screen, pygame.Rect(1050, 150, 300, 400), rm, [USER_TAB_NAME, FRIEND_TAB_NAME])
 
         self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
@@ -236,22 +236,29 @@ class LobbyState(BaseState):
             if hasattr(ev, "pos"): # 마우스 이벤트만 넘긴다. 외부 클릭시 None이 넘어오고 그것을 토대로 버튼을 제거해야 한다
                 if self.friend_ev_btn: # 버튼이 있다면 버튼 먼저
                     if self.friend_ev_btn.handle_event(ev):
-                        if self.friend_ev_btn.idle.text == "친구추가":
+                        if self.friend_ev_btn.button.text == "친구추가":
                             packet = self.net_worker.builder.build_request_friend_pkt(self.friend_ev_target_id)
                             self.net_worker.send_packet(packet)
-                        elif self.friend_ev_btn.idle.text == "친구삭제":
+                        elif self.friend_ev_btn.button.text == "친구삭제":
                             packet = self.net_worker.builder.build_delete_friend_pkt(self.friend_ev_target_id)
                             self.net_worker.send_packet(packet)
                         self.friend_ev_btn = None
                         self.friend_ev_target_id = None
                         return
-                    # 버튼이 있으면 마우스 이벤트가 로비 어디서 발생하던 일단 버튼은 없애야함. 
-                    self.friend_ev_btn = None
-                    self.friend_ev_target_id = None
+                    if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                        if not self.friend_ev_btn.button.rect.collidepoint(ev.pos):
+                            self.friend_ev_btn = None
+                            self.friend_ev_target_id = None
                 
                 friend_event = self.user_tabs.handle_event(ev) # 버튼이 없으면 탭으로 (버튼이 탭 위에 있음)
+                if friend_event == USER_TAB_NAME:
+                    self.request_lobby_user_list()
+                    return
+                if friend_event == FRIEND_TAB_NAME:
+                    self.request_friend_list()
+                    return
                 if friend_event != None:
-                    btn_rect = pygame.Rect(friend_event.pos[0], friend_event.pos[1], 50, 25)
+                    btn_rect = pygame.Rect(friend_event.pos[0], friend_event.pos[1], 100, 50)
                     self.friend_ev_target_id = friend_event.target_id
                     if friend_event.ev_type == "add":
                         btn_text = "친구추가"

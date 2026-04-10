@@ -8,6 +8,7 @@ from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 
 HEADER_HEIGHT_RATE = 0.1
+NICKNAME_WIDTH_RATE = 0.7
 
 
 class UserList(ScrollWindowBase):
@@ -25,7 +26,7 @@ class UserList(ScrollWindowBase):
         header_rect.h = int(rect.h * HEADER_HEIGHT_RATE)
 
         nickname_rect = header_rect.copy()
-        nickname_rect.w = int(header_rect.w * 0.8)
+        nickname_rect.w = int(header_rect.w * NICKNAME_WIDTH_RATE)
 
         state_rect = header_rect.copy()
         state_rect.x = nickname_rect.x + nickname_rect.w

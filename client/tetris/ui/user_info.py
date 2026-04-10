@@ -7,8 +7,8 @@ from tetris.ui.rectangle import Rectangle
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 
-NICKNAME_WIDTH_RATE = 0.8
-STATE_WIDTH_RATE = 0.2
+NICKNAME_WIDTH_RATE = 0.7
+STATE_WIDTH_RATE = 0.3
 
 
 class UserInfo:

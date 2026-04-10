@@ -12,6 +12,10 @@ from tetris.net.packet_structs import *
 
 TAB_HEIGHT = 40
 TAB_GAP = 5
+FOOTER_HEIGHT = 70
+REFRESH_BUTTON_WIDTH = 100
+REFRESH_BUTTON_HEIGHT = 50
+REFRESH_BUTTON_MARGIN = 10
 
 USER_TAB_NAME = "유저"
 FRIEND_TAB_NAME = "친구"
@@ -29,6 +33,7 @@ class UserTabs:
         self.tab_buttons: list[Button] = []
         self.tab_rects: list[pygame.Rect] = []
         self.user_lists: dict[str, UserList] = {}
+        self.refresh_buttons: dict[str, Button] = {}
 
         self.set_layout()
 
@@ -38,11 +43,12 @@ class UserTabs:
 
         list_rect = self.rect.copy()
         list_rect.y += TAB_HEIGHT + TAB_GAP
-        list_rect.h -= (TAB_HEIGHT + TAB_GAP)
+        list_rect.h -= (TAB_HEIGHT + TAB_GAP + FOOTER_HEIGHT)
 
         self.tab_buttons.clear()
         self.tab_rects.clear()
         self.user_lists.clear()
+        self.refresh_buttons.clear()
 
         tab_count = len(self.tab_names)
         if tab_count <= 0:
@@ -58,11 +64,19 @@ class UserTabs:
             self.tab_buttons.append(button)
             self.tab_rects.append(button_rect)
             self.user_lists[tab_name] = UserList(self.screen, list_rect, self.rm)
+
+            refresh_rect = pygame.Rect(
+                self.rect.right - REFRESH_BUTTON_MARGIN - REFRESH_BUTTON_WIDTH,
+                self.rect.bottom - REFRESH_BUTTON_MARGIN - REFRESH_BUTTON_HEIGHT,
+                REFRESH_BUTTON_WIDTH,
+                REFRESH_BUTTON_HEIGHT,
+            )
+            self.refresh_buttons[tab_name] = Button(self.screen, refresh_rect, self.rm, None, "새로고침")
             draw_x += tab_w + TAB_GAP
 
     def get_cur_user_list(self) -> UserList:
         return self.user_lists[self.tab_names[self.cur_tab_index]]
-    
+
     def get_cur_tab_name(self) -> str:
         return self.tab_names[self.cur_tab_index]
 
@@ -102,19 +116,19 @@ class UserTabs:
 
         if data.type == S2C_LOBBY_USER_INFO:
             user_data = cast(S2C_LOBBY_USER_INFO_PACKET, data)
-            self.add_user("유저", user_data.user_pk, user_data.nickname, True)
+            self.add_user(USER_TAB_NAME, user_data.user_pk, user_data.nickname, True)
 
         elif data.type == S2C_FRIEND_INFO:
             friend_data = cast(S2C_FRIEND_INFO_PACKET, data)
-            self.add_user("친구", friend_data.user_pk, friend_data.nickname, friend_data.is_lobby)
+            self.add_user(FRIEND_TAB_NAME, friend_data.user_pk, friend_data.nickname, friend_data.is_lobby)
 
         elif data.type == S2C_ADD_FRIEND:
             add_data = cast(S2C_ADD_FRIEND_PACKET, data)
-            self.add_user("친구", add_data.friend_id, add_data.friend_nickname, True) # 나중에 서버에서 확인하고 패킷에 정보 추가해서 보내줘야 할 듯
+            self.add_user(FRIEND_TAB_NAME, add_data.friend_id, add_data.friend_nickname, True)
 
         elif data.type == S2C_DELETE_FRIEND:
             delete_data = cast(S2C_DELETE_FRIEND_PACKET, data)
-            self.delete_user("친구", delete_data.target_pk)
+            self.delete_user(FRIEND_TAB_NAME, delete_data.target_pk)
 
         elif data.type == S2C_REQUEST_FRIEND:
             request_data = cast(S2C_REQUEST_FRIEND_PACKET, data)
@@ -128,11 +142,15 @@ class UserTabs:
                 self.cur_tab_index = index
                 return None
 
+        cur_tab_name = self.get_cur_tab_name()
+        refresh_btn = self.refresh_buttons.get(cur_tab_name)
+        if refresh_btn and refresh_btn.handle_event(ev):
+            return cur_tab_name
+
         result = self.get_cur_user_list().handle_event(ev)
         if result is None:
             return None
 
-        cur_tab_name = self.get_cur_tab_name()
         if cur_tab_name == USER_TAB_NAME:
             result.ev_type = "add"
         elif cur_tab_name == FRIEND_TAB_NAME:
@@ -150,3 +168,6 @@ class UserTabs:
                 pygame.draw.rect(self.screen, ORANGE, self.tab_rects[index], 2)
 
         self.get_cur_user_list().draw()
+        refresh_btn = self.refresh_buttons.get(self.get_cur_tab_name())
+        if refresh_btn:
+            refresh_btn.draw()
