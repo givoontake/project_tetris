@@ -446,9 +446,9 @@ void IOCPServer::SendLobbyUserList(Session* session, int request_sess_id)
 	int packet_size = 0;
 	char packet_buf[BUF_SIZE];
 	for (auto& user : users) {
-		S2C_FRIEND_INFO_PACKET info_p;
-		info_p.size = sizeof(S2C_FRIEND_INFO_PACKET);
-		info_p.type = S2C_FRIEND_INFO;
+		S2C_LOBBY_USER_INFO_PACKET info_p;
+		info_p.size = sizeof(S2C_LOBBY_USER_INFO_PACKET);
+		info_p.type = S2C_LOBBY_USER_INFO;
 		//info_p.user_pk = -1;
 		{
 			std::lock_guard<std::mutex> lock(user->GetMutex());
