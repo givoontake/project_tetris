@@ -452,6 +452,7 @@ void IOCPServer::SendLobbyUserList(Session* session, int request_sess_id)
 		//info_p.user_pk = -1;
 		{
 			std::lock_guard<std::mutex> lock(user->GetMutex());
+			if (user->GetSessionKey().id == request_sess_id) continue;
 			if (user->GetState() == SESS_STATE::LOBBY) {
 				info_p.user_pk = user->GetDBInfo().db_pk;
 				StringToCharBuf(user->GetDBInfo().nickname, info_p.nickname, MAX_ROOM_NAME);
