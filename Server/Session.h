@@ -2,6 +2,8 @@
 #include <WinSock2.h>
 #include <MSWSock.h>
 #include <mutex>
+#include <vector>
+#include <array>
 #include "ExOverlapped.h"
 #include "Atomic.h"
 #include "define.h"
@@ -28,8 +30,11 @@ class Session
 
 	Atomic<bool> disconnect_flag = false; // 상태에 추가하려고 해도 DISCONNECT 전에 어떤 상태인지 알 수가 없어서 CAS가 불가능해 따로 추가한 값
 	Atomic<SESS_STATE> state = SESS_STATE::NONE;
-	DBResultLogin info;
-	std::mutex sess_mutex; // send 작업 도중 disconnect를 막기 위한 것, 제너레이션은 send 성공 이후 ~ iocp 결과 처리 사이에 발생한 disconnect에 의한 예외를 막기 위한 것
+	DBResultLogin db_info;
+	std::mutex sess_mutex;
+
+	std::vector<FriendInfo> friend_list;
+
 public:
 	Session();
 
@@ -41,17 +46,21 @@ public:
 	void SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp_handle);
 	void SendBoundPacket(int request_sess_id, char* packet_buf, int data_size, const HANDLE iocp_handle);
 	void RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle);
+	void AddFriend(FriendInfo& new_friend);
+	void DeleteFriend(const int target_pk);
+	void InitFriendList(std::vector<FriendInfo>& db_friend_list);
 
 	//getters
 	SOCKET GetSocket() const { return socket; }
 	IOOverlapped& GetExOver() { return recv_over; }
+	std::vector<FriendInfo>& GetFriendList() { return friend_list; }
 
 	//IOKey GetIOKey() const { return key; }
 	SessionKey GetSessionKey() const { return key; }
 	int GetRoomIndex() const { return room_index; }
 	int GetRemainDataSize() const { return remain_data_size; }
 	SESS_STATE GetState() const { return state.Load(); }
-	DBResultLogin& GetInfo() { return info; }
+	DBResultLogin& GetDBInfo() { return db_info; }
 	std::mutex& GetMutex(){ return sess_mutex; }
 	//std::string GetPrimaryKey() const { return login_id; }
 

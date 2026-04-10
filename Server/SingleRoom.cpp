@@ -196,7 +196,7 @@ void SingleRoom::SendCreateRoom(Session* session) // 외부에서 세션락 걸�
 		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
 		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
-	std::cout << "Room[: " << room_index << "] created by : " << session->GetInfo().nickname << "\n";
+	std::cout << "Room[: " << room_index << "] created by : " << session->GetDBInfo().nickname << "\n";
 }
 
 void SingleRoom::ReduceTimeouts(int type)
@@ -282,11 +282,11 @@ void SingleRoom::MakeMovePacketData(int move_type)
 
 void SingleRoom::RequestUpdateScore()
 {
-	if (room_users[0].GetSession()->GetInfo().max_score < room_users[0].GetScore()) {
+	if (room_users[0].GetSession()->GetDBInfo().max_score < room_users[0].GetScore()) {
 		SessionKey key;
 		key.id = room_users[0].GetSession()->GetSessionKey().id;
 		key.index = room_users[0].GetSession()->GetSessionKey().index;
-		int db_PK = room_users[0].GetSession()->GetInfo().db_PK;
+		int db_PK = room_users[0].GetSession()->GetDBInfo().db_pk;
 		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
 		auto task_update_score = [key, db_PK, new_score, &db] {

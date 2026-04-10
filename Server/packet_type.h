@@ -62,6 +62,20 @@ constexpr char S2C_ROOM_INFO = 49;
 constexpr char C2S_JOIN_LOCK_ROOM = 50;
 constexpr char C2S_FAST_MATCHING = 51;  
 
+constexpr char C2S_REQUEST_FRIEND = 52;
+constexpr char C2S_DELETE_FRIEND = 53;
+constexpr char C2S_ACCEPT_FRIEND = 54;
+
+constexpr char S2C_REQUEST_FRIEND = 55;
+constexpr char S2C_DELETE_FRIEND = 56;
+constexpr char S2C_ADD_FRIEND = 57;
+
+constexpr char C2S_REQUEST_LOBBY_USER_LIST = 58;
+constexpr char S2C_LOBBY_USER_INFO = 59;
+
+constexpr char C2S_REQUEST_FRIEND_LIST = 60;
+constexpr char S2C_FRIEND_INFO = 61;
+
 constexpr char S2C_INFO = 100;
 constexpr char S2C_TEST_LOGIN = 101;
 constexpr char C2S_TEST_LOGIN = 102;

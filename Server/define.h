@@ -291,4 +291,62 @@ struct C2S_FAST_MATCHING_PACKET {
 	char max_user;
 };
 
+struct C2S_REQUEST_FRIEND_PACKET {
+	short size;
+	char type;
+	int recver_pk; // 누구에게 보내는지
+};
+
+struct C2S_DELETE_FRIEND_PACKET {
+	short size;
+	char type;
+	int target_pk;
+};
+
+struct C2S_ACCEPT_FRIEND_PACKET {
+	short size;
+	char type;
+	int requester_pk;
+};
+
+struct S2C_REQUEST_FRIEND_PACKET {
+	short size;
+	char type;
+	int requester_pk; // 누구에게 왔는지
+	char requester_nickname[MAX_USER_NAME];
+};
+
+struct S2C_DELETE_FRIEND_PACKET {
+	short size;
+	char type;
+	int target_pk;
+};
+
+struct S2C_ADD_FRIEND_PACKET {
+	short size;
+	char type;
+	int friend_id;
+	char friend_nickname[MAX_USER_NAME];
+};
+
+struct C2S_REQUEST_LOBBY_USER_LIST_PACKET {
+	short size;
+	char type;
+};
+
+struct S2C_LOBBY_USER_INFO_PACKET {
+	short size;
+	char type;
+	int user_pk;
+	char nickname[MAX_USER_NAME];
+};
+
+struct S2C_FRIEND_INFO_PACKET {
+	short size;
+	char type;
+	int user_pk;
+	char nickname[MAX_USER_NAME];
+	bool is_lobby; // 세부 상태를 보여주려면 나중에 char로 바꾸기
+};
+
 #pragma pack(pop)

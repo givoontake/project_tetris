@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include "define.h"
 
 struct DBResultDefault {
@@ -11,7 +12,7 @@ struct DBResultDefault {
 };
 
 struct DBResultLogin : public DBResultDefault {
-	int db_PK;
+	int db_pk;
 	int max_score;
 	int win_count;
 	int lose_count;
@@ -20,7 +21,7 @@ struct DBResultLogin : public DBResultDefault {
 
 	void clear()
 	{
-		db_PK = -1;
+		db_pk = -1;
 		max_score = 0;
 		win_count = 0;
 		lose_count = 0;
@@ -35,4 +36,30 @@ struct DBResultUpdateScore : public DBResultDefault {
 
 struct DBResultUpdateMatchResult : public DBResultDefault {
 	bool is_winner;
+};
+
+struct FriendInfo {
+	int db_pk;
+	//int sess_gen; // db 요청 - 응답 사이에 재사용 판별을 위해 사용 -> 어차피 재사용 보장이 안돼서 탐색해서 찾아야겠다
+	std::string nickname;
+};
+
+struct DBResultAddFriend : public DBResultDefault { // 재조회하기는 싫으니까 그냥 닉네임을 받는걸로 하자
+	// DB 요청 이후 두 세션은 존재하는지, 아닌지, 재로그인 했는지 알 수 없으므로 어차피 탐색해서 찾아야 함
+	FriendInfo requester_info;
+	FriendInfo accepter_info;
+};
+
+struct DBResultDeleteFriend : public DBResultDefault {
+	int requester_pk;
+	int target_pk;
+};
+
+struct DBResultAddFriendRequest : public DBResultDefault {
+	FriendInfo requester_info;
+	FriendInfo recver_info;
+};
+
+struct DBResultLoadFriendList : public DBResultDefault {
+	std::vector<FriendInfo> friend_list;
 };

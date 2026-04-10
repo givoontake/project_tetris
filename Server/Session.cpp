@@ -15,7 +15,8 @@ void Session::InitSession(int new_id, SOCKET new_socket)
 	// 예시로 소켓만 초기화되고 이전 요청이 남아 들어오면, 제너레이션은 아직 변경되지 않았으므로 문제가 발생할 수 있다.
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	socket = new_socket;
-	info.clear();
+	db_info.clear();
+	friend_list.reserve(MAX_FRIENDS);
 	key.id = new_id;
 	remain_data_size = 0; // 얘 기준으로 버퍼에 쓰니까 굳이 버퍼 자체를 초기화할 필요는 없어 보임.
 	disconnect_flag.Store(false);
@@ -30,26 +31,26 @@ void Session::ClearSession()
 {
 	// 특정 작업 시 disconnect를 막아야 하므로 뮤텍스 추가
 	// 예시로 db 작업 등록 중에는 disconnect 되면 안된다.
-	{
-		std::lock_guard<std::mutex> lock(sess_mutex);
-		closesocket(socket);
-		info.clear();
-		key.id = -1;
-		// tcp에서 패킷을 나누어 보낼 때 비정상 종료되면 일부만 보내고 끝날 수도 있다고 한다
-		// 따라서 remain_data_size는 항상 초기화가 필요하다
-		remain_data_size = 0;
-		recv_over.ex_over.request_id = -1;
-		state.Store(SESS_STATE::NONE);
-	}
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	closesocket(socket);
+	db_info.clear();
+	friend_list.clear();
+	key.id = -1;
+	// tcp에서 패킷을 나누어 보낼 때 비정상 종료되면 일부만 보내고 끝날 수도 있다고 한다
+	// 따라서 remain_data_size는 항상 초기화가 필요하다
+	remain_data_size = 0;
+	recv_over.ex_over.request_id = -1;
+	state.Store(SESS_STATE::NONE);
 }
 
-void Session::InitDBInfo(DBResultLogin* db_info)
+void Session::InitDBInfo(DBResultLogin* new_info)
 {
-	info.login_id = db_info->login_id;
-	info.nickname = db_info->nickname;
-	info.lose_count = db_info->lose_count;
-	info.win_count = db_info->win_count;
-	info.max_score = db_info->max_score;
+	db_info.db_pk = new_info->db_pk;
+	db_info.login_id = new_info->login_id;
+	db_info.nickname = new_info->nickname;
+	db_info.lose_count = new_info->lose_count;
+	db_info.win_count = new_info->win_count;
+	db_info.max_score = new_info->max_score;
 }
 
 // IOKey reqeust_sess_key는 재사용 여부를 거르기 위한 장치다. 외부에서 받은 것과 현재 키를 비교한다.
@@ -152,6 +153,26 @@ void Session::RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle)
 			return;
 		}
 	}
+}
+
+void Session::AddFriend(FriendInfo& new_friend)
+{
+	friend_list.emplace_back(new_friend);
+}
+
+void Session::DeleteFriend(int target_pk)
+{
+	auto it = std::find_if(friend_list.begin(), friend_list.end(), [&target_pk](const FriendInfo& friend_info) {
+		return friend_info.db_pk == target_pk;
+		});
+	if (it != friend_list.end()) {
+		friend_list.erase(it);
+	}
+}
+
+void Session::InitFriendList(std::vector<FriendInfo>& db_friend_list)
+{
+	friend_list = std::move(db_friend_list);
 }
 
 bool Session::TryChangeState(SESS_STATE expected, SESS_STATE desired)

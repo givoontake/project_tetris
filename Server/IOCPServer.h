@@ -47,7 +47,7 @@ public:
 	int GetNewRoomId();
 	bool GetRunning() const { return is_running; }
 	HANDLE GetHandle() const { return iocp_handle; }
-	Session* GetSession(int user_index) const { return users[user_index]; }
+	
 	long long GetTickCount() const { return tick_count.load(); }
 	std::shared_ptr<TetrisRoom> GetRoom(int room_index) const { return std::atomic_load(&rooms[room_index]); }
 	Database& GetDB() { return db; }
@@ -55,6 +55,8 @@ public:
 	void AddTickCount() { tick_count.fetch_add(1); }
 
 	//virtual MQueue& GetTaskQueue() override;
+	Session* FindSessionByIndex(int user_index) const { return users[user_index]; }
+	Session* FindSessionByPK(int db_PK) const;
 
 	void Disconnect(int user_index);
 	void StartServer();
@@ -74,7 +76,12 @@ public:
 	void SendRoomList(Session* session, int reqeust_sess_id);
 	bool TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password);
 	int FindRoom(int room_id);
+	int FindUser(int user_id);
 	void SendError(Session* session, int request_sess_id, int error_code);
 	bool CheckDuplicateLoginId(const std::string& login_id);
 	void FindMatch(Session* session, int request_sess_id, int max_user);
+	void SendLobbyUserList(Session* session, int request_sess_id);
+	void SendFriendList(Session* session, int request_sess_id);
+	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
+	void SendDeleteFriendResult(const int requester_pk, const int target_pk);
 };

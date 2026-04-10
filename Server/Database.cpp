@@ -246,7 +246,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
                 if (info_rs && info_rs->next()) // 가져온 결과(행)이 있는지 판별
                 {
                     p->login_id = login_id;
-					p->db_PK = info_rs->getInt(1);
+					p->db_pk = info_rs->getInt(1);
                     p->nickname = info_rs->getString(2);
                     p->max_score = info_rs->getInt(3);
                     p->win_count = info_rs->getInt(4);
@@ -345,7 +345,7 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, const int db_PK, bool is
             const char* SQL_UPDATE_MATCH_RESULT =
                 "UPDATE users "
                 "SET win = win + ?, "
-                "    lose = lose + ? "
+                "lose = lose + ? "
                 "WHERE user_id=?";
 
             caches.stmt_cache[DBOperationType::UPDATE_MATCH_RESULT]
@@ -388,6 +388,268 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, const int db_PK, bool is
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
+void Database::ExecuteAddFriend(const int requester_pk, const FriendInfo& accepter_info)
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = OP_TYPE::DB;
+    //db_over->ex_over.request_id; // 사실 여기서는 의미가 없음. 적용된 두 클라에게 모두 보내야해서 두 클라의 키값이 모두 필요
+    db_over->type = DBOperationType::ADD_FRIEND;
+    db_over->ok = false;
+
+    caches.conn->setAutoCommit(false);
+    try
+    {
+        auto* af_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND);
+        if (!af_stmt)
+        {
+            const char* SQL_ADD_FRIEND = // 쿼리 안에서 몇 개를 요청하던 1번의 요청 결과는 원자적
+            "INSERT IGNORE INTO friends (my_id, friend_id) "
+            "VALUES (?, ?), (?, ?)";
+
+            caches.stmt_cache[DBOperationType::ADD_FRIEND].reset(caches.conn->prepareStatement(SQL_ADD_FRIEND));
+            af_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND);
+            if (!af_stmt) goto POST_RESULT;
+        }
+
+        af_stmt->setInt(1, accepter_info.db_pk);
+        af_stmt->setInt(2, requester_pk);
+        af_stmt->setInt(3, requester_pk);
+        af_stmt->setInt(4, accepter_info.db_pk);
+
+        const int af_affected = af_stmt->executeUpdate(); // INSERT, UPDATE, DELETE -> 영향을 받은 행의 수를 반환
+
+		if (af_affected >= 2) // 친구 추가 성공 -> 친구 요청 레코드 삭제 (추가는 양방향이므로 2행이 영향을 받아야 성공)
+        {
+            const char* SQL_DELETE_FRIEND_REQUEST =
+                "DELETE FROM friend_requests "
+                "WHERE from_user_id = ? AND to_user_id = ?";
+
+            auto* dfr_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND_REQUEST);
+            if (!dfr_stmt) {
+                caches.stmt_cache[DBOperationType::DELETE_FRIEND_REQUEST].reset(caches.conn->prepareStatement(SQL_DELETE_FRIEND_REQUEST));
+                dfr_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND_REQUEST);
+				if (!dfr_stmt) goto POST_RESULT;
+            }
+            
+            dfr_stmt->setInt(1, requester_pk);
+            dfr_stmt->setInt(2, accepter_info.db_pk);
+
+            int dfr_affected = dfr_stmt->executeUpdate();
+            if (dfr_affected > 0) {
+                const char* SQL_GET_FRIEND_INFO =
+                    "SELECT nickname FROM users WHERE user_id=?";
+
+                auto* gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+                if (!gri_stmt) {
+                    caches.stmt_cache[DBOperationType::GET_FRIEND_INFO].reset(caches.conn->prepareStatement(SQL_GET_FRIEND_INFO));
+
+                    gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+                    if (!gri_stmt) goto POST_RESULT;
+                }
+
+                gri_stmt->setInt(1, requester_pk);
+                std::unique_ptr<sql::ResultSet> rs(gri_stmt->executeQuery());
+
+                if (rs && rs->next()) {
+                    db_over->ok = true;
+                    db_over->result_data = std::make_unique<DBResultAddFriend>();
+                    DBResultAddFriend* p = static_cast<DBResultAddFriend*>(db_over->result_data.get());
+                    p->requester_info.nickname = rs->getString(1);
+                    p->requester_info.db_pk = requester_pk;
+                    p->accepter_info = accepter_info;
+                    caches.conn->commit();
+                }
+            }
+        }
+
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+
+POST_RESULT:
+	if (!db_over->ok) caches.conn->rollback();
+
+    caches.conn->setAutoCommit(true);
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
+void Database::ExecuteDeleteFriend(const int requester_pk, const int target_pk)
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = OP_TYPE::DB;
+    //db_over->ex_over.request_id = key.id;
+    db_over->type = DBOperationType::DELETE_FRIEND;
+    db_over->ok = false;
+
+    try
+    {
+        auto* df_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND);
+        if (!df_stmt)
+        {
+            const char* SQL_DELETE_FRIEND = // 쿼리 안에서 몇 개를 요청하던 1번의 요청 결과는 원자적
+                "DELETE FROM friends "
+                "WHERE(my_id, friend_id) IN((? , ?), (? , ?))";
+
+            caches.stmt_cache[DBOperationType::DELETE_FRIEND].reset(caches.conn->prepareStatement(SQL_DELETE_FRIEND));
+
+            df_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND);
+            if (!df_stmt)
+            {
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                return;
+            }
+        }
+
+        df_stmt->setInt(1, requester_pk);
+        df_stmt->setInt(2, target_pk);
+        df_stmt->setInt(3, target_pk);
+        df_stmt->setInt(4, requester_pk);
+
+        const int affected = df_stmt->executeUpdate(); // INSERT, UPDATE, DELETE -> 영향을 받은 행의 수를 반환
+
+        if (affected >= 2)
+        {
+            db_over->ok = true;
+            db_over->result_data = std::make_unique<DBResultDeleteFriend>();
+            DBResultDeleteFriend* p = static_cast<DBResultDeleteFriend*>(db_over->result_data.get()); 
+            p->requester_pk = requester_pk;
+			p->target_pk = target_pk;
+        }
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
+void Database::ExecuteLoadFriendList(SessionKey key, const int db_PK) 
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.request_id = key.id;
+    db_over->type = DBOperationType::LOAD_FRIEND_LIST;
+    db_over->ok = false;
+
+    try
+    {
+        auto* stmt = caches.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
+        if (!stmt)
+        {
+            // SELECT: 컬럼들 선택(열)
+            // FROM: 테이블 선택(단일 뿐만 아니라 조인된 테이블도 당연히 가능)
+            // WHERE: 테이블에서 조건에 맞는 행 선택
+            const char* SQL_GET_FRIEND_LIST = // 쿼리 안에서 몇 개를 요청하던 1번의 요청 결과는 원자적
+                "SELECT user_id, nickname " // 헷갈리지만, 직접 해보면 맞다. 친구 목록 뒤에 친구에 대한 부가 정보를 붙이고(친구 닉네임 알려고), 그 중 내 친구들만 골라서 그 중 user_id(db_PK), nickname을 받는다.
+				"FROM friends JOIN users " 
+                "ON friends.friend_id = users.user_id "
+			    "WHERE my_id = ?";
+
+            caches.stmt_cache[DBOperationType::LOAD_FRIEND_LIST].reset(caches.conn->prepareStatement(SQL_GET_FRIEND_LIST));
+
+            stmt = caches.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
+            if (!stmt)
+            {
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                return;
+            }
+        }
+
+        stmt->setInt(1, db_PK);
+
+        std::unique_ptr<sql::ResultSet> rs(stmt->executeQuery());
+
+        if (rs) {
+            db_over->ok = true;
+            db_over->result_data = std::make_unique<DBResultLoadFriendList>();
+            DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
+            while (rs->next()) { // rs->next()는 다음 결과로 이동하며, 결과가 있는지 여부를 반환한다.
+                FriendInfo info;
+				info.db_pk = rs->getInt(1);
+                info.nickname = rs->getString(2);
+				res->friend_list.emplace_back(info);
+            }
+        }
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
+void Database::ExecuteAddFriendRequest(const FriendInfo& requester_info, const int recver_pk)
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->type = DBOperationType::ADD_FRIEND_REQUEST;
+    db_over->ok = false;
+
+	caches.conn->setAutoCommit(false);
+    try
+    {
+        auto* afr_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND_REQUEST);
+        if (!afr_stmt)
+        {
+            const char* SQL_ADD_FRIEND_REQUEST =
+                "INSERT INTO friend_requests (from_user_id, to_user_id) "
+                "VALUES (?, ?)";
+            caches.stmt_cache[DBOperationType::ADD_FRIEND_REQUEST].reset(caches.conn->prepareStatement(SQL_ADD_FRIEND_REQUEST));
+            afr_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND_REQUEST);
+			if (!afr_stmt) goto POST_RESULT;
+        }
+        afr_stmt->setInt(1, requester_info.db_pk);
+        afr_stmt->setInt(2, recver_pk);
+        const int afr_affected = afr_stmt->executeUpdate();
+        
+        if (afr_affected >= 1)
+        {
+            const char* SQL_GET_FRIEND_INFO =
+				"SELECT nickname FROM users WHERE user_id=?";
+
+            auto* gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+            if (!gri_stmt) {
+                caches.stmt_cache[DBOperationType::GET_FRIEND_INFO].reset(caches.conn->prepareStatement(SQL_GET_FRIEND_INFO));
+
+                gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+				if (!gri_stmt) goto POST_RESULT;
+            }
+
+			gri_stmt->setInt(1, recver_pk);
+            std::unique_ptr<sql::ResultSet> gri_rs(gri_stmt->executeQuery());
+
+            if (gri_rs && gri_rs->next()) {
+                FriendInfo recver_info;
+                recver_info.db_pk = recver_pk;
+                recver_info.nickname = gri_rs->getString(1);
+
+                db_over->ok = true;
+                db_over->result_data = std::make_unique<DBResultAddFriendRequest>();
+                DBResultAddFriendRequest* p = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
+                p->requester_info = requester_info;
+                p->recver_info = recver_info; // 얘는 있는지 없는지 모르니까 gen은 당연히 못넣음
+            }
+        }
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+POST_RESULT:
+    if (!db_over->ok) caches.conn->rollback();
+	caches.conn->setAutoCommit(true);
+
+	PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
 // ---- DB 스레드 루프 ----
 void Database::Run()
 {
@@ -404,7 +666,6 @@ void Database::Run()
     while (true)
     {
         Task job;
-
         {
             std::unique_lock<std::mutex> lock(mutex);
             // 잠자고 있는 상태에서는 깨우는 신호가 오면 다시 조건을 검사한다.

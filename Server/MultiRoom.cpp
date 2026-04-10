@@ -119,7 +119,7 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 			add_p.size = sizeof(S2C_ADD_USER_PACKET);
 			add_p.type = S2C_ADD_USER;
 			add_p.id = new_session->GetSessionKey().id;
-			memcpy(&add_p.name, &new_session->GetInfo().nickname, MAX_USER_NAME);
+			memcpy(&add_p.name, &new_session->GetDBInfo().nickname, MAX_USER_NAME);
 			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
 		}
 
@@ -131,7 +131,7 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 			add_p.size = sizeof(S2C_ADD_USER_PACKET);
 			add_p.type = S2C_ADD_USER;
 			add_p.id = r_user.GetSession()->GetSessionKey().id;
-			memcpy(&add_p.name, &r_user.GetSession()->GetInfo().nickname, MAX_USER_NAME);
+			memcpy(&add_p.name, &r_user.GetSession()->GetDBInfo().nickname, MAX_USER_NAME);
 			new_session->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
 		}
 
@@ -193,7 +193,7 @@ void MultiRoom::SendCreateRoom(Session* session)
 		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
 	FindNewHost();
-	std::cout << "Room[: " << room_index << "] created by : " << session->GetInfo().nickname << "\n";
+	std::cout << "Room[: " << room_index << "] created by : " << session->GetDBInfo().nickname << "\n";
 }
 
 void MultiRoom::ReadyUser(int id)
@@ -471,7 +471,7 @@ void MultiRoom::RequestUpdateMatchResult()
 			SessionKey key;
 			key.id = r_user.GetSession()->GetSessionKey().id;
 			key.index = r_user.GetSession()->GetSessionKey().index;
-			int db_PK = r_user.GetSession()->GetInfo().db_PK;
+			int db_PK = r_user.GetSession()->GetDBInfo().db_pk;
 			auto task_update_match_result = [key, db_PK, is_winner, &db] {
 				db.ExecuteUpdateMatchResult(key, db_PK, is_winner);
 				};
@@ -487,10 +487,10 @@ void MultiRoom::FindNewHost()
 	if (cur_user != 0) {
 		for (auto& r_user : room_users) {
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue; 
-				host_id = r_user.GetSession()->GetSessionKey().id;
-				if (room_state == ROOM_STATE::WAIT) r_user.SetRoomUserState(ROOM_USER_STATE::WAIT); // 게임 중이 아닐 때, 호스트가 나갔을 때 레디 상태인 사람이 호스트가 되면, 레디 상태를 풀어줘야함
-				find_host = true;
-				break;
+			host_id = r_user.GetSession()->GetSessionKey().id;
+			if (room_state == ROOM_STATE::WAIT) r_user.SetRoomUserState(ROOM_USER_STATE::WAIT); // 게임 중이 아닐 때, 호스트가 나갔을 때 레디 상태인 사람이 호스트가 되면, 레디 상태를 풀어줘야함
+			find_host = true;
+			break;
 		}
 	}
 
