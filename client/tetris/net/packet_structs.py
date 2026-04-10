@@ -263,6 +263,49 @@ class S2C_INFO_PACKET(RecvPacketStruct):
     BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
+@dataclass
+class S2C_REQUEST_FRIEND_PACKET(RecvPacketStruct):
+    requester_pk: int = -1
+    requester_nickname: str = ""
+
+    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class S2C_DELETE_FRIEND_PACKET(RecvPacketStruct):
+    target_pk: int = -1
+
+    BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class S2C_ADD_FRIEND_PACKET(RecvPacketStruct):
+    friend_id: int = -1
+    friend_nickname: str = ""
+
+    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class S2C_LOBBY_USER_INFO_PACKET(RecvPacketStruct):
+    user_pk: int = -1
+    nickname: str = ""
+
+    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class S2C_FRIEND_INFO_PACKET(RecvPacketStruct):
+    user_pk: int = -1
+    nickname: str = ""
+    is_lobby: bool = False
+
+    BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s?"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 # ---------------------------
 # C2S (송신) : SendPacketStruct
@@ -373,4 +416,39 @@ class C2S_FAST_MATCHING_PACKET(SendPacketStruct):
     max_user: int = -1
 
     BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+@dataclass
+class C2S_REQUEST_FRIEND_PACKET(SendPacketStruct):
+    recver_pk: int = -1
+
+    BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class C2S_DELETE_FRIEND_PACKET(SendPacketStruct):
+    target_pk: int = -1
+
+    BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class C2S_ACCEPT_FRIEND_PACKET(SendPacketStruct):
+    requester_pk: int = -1
+
+    BODY_FMT: ClassVar[str] = "i"
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class C2S_REQUEST_LOBBY_USER_LIST_PACKET(SendPacketStruct):
+    BODY_FMT: ClassVar[str] = ""
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class C2S_REQUEST_FRIEND_LIST_PACKET(SendPacketStruct):
+    BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT

@@ -168,3 +168,41 @@ class PacketBuilder:
         values = self.struct_to_values(data)
 
         return struct.pack(data.FMT, *values)
+    
+    def build_request_friend_pkt(self, recver_pk: int) -> bytes:
+        data = C2S_REQUEST_FRIEND_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_REQUEST_FRIEND
+        data.recver_pk = recver_pk
+        values = self.struct_to_values(data)
+        return struct.pack(data.FMT, *values)
+
+    def build_delete_friend_pkt(self, target_pk: int) -> bytes:
+        data = C2S_DELETE_FRIEND_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_DELETE_FRIEND
+        data.target_pk = target_pk
+        values = self.struct_to_values(data)
+        return struct.pack(data.FMT, *values)
+
+    def build_accept_friend_pkt(self, requester_pk: int) -> bytes:
+        data = C2S_ACCEPT_FRIEND_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_ACCEPT_FRIEND
+        data.requester_pk = requester_pk
+        values = self.struct_to_values(data)
+        return struct.pack(data.FMT, *values)
+
+    def build_request_lobby_user_list_pkt(self) -> bytes:
+        data = C2S_REQUEST_LOBBY_USER_LIST_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_REQUEST_LOBBY_USER_LIST
+        values = self.struct_to_values(data)
+        return struct.pack(data.FMT, *values)
+
+    def build_request_friend_list_pkt(self) -> bytes:
+        data = C2S_REQUEST_FRIEND_LIST_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_REQUEST_FRIEND_LIST
+        values = self.struct_to_values(data)
+        return struct.pack(data.FMT, *values)

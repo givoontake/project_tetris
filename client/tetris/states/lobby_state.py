@@ -25,6 +25,7 @@ from tetris.ui.my_info import Profile
 from tetris.ui.fast_matching_window import FastMatchingWindow
 from tetris.ui.create_room_window import CreateRoomWindow
 from tetris.ui.setting_window import SettingWindow
+from tetris.ui.user_taps import UserTabs, USER_TAB_NAME, FRIEND_TAB_NAME
 from tetris.states.single_play_state import SinglePlayState
 from tetris.states.multi_play_state import MultiPlayState
 from tetris.states.base_state import BaseState
@@ -48,6 +49,7 @@ class LobbyState(BaseState):
                                        "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
         self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), self.chat_input_box.font)
         self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), rm, session)
+        self.user_tabs = UserTabs(screen, pygame.Rect(1050, 150, 300, 400), rm, ["유저", "친구"])
 
         self.open_shutter = ShutterAnimation(screen, rm)
         self.is_animation = is_animation
@@ -62,6 +64,11 @@ class LobbyState(BaseState):
         self.reactable = True
 
         self.info_popup = None
+        self.friend_request_popup = None
+        self.friend_request_pk = None
+
+        self.friend_ev_btn = None
+        self.friend_ev_target_id = None
 
         self.join_room_id = None
     
@@ -85,12 +92,28 @@ class LobbyState(BaseState):
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
 
-        packet = self.net_worker.builder.build_request_room_list_pkt()
-        self.net_worker.send_packet(packet)
+        self.request_room_list()
+        self.request_lobby_user_list()
+        self.request_friend_list()
 
     # def on_resize(self, w, h, screen):
     #     self.screen = screen
     #     self.set_layout()
+
+    def request_room_list(self):
+        self.room_list.clear()
+        packet = self.net_worker.builder.build_request_room_list_pkt()
+        self.net_worker.send_packet(packet)
+
+    def request_lobby_user_list(self):
+        self.user_tabs.clear(USER_TAB_NAME)
+        packet = self.net_worker.builder.build_request_lobby_user_list_pkt()
+        self.net_worker.send_packet(packet)
+
+    def request_friend_list(self):
+        self.user_tabs.clear(FRIEND_TAB_NAME)
+        packet = self.net_worker.builder.build_request_friend_list_pkt()
+        self.net_worker.send_packet(packet)
 
     def handle_packet(self, data: RecvPacketStruct):
         if data:
@@ -105,6 +128,20 @@ class LobbyState(BaseState):
                 info_message = INFO_MESSAGES[info_data.info_type]
                 self.info_popup = PopupBox(self.screen, self.rm, info_message, ["확인"])
                 self.reactable = False
+
+            elif data.type == S2C_LOBBY_USER_INFO or \
+                    data.type == S2C_FRIEND_INFO or \
+                    data.type == S2C_ADD_FRIEND or \
+                    data.type == S2C_DELETE_FRIEND or \
+                    data.type == S2C_REQUEST_FRIEND:
+
+                result = self.user_tabs.handle_packet(data)
+
+                if data.type == S2C_REQUEST_FRIEND and result is not None:
+                    self.friend_request_pk = result.requester_pk
+                    fr_message = f"{result.requester_nickname} 님이 친구 요청을 보냈습니다."
+                    self.friend_request_popup = PopupBox(self.screen,self.rm, fr_message,["수락", "닫기"])
+                    self.reactable = False
 
             elif data.type == S2C_MESSAGE:
                 message_data = cast(S2C_MESSAGE_PACKET, data)
@@ -195,6 +232,34 @@ class LobbyState(BaseState):
             if message != None:
                 packet = self.net_worker.builder.build_message_pkt(message)
                 self.net_worker.send_packet(packet)
+            
+            if hasattr(ev, "pos"): # 마우스 이벤트만 넘긴다. 외부 클릭시 None이 넘어오고 그것을 토대로 버튼을 제거해야 한다
+                if self.friend_ev_btn: # 버튼이 있다면 버튼 먼저
+                    if self.friend_ev_btn.handle_event(ev):
+                        if self.friend_ev_btn.idle.text == "친구추가":
+                            packet = self.net_worker.builder.build_request_friend_pkt(self.friend_ev_target_id)
+                            self.net_worker.send_packet(packet)
+                        elif self.friend_ev_btn.idle.text == "친구삭제":
+                            packet = self.net_worker.builder.build_delete_friend_pkt(self.friend_ev_target_id)
+                            self.net_worker.send_packet(packet)
+                        self.friend_ev_btn = None
+                        self.friend_ev_target_id = None
+                        return
+                    # 버튼이 있으면 마우스 이벤트가 로비 어디서 발생하던 일단 버튼은 없애야함. 
+                    self.friend_ev_btn = None
+                    self.friend_ev_target_id = None
+                
+                friend_event = self.user_tabs.handle_event(ev) # 버튼이 없으면 탭으로 (버튼이 탭 위에 있음)
+                if friend_event != None:
+                    btn_rect = pygame.Rect(friend_event.pos[0], friend_event.pos[1], 50, 25)
+                    self.friend_ev_target_id = friend_event.target_id
+                    if friend_event.ev_type == "add":
+                        btn_text = "친구추가"
+
+                    elif friend_event.ev_type == "delete":
+                        btn_text = "친구삭제"
+
+                    self.friend_ev_btn = Button(self.screen, btn_rect, self.rm, None, btn_text)
 
         else:
             if self.error_popup:
@@ -258,6 +323,19 @@ class LobbyState(BaseState):
                     self.info_popup = None
                     self.reactable = True
 
+            elif self.friend_request_popup:
+                fr_event = self.friend_request_popup.handle_event(ev)
+                if fr_event != None:
+                    if fr_event == "수락":
+                        packet = self.net_worker.builder.build_accept_friend_pkt(self.friend_request_pk)
+                        self.net_worker.send_packet(packet)
+
+                    self.friend_request_popup = None
+                    self.friend_request_pk = None
+                    self.reactable = True
+
+            return
+
     def update(self, dt_ms, events):
         if self.is_animation and self.open_shutter.is_active: 
             self.open_shutter.update(dt_ms)
@@ -288,6 +366,7 @@ class LobbyState(BaseState):
         self.chat_window.draw()
         self.chat_input_box.draw()
         self.my_info_rect.draw()
+        self.user_tabs.draw()
 
         if self.error_popup: self.error_popup.draw()
         if self.fast_matching_window: self.fast_matching_window.draw()
@@ -298,3 +377,5 @@ class LobbyState(BaseState):
         if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()
         if self.input_pw_window: self.input_pw_window.draw()
         if self.info_popup: self.info_popup.draw()
+        if self.friend_request_popup: self.friend_request_popup.draw()
+        if self.friend_ev_btn: self.friend_ev_btn.draw()

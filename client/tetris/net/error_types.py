@@ -12,6 +12,8 @@ ROOM_NOT_ALL_READY = 20
 ROOM_NOT_ENOUGH_PLAYERS = 21
 ROOM_INVALID_PASSWORD = 22
 
+USER_NOT_FOUND = 30
+
 ERROR_MESSAGES = {
     SERVER_ERROR: "서버와의 상태가 원활하지 않습니다.",
     INVALID_REQUEST: "잘못된 요청입니다.",
@@ -25,5 +27,7 @@ ERROR_MESSAGES = {
 
     ROOM_NOT_ALL_READY: "모두 준비해야 시작할 수 있습니다.",
     ROOM_NOT_ENOUGH_PLAYERS: "최소 2명이 모여야 시작할 수 있습니다.",
-    ROOM_INVALID_PASSWORD: "방 비밀번호와 일치하지 않습니다."
+    ROOM_INVALID_PASSWORD: "방 비밀번호와 일치하지 않습니다.",
+
+    USER_NOT_FOUND: "유저를 찾을 수 없습니다."
 }
