@@ -85,8 +85,8 @@ protected:
 	std::mutex room_mutex;
 
 public:
-	TetrisRoom(IOCPServer* server, Session* session, OpenRoomInitData data);
-	TetrisRoom(IOCPServer* server, Session* session, LockRoomInitData data);
+	TetrisRoom(IOCPServer* server, Session& session, OpenRoomInitData data);
+	TetrisRoom(IOCPServer* server, Session& session, LockRoomInitData data);
 	virtual ~TetrisRoom();
 
 	ROOM_STATE GetRoomState() const { return room_state.Load(); }
@@ -100,10 +100,10 @@ public:
 	const char* GetRoomName() const { return room_name; }
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session* request_session) = 0;
+	virtual void HandlePacket(char* packet, Session& request_session) = 0;
 	virtual void ProcessPlayTasks() = 0;
 	virtual void DeleteUser(const int id) = 0;	
-	virtual void SendCreateRoom(Session* session) = 0;
+	virtual void SendCreateRoom(Session& session) = 0;
 	// 공통
 	void SetRoomIndex(const int val);
 	void SetRoomId(const int val);

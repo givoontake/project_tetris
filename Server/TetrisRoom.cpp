@@ -3,7 +3,7 @@
 #include "IOCPServer.h"
 #include "packet_type.h"
 
-TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, OpenRoomInitData data)
+TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, OpenRoomInitData data)
 {
 	// 생성과 소멸은 스레드 세이프하지는 않지만, 어차피 make_shared하고 CAS해서 룸 리스트에 할당하기 전에는 접근되지 않는다.
 	server = _server;
@@ -18,13 +18,13 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, OpenRoomInitData d
 		room_users.emplace_back();
 	}
 
-	session->SetRoomIndex(room_index);
+	session.SetRoomIndex(room_index);
 	room_users[0].InitRoomSession(session);
 	cur_user = 1;
 	//SendAddRoom(session);
 }
 
-TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, LockRoomInitData data)
+TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, LockRoomInitData data)
 {
 	server = _server;
 	max_user = data.max_user;
@@ -38,7 +38,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session* session, LockRoomInitData d
 	for (int i = 0; i < max_user; ++i) {
 		room_users.emplace_back();
 	}
-	session->SetRoomIndex(room_index);
+	session.SetRoomIndex(room_index);
 	room_users[0].InitRoomSession(session);
 	cur_user = 1;
 	//SendAddRoom(session);

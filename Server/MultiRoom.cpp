@@ -1,15 +1,15 @@
 #include "MultiRoom.h"
 
-MultiRoom::MultiRoom(IOCPServer* server, Session* session, OpenRoomInitData data)
+MultiRoom::MultiRoom(IOCPServer* server, Session& session, OpenRoomInitData data)
 	: TetrisRoom(server, session, data)
 {
-	host_id = session->GetSessionKey().id;
+	host_id = session.GetSessionKey().id;
 }
 
-MultiRoom::MultiRoom(IOCPServer* server, Session* session, LockRoomInitData data)
+MultiRoom::MultiRoom(IOCPServer* server, Session& session, LockRoomInitData data)
 	: TetrisRoom(server, session, data)
 {
-	host_id = session->GetSessionKey().id;
+	host_id = session.GetSessionKey().id;
 }
 
 MultiRoom::~MultiRoom()
@@ -18,38 +18,38 @@ MultiRoom::~MultiRoom()
 
 // 게임 시작 전에 처리되는 것들 -> 함수 내에 뮤텍스 넣고 처리
 // 게임 시작 후에 처리되는 것들 -> 틱 처리 함수에 뮤텍스 넣고, 틱 처리 관련 내부 함수는 뮤텍스 넣지 않음
-void MultiRoom::HandlePacket(char* packet, Session* request_session)
+void MultiRoom::HandlePacket(char* packet, Session& request_session)
 {
 	switch (packet[2]) {
 
 	case C2S_DELETE_USER: {
 		C2S_DELETE_USER_PACKET* delete_p = reinterpret_cast<C2S_DELETE_USER_PACKET*>(packet);
-		DeleteUser(request_session->GetSessionKey().id);
+		DeleteUser(request_session.GetSessionKey().id);
 		break;
 	}
 
 	case C2S_READY: {
 		C2S_READY_PACKET* ready_p = reinterpret_cast<C2S_READY_PACKET*>(packet);
-		ReadyUser(request_session->GetSessionKey().id);
+		ReadyUser(request_session.GetSessionKey().id);
 		break;
 	}
 
 	case C2S_KICK: {
 		C2S_KICK_PACKET* kick_p = reinterpret_cast<C2S_KICK_PACKET*>(packet);
-		KickUser(request_session->GetSessionKey().id, kick_p->kick_user_id);
+		KickUser(request_session.GetSessionKey().id, kick_p->kick_user_id);
 		break;
 	}
 
 	case C2S_START: {
 		//C2S_START_PACKET* recv_p = reinterpret_cast<C2S_START_PACKET*>(packet);
-		StartGame(request_session->GetSessionKey().id);
+		StartGame(request_session.GetSessionKey().id);
 		break;
 	}
 
 	case C2S_MOVE: {
 		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
 		TaskInfo new_task;
-		new_task.id = request_session->GetSessionKey().id;
+		new_task.id = request_session.GetSessionKey().id;
 		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
 		GetTasks().AddTask(new_task);
 		break;
@@ -58,7 +58,7 @@ void MultiRoom::HandlePacket(char* packet, Session* request_session)
 }
 
 // add는 외부에서 추가되므로 아직 세션이 안전하지 않음. 방에 완전히 들어와야 안전해짐. 락은 외부에서 건다
-int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* input_password)
+int MultiRoom::AddUser(Session& new_session, int request_sess_id, const char* input_password)
 {
 	if (room_password) {
 		if (memcmp(room_password, input_password, MAX_ROOM_PASSWORD) != 0) {
@@ -75,12 +75,12 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 			if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
 
 			else {
-				std::lock_guard<std::mutex> lock(new_session->GetMutex());
-				if (new_session->GetState() == SESS_STATE::NONE) return ERROR_CODE::INVALID_REQUEST; // 반환값이 있어야 해서 일단 억지로 넣은 느낌..
-				if (new_session->GetSessionKey().id != request_sess_id) return ERROR_CODE::INVALID_REQUEST;
+				std::lock_guard<std::mutex> lock(new_session.GetMutex());
+				if (new_session.GetState() == SESS_STATE::NONE) return ERROR_CODE::INVALID_REQUEST; // 반환값이 있어야 해서 일단 억지로 넣은 느낌..
+				if (new_session.GetSessionKey().id != request_sess_id) return ERROR_CODE::INVALID_REQUEST;
 
-				new_session->StoreState(SESS_STATE::ROOM);
-				new_session->SetRoomIndex(room_index);
+				new_session.StoreState(SESS_STATE::ROOM);
+				new_session.SetRoomIndex(room_index);
 				r_user.InitRoomSession(new_session);
 				++cur_user;
 				result = SUCCESS;
@@ -118,8 +118,8 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 			S2C_ADD_USER_PACKET add_p;
 			add_p.size = sizeof(S2C_ADD_USER_PACKET);
 			add_p.type = S2C_ADD_USER;
-			add_p.id = new_session->GetSessionKey().id;
-			memcpy(&add_p.name, &new_session->GetDBInfo().nickname, MAX_USER_NAME);
+			add_p.id = new_session.GetSessionKey().id;
+			memcpy(&add_p.name, &new_session.GetDBInfo().nickname, MAX_USER_NAME);
 			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
 		}
 
@@ -132,7 +132,7 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 			add_p.type = S2C_ADD_USER;
 			add_p.id = r_user.GetSession()->GetSessionKey().id;
 			memcpy(&add_p.name, &r_user.GetSession()->GetDBInfo().nickname, MAX_USER_NAME);
-			new_session->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
+			new_session.SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
 		}
 
 		// 새로 입장한 세션에게 방장이 누구인지
@@ -140,7 +140,7 @@ int MultiRoom::AddUser(Session* new_session, int request_sess_id, const char* in
 		host_p.size = sizeof(S2C_UPDATE_HOST_PACKET);
 		host_p.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id;
-		new_session->SendPacket(reinterpret_cast<char*>(&host_p), server->GetHandle());
+		new_session.SendPacket(reinterpret_cast<char*>(&host_p), server->GetHandle());
 		return result;
 	}
 
@@ -171,29 +171,29 @@ void MultiRoom::DeleteUser(const int id)
 	}
 }
 
-void MultiRoom::SendCreateRoom(Session* session)
+void MultiRoom::SendCreateRoom(Session& session)
 {
 	if (!room_password) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
-		open_p.id = session->GetSessionKey().id;
+		open_p.id = session.GetSessionKey().id;
 		open_p.max_user = max_user;
 		memcpy(open_p.room_name, room_name, sizeof(room_name));
-		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
+		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
 		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 		lock_p.type = S2C_ADD_LOCK_ROOM;
-		lock_p.id = session->GetSessionKey().id;
+		lock_p.id = session.GetSessionKey().id;
 		lock_p.max_user = max_user;
 		memcpy(lock_p.room_name, room_name, sizeof(room_name));
 		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
-		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
+		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
 	FindNewHost();
-	std::cout << "Room[: " << room_index << "] created by : " << session->GetDBInfo().nickname << "\n";
+	std::cout << "Room[: " << room_index << "] created by : " << session.GetDBInfo().nickname << "\n";
 }
 
 void MultiRoom::ReadyUser(int id)

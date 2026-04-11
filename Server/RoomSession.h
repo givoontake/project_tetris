@@ -42,7 +42,7 @@ public:
 	void ResetCombo() { combo = 0; }
 	void AddCombo() { ++combo; }
 
-	void InitRoomSession(Session* s);
+	void InitRoomSession(Session& s);
 	void ClearRoomSession();
 	void ClearData();
 	void AddToSendBuffer(const char* data, int data_size);

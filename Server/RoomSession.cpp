@@ -10,9 +10,9 @@ RoomSession::~RoomSession()
 
 }
 
-void RoomSession::InitRoomSession(Session* s)
+void RoomSession::InitRoomSession(Session& s)
 {
-	session = s;
+	session = &s;
 	session->StoreState(SESS_STATE::ROOM);
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);

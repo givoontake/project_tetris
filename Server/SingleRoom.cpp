@@ -3,17 +3,17 @@
 #include "SingleRoom.h"
 #include "packet_type.h"
 
-SingleRoom::SingleRoom(IOCPServer* server, Session* session, OpenRoomInitData data)
+SingleRoom::SingleRoom(IOCPServer* server, Session& session, OpenRoomInitData data)
 	: TetrisRoom(server, session, data)
 {
 }
 
-SingleRoom::SingleRoom(IOCPServer* server, Session* session, LockRoomInitData data)
+SingleRoom::SingleRoom(IOCPServer* server, Session& session, LockRoomInitData data)
 	: TetrisRoom(server, session, data)
 {
 }
 
-void SingleRoom::HandlePacket(char* packet, Session* request_session) 
+void SingleRoom::HandlePacket(char* packet, Session& request_session) 
 {
 	//std::cout << "SingleRoom::HandlePacket, Packet type: ";
 	//PrintPacketType(packet[2]);
@@ -26,7 +26,7 @@ void SingleRoom::HandlePacket(char* packet, Session* request_session)
 	}
 
 	case C2S_DELETE_USER: {
-		DeleteUser(request_session->GetSessionKey().id);
+		DeleteUser(request_session.GetSessionKey().id);
 		break;
 	}
 
@@ -175,28 +175,28 @@ void SingleRoom::DeleteUser(const int id)
 	}
 }
 
-void SingleRoom::SendCreateRoom(Session* session) // 외부에서 세션락 걸고 들어온다
+void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸고 들어온다
 {
 	if (!room_password) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
-		open_p.id = session->GetSessionKey().id;
+		open_p.id = session.GetSessionKey().id;
 		open_p.max_user = max_user;
 		memcpy(open_p.room_name, room_name, sizeof(room_name));
-		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
+		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
 		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 		lock_p.type = S2C_ADD_LOCK_ROOM;
-		lock_p.id = session->GetSessionKey().id;
+		lock_p.id = session.GetSessionKey().id;
 		lock_p.max_user = max_user;
 		memcpy(lock_p.room_name, room_name, sizeof(room_name));
 		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
-		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
+		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
-	std::cout << "Room[: " << room_index << "] created by : " << session->GetDBInfo().nickname << "\n";
+	std::cout << "Room[: " << room_index << "] created by : " << session.GetDBInfo().nickname << "\n";
 }
 
 void SingleRoom::ReduceTimeouts(int type)
