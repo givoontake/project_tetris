@@ -56,7 +56,7 @@ public:
 
 	//virtual MQueue& GetTaskQueue() override;
 	Session& FindSessionByIndex(int user_index) { return users[user_index]; }
-	Session* FindSessionByPK(int db_PK);
+	int FindSessionIndexByPK(int db_PK);
 
 	void Disconnect(int user_index);
 	void StartServer();

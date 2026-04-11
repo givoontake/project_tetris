@@ -488,11 +488,12 @@ void IOCPServer::SendFriendList(Session& session, int request_sess_id)
 		StringToCharBuf(friend_info.nickname, info_p.nickname, MAX_USER_NAME);
 
 		// 로비인지 체크만 함
-		Session* sess = FindSessionByPK(friend_info.db_pk);
-		if (sess) {
-			std::lock_guard<std::mutex> lock(sess->GetMutex());
-			if (sess->GetDBInfo().db_pk != friend_info.db_pk) continue;
-			if (sess->GetState() == SESS_STATE::LOBBY) info_p.is_lobby = true;
+		int sess_index = FindSessionIndexByPK(friend_info.db_pk);
+		if (sess_index != -1) {
+			Session& sess = users[sess_index];
+			std::lock_guard<std::mutex> lock(sess.GetMutex());
+			if (sess.GetDBInfo().db_pk != friend_info.db_pk) continue;
+			if (sess.GetState() == SESS_STATE::LOBBY) info_p.is_lobby = true;
 		}
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
@@ -508,42 +509,45 @@ void IOCPServer::SendFriendList(Session& session, int request_sess_id)
 
 void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& accepter_info)
 {
-	Session* requester_sess = FindSessionByPK(requester_info.db_pk);
-	Session* accepter_sess = FindSessionByPK(accepter_info.db_pk);
+	int requester_index = FindSessionIndexByPK(requester_info.db_pk);
+	int accepter_index = FindSessionIndexByPK(accepter_info.db_pk);
 
 	int requester_gen = -1;
 	S2C_ADD_FRIEND_PACKET add_p;
 	add_p.size = sizeof(S2C_ADD_FRIEND_PACKET);
 	add_p.type = S2C_ADD_FRIEND;
 
-	if (requester_sess) { 
-		std::lock_guard<std::mutex> lock(requester_sess->GetMutex());
-		if (requester_sess->GetDBInfo().db_pk == requester_info.db_pk) {
-			requester_sess->AddFriend(accepter_info);
-			if ((requester_sess->GetState() == SESS_STATE::LOBBY)) requester_gen = requester_sess->GetSessionKey().id;
+	if (requester_index != -1) {
+		Session& requester_sess = users[requester_index];
+		std::lock_guard<std::mutex> lock(requester_sess.GetMutex());
+		if (requester_sess.GetDBInfo().db_pk == requester_info.db_pk) {
+			requester_sess.AddFriend(accepter_info);
+			if ((requester_sess.GetState() == SESS_STATE::LOBBY)) requester_gen = requester_sess.GetSessionKey().id;
 		}
-		
 	}
 
 	if (requester_gen != -1) {
+		Session& requester_sess = users[requester_index];
 		add_p.friend_id = accepter_info.db_pk;
 		StringToCharBuf(accepter_info.nickname, add_p.friend_nickname, MAX_USER_NAME);
-		requester_sess->SendPacket(requester_gen, reinterpret_cast<char*>(&add_p), iocp_handle);
+		requester_sess.SendPacket(requester_gen, reinterpret_cast<char*>(&add_p), iocp_handle);
 	}
 	
 	int accepter_gen = -1;
-	if (accepter_sess){
-		std::lock_guard<std::mutex> lock(accepter_sess->GetMutex());
-		if (accepter_sess->GetDBInfo().db_pk == accepter_info.db_pk) {
-			accepter_sess->AddFriend(requester_info);
-			if (accepter_sess->GetState() == SESS_STATE::LOBBY) accepter_gen = accepter_sess->GetSessionKey().id;
+	if (accepter_index != -1){
+		Session& accepter_sess = users[accepter_index];
+		std::lock_guard<std::mutex> lock(accepter_sess.GetMutex());
+		if (accepter_sess.GetDBInfo().db_pk == accepter_info.db_pk) {
+			accepter_sess.AddFriend(requester_info);
+			if (accepter_sess.GetState() == SESS_STATE::LOBBY) accepter_gen = accepter_sess.GetSessionKey().id;
 		}
 	}
 
 	if (accepter_gen != -1) {
+		Session& accepter_sess = users[accepter_index];
 		add_p.friend_id = requester_info.db_pk;
 		StringToCharBuf(requester_info.nickname, add_p.friend_nickname, MAX_USER_NAME);
-		accepter_sess->SendPacket(accepter_gen, reinterpret_cast<char*>(&add_p), iocp_handle);
+		accepter_sess.SendPacket(accepter_gen, reinterpret_cast<char*>(&add_p), iocp_handle);
 	}
 }
 
@@ -551,39 +555,43 @@ void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acc
 void IOCPServer::SendDeleteFriendResult(const int requester_pk, const int target_pk)
 {
 	// 세션은 재사용하므로 논리적으로는 포인터는 항상 유효
-	Session* requester_sess = FindSessionByPK(requester_pk);
-	Session* target_sess = FindSessionByPK(target_pk);
+	int requester_index = FindSessionIndexByPK(requester_pk);
+	int target_index = FindSessionIndexByPK(target_pk);
 
 	int requester_gen = -1;
 	S2C_DELETE_FRIEND_PACKET delete_p;
 	delete_p.size = sizeof(S2C_DELETE_FRIEND_PACKET);
 	delete_p.type = S2C_DELETE_FRIEND;
 
-	if (requester_sess){ // 안전성 + 가드
-		std::lock_guard<std::mutex> lock(requester_sess->GetMutex());
-		if (requester_sess->GetDBInfo().db_pk == requester_pk) {
-			requester_sess->DeleteFriend(target_pk);
-			if (requester_sess->GetState() == SESS_STATE::LOBBY) requester_gen = requester_sess->GetSessionKey().id;
+	if (requester_index != -1){ // 안전성 + 가드
+		Session& requester_sess = users[requester_index];
+		std::lock_guard<std::mutex> lock(requester_sess.GetMutex());
+		if (requester_sess.GetDBInfo().db_pk == requester_pk) {
+			requester_sess.DeleteFriend(target_pk);
+			if (requester_sess.GetState() == SESS_STATE::LOBBY) requester_gen = requester_sess.GetSessionKey().id;
 		}
 	}
 
 	if (requester_gen != -1) {
+		Session& requester_sess = users[requester_index];
 		delete_p.target_pk = target_pk;
-		requester_sess->SendPacket(requester_gen, reinterpret_cast<char*>(&delete_p), iocp_handle);
+		requester_sess.SendPacket(requester_gen, reinterpret_cast<char*>(&delete_p), iocp_handle);
 	}
 	
 	int target_gen = -1;
-	if (target_sess){
-		std::lock_guard<std::mutex> lock(target_sess->GetMutex());
-		if (target_sess->GetDBInfo().db_pk == target_pk) {
-			target_sess->DeleteFriend(requester_pk);
-			if (target_sess->GetState() == SESS_STATE::LOBBY)  target_gen = target_sess->GetSessionKey().id;
+	if (target_index != -1){
+		Session& target_sess = users[target_index];
+		std::lock_guard<std::mutex> lock(target_sess.GetMutex());
+		if (target_sess.GetDBInfo().db_pk == target_pk) {
+			target_sess.DeleteFriend(requester_pk);
+			if (target_sess.GetState() == SESS_STATE::LOBBY)  target_gen = target_sess.GetSessionKey().id;
 		}
 	}
 
 	if (target_gen != -1) {
+		Session& target_sess = users[target_index];
 		delete_p.target_pk = requester_pk;
-		target_sess->SendPacket(target_gen, reinterpret_cast<char*>(&delete_p), iocp_handle);
+		target_sess.SendPacket(target_gen, reinterpret_cast<char*>(&delete_p), iocp_handle);
 	}
 }
 
@@ -903,13 +911,13 @@ int IOCPServer::GetEmptyRoomIndex()
 	return -1;
 }
 
-Session* IOCPServer::FindSessionByPK(int db_PK)
+int IOCPServer::FindSessionIndexByPK(int db_PK)
 {
 	// 락 안쓴다. 어차피 반환된 세션 락 걸고 또 검증해야 한다.
-	for (auto& user : users) {
-		if (user.GetDBInfo().db_pk == db_PK) return &user;
+	for (int i = 0; i < users.size(); ++i) {
+		if (users[i].GetDBInfo().db_pk == db_PK) return i;
 	}
-	return nullptr;
+	return -1;
 }
 
 void IOCPServer::Disconnect(int user_index)
@@ -1051,18 +1059,19 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 		// 요청한 사람이 받는 IO
 		if (db_over->ok) {
 			DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-			Session* recver_session = FindSessionByPK(res->recver_info.db_pk);
-			if (recver_session) { // 요청받는 사람은 실제 본인이어야 함
-				std::lock_guard<std::mutex> lock(recver_session->GetMutex());
-				if (recver_session->GetState() != SESS_STATE::LOBBY) break;
-				if (recver_session->GetDBInfo().db_pk != res->recver_info.db_pk) break;
+			int recver_index = FindSessionIndexByPK(res->recver_info.db_pk);
+			if (recver_index != -1) { // 요청받는 사람은 실제 본인이어야 함
+				Session& recver_session = users[recver_index];
+				std::lock_guard<std::mutex> lock(recver_session.GetMutex());
+				if (recver_session.GetState() != SESS_STATE::LOBBY) break;
+				if (recver_session.GetDBInfo().db_pk != res->recver_info.db_pk) break;
 
 				S2C_REQUEST_FRIEND_PACKET request_p;
 				request_p.size = sizeof(S2C_REQUEST_FRIEND_PACKET);
 				request_p.type = S2C_REQUEST_FRIEND;
 				request_p.requester_pk = res->requester_info.db_pk; // 요청자 정보 넣기
 				StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
-				recver_session->SendPacket(reinterpret_cast<char*>(&request_p), iocp_handle);
+				recver_session.SendPacket(reinterpret_cast<char*>(&request_p), iocp_handle);
 			}
 		}
 		break;
