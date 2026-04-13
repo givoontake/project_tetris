@@ -11,7 +11,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, OpenRoomInitData d
 	memcpy(this->room_name, data.room_name, sizeof(this->room_name));
 	room_password = nullptr;
 	room_index = data.room_index;
-	room_id = data.room_id;
+	room_gen = data.room_gen;
 	room_state.Store(ROOM_STATE::WAIT);
 	room_users.reserve(max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
 	for (int i = 0; i < max_user; ++i) {
@@ -32,7 +32,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, LockRoomInitData d
 	room_password = new char[MAX_ROOM_PASSWORD];
 	memcpy(room_password, data.room_password, MAX_ROOM_PASSWORD);
 	room_index = data.room_index;
-	room_id = data.room_id;
+	room_gen = data.room_gen;
 	room_state.Store(ROOM_STATE::WAIT);
 	room_users.reserve(max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
 	for (int i = 0; i < max_user; ++i) {
@@ -298,9 +298,9 @@ void TetrisRoom::SetRoomIndex(const int val)
 	room_index = val;
 }
 
-void TetrisRoom::SetRoomId(const int val)
+void TetrisRoom::SetRoomGen(const int val)
 {
-	room_id = val;
+	room_gen = val;
 }
 
 void TetrisRoom::StoreRoomState(ROOM_STATE new_state)

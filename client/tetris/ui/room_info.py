@@ -86,7 +86,7 @@ class RoomInfo:
             self.join_button = Button(self.screen, join_rect, self.rm, None, "참가")
 
     def update_info(self, data: S2C_ROOM_INFO_PACKET):
-        self.room_id = data.room_id
+        self.room_gen = data.room_gen
         self.title = data.room_name
         self.is_private = data.is_private
         self.cur_user = data.cur_user

@@ -95,7 +95,7 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 			S2C_ADD_OPEN_ROOM_PACKET open_p;
 			open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 			open_p.type = S2C_ADD_OPEN_ROOM;
-			open_p.id = room_id;
+			open_p.gen = room_gen;
 			open_p.max_user = max_user;
 			memcpy(&open_p.room_name, room_name, MAX_ROOM_NAME);
 			room_users[added_slot].GetSession()->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
@@ -104,7 +104,7 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 			S2C_ADD_LOCK_ROOM_PACKET lock_p;
 			lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 			lock_p.type = S2C_ADD_LOCK_ROOM;
-			lock_p.id = room_id;
+			lock_p.gen = room_gen;
 			lock_p.max_user = max_user;
 			memcpy(&lock_p.room_name, room_name, MAX_ROOM_NAME);
 			memcpy(&lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
@@ -177,7 +177,7 @@ void MultiRoom::SendCreateRoom(Session& session)
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
-		open_p.id = session.GetDBInfo().id;
+		open_p.gen = room_gen;
 		open_p.max_user = max_user;
 		memcpy(open_p.room_name, room_name, sizeof(room_name));
 		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
@@ -186,7 +186,7 @@ void MultiRoom::SendCreateRoom(Session& session)
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
 		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 		lock_p.type = S2C_ADD_LOCK_ROOM;
-		lock_p.id = session.GetDBInfo().id;
+		lock_p.gen = room_gen;
 		lock_p.max_user = max_user;
 		memcpy(lock_p.room_name, room_name, sizeof(room_name));
 		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);

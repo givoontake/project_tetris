@@ -153,12 +153,12 @@ void IOCPServer::HandlePacket(char* packet, Session& session, int request_gen)
 
 	case C2S_JOIN_OPEN_ROOM: {
 		C2S_JOIN_OPEN_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_OPEN_ROOM_PACKET*>(packet);
-		TryJoinRoom(session, request_gen, join_p->room_id, nullptr);
+		TryJoinRoom(session, request_gen, join_p->room_gen, nullptr);
 		break;
 	}
 	case C2S_JOIN_LOCK_ROOM: {
 		C2S_JOIN_LOCK_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_LOCK_ROOM_PACKET*>(packet);
-		TryJoinRoom(session, request_gen, join_p->room_id, join_p->room_password);
+		TryJoinRoom(session, request_gen, join_p->room_gen, join_p->room_password);
 		break;
 	}
 	case C2S_REQUEST_ROOM_LIST: {
@@ -263,7 +263,7 @@ void IOCPServer::SendRoomList(Session& session, int request_gen)
 		p.size = sizeof(S2C_ROOM_INFO_PACKET);
 		p.type = S2C_ROOM_INFO;
 
-		p.room_id = 1,000,000 + i;
+		p.room_gen = 1,000,000 + i;
 
 		std::string name = "DummyRoom_" + std::to_string(i);
 		StringToCharBuf(name, p.room_name, sizeof(p.room_name));
@@ -293,7 +293,7 @@ void IOCPServer::SendRoomList(Session& session, int request_gen)
 		if (room_sp->GetRoomState() == ROOM_STATE::EMPTY) continue;
 		info_p.size = sizeof(S2C_ROOM_INFO_PACKET);
 		info_p.type = S2C_ROOM_INFO;
-		info_p.room_id = room_sp->GetRoomId();
+		info_p.room_gen = room_sp->GetRoomGen();
 		const char* name = room_sp->GetRoomName();
 		info_p.max_user = room_sp->GetMaxUser();
 		info_p.cur_user = room_sp->GetCurrentUser();
@@ -319,10 +319,10 @@ void IOCPServer::SendRoomList(Session& session, int request_gen)
 }
 
 // 
-bool IOCPServer::TryJoinRoom(Session& session, int request_gen, int room_id, const char* room_password)
+bool IOCPServer::TryJoinRoom(Session& session, int request_gen, int room_gen, const char* room_password)
 {	
 	int result = ERROR_CODE::ROOM_NOT_FOUND;
-	int room_index = FindRoom(room_id);
+	int room_index = FindRoom(room_gen);
 	if (room_index != -1) {
 		std::shared_ptr<TetrisRoom> room_sp = rooms[room_index].load();
 		if (room_sp) {
@@ -352,12 +352,12 @@ bool IOCPServer::TryJoinRoom(Session& session, int request_gen, int room_id, con
 	return false;
 }
 
-int IOCPServer::FindRoom(int room_id)
+int IOCPServer::FindRoom(int room_gen)
 {
 	for (auto& room : rooms) {
 		auto room_sp = room.load();
 		if (room_sp) {
-			if (room_sp->GetRoomId() == room_id) return room_sp->GetRoomIndex();
+			if (room_sp->GetRoomGen() == room_gen) return room_sp->GetRoomIndex();
 		}
 	}
 	return -1;
@@ -402,7 +402,7 @@ void IOCPServer::FindMatch(Session& session, int request_gen, int max_user)
 			auto room_sp = room.load();
 			if (room_sp) {
 				if (room_sp->GetMaxUser() == 2 or room_sp->GetMaxUser() == 5) { // 공개 멀티 방 중 아무 방이나 찾기
-					if (TryJoinRoom(session, request_gen, room_sp->GetRoomId(), nullptr)) return;
+					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), nullptr)) return;
 				}
 			}
 		}
@@ -413,7 +413,7 @@ void IOCPServer::FindMatch(Session& session, int request_gen, int max_user)
 			auto room_sp = room.load();
 			if (room_sp) {
 				if (room_sp->GetMaxUser() == max_user) {
-					if (TryJoinRoom(session, request_gen, room_sp->GetRoomId(), nullptr)) return;
+					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), nullptr)) return;
 				}
 			}
 		}
@@ -424,7 +424,7 @@ void IOCPServer::FindMatch(Session& session, int request_gen, int max_user)
 			auto room_sp = room.load();
 			if (room_sp) {
 				if (room_sp->GetMaxUser() == max_user) {
-					if (TryJoinRoom(session, request_gen, room_sp->GetRoomId(), nullptr)) return;
+					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), nullptr)) return;
 				}
 			}
 		}
@@ -840,7 +840,7 @@ void IOCPServer::CreateOpenRoom(char* packet, Session& session, int request_gen)
 		
 	else return;
 	memcpy(data.room_name, open_p->room_name, sizeof(data.room_name));
-	data.room_id = GetNewRoomId();
+	data.room_gen = GetNewRoomGen();
 	
 	std::shared_ptr<TetrisRoom> new_room;
 	
@@ -885,7 +885,7 @@ void IOCPServer::CreateLockRoom(char* packet, Session& session, int request_gen)
 	else return;
 	memcpy(data.room_name, lock_p->room_name, sizeof(data.room_name));
 	memcpy(data.room_password, lock_p->room_password, sizeof(data.room_password));
-	data.room_id = GetNewRoomId();
+	data.room_gen = GetNewRoomGen();
 
 	std::shared_ptr<TetrisRoom> new_room;
 
@@ -929,9 +929,9 @@ int IOCPServer::GetNewUserGen()
 	return user_gen_generator.fetch_add(1) + 1; // fetch_add는 값을 실제로 원자적으로 증가시키지만, 반환하는 것은 증가 이전의 값
 }
 
-int IOCPServer::GetNewRoomId()
+int IOCPServer::GetNewRoomGen()
 {
-	return room_id_generator.fetch_add(1) + 1;
+	return room_gen_generator.fetch_add(1) + 1;
 }
 
 int IOCPServer::GetEmptyUserIndex()

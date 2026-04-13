@@ -46,14 +46,14 @@ struct Tasks
 };
 
 struct OpenRoomInitData {
-	int room_id = -1;
+	int room_gen = -1;
 	int room_index = -1;
 	char max_user = -1;
 	char room_name[MAX_ROOM_NAME];
 };
 
 struct LockRoomInitData {
-	int room_id = -1;
+	int room_gen = -1;
 	int room_index = -1;
 	char max_user = -1;
 	char room_name[MAX_ROOM_NAME];
@@ -76,7 +76,7 @@ protected:
 	Position spawn_pos{ 3, 0 };
 
 	int room_index;
-	int room_id;
+	int room_gen;
 	char room_name[MAX_ROOM_NAME];
 	char* room_password;
 	char max_user;
@@ -92,7 +92,7 @@ public:
 	ROOM_STATE GetRoomState() const { return room_state.Load(); }
 	Tasks& GetTasks() { return tasks; }
 	std::mutex& GetRoomMutex() { return room_mutex; }
-	int GetRoomId() const { return room_id; }
+	int GetRoomGen() const { return room_gen; }
 	int GetRoomIndex() const { return room_index; }
 	bool GetIsPrivate() const { return room_password ? true : false; }
 	int GetMaxUser() const { return static_cast<int>(max_user); }
@@ -106,7 +106,7 @@ public:
 	virtual void SendCreateRoom(Session& session) = 0;
 	// 공통
 	void SetRoomIndex(const int val);
-	void SetRoomId(const int val);
+	void SetRoomGen(const int val);
 	void StoreRoomState(const ROOM_STATE new_state);
 	bool TryChangeRoomState(ROOM_STATE expected, ROOM_STATE desired);
 	void InitGame();

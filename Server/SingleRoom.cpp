@@ -181,7 +181,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
-		open_p.id = session.GetDBInfo().id;
+		open_p.gen = room_gen;
 		open_p.max_user = max_user;
 		memcpy(open_p.room_name, room_name, sizeof(room_name));
 		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
@@ -190,7 +190,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
 		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 		lock_p.type = S2C_ADD_LOCK_ROOM;
-		lock_p.id = session.GetDBInfo().id;
+		lock_p.gen = room_gen;
 		lock_p.max_user = max_user;
 		memcpy(lock_p.room_name, room_name, sizeof(room_name));
 		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);

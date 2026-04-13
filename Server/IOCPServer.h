@@ -27,7 +27,7 @@ class IOCPServer
 	RankingManager ranking_manager;
 	ActiveUserManager active_users;
 	std::atomic<int> user_gen_generator = -1;
-	std::atomic<int> room_id_generator = -1;
+	std::atomic<int> room_gen_generator = -1;
 	std::atomic<long long> tick_count = 0;
 	std::array<Session, MAX_USER> users;
 
@@ -42,7 +42,7 @@ public:
 	int GetEmptyUserIndex();
 	int GetEmptyRoomIndex();
 	int GetNewUserGen();
-	int GetNewRoomId();
+	int GetNewRoomGen();
 	bool GetRunning() const { return is_running; }
 	HANDLE GetHandle() const { return iocp_handle; }
 
@@ -72,8 +72,8 @@ public:
 	std::string CharBufToString(const char* buf, int buf_size);
 	void HandlePacket(char* packet, Session& session, int request_gen);
 	void SendRoomList(Session& session, int request_gen);
-	bool TryJoinRoom(Session& session, int request_gen, int room_id, const char* room_password);
-	int FindRoom(int room_id);
+	bool TryJoinRoom(Session& session, int request_gen, int room_gen, const char* room_password);
+	int FindRoom(int room_gen);
 	int FindUser(int user_id);
 	void SendError(Session& session, int request_gen, int error_code);
 	bool CheckDuplicateLoginId(const std::string& login_id);

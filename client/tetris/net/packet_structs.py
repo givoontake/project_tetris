@@ -100,7 +100,7 @@ class S2C_DISCONNECT_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_ADD_OPEN_ROOM_PACKET(RecvPacketStruct):
-    id: int = -1
+    gen: int = -1
     max_user: int = -1
     room_name: str = ""
 
@@ -110,7 +110,7 @@ class S2C_ADD_OPEN_ROOM_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_ADD_LOCK_ROOM_PACKET(RecvPacketStruct):
-    id: int = -1
+    gen: int = -1
     max_user: int = -1
     room_name: str = ""
     room_password: str = ""
@@ -247,7 +247,7 @@ class S2C_UPDATE_HOST_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_ROOM_INFO_PACKET(RecvPacketStruct):
-    room_id: int = -1
+    room_gen: int = -1
     room_name: str = ""
     max_user: int = -1
     cur_user: int = -1
@@ -364,14 +364,14 @@ class C2S_ADD_LOCK_ROOM_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_JOIN_OPEN_ROOM_PACKET(SendPacketStruct):
-    room_id: int = -1
+    room_gen: int = -1
 
     BODY_FMT: ClassVar[str] = f"i"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 @dataclass
 class C2S_JOIN_LOCK_ROOM_PACKET(SendPacketStruct):
-    room_id: int = -1
+    room_gen: int = -1
     room_password: str = ""
 
     BODY_FMT: ClassVar[str] = f"i{MAX_ROOM_PASSWORD}s"

@@ -67,7 +67,7 @@ public:
 	//setters
 	void SetGen(int new_gen) { key.gen = new_gen; }
 	void SetIndex(int new_index) { key.index = new_index; }
-	void SetRoomIndex(int new_room_id) { room_index = new_room_id; }
+	void SetRoomIndex(int new_room_index) { room_index = new_room_index; }
 	void AddDataSize(int new_data_size) { remain_data_size += new_data_size; }
 	void StoreState(SESS_STATE new_state) { state.Store(new_state); }
 	bool TryChangeState(SESS_STATE expected, SESS_STATE desired);

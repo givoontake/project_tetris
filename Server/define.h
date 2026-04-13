@@ -85,7 +85,7 @@ struct C2S_ADD_OPEN_ROOM_PACKET {
 struct S2C_ADD_OPEN_ROOM_PACKET {
 	short size;
 	char type;
-	int id;
+	int gen;
 	char max_user;
 	char room_name[MAX_ROOM_NAME];
 };
@@ -101,7 +101,7 @@ struct C2S_ADD_LOCK_ROOM_PACKET {
 struct S2C_ADD_LOCK_ROOM_PACKET {
 	short size; 
 	char type;
-	int id;
+	int gen;
 	char max_user;
 	char room_name[MAX_ROOM_NAME];
 	char room_password[MAX_ROOM_PASSWORD];
@@ -110,13 +110,13 @@ struct S2C_ADD_LOCK_ROOM_PACKET {
 struct C2S_JOIN_OPEN_ROOM_PACKET {
 	short size;
 	char type;
-	int room_id;
+	int room_gen;
 };
 
 struct C2S_JOIN_LOCK_ROOM_PACKET {
 	short size;
 	char type;
-	int room_id;
+	int room_gen;
 	char room_password[MAX_ROOM_PASSWORD];
 };
 
@@ -271,7 +271,7 @@ struct C2S_REQEUST_ROOM_LIST_PACKET {
 struct S2C_ROOM_INFO_PACKET {
 	short size;
 	char type;
-	int room_id;
+	int room_gen;
 	char room_name[MAX_ROOM_NAME];
 	char max_user;
 	char cur_user;
