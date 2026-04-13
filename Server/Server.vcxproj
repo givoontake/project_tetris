@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ActiveRoomManager.cpp" />
     <ClCompile Include="ActiveUserManager.cpp" />
     <ClCompile Include="Database.cpp" />
     <ClCompile Include="IOCPServer.cpp" />
@@ -35,6 +36,7 @@
     <ClCompile Include="TetrisTickData.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ActiveRoomManager.h" />
     <ClInclude Include="ActiveUserManager.h" />
     <ClInclude Include="Atomic.h" />
     <ClInclude Include="Database.h" />

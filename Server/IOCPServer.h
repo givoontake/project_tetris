@@ -5,6 +5,7 @@
 #include <atomic>
 #include <memory>
 #include "ExOverlapped.h"
+#include "ActiveRoomManager.h"
 #include "ActiveUserManager.h"
 #include "Session.h"
 #include "PacketHandler.h"
@@ -25,6 +26,7 @@ class IOCPServer
 	IOOverlapped accept_over;
 	Database db;
 	RankingManager ranking_manager;
+	ActiveRoomManager active_rooms;
 	ActiveUserManager active_users;
 	std::atomic<int> user_gen_generator = -1;
 	std::atomic<int> room_gen_generator = -1;

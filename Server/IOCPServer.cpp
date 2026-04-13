@@ -45,6 +45,7 @@ IOCPServer::~IOCPServer()
 	for(auto& room : rooms) {
 		std::atomic_store(&room, std::shared_ptr<TetrisRoom>{}); // nullptr과 같은 논리
 	}
+	active_rooms.Clear();
 	active_users.Clear();
 	closesocket(listen_socket);
 	closesocket(client_socket);
@@ -354,13 +355,7 @@ bool IOCPServer::TryJoinRoom(Session& session, int request_gen, int room_gen, co
 
 int IOCPServer::FindRoom(int room_gen)
 {
-	for (auto& room : rooms) {
-		auto room_sp = room.load();
-		if (room_sp) {
-			if (room_sp->GetRoomGen() == room_gen) return room_sp->GetRoomIndex();
-		}
-	}
-	return -1;
+	return active_rooms.FindRoomIndex(room_gen);
 }
 
 int IOCPServer::FindUser(int user_id)
@@ -856,6 +851,7 @@ void IOCPServer::CreateOpenRoom(char* packet, Session& session, int request_gen)
 				else new_room = std::make_shared<MultiRoom>(this, session, data);
 				std::shared_ptr<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
+					active_rooms.AddRoom(data.room_gen, i);
 					new_room->SendCreateRoom(session);
 					return;
 				}
@@ -901,6 +897,7 @@ void IOCPServer::CreateLockRoom(char* packet, Session& session, int request_gen)
 				else new_room = std::make_shared<MultiRoom>(this, session, data);
 				std::shared_ptr<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
+					active_rooms.AddRoom(data.room_gen, i);
 					new_room->SendCreateRoom(session);
 					return;
 				}
@@ -911,6 +908,10 @@ void IOCPServer::CreateLockRoom(char* packet, Session& session, int request_gen)
 
 void IOCPServer::DeleteRoom(int room_index)
 {
+	auto room = rooms[room_index].load();
+	if (room) {
+		active_rooms.RemoveRoom(room->GetRoomGen(), room_index);
+	}
 	rooms[room_index].store(nullptr);
 	std::cout << "Room deleted, Room index: " << room_index << std::endl;
 }
