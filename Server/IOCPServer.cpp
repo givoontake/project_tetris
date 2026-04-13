@@ -45,6 +45,7 @@ IOCPServer::~IOCPServer()
 	for(auto& room : rooms) {
 		std::atomic_store(&room, std::shared_ptr<TetrisRoom>{}); // nullptr과 같은 논리
 	}
+	active_users.Clear();
 	closesocket(listen_socket);
 	closesocket(client_socket);
 	db.SetRunning(false);
@@ -959,10 +960,7 @@ int IOCPServer::GetEmptyRoomIndex()
 int IOCPServer::FindSessionIndexById(int user_id)
 {
 	// 락 안쓴다. 어차피 반환된 세션 락 걸고 또 검증해야 한다.
-	for (int i = 0; i < users.size(); ++i) {
-		if (users[i].GetDBInfo().id == user_id) return i;
-	}
-	return -1;
+	return active_users.FindSessionIndexById(user_id);
 }
 
 void IOCPServer::Disconnect(int user_index)
@@ -971,11 +969,13 @@ void IOCPServer::Disconnect(int user_index)
 	if (target.GetState() == SESS_STATE::NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
 
 	if (target.TryChangeDisconnectFlag(true, false)) {
+		int user_id = target.GetDBInfo().id;
 		if (target.GetState() == SESS_STATE::ROOM) {
 			auto room = rooms[target.GetRoomIndex()].load();
-			if (room) room->DeleteUser(target.GetDBInfo().id);
+			if (room) room->DeleteUser(user_id);
 		}
 
+		active_users.RemoveUser(user_id, user_index);
 		std::cout << "Session index[" << target.GetSessionKey().index << "] disconnect/Gen: " << target.GetSessionKey().gen << " nickname: " << target.GetDBInfo().nickname << std::endl;
 		target.ClearSession();
 	}
@@ -1012,6 +1012,7 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 
 					session.InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
 					session.StoreState(SESS_STATE::LOBBY);
+					active_users.AddUser(session.GetDBInfo().id, session.GetSessionKey().index);
 					login_p.id = session.GetDBInfo().id;
 					login_p.max_score = session.GetDBInfo().max_score;
 					login_p.win_count = session.GetDBInfo().win_count;
