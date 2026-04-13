@@ -9,6 +9,17 @@ class BaseState:
         self.rm = rm
         self.net_worker = net_worker
         self.session = session
+        self.next_state = None
+
+    def queue_state(self, next_state):
+        self.next_state = next_state
+
+    def consume_state(self):
+        if self.next_state is not None:
+            next_state = self.next_state
+            self.next_state = None
+            return next_state
+        return self
 
     def handle_packets(self):
         pass

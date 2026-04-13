@@ -11,6 +11,7 @@
 #include "TetrisRoom.h"
 #include "Atomic.h"
 #include "Database.h"
+#include "RankingManager.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -22,6 +23,7 @@ class IOCPServer
 	SOCKADDR_IN server_addr;
 	IOOverlapped accept_over;
 	Database db;
+	RankingManager ranking_manager;
 	std::atomic<int> user_id_generator = -1;
 	std::atomic<int> room_id_generator = -1;
 	std::atomic<long long> tick_count = 0;
@@ -51,6 +53,7 @@ public:
 	long long GetTickCount() const { return tick_count.load(); }
 	std::shared_ptr<TetrisRoom> GetRoom(int room_index) const { return std::atomic_load(&rooms[room_index]); }
 	Database& GetDB() { return db; }
+	RankingManager& GetRankingManager() { return ranking_manager; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
 
@@ -70,6 +73,8 @@ public:
 	void CreateLockRoom(char* packet, Session& session, int request_sess_id);
 	void DeleteRoom(int room_index);
 	void ProcessDBResult(DBOverlapped* db_over, Session& session, int request_sess_id);
+	void ProcessRankingResult(DBOverlapped* db_over);
+	void RequestLoadRanking();
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
 	void HandlePacket(char* packet, Session& session, int request_sess_id);
@@ -82,6 +87,7 @@ public:
 	void FindMatch(Session& session, int request_sess_id, int max_user);
 	void SendLobbyUserList(Session& session, int request_sess_id);
 	void SendFriendList(Session& session, int request_sess_id);
+	void SendRanking(Session& session, int request_sess_id);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
 	void SendDeleteFriendResult(const int requester_pk, const int target_pk);
 };

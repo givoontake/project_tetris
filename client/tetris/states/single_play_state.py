@@ -90,7 +90,7 @@ class SinglePlayState(BaseState):
             delete_user = cast(S2C_DELETE_USER_PACKET, data)
             if delete_user.id == self.tetris_session.session.id:
                 pygame.mixer.music.stop()
-                return LobbyState(self.screen, self.rm, self.net_worker, self.session)
+                self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session))
 
         elif data.type == S2C_GAMEOVER:
             self.tetris_session.process_gameover()
@@ -132,7 +132,7 @@ class SinglePlayState(BaseState):
      
         self.tetris_session.update(dt_ms)
 
-        return self
+        return self.consume_state()
 
     def draw(self):
         if self.tetris_session.board is None:

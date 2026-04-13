@@ -60,15 +60,15 @@ class GameLoop:
             except queue.Empty:
                 data = None
 
-            next_state = self.state.handle_packet(data)            
-            if next_state is not self.state:
-                self.state = next_state
+            self.state.handle_packet(data)
 
             if data is None:
                 break
 
     def update(self, dt_ms, events):
-        self.state.update(dt_ms, events) 
+        next_state = self.state.update(dt_ms, events)
+        if next_state is not None and next_state is not self.state:
+            self.state = next_state
         # if hasattr(self.state, "init"):
         #     self.state.init()
 

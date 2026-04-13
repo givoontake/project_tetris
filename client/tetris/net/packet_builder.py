@@ -206,3 +206,10 @@ class PacketBuilder:
         data.type = C2S_REQUEST_FRIEND_LIST
         values = self.struct_to_values(data)
         return struct.pack(data.FMT, *values)
+
+    def build_request_ranking_pkt(self) -> bytes:
+        data = C2S_REQUEST_RANKING_PACKET()
+        data.size = struct.calcsize(data.FMT)
+        data.type = C2S_REQUEST_RANKING
+        values = self.struct_to_values(data)
+        return struct.pack(data.FMT, *values)

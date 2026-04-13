@@ -349,4 +349,16 @@ struct S2C_FRIEND_INFO_PACKET {
 	bool is_lobby; // 세부 상태를 보여주려면 나중에 char로 바꾸기
 };
 
+struct C2S_REQUEST_RANKING_PACKET {
+	short size;
+	char type;
+};
+
+struct S2C_RANKING_INFO_PACKET {
+	short size;
+	char type;
+	char nickname[MAX_USER_NAME];
+	int score;
+};
+
 #pragma pack(pop)

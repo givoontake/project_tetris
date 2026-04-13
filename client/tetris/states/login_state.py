@@ -87,7 +87,7 @@ class LoginState(BaseState):
                 self.session.lose = login_data.lose_count
                 self.session.max_score = login_data.max_score
 
-                return LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True)
+                self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True))
             
             return self
         
@@ -137,7 +137,7 @@ class LoginState(BaseState):
 
         self.id_label.update(dt_ms)
         self.pw_label.update(dt_ms)
-        return self
+        return self.consume_state()
 
     def draw(self):
         background_rect = pygame.Rect(0,0,BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT)

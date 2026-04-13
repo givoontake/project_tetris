@@ -274,6 +274,60 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
+void Database::ExecuteLoadRanking()
+{
+    auto* db_over = new DBOverlapped{};
+    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.request_id = -1;
+    db_over->type = DBOperationType::LOAD_RANKING;
+    db_over->ok = false;
+
+    try
+    {
+        auto* stmt = caches.GetStmt(DBOperationType::LOAD_RANKING);
+        if (!stmt)
+        {
+            const char* SQL_LOAD_RANKING =
+                "SELECT user_id, nickname, single_score "
+                "FROM users "
+                "WHERE single_score > 0 "
+                "ORDER BY single_score DESC, user_id ASC "
+                "LIMIT 10";
+
+            caches.stmt_cache[DBOperationType::LOAD_RANKING]
+                .reset(caches.conn->prepareStatement(SQL_LOAD_RANKING));
+
+            stmt = caches.GetStmt(DBOperationType::LOAD_RANKING);
+            if (!stmt)
+            {
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                return;
+            }
+        }
+
+        std::unique_ptr<sql::ResultSet> rs(stmt->executeQuery());
+        db_over->result_data = std::make_unique<DBResultLoadRanking>();
+        DBResultLoadRanking* res = static_cast<DBResultLoadRanking*>(db_over->result_data.get());
+
+        while (rs && rs->next()) {
+            RankingInfo info;
+            info.db_pk = rs->getInt(1);
+            info.nickname = rs->getString(2);
+            info.score = rs->getInt(3);
+            res->rankings.emplace_back(std::move(info));
+        }
+
+        db_over->ok = true;
+    }
+    catch (const sql::SQLException& e)
+    {
+        PrintErrorLog(__func__, e);
+        db_over->ok = false;
+    }
+
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+}
+
 void Database::ExecuteUpdateScore(SessionKey key, const int db_PK, int new_score)
 {
     auto* db_over = new DBOverlapped{};

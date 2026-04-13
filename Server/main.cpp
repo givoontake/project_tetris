@@ -97,6 +97,7 @@ int main()
 
     std::thread db_thread(DBThread);
     --num_threads;
+    iocp_server.RequestLoadRanking();
 
     for (int i = 0; i < num_threads; ++i)
         worker_threads.emplace_back(WorkerThread);

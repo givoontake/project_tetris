@@ -172,6 +172,10 @@ void IOCPServer::HandlePacket(char* packet, Session& session, int request_sess_i
 		SendFriendList(session, request_sess_id);
 		break;
 	}
+	case C2S_REQUEST_RANKING: {
+		SendRanking(session, request_sess_id);
+		break;
+	}
 	case C2S_FAST_MATCHING:{
 		C2S_FAST_MATCHING_PACKET* matching_p = reinterpret_cast<C2S_FAST_MATCHING_PACKET*>(packet);
 		FindMatch(session, request_sess_id, matching_p->max_user);
@@ -507,6 +511,38 @@ void IOCPServer::SendFriendList(Session& session, int request_sess_id)
 	session.SendBoundPacket(request_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
 }
 
+void IOCPServer::SendRanking(Session& session, int request_sess_id)
+{
+	{
+		std::lock_guard<std::mutex> lock(session.GetMutex());
+		if (session.GetSessionKey().id != request_sess_id) return;
+		if (session.GetState() != SESS_STATE::LOBBY) return;
+	}
+
+	std::vector<RankingInfo> rankings = ranking_manager.GetRankings();
+	if (rankings.empty()) return;
+
+	int packet_size = 0;
+	char packet_buf[BUF_SIZE];
+	for (const auto& ranking : rankings) {
+		S2C_RANKING_INFO_PACKET info_p{};
+		info_p.size = sizeof(S2C_RANKING_INFO_PACKET);
+		info_p.type = S2C_RANKING_INFO;
+		StringToCharBuf(ranking.nickname, info_p.nickname, MAX_USER_NAME);
+		info_p.score = ranking.score;
+
+		if (packet_size + sizeof(info_p) > BUF_SIZE) {
+			session.SendBoundPacket(request_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
+			packet_size = 0;
+		}
+
+		memcpy(packet_buf + packet_size, &info_p, sizeof(info_p));
+		packet_size += sizeof(info_p);
+	}
+
+	session.SendBoundPacket(request_sess_id, reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
+}
+
 void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& accepter_info)
 {
 	int requester_index = FindSessionIndexByPK(requester_info.db_pk);
@@ -691,8 +727,8 @@ void IOCPServer::ProcessGQCS()
 			break;
 		case OP_TYPE::DB:
 			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
-
-			ProcessDBResult(db_over, session, db_over->ex_over.request_id);
+			if (db_over->type == DBOperationType::LOAD_RANKING) ProcessRankingResult(db_over);
+			else ProcessDBResult(db_over, session, db_over->ex_over.request_id);
 
 			break;
 		}
@@ -878,6 +914,15 @@ void IOCPServer::DeleteRoom(int room_index)
 	std::cout << "Room deleted, Room index: " << room_index << std::endl;
 }
 
+void IOCPServer::RequestLoadRanking()
+{
+	Database& repr_db = GetDB();
+	auto task = [&repr_db]() {
+		repr_db.ExecuteLoadRanking();
+		};
+	repr_db.Enqueue(task);
+}
+
 int IOCPServer::GetNewUserId()
 {
 	return user_id_generator.fetch_add(1) + 1; // fetch_add는 값을 실제로 원자적으로 증가시키지만, 반환하는 것은 증가 이전의 값
@@ -1024,6 +1069,7 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 				if (request_sess_id != session.GetSessionKey().id) return;
 				if (session.GetState() == SESS_STATE::NONE) return;
 				session.GetDBInfo().max_score = res->max_score;
+				ranking_manager.UpdateRanking(session.GetDBInfo().db_pk, session.GetDBInfo().nickname, res->max_score);
 			}
 			S2C_UPDATE_SCORE_PACKET us_p;
 			us_p.size = sizeof(S2C_UPDATE_SCORE_PACKET);
@@ -1102,6 +1148,16 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 			session.InitFriendList(res->friend_list); 
 		}
 		break;
+	}
+
+	delete db_over;
+}
+
+void IOCPServer::ProcessRankingResult(DBOverlapped* db_over)
+{
+	if (db_over->ok && db_over->result_data) {
+		DBResultLoadRanking* res = static_cast<DBResultLoadRanking*>(db_over->result_data.get());
+		ranking_manager.LoadInitialRanking(res->rankings);
 	}
 
 	delete db_over;

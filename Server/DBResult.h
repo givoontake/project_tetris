@@ -44,6 +44,12 @@ struct FriendInfo {
 	std::string nickname;
 };
 
+struct RankingInfo {
+	int db_pk;
+	std::string nickname;
+	int score;
+};
+
 struct DBResultAddFriend : public DBResultDefault { // 재조회하기는 싫으니까 그냥 닉네임을 받는걸로 하자
 	// DB 요청 이후 두 세션은 존재하는지, 아닌지, 재로그인 했는지 알 수 없으므로 어차피 탐색해서 찾아야 함
 	FriendInfo requester_info;
@@ -62,4 +68,8 @@ struct DBResultAddFriendRequest : public DBResultDefault {
 
 struct DBResultLoadFriendList : public DBResultDefault {
 	std::vector<FriendInfo> friend_list;
+};
+
+struct DBResultLoadRanking : public DBResultDefault {
+	std::vector<RankingInfo> rankings;
 };

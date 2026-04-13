@@ -195,7 +195,7 @@ class MultiPlayState(BaseState):
                 if delete_user.id == player.session.id:
                     if player.session.is_self:     
                         pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 음악나오면 안되니까
-                        return LobbyState(self.screen, self.rm, self.net_worker, self.session)
+                        self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session))
                     else:
                         player.clear()
                         player.nickname.set_text("")
@@ -242,7 +242,7 @@ class MultiPlayState(BaseState):
                     player.handle_packet(data)
                     break
 
-        return self
+        return self.consume_state()
 
     # ------------ 상단 방 정보 그리기 ------------ #
     def draw_room_header(self):

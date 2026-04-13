@@ -75,6 +75,8 @@ constexpr char S2C_LOBBY_USER_INFO = 59;
 
 constexpr char C2S_REQUEST_FRIEND_LIST = 60;
 constexpr char S2C_FRIEND_INFO = 61;
+constexpr char C2S_REQUEST_RANKING = 62;
+constexpr char S2C_RANKING_INFO = 63;
 
 constexpr char S2C_INFO = 100;
 constexpr char S2C_TEST_LOGIN = 101;
@@ -141,6 +143,8 @@ inline void PrintPacketType(char type)
 
     case S2C_TEST_LOGIN:        std::cout << "S2C_TEST_LOGIN"; break;
     case C2S_TEST_LOGIN:        std::cout << "C2S_TEST_LOGIN"; break;
+    case C2S_REQUEST_RANKING:   std::cout << "C2S_REQUEST_RANKING"; break;
+    case S2C_RANKING_INFO:      std::cout << "S2C_RANKING_INFO"; break;
 
     default:                    std::cout << "UNKNOWN_PACKET_TYPE"; break;
     }

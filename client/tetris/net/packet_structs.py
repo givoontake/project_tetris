@@ -307,6 +307,15 @@ class S2C_FRIEND_INFO_PACKET(RecvPacketStruct):
     BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s?"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
+
+@dataclass
+class S2C_RANKING_INFO_PACKET(RecvPacketStruct):
+    nickname: str = ""
+    score: int = -1
+
+    BODY_FMT: ClassVar[str] = f"{MAX_USER_NAME}si"
+    FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
+
 # ---------------------------
 # C2S (송신) : SendPacketStruct
 # ---------------------------
@@ -450,5 +459,11 @@ class C2S_REQUEST_LOBBY_USER_LIST_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_REQUEST_FRIEND_LIST_PACKET(SendPacketStruct):
+    BODY_FMT: ClassVar[str] = ""
+    FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
+
+
+@dataclass
+class C2S_REQUEST_RANKING_PACKET(SendPacketStruct):
     BODY_FMT: ClassVar[str] = ""
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT

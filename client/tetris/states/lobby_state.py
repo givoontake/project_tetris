@@ -28,6 +28,7 @@ from tetris.ui.setting_window import SettingWindow
 from tetris.ui.user_taps import UserTabs, USER_TAB_NAME, FRIEND_TAB_NAME
 from tetris.states.single_play_state import SinglePlayState
 from tetris.states.multi_play_state import MultiPlayState
+from tetris.states.ranking_state import RankingState
 from tetris.states.base_state import BaseState
 from tetris.net.packet_manager import *
 from tetris.net.error_types import *
@@ -36,6 +37,7 @@ from tetris.animation.shutter_animaion import ShutterAnimation
 
 MENU_WIDTH = 200
 MENU_HEIGHT = 100
+RANKING_MENU_TEXT = "\uB7AD\uD0B9"
 
 class LobbyState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager,
@@ -91,6 +93,7 @@ class LobbyState(BaseState):
             menu = Button(self.screen, menu_rect, self.rm, None, menu_text)
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
+        self.top_menus[4].button.set_text(RANKING_MENU_TEXT)
 
         self.request_room_list()
         self.request_lobby_user_list()
@@ -154,20 +157,20 @@ class LobbyState(BaseState):
             elif data.type == S2C_ADD_OPEN_ROOM:
                 open_data = cast(S2C_ADD_OPEN_ROOM_PACKET, data)
                 if open_data.max_user == 1:
-                    return SinglePlayState(self.screen, self.rm, self.net_worker, 
-                                           self.session, open_data.room_name)
+                    self.queue_state(SinglePlayState(self.screen, self.rm, self.net_worker,
+                                                     self.session, open_data.room_name))
                 elif open_data.max_user == 2 or open_data.max_user == 5:
-                    return MultiPlayState(self.screen, self.rm, self.net_worker, 
-                                          self.session, open_data.room_name, open_data.max_user)
+                    self.queue_state(MultiPlayState(self.screen, self.rm, self.net_worker,
+                                                    self.session, open_data.room_name, open_data.max_user))
 
             elif data.type == S2C_ADD_LOCK_ROOM:
                 lock_data = cast(S2C_ADD_LOCK_ROOM_PACKET, data)
                 if lock_data.max_user == 1:
-                    return SinglePlayState(self.screen, self.rm, self.net_worker, 
-                                           self.session, lock_data.room_name, lock_data.room_password)
+                    self.queue_state(SinglePlayState(self.screen, self.rm, self.net_worker,
+                                                     self.session, lock_data.room_name, lock_data.room_password))
                 elif lock_data.max_user == 2 or lock_data.max_user == 5:
-                    return MultiPlayState(self.screen, self.rm, self.net_worker, 
-                                          self.session, lock_data.room_name, lock_data.max_user, lock_data.room_password)
+                    self.queue_state(MultiPlayState(self.screen, self.rm, self.net_worker,
+                                                    self.session, lock_data.room_name, lock_data.max_user, lock_data.room_password))
         return self
 
     def handle_event(self, ev: pygame.event.Event):
@@ -207,6 +210,8 @@ class LobbyState(BaseState):
                     setting_window_rect = pygame.Rect(setting_window_x, setting_window_y, setting_window_w, setting_window_h)
                     self.setting_window = SettingWindow(self.screen, setting_window_rect, self.rm)
                     self.reactable = False
+                elif event == RANKING_MENU_TEXT:
+                    self.queue_state(RankingState(self.screen, self.rm, self.net_worker, self.session))
                 return
 
             index = self.room_list.handle_event(ev)
@@ -359,7 +364,7 @@ class LobbyState(BaseState):
         if self.input_pw_window:
             self.input_pw_window.update(dt_ms)
         
-        return self
+        return self.consume_state()
 
     def draw(self):
         self.screen.fill(BLACK)
