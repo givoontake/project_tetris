@@ -233,7 +233,7 @@ class MultiPlayState(BaseState):
                     player.session.lose = match_data.lose_count
                     break
 
-        else:
+        elif isinstance(data, IngamePacket):
             ingame_data = cast(IngamePacket, data)
             id = ingame_data.id
             for player in self.players:
@@ -242,7 +242,7 @@ class MultiPlayState(BaseState):
                     player.handle_packet(data)
                     break
 
-        return self.consume_state()
+        return self
 
     # ------------ 상단 방 정보 그리기 ------------ #
     def draw_room_header(self):
@@ -265,7 +265,7 @@ class MultiPlayState(BaseState):
         for player in self.players:
             player.update(dt_ms)
 
-        return self
+        return self.consume_state()
 
     def draw(self):
         self.screen.fill((0, 0, 0))

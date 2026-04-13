@@ -62,6 +62,9 @@ class GameLoop:
 
             self.state.handle_packet(data)
 
+            if getattr(self.state, "next_state", None) is not None:
+                break
+
             if data is None:
                 break
 

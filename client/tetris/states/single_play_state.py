@@ -100,7 +100,7 @@ class SinglePlayState(BaseState):
             update_score = cast(S2C_UPDATE_SCORE_PACKET, data)
             self.tetris_session.session.max_score = update_score.max_score
 
-        else:
+        elif isinstance(data, IngamePacket):
             self.tetris_session.handle_packet(data)
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
