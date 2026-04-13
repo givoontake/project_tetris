@@ -26,11 +26,11 @@ public:
 	virtual void DeleteUser(const int id) override;
 	virtual void SendCreateRoom(Session& session) override;
 
-	void StartGame(int id);
+	void StartGame(int request_user_id);
 
 	void FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
 	int FindHostIndex(int host_id); // 현재 호스트의 인덱스를 반환
-	int AddUser(Session& new_session, int request_sess_id, const char* room_password);
+	int AddUser(Session& new_session, int request_gen, const char* room_password);
 	void ReadyUser(int id);
 	void KickUser(int id, int kick_user_id);
 	bool FindWinner();

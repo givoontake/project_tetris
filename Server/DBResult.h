@@ -12,7 +12,7 @@ struct DBResultDefault {
 };
 
 struct DBResultLogin : public DBResultDefault {
-	int db_pk;
+	int id;
 	int max_score;
 	int win_count;
 	int lose_count;
@@ -21,7 +21,7 @@ struct DBResultLogin : public DBResultDefault {
 
 	void clear()
 	{
-		db_pk = -1;
+		id = -1;
 		max_score = 0;
 		win_count = 0;
 		lose_count = 0;
@@ -39,13 +39,13 @@ struct DBResultUpdateMatchResult : public DBResultDefault {
 };
 
 struct FriendInfo {
-	int db_pk;
+	int id;
 	//int sess_gen; // db 요청 - 응답 사이에 재사용 판별을 위해 사용 -> 어차피 재사용 보장이 안돼서 탐색해서 찾아야겠다
 	std::string nickname;
 };
 
 struct RankingInfo {
-	int db_pk;
+	int id;
 	std::string nickname;
 	int score;
 };
@@ -57,8 +57,8 @@ struct DBResultAddFriend : public DBResultDefault { // 재조회하기는 싫으
 };
 
 struct DBResultDeleteFriend : public DBResultDefault {
-	int requester_pk;
-	int target_pk;
+	int requester_id;
+	int target_id;
 };
 
 struct DBResultAddFriendRequest : public DBResultDefault {

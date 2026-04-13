@@ -8,13 +8,13 @@
 struct ExOverlapped {
 	WSAOVERLAPPED over;
 	OP_TYPE op_type;
-	int request_id = -1;
+	int request_gen = -1;
 
 	ExOverlapped() {
 		ZeroMemory(&over, sizeof(over));
 	}
 
-	void SetRequestId(int new_id) { request_id = new_id; }
+	void SetRequestGen(int new_gen) { request_gen = new_gen; }
 };
 
 struct IOOverlapped {

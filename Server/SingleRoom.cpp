@@ -26,14 +26,14 @@ void SingleRoom::HandlePacket(char* packet, Session& request_session)
 	}
 
 	case C2S_DELETE_USER: {
-		DeleteUser(request_session.GetSessionKey().id);
+		DeleteUser(request_session.GetDBInfo().id);
 		break;
 	}
 
 	case C2S_MOVE: {
 		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
 		TaskInfo new_task;
-		new_task.id = room_users[0].GetSession()->GetSessionKey().id;
+		new_task.id = room_users[0].GetSession()->GetDBInfo().id;
 		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
 		GetTasks().AddTask(new_task);
 		break;
@@ -46,7 +46,7 @@ void SingleRoom::HandlePacket(char* packet, Session& request_session)
 			S2C_GAMEOVER_PACKET gameover_p;
 			gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
 			gameover_p.type = S2C_GAMEOVER;
-			gameover_p.id = room_users[0].GetSession()->GetSessionKey().id;
+			gameover_p.id = room_users[0].GetSession()->GetDBInfo().id;
 			room_users[0].GetSession()->SendPacket(reinterpret_cast<char*>(&gameover_p), server->GetHandle());
 			RequestUpdateScore();
 			ClearGame();
@@ -68,7 +68,7 @@ void SingleRoom::ProcessPlayTasks()
 			TaskInfo task = tasks.GetTask();
 			for (auto& r_user : room_users) {
 				if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-				if (r_user.GetSession()->GetSessionKey().id == task.id) {
+				if (r_user.GetSession()->GetDBInfo().id == task.id) {
 					// 각 작업들을 각 세션에 분배
 					r_user.GetTetris().GetInputTasks().emplace_back(task.type);
 
@@ -134,7 +134,7 @@ void SingleRoom::StartGame()
 			S2C_SPAWN_PACKET spawn_p;
 			spawn_p.size = sizeof(S2C_SPAWN_PACKET);
 			spawn_p.type = S2C_SPAWN;
-			spawn_p.id = r_user.GetSession()->GetSessionKey().id;
+			spawn_p.id = r_user.GetSession()->GetDBInfo().id;
 			spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 			spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 			spawn_p.spawn_x = spawn_pos.x;
@@ -153,7 +153,7 @@ void SingleRoom::DeleteUser(const int id)
 		std::lock_guard<std::mutex> lock(room_mutex);
 		for (auto& r_user : room_users) {
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-			if (r_user.GetSession()->GetSessionKey().id == id) { // 삭제할 아이디 검색
+			if (r_user.GetSession()->GetDBInfo().id == id) { // 삭제할 아이디 검색
 				//std::cout << "delete user id: " << id << std::endl;
 				//room_mutex.lock();
 				r_user.GetSession()->StoreState(SESS_STATE::LOBBY);
@@ -181,7 +181,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
-		open_p.id = session.GetSessionKey().id;
+		open_p.id = session.GetDBInfo().id;
 		open_p.max_user = max_user;
 		memcpy(open_p.room_name, room_name, sizeof(room_name));
 		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
@@ -190,7 +190,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
 		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
 		lock_p.type = S2C_ADD_LOCK_ROOM;
-		lock_p.id = session.GetSessionKey().id;
+		lock_p.id = session.GetDBInfo().id;
 		lock_p.max_user = max_user;
 		memcpy(lock_p.room_name, room_name, sizeof(room_name));
 		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
@@ -275,7 +275,7 @@ void SingleRoom::MakeMovePacketData(int move_type)
 	S2C_MOVE_PACKET move_p;
 	move_p.size = sizeof(S2C_MOVE_PACKET);
 	move_p.type = S2C_MOVE;
-	move_p.id = room_users[0].GetSession()->GetSessionKey().id;
+	move_p.id = room_users[0].GetSession()->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
 	room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
 }
@@ -284,13 +284,13 @@ void SingleRoom::RequestUpdateScore()
 {
 	if (room_users[0].GetSession()->GetDBInfo().max_score < room_users[0].GetScore()) {
 		SessionKey key;
-		key.id = room_users[0].GetSession()->GetSessionKey().id;
+		key.gen = room_users[0].GetSession()->GetSessionKey().gen;
 		key.index = room_users[0].GetSession()->GetSessionKey().index;
-		int db_PK = room_users[0].GetSession()->GetDBInfo().db_pk;
+		int user_id = room_users[0].GetSession()->GetDBInfo().id;
 		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
-		auto task_update_score = [key, db_PK, new_score, &db] {
-			db.ExecuteUpdateScore(key, db_PK, new_score);
+		auto task_update_score = [key, user_id, new_score, &db] {
+			db.ExecuteUpdateScore(key, user_id, new_score);
 			};
 		server->GetDB().Enqueue(task_update_score);
 	}

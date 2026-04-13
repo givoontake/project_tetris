@@ -265,7 +265,7 @@ class S2C_INFO_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_REQUEST_FRIEND_PACKET(RecvPacketStruct):
-    requester_pk: int = -1
+    requester_id: int = -1
     requester_nickname: str = ""
 
     BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
@@ -274,7 +274,7 @@ class S2C_REQUEST_FRIEND_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_DELETE_FRIEND_PACKET(RecvPacketStruct):
-    target_pk: int = -1
+    target_id: int = -1
 
     BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
@@ -291,7 +291,7 @@ class S2C_ADD_FRIEND_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_LOBBY_USER_INFO_PACKET(RecvPacketStruct):
-    user_pk: int = -1
+    user_id: int = -1
     nickname: str = ""
 
     BODY_FMT: ClassVar[str] = f"i{MAX_USER_NAME}s"
@@ -300,7 +300,7 @@ class S2C_LOBBY_USER_INFO_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_FRIEND_INFO_PACKET(RecvPacketStruct):
-    user_pk: int = -1
+    user_id: int = -1
     nickname: str = ""
     is_lobby: bool = False
 
@@ -429,7 +429,7 @@ class C2S_FAST_MATCHING_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_REQUEST_FRIEND_PACKET(SendPacketStruct):
-    recver_pk: int = -1
+    recver_id: int = -1
 
     BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
@@ -437,7 +437,7 @@ class C2S_REQUEST_FRIEND_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_DELETE_FRIEND_PACKET(SendPacketStruct):
-    target_pk: int = -1
+    target_id: int = -1
 
     BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
@@ -445,7 +445,7 @@ class C2S_DELETE_FRIEND_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_ACCEPT_FRIEND_PACKET(SendPacketStruct):
-    requester_pk: int = -1
+    requester_id: int = -1
 
     BODY_FMT: ClassVar[str] = "i"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT

@@ -141,7 +141,7 @@ class LobbyState(BaseState):
                 result = self.user_tabs.handle_packet(data)
 
                 if data.type == S2C_REQUEST_FRIEND and result is not None:
-                    self.friend_request_pk = result.requester_pk
+                    self.friend_request_pk = result.requester_id
                     fr_message = f"{result.requester_nickname} 님이 친구 요청을 보냈습니다."
                     self.friend_request_popup = PopupBox(self.screen,self.rm, fr_message,["수락", "닫기"])
                     self.reactable = False

@@ -6,7 +6,7 @@ Session::Session()
 	recv_over.SetOperationType(OP_TYPE::RECV);
 }
 
-void Session::InitSession(int new_id, SOCKET new_socket)
+void Session::InitSession(int new_gen, SOCKET new_socket)
 {
 	// lock이 없다면 우연히 일부 필드만 초기화된 상태에서 작업이 일어날 수 있다.
 	// 따라서 완전히 초기화 된 상태에서 접근하도록 한다.
@@ -17,14 +17,13 @@ void Session::InitSession(int new_id, SOCKET new_socket)
 	socket = new_socket;
 	db_info.clear();
 	friend_list.reserve(MAX_FRIENDS);
-	key.id = new_id;
-	remain_data_size = 0; // 얘 기준으로 버퍼에 쓰니까 굳이 버퍼 자체를 초기화할 필요는 없어 보임.
+	key.gen = new_gen;
+	remain_data_size = 0;
 	disconnect_flag.Store(false);
-	recv_over.ex_over.request_id = key.id;
+	recv_over.ex_over.request_gen = key.gen;
 
 	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
-
 }
 
 void Session::ClearSession()
@@ -35,17 +34,17 @@ void Session::ClearSession()
 	closesocket(socket);
 	db_info.clear();
 	friend_list.clear();
-	key.id = -1;
+	key.gen = -1;
 	// tcp에서 패킷을 나누어 보낼 때 비정상 종료되면 일부만 보내고 끝날 수도 있다고 한다
 	// 따라서 remain_data_size는 항상 초기화가 필요하다
 	remain_data_size = 0;
-	recv_over.ex_over.request_id = -1;
+	recv_over.ex_over.request_gen = -1;
 	state.Store(SESS_STATE::NONE);
 }
 
 void Session::InitDBInfo(DBResultLogin* new_info)
 {
-	db_info.db_pk = new_info->db_pk;
+	db_info.id = new_info->id;
 	db_info.login_id = new_info->login_id;
 	db_info.nickname = new_info->nickname;
 	db_info.lose_count = new_info->lose_count;
@@ -65,13 +64,13 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
-	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
-		PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
-		std::cerr << key.id << " Session::SendPacket() WSASend error\n";
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
+		PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+		std::cerr << key.gen << " Session::SendPacket() WSASend error\n";
 	}
 }
 
-void Session::SendPacket(int request_sess_id, char* packet, const HANDLE iocp_handle)
+void Session::SendPacket(int request_gen, char* packet, const HANDLE iocp_handle)
 {
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);
@@ -81,12 +80,12 @@ void Session::SendPacket(int request_sess_id, char* packet, const HANDLE iocp_ha
 	send_over->wsabuf.len = packet_size;
 	{
 		std::lock_guard<std::mutex> lock(sess_mutex);
-		if (key.id == request_sess_id) {
+		if (key.gen == request_gen) {
 			// 같다면 재사용되지 않았다는 것이고 중간에 NONE이 된 적이 없다는 말이므로 굳이 상태 비교는 필요없다.
 			int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
-			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { // 이 작업이 실패했다는 것은 IOCP에 등록되지 않았다는 뜻, 그러나 이 실패는 DISCONNECT 사유에 해당
-				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over)); // 따라서 IOCP에 직접 등록하고, 전송 바이트를 0으로 하여 IOCP 루프에서 DISCONNECT
-				std::cerr << key.id << " Session::SendPacket() WSASend error\n";
+			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
+				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+				std::cerr << key.gen << " Session::SendPacket() WSASend error\n";
 			}
 		}
 		else {
@@ -103,13 +102,13 @@ void Session::SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp
 	memcpy(send_over->packet_buf, packet_buf, data_size);
 	send_over->wsabuf.len = data_size;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
-	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { 
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
-		std::cerr << key.id << " Session::SendBoundPacket() WSASend error\n";
+		std::cerr << key.gen << " Session::SendBoundPacket() WSASend error\n";
 	}
 }
 
-void Session::SendBoundPacket(int request_sess_id, char* packet_buf, int data_size, const HANDLE iocp_handle)
+void Session::SendBoundPacket(int request_gen, char* packet_buf, int data_size, const HANDLE iocp_handle)
 {
 	if (data_size == 0) return;
 	IOOverlapped* send_over = new IOOverlapped;
@@ -118,11 +117,11 @@ void Session::SendBoundPacket(int request_sess_id, char* packet_buf, int data_si
 	send_over->wsabuf.len = data_size;
 	{
 		std::lock_guard<std::mutex> lock(sess_mutex);
-		if (key.id == request_sess_id) {
+		if (key.gen == request_gen) {
 			int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
-			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) { 
+			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
-				std::cerr << key.id << " Session::SendPacket() WSASend error\n";
+				std::cerr << key.gen << " Session::SendPacket() WSASend error\n";
 			}
 		}
 		else {
@@ -132,20 +131,20 @@ void Session::SendBoundPacket(int request_sess_id, char* packet_buf, int data_si
 	}
 }
 
-void Session::RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle)
+void Session::RecvPacket(int request_gen, const HANDLE iocp_handle)
 {
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over.ex_over.over, sizeof(recv_over.ex_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
 	{
 		std::lock_guard<std::mutex> lock(sess_mutex);
 		if (state == SESS_STATE::NONE) return;
-		if (key.id == reqeust_sess_id) {
+		if (key.gen == request_gen) {
 			recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
 			recv_over.wsabuf.buf = recv_over.packet_buf + remain_data_size;
 			int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag, &recv_over.ex_over.over, 0);
 			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
-				std::cerr << key.id << " Session::RecvPacket() WSARecv error\n";
+				std::cerr << key.gen << " Session::RecvPacket() WSARecv error\n";
 			}
 		}
 		else {
@@ -160,10 +159,10 @@ void Session::AddFriend(FriendInfo& new_friend)
 	friend_list.emplace_back(new_friend);
 }
 
-void Session::DeleteFriend(int target_pk)
+void Session::DeleteFriend(int target_id)
 {
-	auto it = std::find_if(friend_list.begin(), friend_list.end(), [&target_pk](const FriendInfo& friend_info) {
-		return friend_info.db_pk == target_pk;
+	auto it = std::find_if(friend_list.begin(), friend_list.end(), [&target_id](const FriendInfo& friend_info) {
+		return friend_info.id == target_id;
 		});
 	if (it != friend_list.end()) {
 		friend_list.erase(it);

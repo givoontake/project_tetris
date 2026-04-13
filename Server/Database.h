@@ -97,12 +97,12 @@ public:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
     void ExecuteLogin(SessionKey key, const std::string login_id, const std::string password);
     void ExecuteLoadRanking();
-    void ExecuteUpdateScore(SessionKey key, const int db_PK, int new_score);
-	void ExecuteUpdateMatchResult(SessionKey key, const int db_PK, bool is_winner);
-    void ExecuteAddFriend(const int requester_pk, const FriendInfo& accepter_info);
-	void ExecuteDeleteFriend(const int requester_pk, const int target_pk);
-    void ExecuteAddFriendRequest(const FriendInfo& requester_info, const int recver_pk);
-	void ExecuteLoadFriendList(SessionKey key, const int db_pk);
+    void ExecuteUpdateScore(SessionKey key, int user_id, int new_score);
+	void ExecuteUpdateMatchResult(SessionKey key, int user_id, bool is_winner);
+    void ExecuteAddFriend(int requester_id, const FriendInfo& accepter_info);
+	void ExecuteDeleteFriend(int requester_id, int target_id);
+    void ExecuteAddFriendRequest(const FriendInfo& requester_info, int recver_id);
+	void ExecuteLoadFriendList(SessionKey key, int user_id);
 
 private:
     // ---- 설정 파일 로드 ----

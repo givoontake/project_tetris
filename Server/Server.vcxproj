@@ -24,6 +24,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MultiRoom.cpp" />
     <ClCompile Include="PacketHandler.cpp" />
+    <ClCompile Include="RankingManager.cpp" />
     <ClCompile Include="RoomPacketHandler.cpp" />
     <ClCompile Include="RoomSession.cpp" />
     <ClCompile Include="Session.cpp" />
@@ -51,6 +52,7 @@
     <ClInclude Include="MQueue.h" />
     <ClInclude Include="PacketHandler.h" />
     <ClInclude Include="packet_type.h" />
+    <ClInclude Include="RankingManager.h" />
     <ClInclude Include="RoomPacketHandler.h" />
     <ClInclude Include="RoomSession.h" />
     <ClInclude Include="Session.h" />

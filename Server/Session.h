@@ -15,7 +15,7 @@
 
 struct SessionKey { 
 	int index = -1;
-	int id = -1;
+	int gen = -1;
 };
 
 class Session
@@ -38,16 +38,16 @@ class Session
 public:
 	Session();
 
-	void InitSession(int new_id, SOCKET new_socket);
+	void InitSession(int new_gen, SOCKET new_socket);
 	void ClearSession();
 	void InitDBInfo(DBResultLogin* info);
 	void SendPacket(char* packet, const HANDLE iocp_handle);
-	void SendPacket(int reqeust_sess_id, char* packet, const HANDLE iocp_handle);
+	void SendPacket(int request_gen, char* packet, const HANDLE iocp_handle);
 	void SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp_handle);
-	void SendBoundPacket(int request_sess_id, char* packet_buf, int data_size, const HANDLE iocp_handle);
-	void RecvPacket(int reqeust_sess_id, const HANDLE iocp_handle);
+	void SendBoundPacket(int request_gen, char* packet_buf, int data_size, const HANDLE iocp_handle);
+	void RecvPacket(int request_gen, const HANDLE iocp_handle);
 	void AddFriend(FriendInfo& new_friend);
-	void DeleteFriend(const int target_pk);
+	void DeleteFriend(const int target_id);
 	void InitFriendList(std::vector<FriendInfo>& db_friend_list);
 
 	//getters
@@ -65,7 +65,7 @@ public:
 	//std::string GetPrimaryKey() const { return login_id; }
 
 	//setters
-	void SetId(int new_id) { key.id = new_id; }
+	void SetGen(int new_gen) { key.gen = new_gen; }
 	void SetIndex(int new_index) { key.index = new_index; }
 	void SetRoomIndex(int new_room_id) { room_index = new_room_id; }
 	void AddDataSize(int new_data_size) { remain_data_size += new_data_size; }
