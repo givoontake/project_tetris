@@ -173,10 +173,10 @@ class TetrisSession:
             if self.btn_start: 
                 if self.btn_start.handle_event(ev): return "start"
 
-            elif self.btn_ready:
+            if self.btn_ready:
                 if self.btn_ready.handle_event(ev): return "ready"
             
-            elif self.btn_kick:
+            if self.btn_kick:
                 if self.btn_kick.handle_event(ev): return "kick"
 
         return None
