@@ -13,7 +13,7 @@ from tetris.game.tetris_controller import TetrisController
 from tetris.game.define import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.images import *
-from tetris.resources.fonts import Fonts
+from tetris.resources.fonts import Fonts, RECTANGLE_FONT_SIZE
 from tetris.ui.rectangle import Rectangle
 from tetris.ui.button import Button
 from tetris.ui.toggle_button import ToggleButton
@@ -30,6 +30,7 @@ class TetrisSession:
         self.controller = None
         self.state: TSessionState = TSessionState.EMPTY
         self.score = 0
+        self.text_size = RECTANGLE_FONT_SIZE
         self.prev_packet_type = None # clearline 1번 재생을 위한 변수
 
         self.set_layout()
@@ -69,11 +70,13 @@ class TetrisSession:
             nickname_rect.y += nickname_rect.h
             nickname_rect.h = nickname_rect.h*0.1
             self.nickname = Rectangle(self.screen, nickname_rect, self.rm, None, "", 1)
+            self.nickname.set_text_size(self.text_size)
 
             self.ready_rect = nickname_rect.copy()
             self.ready_rect.x += nickname_rect.w
             self.ready_rect.w = self.board.preview_rect.w
             self.btn_ready = ToggleButton(self.screen, self.ready_rect, self.rm, None, "준비")
+            self.btn_ready.set_text_size(self.text_size)
 
             crown_rect = self.ready_rect.copy()
             crown_image = self.rm.images.ui_images[UI_HOST]
@@ -104,6 +107,17 @@ class TetrisSession:
     def set_state(self, new_state: TSessionState):
         self.state = new_state
 
+    def set_multiplayer_text_size(self, new_size: int):
+        if self.is_single: return
+        self.text_size = new_size
+        self.nickname.set_text_size(new_size)
+        if self.btn_ready:
+            self.btn_ready.set_text_size(new_size)
+        if self.btn_start:
+            self.btn_start.button.set_text_size(new_size)
+        if self.btn_kick:
+            self.btn_kick.button.set_text_size(new_size)
+
     def make_btn_kick(self):
         kick_rect_h = self.ready_rect.h // 2
         kick_rect_w = kick_rect_h
@@ -111,6 +125,7 @@ class TetrisSession:
         kick_rect_y = self.ready_rect.y
         kick_rect = pygame.Rect(kick_rect_x, kick_rect_y, kick_rect_w, kick_rect_h)
         self.btn_kick = Button(self.screen, kick_rect, self.rm, None, "X", 1)
+        self.btn_kick.button.set_text_size(self.text_size)
     
     def process_gameover(self):
         self.state = TSessionState.GAMEOVER_ANIMATING

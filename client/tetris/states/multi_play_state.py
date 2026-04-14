@@ -10,7 +10,7 @@ from tetris.net.network import NetworkWorker
 from tetris.net.packet_structs import *
 from tetris.net.error_types import *
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.fonts import Fonts
+from tetris.resources.fonts import Fonts, RECTANGLE_FONT_SIZE
 
 from tetris.ui.button import Button
 from tetris.ui.popupbox import PopupBox
@@ -110,6 +110,7 @@ class MultiPlayState(BaseState):
                     sub_h,
                 )
                 tetris_player = TetrisSession(self.screen, sub_rect, self.rm, self.net_worker, False)
+                tetris_player.set_multiplayer_text_size(RECTANGLE_FONT_SIZE // 2)
                 self.players.append(tetris_player)
 
     def reset_room(self):
