@@ -54,6 +54,9 @@ class GameLoop:
     def drain_packets(self):
         q = self.net_worker._pm.queue
 
+        if getattr(self.state, "next_state", None) is not None:
+            return
+
         while not q.empty():
             try:
                 data = q.get_nowait()
