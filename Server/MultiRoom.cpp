@@ -137,6 +137,7 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 		for (int i = 0; i < room_users.size(); ++i) {
 			if (i == added_slot) continue;
 			auto& r_user = room_users[i];
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			S2C_ADD_USER_PACKET add_p;
 			add_p.size = sizeof(S2C_ADD_USER_PACKET);
 			add_p.type = S2C_ADD_USER;
@@ -149,6 +150,7 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 		for (int i = 0; i < room_users.size(); ++i)	{
 			if (i == added_slot) continue;
 			auto& r_user = room_users[i];
+			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			S2C_ADD_USER_PACKET add_p;
 			add_p.size = sizeof(S2C_ADD_USER_PACKET);
 			add_p.type = S2C_ADD_USER;
