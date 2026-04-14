@@ -94,6 +94,24 @@ class MultiPlayState(BaseState):
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
 
+    def set_layout_5player(self):
+        self.set_layout_2player()
+        right_rect = self.players.pop().rect.copy()
+
+        sub_w = right_rect.w // 2
+        sub_h = right_rect.h // 2
+
+        for row in range(2):
+            for col in range(2):
+                sub_rect = pygame.Rect(
+                    right_rect.x + (sub_w * col),
+                    right_rect.y + (sub_h * row),
+                    sub_w,
+                    sub_h,
+                )
+                tetris_player = TetrisSession(self.screen, sub_rect, self.rm, self.net_worker, False)
+                self.players.append(tetris_player)
+
     def reset_room(self):
         pygame.mixer.music.stop()
         for player in self.players:
@@ -102,10 +120,16 @@ class MultiPlayState(BaseState):
 
     def add_user(self, session: Session):
         for player in self.players:
+            if player.session == None: continue
+            if player.session.id == session.id:
+                return
+
+        for player in self.players:
             if player.session == None:
                 player.init_session(session)
-                if self.players[self.host_index].session.is_self:
+                if self.host_index != -1 and self.players[self.host_index].session and self.players[self.host_index].session.is_self:
                     player.make_btn_kick()
+                break
 
     def find_host_index(self) -> int:
         for i in range(len(self.players)):
