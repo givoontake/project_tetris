@@ -29,5 +29,11 @@ public:
 
 	void MakeMovePacketData(int move_type);
 	void ReduceTimeouts(int type);
+
+private:
+	void HandleStartPacket();
+	void HandleDeleteUserPacket(Session& request_session);
+	void HandleMovePacket(char* packet);
+	void HandleGiveupPacket();
 };
 

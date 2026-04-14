@@ -85,4 +85,16 @@ public:
 	void SendRanking(Session& session, int request_gen);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
 	void SendDeleteFriendResult(int requester_id, int target_id);
+
+private:
+	void HandleLoginPacket(char* packet, Session& session, int request_gen);
+	void HandleMessagePacket(char* packet, Session& session, int request_gen);
+	void HandleTestPacket(char* packet, Session& session);
+	void HandleDisconnectPacket(Session& session);
+	void HandleJoinOpenRoomPacket(char* packet, Session& session, int request_gen);
+	void HandleJoinLockRoomPacket(char* packet, Session& session, int request_gen);
+	void HandleFastMatchingPacket(char* packet, Session& session, int request_gen);
+	void HandleRequestFriendPacket(char* packet, Session& session, int request_gen);
+	void HandleAcceptFriendPacket(char* packet, Session& session, int request_gen);
+	void HandleDeleteFriendPacket(char* packet, Session& session, int request_gen);
 };

@@ -16,6 +16,36 @@ MultiRoom::~MultiRoom()
 {
 }
 
+void MultiRoom::HandleDeleteUserPacket(Session& request_session)
+{
+	DeleteUser(request_session.GetDBInfo().id);
+}
+
+void MultiRoom::HandleReadyPacket(Session& request_session)
+{
+	ReadyUser(request_session.GetDBInfo().id);
+}
+
+void MultiRoom::HandleKickPacket(char* packet, Session& request_session)
+{
+	C2S_KICK_PACKET* kick_p = reinterpret_cast<C2S_KICK_PACKET*>(packet);
+	KickUser(request_session.GetDBInfo().id, kick_p->kick_user_id);
+}
+
+void MultiRoom::HandleStartPacket(Session& request_session)
+{
+	StartGame(request_session.GetDBInfo().id);
+}
+
+void MultiRoom::HandleMovePacket(char* packet, Session& request_session)
+{
+	C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
+	TaskInfo new_task;
+	new_task.id = request_session.GetDBInfo().id;
+	new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+	GetTasks().AddTask(new_task);
+}
+
 // 게임 시작 전에 처리되는 것들 -> 함수 내에 뮤텍스 넣고 처리
 // 게임 시작 후에 처리되는 것들 -> 틱 처리 함수에 뮤텍스 넣고, 틱 처리 관련 내부 함수는 뮤텍스 넣지 않음
 void MultiRoom::HandlePacket(char* packet, Session& request_session)
@@ -23,35 +53,27 @@ void MultiRoom::HandlePacket(char* packet, Session& request_session)
 	switch (packet[2]) {
 
 	case C2S_DELETE_USER: {
-		C2S_DELETE_USER_PACKET* delete_p = reinterpret_cast<C2S_DELETE_USER_PACKET*>(packet);
-		DeleteUser(request_session.GetDBInfo().id);
+		HandleDeleteUserPacket(request_session);
 		break;
 	}
 
 	case C2S_READY: {
-		C2S_READY_PACKET* ready_p = reinterpret_cast<C2S_READY_PACKET*>(packet);
-		ReadyUser(request_session.GetDBInfo().id);
+		HandleReadyPacket(request_session);
 		break;
 	}
 
 	case C2S_KICK: {
-		C2S_KICK_PACKET* kick_p = reinterpret_cast<C2S_KICK_PACKET*>(packet);
-		KickUser(request_session.GetDBInfo().id, kick_p->kick_user_id);
+		HandleKickPacket(packet, request_session);
 		break;
 	}
 
 	case C2S_START: {
-		//C2S_START_PACKET* recv_p = reinterpret_cast<C2S_START_PACKET*>(packet);
-		StartGame(request_session.GetDBInfo().id);
+		HandleStartPacket(request_session);
 		break;
 	}
 
 	case C2S_MOVE: {
-		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
-		TaskInfo new_task;
-		new_task.id = request_session.GetDBInfo().id;
-		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
-		GetTasks().AddTask(new_task);
+		HandleMovePacket(packet, request_session);
 		break;
 	}
 	}

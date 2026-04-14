@@ -39,5 +39,12 @@ public:
 	void UpdatePrevUsersState();
 
 	void RequestUpdateMatchResult();
+
+private:
+	void HandleDeleteUserPacket(Session& request_session);
+	void HandleReadyPacket(Session& request_session);
+	void HandleKickPacket(char* packet, Session& request_session);
+	void HandleStartPacket(Session& request_session);
+	void HandleMovePacket(char* packet, Session& request_session);
 };
 

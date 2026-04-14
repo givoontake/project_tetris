@@ -21,37 +21,57 @@ void SingleRoom::HandlePacket(char* packet, Session& request_session)
 	switch (packet[2]) {
 
 	case C2S_START: {
-		StartGame();
+		HandleStartPacket();
 		break;
 	}
 
 	case C2S_DELETE_USER: {
-		DeleteUser(request_session.GetDBInfo().id);
+		HandleDeleteUserPacket(request_session);
 		break;
 	}
 
 	case C2S_MOVE: {
-		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
-		TaskInfo new_task;
-		new_task.id = room_users[0].GetSession()->GetDBInfo().id;
-		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
-		GetTasks().AddTask(new_task);
+		HandleMovePacket(packet);
 		break;
 	}
 
 	case C2S_GIVEUP: {
-		std::lock_guard<std::mutex> lock(room_mutex);
-
-		if (room_state == ROOM_STATE::PLAY) {
-			S2C_GAMEOVER_PACKET gameover_p;
-			gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
-			gameover_p.type = S2C_GAMEOVER;
-			gameover_p.id = room_users[0].GetSession()->GetDBInfo().id;
-			room_users[0].GetSession()->SendPacket(reinterpret_cast<char*>(&gameover_p), server->GetHandle());
-			RequestUpdateScore();
-			ClearGame();
-		}
+		HandleGiveupPacket();
 	}
+	}
+}
+
+void SingleRoom::HandleStartPacket()
+{
+	StartGame();
+}
+
+void SingleRoom::HandleDeleteUserPacket(Session& request_session)
+{
+	DeleteUser(request_session.GetDBInfo().id);
+}
+
+void SingleRoom::HandleMovePacket(char* packet)
+{
+	C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
+	TaskInfo new_task;
+	new_task.id = room_users[0].GetSession()->GetDBInfo().id;
+	new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+	GetTasks().AddTask(new_task);
+}
+
+void SingleRoom::HandleGiveupPacket()
+{
+	std::lock_guard<std::mutex> lock(room_mutex);
+
+	if (room_state == ROOM_STATE::PLAY) {
+		S2C_GAMEOVER_PACKET gameover_p;
+		gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
+		gameover_p.type = S2C_GAMEOVER;
+		gameover_p.id = room_users[0].GetSession()->GetDBInfo().id;
+		room_users[0].GetSession()->SendPacket(reinterpret_cast<char*>(&gameover_p), server->GetHandle());
+		RequestUpdateScore();
+		ClearGame();
 	}
 }
 
