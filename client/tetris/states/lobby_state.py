@@ -67,7 +67,7 @@ class LobbyState(BaseState):
 
         self.info_popup = None
         self.friend_request_popup = None
-        self.friend_request_pk = None
+        self.friend_requester_id = None
 
         self.friend_ev_btn = None
         self.friend_ev_target_id = None
@@ -141,7 +141,7 @@ class LobbyState(BaseState):
                 result = self.user_tabs.handle_packet(data)
 
                 if data.type == S2C_REQUEST_FRIEND and result is not None:
-                    self.friend_request_pk = result.requester_id
+                    self.friend_requester_id = result.requester_id
                     fr_message = f"{result.requester_nickname} 님이 친구 요청을 보냈습니다."
                     self.friend_request_popup = PopupBox(self.screen,self.rm, fr_message,["수락", "닫기"])
                     self.reactable = False
@@ -339,11 +339,11 @@ class LobbyState(BaseState):
                 fr_event = self.friend_request_popup.handle_event(ev)
                 if fr_event != None:
                     if fr_event == "수락":
-                        packet = self.net_worker.builder.build_accept_friend_pkt(self.friend_request_pk)
+                        packet = self.net_worker.builder.build_accept_friend_pkt(self.friend_requester_id)
                         self.net_worker.send_packet(packet)
 
                     self.friend_request_popup = None
-                    self.friend_request_pk = None
+                    self.friend_requester_id = None
                     self.reactable = True
 
             return

@@ -100,7 +100,7 @@ class S2C_DISCONNECT_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_ADD_OPEN_ROOM_PACKET(RecvPacketStruct):
-    gen: int = -1
+    room_gen: int = -1
     max_user: int = -1
     room_name: str = ""
 
@@ -110,7 +110,7 @@ class S2C_ADD_OPEN_ROOM_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_ADD_LOCK_ROOM_PACKET(RecvPacketStruct):
-    gen: int = -1
+    room_gen: int = -1
     max_user: int = -1
     room_name: str = ""
     room_password: str = ""

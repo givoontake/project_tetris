@@ -116,11 +116,11 @@ class UserTabs:
 
         if data.type == S2C_LOBBY_USER_INFO:
             user_data = cast(S2C_LOBBY_USER_INFO_PACKET, data)
-            self.add_user(USER_TAB_NAME, user_data.user_pk, user_data.nickname, True)
+            self.add_user(USER_TAB_NAME, user_data.user_id, user_data.nickname, True)
 
         elif data.type == S2C_FRIEND_INFO:
             friend_data = cast(S2C_FRIEND_INFO_PACKET, data)
-            self.add_user(FRIEND_TAB_NAME, friend_data.user_pk, friend_data.nickname, friend_data.is_lobby)
+            self.add_user(FRIEND_TAB_NAME, friend_data.user_id, friend_data.nickname, friend_data.is_lobby)
 
         elif data.type == S2C_ADD_FRIEND:
             add_data = cast(S2C_ADD_FRIEND_PACKET, data)
@@ -128,7 +128,7 @@ class UserTabs:
 
         elif data.type == S2C_DELETE_FRIEND:
             delete_data = cast(S2C_DELETE_FRIEND_PACKET, data)
-            self.delete_user(FRIEND_TAB_NAME, delete_data.target_pk)
+            self.delete_user(FRIEND_TAB_NAME, delete_data.target_id)
 
         elif data.type == S2C_REQUEST_FRIEND:
             request_data = cast(S2C_REQUEST_FRIEND_PACKET, data)
