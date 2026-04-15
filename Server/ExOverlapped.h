@@ -5,16 +5,25 @@
 #include "enum_class.h"
 #include "DBResult.h"
 
+struct SessionKey {
+	int index = -1;
+	int gen = -1;
+};
+
+constexpr ULONG_PTR LISTEN_IO_COMPLETION = 1;
+constexpr ULONG_PTR SESSION_IO_COMPLETION = 2;
+constexpr ULONG_PTR ROOM_IO_COMPLETION = 3;
+constexpr ULONG_PTR DB_IO_COMPLETION = 4;
+
 struct ExOverlapped {
 	WSAOVERLAPPED over;
 	OP_TYPE op_type;
-	int request_gen = -1;
+	SessionKey key;
+	int room_index = -1;
 
 	ExOverlapped() {
 		ZeroMemory(&over, sizeof(over));
 	}
-
-	void SetRequestGen(int new_gen) { request_gen = new_gen; }
 };
 
 struct IOOverlapped {

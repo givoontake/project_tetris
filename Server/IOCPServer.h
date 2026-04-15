@@ -67,7 +67,8 @@ public:
 	void CreateOpenRoom(char* packet, Session& session, int request_gen);
 	void CreateLockRoom(char* packet, Session& session, int request_gen);
 	void DeleteRoom(int room_index);
-	void ProcessDBResult(DBOverlapped* db_over, Session& session, int request_gen);
+	void HandleDBResult(DBOverlapped* db_over, Session& session);
+	void HandleDBResult(DBOverlapped* db_over);
 	void ProcessRankingResult(DBOverlapped* db_over);
 	void RequestLoadRanking();
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);

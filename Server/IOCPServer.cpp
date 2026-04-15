@@ -300,26 +300,24 @@ void IOCPServer::HandlePacket(char* packet, Session& session, int request_gen)
 void IOCPServer::SendRoomList(Session& session, int request_gen)
 {
 	// 더미 방 생성
-	#if 0
-	for (int i = 0; i < 20; ++i) {
-		S2C_ROOM_INFO_PACKET p{};
-		p.size = sizeof(S2C_ROOM_INFO_PACKET);
-		p.type = S2C_ROOM_INFO;
+	//for (int i = 0; i < 20; ++i) {
+	//	S2C_ROOM_INFO_PACKET p{};
+	//	p.size = sizeof(S2C_ROOM_INFO_PACKET);
+	//	p.type = S2C_ROOM_INFO;
 
-		p.room_gen = 1,000,000 + i;
+	//	p.room_gen = 1,000,000 + i;
 
-		std::string name = "DummyRoom_" + std::to_string(i);
-		StringToCharBuf(name, p.room_name, sizeof(p.room_name));
+	//	std::string name = "DummyRoom_" + std::to_string(i);
+	//	StringToCharBuf(name, p.room_name, sizeof(p.room_name));
 
-		p.max_user = 2;
-		p.cur_user = 1; 
+	//	p.max_user = 2;
+	//	p.cur_user = 1; 
 
-		p.is_private = false;
-		p.is_play = false;
+	//	p.is_private = false;
+	//	p.is_play = false;
 
-		session.SendPacket(request_gen, reinterpret_cast<char*>(&p), iocp_handle);
-	}
-	#endif
+	//	session.SendPacket(request_gen, reinterpret_cast<char*>(&p), iocp_handle);
+	//}
 
 	{
 		// 어차피 send의 세션 조건에서 걸러지지만, 방이 많아지면 작업 자체가 길어질 수 있으므로 미리 체크
@@ -678,14 +676,14 @@ void IOCPServer::StartServer()
 	bind(listen_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
 	listen(listen_socket, SOMAXCONN);
 	iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
-	CreateIoCompletionPort(reinterpret_cast<HANDLE>(listen_socket), iocp_handle, 9999, 0);
+	CreateIoCompletionPort(reinterpret_cast<HANDLE>(listen_socket), iocp_handle, LISTEN_IO_COMPLETION, 0);
 	int addr_size = sizeof(SOCKADDR_IN);
 	AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.ex_over.over);
 }
 
 void IOCPServer::ProcessGQCS()
 {
-	while (is_running){
+	while (is_running) {
 		DWORD transferred_bytes = 0;
 		ULONG_PTR completion_key = 0;
 		WSAOVERLAPPED* over = nullptr;
@@ -697,86 +695,94 @@ void IOCPServer::ProcessGQCS()
 			INFINITE);
 
 		ExOverlapped* ex_over = reinterpret_cast<ExOverlapped*>(over);
-		Session& session = users[completion_key];
-
-		if (!result){
-			if (ex_over->op_type == OP_TYPE::ACCEPT) std::cout << "Accept Error" << WSAGetLastError() << "\n";
-			else { // 클라이언트 강제 종료일 경우
-				session.StoreDisconnectFlag(true);
-				Disconnect(static_cast<int>(session.GetSessionKey().index));
-				if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
+		switch (completion_key) {
+		case LISTEN_IO_COMPLETION: {
+			if (ex_over->op_type != OP_TYPE::ACCEPT) break;
+			if (!result) {
+				std::cout << "Accept Error" << WSAGetLastError() << "\n";
+				break;
 			}
-			continue;
-		}
-
-		// 클라이언트 정상 종료일 경우
-		if (transferred_bytes == 0 && ex_over->op_type != OP_TYPE::ACCEPT) {
-			session.StoreDisconnectFlag(true);
-			Disconnect(static_cast<int>(session.GetSessionKey().index));
-			if (ex_over->op_type == OP_TYPE::SEND) delete ex_over;
-			continue;
-		}
-
-		switch (ex_over->op_type) {
-		case OP_TYPE::ACCEPT: {
-			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 			int new_index = GetEmptyUserIndex();
 			if (new_index != -1) {
 				int gen = GetNewUserGen();
 				users[new_index].InitSession(gen, client_socket);
-				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
+				CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, SESSION_IO_COMPLETION, 0);
 				users[new_index].RecvPacket(users[new_index].GetSessionKey().gen, iocp_handle);
-				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED); // 커널 내 새 소켓을 생성하고 그것을 가리키는 핸들을 받음, 기존 핸들은 이미 initsession 되어 세션 내부에 가지고 있다.
+				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 				std::cout << "Session[" << new_index << "] connect/Gen: " << users[new_index].GetSessionKey().gen << std::endl;
 			}
 
 			else {
-				std::cout << "서버가 혼잡합니다. 연결을 종료합니다.\n";
 				closesocket(client_socket);
-				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED); // WSASocket은 리소스 부족 시 실패할 수 있다. 실패 시 INVALID_SOCKET 반환
+				client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 			}
 
-			// 리소스 부족으로 실패하면 일단 연결 더 안받는걸로 하자.
 			if (client_socket != INVALID_SOCKET) {
 				ZeroMemory(&accept_over.ex_over.over, sizeof(accept_over.ex_over.over));
 				int addr_size = sizeof(SOCKADDR_IN);
-				// AcceptEx도 리소스 부족으로 실패할 수 있다. 
 				bool res = AcceptEx(listen_socket, client_socket, accept_over.packet_buf, 0, addr_size + 16, addr_size + 16, 0, &accept_over.ex_over.over);
 				if (!res && WSAGetLastError() != ERROR_IO_PENDING) std::cerr << "AcceptEx fail.. " << std::endl;
 			}
 			break;
 		}
 
-		case OP_TYPE::RECV: {
+		case SESSION_IO_COMPLETION: {
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
-			int request_gen = io_over->ex_over.request_gen;
-			ProcessPacket(users[completion_key], request_gen, transferred_bytes);
-			users[completion_key].RecvPacket(request_gen, iocp_handle);
-			
+			Session& sess = users[io_over->ex_over.key.index];
+			switch (ex_over->op_type) {
+			case OP_TYPE::RECV: {
+				if (!result || transferred_bytes == 0) {
+					sess.StoreDisconnectFlag(true);
+					Disconnect(sess.GetSessionKey().index);
+					break;
+				}
+				ProcessPacket(sess, io_over->ex_over.key.gen, transferred_bytes);
+				sess.RecvPacket(io_over->ex_over.key.gen, iocp_handle);
+				break;
+			}
+
+			case OP_TYPE::SEND: {
+				if ((!result || transferred_bytes == 0)) {
+					sess.StoreDisconnectFlag(true);
+					Disconnect(sess.GetSessionKey().index);
+				}
+				delete io_over;
+				break;
+			}
+
+			default:
+				break;
+			}
 			break;
 		}
 
-		case OP_TYPE::SEND: {
-			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
-			delete io_over;
-
-			break;
-		}
-		case OP_TYPE::DELETE_ROOM: // 이 작업이 올 때 키는 방 인덱스임
+		case ROOM_IO_COMPLETION:
+			if (ex_over->op_type == OP_TYPE::DELETE_ROOM) DeleteRoom(ex_over->room_index);
 			delete ex_over;
-			DeleteRoom(static_cast<int>(completion_key));
-
 			break;
-		case OP_TYPE::DB:
-			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
-			if (db_over->type == DBOperationType::LOAD_RANKING) ProcessRankingResult(db_over);
-			else ProcessDBResult(db_over, session, db_over->ex_over.request_gen);
 
+		case DB_IO_COMPLETION: {
+			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
+			if (!result) {
+				delete db_over;
+				break;
+			}
+			int index = db_over->ex_over.key.index;
+			if (index > -1) {
+				Session& sess = users[db_over->ex_over.key.index];
+				HandleDBResult(db_over, sess);
+			}
+			else HandleDBResult(db_over);
+
+			delete db_over;
+			break;
+		}
+
+		default:
 			break;
 		}
 	}
 }
-
 void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes)
 {   
 	short packet_size;
@@ -794,7 +800,8 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 		if (session.GetSessionKey().gen != request_gen) return;
 
 		if (recv_bytes + session.GetRemainDataSize() > BUF_SIZE) {
-			PostQueuedCompletionStatus(iocp_handle, 0, request_gen, nullptr);
+			session.StoreDisconnectFlag(true);
+			Disconnect(session.GetSessionKey().index);
 			return;
 		}
 		
@@ -1045,7 +1052,54 @@ void IOCPServer::Disconnect(int user_index)
 
 }
 
-void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int request_gen)
+void IOCPServer::HandleDBResult(DBOverlapped* db_over)
+{
+	switch (db_over->type) {
+	case DBOperationType::ADD_FRIEND_REQUEST: {
+		if (db_over->ok) {
+			DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
+			int recver_index = FindSessionIndexById(res->recver_info.id);
+			if (recver_index != -1) {
+				Session& recver_session = FindSessionByIndex(recver_index);
+				std::lock_guard<std::mutex> lock(recver_session.GetMutex());
+				if (recver_session.GetState() != SESS_STATE::LOBBY) break;
+				if (recver_session.GetDBInfo().id != res->recver_info.id) break;
+
+				S2C_REQUEST_FRIEND_PACKET request_p;
+				request_p.size = sizeof(S2C_REQUEST_FRIEND_PACKET);
+				request_p.type = S2C_REQUEST_FRIEND;
+				request_p.requester_id = res->requester_info.id;
+				StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
+				recver_session.SendPacket(reinterpret_cast<char*>(&request_p), GetHandle());
+			}
+		}
+		break;
+	}
+
+	case DBOperationType::ADD_FRIEND:
+		if (db_over->ok) {
+			DBResultAddFriend* res = static_cast<DBResultAddFriend*>(db_over->result_data.get());
+			SendAddFriendResult(res->requester_info, res->accepter_info);
+		}
+		break;
+
+	case DBOperationType::DELETE_FRIEND:
+		if (db_over->ok) {
+			DBResultDeleteFriend* res = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
+			SendDeleteFriendResult(res->requester_id, res->target_id);
+		}
+		break;
+
+	case DBOperationType::LOAD_RANKING:
+		ProcessRankingResult(db_over);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void IOCPServer::HandleDBResult(DBOverlapped* db_over, Session& session)
 {
 	// DB 작업 이후 결과를 세션에 통지하기 전에, 세션이 종료되었을 수 있다.
 	// 만약 세션이 즉시 재사용된다면, 우연히 세션을 초기화하는 과정에서 아이디가 바뀌기 전에 다른 부분이 먼저 변경되었을 가능성이 있다.
@@ -1054,6 +1108,7 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 	
 	// IOCP에서 작업 완료하고 얻어온 key만 계속 넘어가면 된다. 최종 검증은 send 직전에 한다.
 	// 만약 재사용됐다? -> GQCS에서 받아온 키가 send 전까지 계속 넘어가므로, 최종 검증은 거기서만 하면 된다.
+	int request_gen = db_over->ex_over.key.gen;
 	switch (db_over->type) {
 	case DBOperationType::LOGIN: {
 		S2C_LOGIN_PACKET login_p;
@@ -1065,8 +1120,8 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 				if (CheckDuplicateLoginId(static_cast<DBResultLogin*>(db_over->result_data.get())->login_id)) login_p.id = -2;
 				else {
 					std::lock_guard<std::mutex> lock(session.GetMutex());
-					if (request_gen != session.GetSessionKey().gen) return;
-					if (session.GetState() == SESS_STATE::NONE) return;
+					if (request_gen != session.GetSessionKey().gen) break;
+					if (session.GetState() == SESS_STATE::NONE) break;
 
 					session.InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
 					session.StoreState(SESS_STATE::LOBBY);
@@ -1119,14 +1174,15 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 	}
 
 	case DBOperationType::UPDATE_SCORE:
-		if (db_over->ok) {
+		{
+			if (db_over->ok) {
 			// void*는 사용할 때 타입을 명시해야함(컴파일러가 알아들을 수 있도록)
 			// 보이드 유니크 포인터인 db_over->info를 get 함수로 raw 포인터를 가져와 사용할 포인터로 static_cast, void* <-> T* 간에는 static_cast가 허용되고, void*에는 T*를 대입할 수 있다.
 			DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
 			{
 				std::lock_guard<std::mutex> lock(session.GetMutex());
-				if (request_gen != session.GetSessionKey().gen) return;
-				if (session.GetState() == SESS_STATE::NONE) return;
+				if (request_gen != session.GetSessionKey().gen) break;
+				if (session.GetState() == SESS_STATE::NONE) break;
 				session.GetDBInfo().max_score = res->max_score;
 				ranking_manager.UpdateRanking(session.GetDBInfo().id, session.GetDBInfo().nickname, res->max_score);
 			}
@@ -1135,11 +1191,13 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 			us_p.type = S2C_UPDATE_SCORE;
 			us_p.max_score = res->max_score;
 			session.SendPacket(request_gen, reinterpret_cast<char*>(&us_p), iocp_handle);
+			}
 		}
 		break;
 
 	case DBOperationType::UPDATE_MATCH_RESULT:
-		if (db_over->ok) {
+		{
+			if (db_over->ok) {
 			S2C_MATCH_RECORD_PACKET record_p;
 			record_p.size = sizeof(S2C_MATCH_RECORD_PACKET);
 			record_p.type = S2C_MATCH_RECORD;
@@ -1157,6 +1215,7 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 			}
 
 			session.SendPacket(request_gen, reinterpret_cast<char*>(&record_p), iocp_handle);
+			}
 		}
 		break;
 
@@ -1197,29 +1256,30 @@ void IOCPServer::ProcessDBResult(DBOverlapped* db_over, Session& session, int re
 		break;
 		
 	case DBOperationType::LOAD_FRIEND_LIST: // 얘는 검증하면 됨
-		if (db_over->ok) {
-			DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
+		{
+			if (db_over->ok) {
+				DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
 			std::lock_guard<std::mutex> lock(session.GetMutex());
 			if (session.GetState() == SESS_STATE::NONE) break;
 			if (request_gen != session.GetSessionKey().gen) break;
 
 			// 클라는 상태가 변경되어야 친구를 볼 수 있어서(상태에 따라 받을 수 있는 패킷이 다르다) 상태 변경 시 따로 리스트를 요청하게 되어 있다
-			session.InitFriendList(res->friend_list); 
+				session.InitFriendList(res->friend_list); 
+			}
 		}
 		break;
-	}
 
-	delete db_over;
+	case DBOperationType::LOAD_RANKING:
+		break;
+	}
 }
 
 void IOCPServer::ProcessRankingResult(DBOverlapped* db_over)
 {
 	if (db_over->ok && db_over->result_data) {
 		DBResultLoadRanking* res = static_cast<DBResultLoadRanking*>(db_over->result_data.get());
-		ranking_manager.LoadInitialRanking(res->rankings);
+		ranking_manager.InitRanking(res->rankings);
 	}
-
-	delete db_over;
 }
 
 void IOCPServer::StringToCharBuf(const std::string& str, char* buf, int buf_size)

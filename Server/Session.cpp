@@ -20,7 +20,7 @@ void Session::InitSession(int new_gen, SOCKET new_socket)
 	key.gen = new_gen;
 	remain_data_size = 0;
 	disconnect_flag.Store(false);
-	recv_over.ex_over.request_gen = key.gen;
+	recv_over.ex_over.key = key;
 
 	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
@@ -38,7 +38,7 @@ void Session::ClearSession()
 	// tcp에서 패킷을 나누어 보낼 때 비정상 종료되면 일부만 보내고 끝날 수도 있다고 한다
 	// 따라서 remain_data_size는 항상 초기화가 필요하다
 	remain_data_size = 0;
-	recv_over.ex_over.request_gen = -1;
+	recv_over.ex_over.key = key;
 	state.Store(SESS_STATE::NONE);
 }
 
@@ -63,9 +63,10 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 	memcpy(&packet_size, packet, sizeof(packet_size));
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
+	send_over->ex_over.key = key;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(send_over));
 		std::cerr << key.gen << " Session::SendPacket() WSASend error\n";
 	}
 }
@@ -81,10 +82,11 @@ void Session::SendPacket(int request_gen, char* packet, const HANDLE iocp_handle
 	{
 		std::lock_guard<std::mutex> lock(sess_mutex);
 		if (key.gen == request_gen) {
+			send_over->ex_over.key = key;
 			// 같다면 재사용되지 않았다는 것이고 중간에 NONE이 된 적이 없다는 말이므로 굳이 상태 비교는 필요없다.
 			int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
 			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+				PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(send_over));
 				std::cerr << key.gen << " Session::SendPacket() WSASend error\n";
 			}
 		}
@@ -102,9 +104,10 @@ void Session::SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp
 	send_over->SetOperationType(OP_TYPE::SEND);
 	memcpy(send_over->packet_buf, packet_buf, data_size);
 	send_over->wsabuf.len = data_size;
+	send_over->ex_over.key = key;
 	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
 	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(send_over));
 		std::cerr << key.gen << " Session::SendBoundPacket() WSASend error\n";
 	}
 }
@@ -119,9 +122,10 @@ void Session::SendBoundPacket(int request_gen, char* packet_buf, int data_size, 
 	{
 		std::lock_guard<std::mutex> lock(sess_mutex);
 		if (key.gen == request_gen) {
+			send_over->ex_over.key = key;
 			int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
 			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+				PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(send_over));
 				std::cerr << key.gen << " Session::SendPacket() WSASend error\n";
 			}
 		}
@@ -141,11 +145,12 @@ void Session::RecvPacket(int request_gen, const HANDLE iocp_handle)
 		std::lock_guard<std::mutex> lock(sess_mutex);
 		if (state == SESS_STATE::NONE) return;
 		if (key.gen == request_gen) {
+			recv_over.ex_over.key = key;
 			recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
 			recv_over.wsabuf.buf = recv_over.packet_buf + remain_data_size;
 			int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag, &recv_over.ex_over.over, 0);
 			if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-				PostQueuedCompletionStatus(iocp_handle, 0, key.index, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
+				PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
 				std::cerr << key.gen << " Session::RecvPacket() WSARecv error\n";
 			}
 		}

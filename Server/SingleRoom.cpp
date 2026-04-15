@@ -188,7 +188,8 @@ void SingleRoom::DeleteUser(const int id)
 				room_state.Store(ROOM_STATE::WAITING_DELETE);
 				ExOverlapped* delete_over = new ExOverlapped;
 				delete_over->op_type = OP_TYPE::DELETE_ROOM;
-				PostQueuedCompletionStatus(server->GetHandle(), 1, room_index, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
+				delete_over->room_index = room_index;
+				PostQueuedCompletionStatus(server->GetHandle(), 1, ROOM_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
 				break;
 			}
 		}

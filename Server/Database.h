@@ -70,7 +70,6 @@ private:
 
 public:
     // IOCP 완료 통지에 사용할 completion key (서버에서 이 키로 DB 완료인지 분기)
-    static constexpr ULONG_PTR DB_COMPLETION_KEY = 0xDBDBDBDB;
 
 public:
     // 생성자에서 DB 설정 파일을 읽어 멤버(db_host/db_port/...)를 초기화한다.

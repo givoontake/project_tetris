@@ -150,7 +150,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.request_gen = key.gen;
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::LOGIN;
     db_over->ok = false; // 기본 실패로 두고, 성공 조건에서만 true
 
@@ -172,7 +172,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
             if (!stmt)
             {
                 db_over->ok = false;
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -271,14 +271,13 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
         }
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteLoadRanking()
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.request_gen = -1;
     db_over->type = DBOperationType::LOAD_RANKING;
     db_over->ok = false;
 
@@ -300,7 +299,7 @@ void Database::ExecuteLoadRanking()
             stmt = caches.GetStmt(DBOperationType::LOAD_RANKING);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -325,14 +324,14 @@ void Database::ExecuteLoadRanking()
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteUpdateScore(SessionKey key, int user_id, int new_score)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.request_gen = key.gen;
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::UPDATE_SCORE;
     db_over->ok = false;
 
@@ -348,7 +347,7 @@ void Database::ExecuteUpdateScore(SessionKey key, int user_id, int new_score)
             stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
                 return;
             }
         }
@@ -380,14 +379,14 @@ void Database::ExecuteUpdateScore(SessionKey key, int user_id, int new_score)
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteUpdateMatchResult(SessionKey key, int user_id, bool is_winner)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.request_gen = key.gen;
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::UPDATE_MATCH_RESULT;
     db_over->ok = false;
 
@@ -408,7 +407,7 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, int user_id, bool is_win
             stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -439,7 +438,7 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, int user_id, bool is_win
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteAddFriend(int requester_id, const FriendInfo& accepter_info)
@@ -527,7 +526,7 @@ POST_RESULT:
 	if (!db_over->ok) caches.conn->rollback();
 
     caches.conn->setAutoCommit(true);
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteDeleteFriend(int requester_id, int target_id)
@@ -552,7 +551,7 @@ void Database::ExecuteDeleteFriend(int requester_id, int target_id)
             df_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND);
             if (!df_stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -579,14 +578,14 @@ void Database::ExecuteDeleteFriend(int requester_id, int target_id)
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteLoadFriendList(SessionKey key, int user_id) 
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.request_gen = key.gen;
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::LOAD_FRIEND_LIST;
     db_over->ok = false;
 
@@ -609,7 +608,7 @@ void Database::ExecuteLoadFriendList(SessionKey key, int user_id)
             stmt = caches.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -636,7 +635,7 @@ void Database::ExecuteLoadFriendList(SessionKey key, int user_id)
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 void Database::ExecuteAddFriendRequest(const FriendInfo& requester_info, int recver_id)
@@ -701,7 +700,7 @@ POST_RESULT:
     if (!db_over->ok) caches.conn->rollback();
 	caches.conn->setAutoCommit(true);
 
-	PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+	PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 // ---- DB 스레드 루프 ----
