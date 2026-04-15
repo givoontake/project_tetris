@@ -10,20 +10,14 @@ bool RankingManager::CompareRankingInfo(const RankingInfo& lhs, const RankingInf
 
 void RankingManager::SortAndTrim()
 {
-	std::sort(rankings.begin(), rankings.end(), CompareRankingInfo);
-	if (rankings.size() > MAX_RANKING_COUNT) rankings.resize(MAX_RANKING_COUNT);
+	std::sort(rankings.begin(), rankings.end(), CompareRankingInfo); // 오름차순 정렬
+	if (rankings.size() > MAX_RANKING_COUNT) rankings.resize(MAX_RANKING_COUNT); // 상위 10개만 남기기
 }
 
-void RankingManager::LoadInitialRanking(const std::vector<RankingInfo>& initial_rankings)
+void RankingManager::InitRanking(std::vector<RankingInfo>& loaded_rankings)
 {
 	std::lock_guard<std::mutex> lock(ranking_mutex);
-	rankings = initial_rankings;
-	rankings.erase(
-		std::remove_if(rankings.begin(), rankings.end(),
-			[](const RankingInfo& info) {
-				return info.score <= 0;
-			}),
-		rankings.end());
+	rankings = std::move(loaded_rankings);
 	SortAndTrim();
 }
 

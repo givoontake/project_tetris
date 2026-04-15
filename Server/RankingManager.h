@@ -17,7 +17,7 @@ class RankingManager
 	void SortAndTrim();
 
 public:
-	void LoadInitialRanking(const std::vector<RankingInfo>& initial_rankings);
+	void InitRanking(std::vector<RankingInfo>& initial_rankings);
 	void UpdateRanking(int id, const std::string& nickname, int score);
 	std::vector<RankingInfo> GetRankings() const;
 };
