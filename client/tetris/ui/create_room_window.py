@@ -1,15 +1,17 @@
 import pygame
 from typing import Optional
-from tetris.ui.button import Button
-from tetris.ui.inputbox import InputBox
+
 from tetris.config.define import *
-from tetris.resources.resource_manager import *
-from tetris.resources.fonts import Fonts
-from tetris.ui.rectangle import Rectangle
+from tetris.net.error_types import ERROR_MESSAGES, ROOM_NAME_TOO_SHORT, ROOM_PASSWORD_TOO_SHORT
 from tetris.net.network import NetworkWorker
-from tetris.net.session import Session
-from tetris.ui.toggle_button import ToggleButton
 from tetris.net.packet_manager import *
+from tetris.net.session import Session
+from tetris.resources.resource_manager import ResourceManager
+from tetris.ui.inputbox import InputBox
+from tetris.ui.popupbox import PopupBox
+from tetris.ui.rectangle import Rectangle
+from tetris.ui.toggle_button import ToggleButton
+
 
 class CreateRoomWindow:
     TOP_PADDING = 50
@@ -18,7 +20,6 @@ class CreateRoomWindow:
     GAP = 50
     WIDTH = 600
 
-    # 🔹 좌우 패딩 추가
     LEFT_PADDING = 20
     RIGHT_PADDING = 20
 
@@ -36,8 +37,9 @@ class CreateRoomWindow:
         self.option_open: list[ToggleButton] = []
         self.password: InputBox = None
         self.option_make: list[ToggleButton] = []
+        self.error_popup: Optional[PopupBox] = None
 
-        self.col_num = 5 # 총 5줄
+        self.col_num = 5
 
         self.title_val: Optional[str] = None
         self.player_val: Optional[int] = None
@@ -46,116 +48,93 @@ class CreateRoomWindow:
 
         self.set_layout()
 
-    # def _reset(self):
-    #     for option in self.option_player:
-    #         option.active = False
-
-    #     for option in self.option_open:
-    #         option.active = False
-
-    #     for option in self.option_make:
-    #         option.active = False
-    #     self.title_val = None
-    #     self.player_val = None
-    #     self.is_open = None
-    #     self.password_val = None
-
-    # def on_resize(self, new_screen: pygame.Surface):
-    #     self.screen = new_screen
-    #     self.set_layout()
-
     def set_layout(self):
         sw, sh = self.screen.get_size()
-        
+
         self.rect.w = sw // 2
         self.rect.h = sh // 2
         self.rect.x = (sw // 2) - (self.rect.w // 2)
         self.rect.y = (sh // 2) - (self.rect.h // 2)
-        outline_padding_w = self.rect.w // 10 # 10%
+        outline_padding_w = self.rect.w // 10
         outline_padding_h = self.rect.h // 10
-        inner_padding_w = self.rect.w // 20 # 5%
+        inner_padding_w = self.rect.w // 20
         inner_padding_h = self.rect.h // 20
         self.window = Rectangle(self.screen, self.rect, self.rm, None, "")
-        # 각 h은 전체 줄수와 관련이 있다.
 
-        # copy_rect = pygame.Rect(0, 0, 0, 0) # copy로 여러 복사본을 만들기 위해 값 복사용 rect 생성
-        draw_x, draw_y = self.rect.x + outline_padding_w, self.rect.y + outline_padding_h # 우선 시작 좌표, 계속 갱신할 예정
-        draw_h = (self.rect.h - (outline_padding_h*2 + inner_padding_h*(self.col_num - 1))) // self.col_num # 고정값
-        # draw_w는 그때그때 계산
-        # draw_ 는 레이아웃 값 조작용, 이 값을 기준으로 복사본을 생성해 계속 넣어주면 된다.
-        
-        draw_w = self.rect.w - outline_padding_w*2
+        draw_x = self.rect.x + outline_padding_w
+        draw_y = self.rect.y + outline_padding_h
+        draw_h = (self.rect.h - (outline_padding_h * 2 + inner_padding_h * (self.col_num - 1))) // self.col_num
+
+        draw_w = self.rect.w - outline_padding_w * 2
         title_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.title = InputBox(self.screen, title_rect, self.rm, "방 제목", MAX_INPUT, False, True)
+        self.title = InputBox(self.screen, title_rect, self.rm, "4~16자", MAX_INPUT, False, True)
         draw_y += draw_h + inner_padding_h
 
         op_player_texts = ["1인", "2인", "5인"]
-        draw_w = (self.rect.w - (outline_padding_w*2 + inner_padding_w*(len(op_player_texts) - 1))) // len(op_player_texts)
+        draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_player_texts) - 1))) // len(op_player_texts)
         for op_text in op_player_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
             option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
             self.option_player.append(option)
-            draw_x += (draw_w + inner_padding_w)
+            draw_x += draw_w + inner_padding_w
         draw_x = self.rect.x + outline_padding_w
         draw_y += draw_h + inner_padding_h
 
         op_open_texts = ["공개", "비공개"]
-        draw_w = (self.rect.w - (outline_padding_w*2 + inner_padding_w*(len(op_open_texts) - 1))) // len(op_open_texts)
-        
+        draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_open_texts) - 1))) // len(op_open_texts)
         for op_text in op_open_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
             option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
             self.option_open.append(option)
-            draw_x += (draw_w + inner_padding_w)
+            draw_x += draw_w + inner_padding_w
         draw_x = self.rect.x + outline_padding_w
         draw_y += draw_h + inner_padding_h
 
-        draw_w = self.rect.w - outline_padding_w*2
+        draw_w = self.rect.w - outline_padding_w * 2
         pw_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.password = InputBox(self.screen, pw_rect, self.rm, "비밀번호", MAX_INPUT, False, True)
+        self.password = InputBox(self.screen, pw_rect, self.rm, "4~16자", MAX_INPUT, False, True)
         draw_y += draw_h + inner_padding_h
 
         op_make_texts = ["만들기", "취소"]
-        draw_w = (self.rect.w - (outline_padding_w*2 + inner_padding_w*(len(op_make_texts) - 1))) // len(op_make_texts)
-        
+        draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_make_texts) - 1))) // len(op_make_texts)
         for op_text in op_make_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
             option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
             self.option_make.append(option)
-            draw_x += (draw_w + inner_padding_w)
+            draw_x += draw_w + inner_padding_w
 
-    # -------- 내부 상태 보조 -------- #
     def _set_player_value(self, val: str):
         for option in self.option_player:
-            if option.text == val: option.pressed = True
-            else: option.pressed = False
-
-        int_val = int(val.replace("인", "")) # "인"을 모두 찾아 ""()빈칸으로 대체
-        self.player_val = int_val
+            option.pressed = option.text == val
+        self.player_val = int(val.replace("인", ""))
 
     def _set_open_value(self, val: str):
         for option in self.option_open:
-            if option.text == val: option.pressed = True
-            else: option.pressed = False
-        if val == "공개": 
+            option.pressed = option.text == val
+
+        if val == "공개":
             self.is_open = True
             self.password.active = False
         elif val == "비공개":
             self.is_open = False
             self.password.active = True
 
-    # -------- 프레임 업데이트 -------- #
+    def _is_min_length(self, value: str) -> bool:
+        return len(value.encode("utf-8")) >= 4
+
     def update(self, dt_ms: int):
         self.title.update(dt_ms)
         self.password.update(dt_ms)
 
-    # -------- 이벤트 처리 (버튼 이벤트 반환) -------- #
-    def handle_event(self, ev: pygame.event.Event)-> Optional[str]:
-        
+    def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
+        if self.error_popup:
+            if self.error_popup.handle_event(ev):
+                self.error_popup = None
+            return None
+
         if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
-            # input의 enter 키는 입력된 문자열을 반환하고 초기화
-            return
-        
+            return None
+
         self.title.handle_event(ev)
 
         for option in self.option_player:
@@ -168,24 +147,47 @@ class CreateRoomWindow:
                 self._set_open_value(option.text)
                 break
 
-        if self.is_open == False:
+        if self.is_open is False:
             self.password.handle_event(ev)
 
         for option in self.option_make:
             if option.handle_event(ev):
                 if option.text == "만들기":
+                    title_val = self.title.get_total_text()
+                    password_val = self.password.get_total_text()
+
+                    if not self._is_min_length(title_val):
+                        self.error_popup = PopupBox(
+                            self.screen,
+                            self.rm,
+                            ERROR_MESSAGES[ROOM_NAME_TOO_SHORT],
+                            ["확인"],
+                        )
+                        return None
+
+                    if self.is_open is False and not self._is_min_length(password_val):
+                        self.error_popup = PopupBox(
+                            self.screen,
+                            self.rm,
+                            ERROR_MESSAGES[ROOM_PASSWORD_TOO_SHORT],
+                            ["확인"],
+                        )
+                        return None
+
                     self.title_val = self.title.extract_text()
                     self.password_val = self.password.extract_text()
-                    packet = self.net_worker.builder.build_create_room(self.title_val, self.player_val, self.is_open, self.password_val)
+                    packet = self.net_worker.builder.build_create_room(
+                        self.title_val,
+                        self.player_val,
+                        self.is_open,
+                        self.password_val,
+                    )
                     self.net_worker.send_packet(packet)
-
-                # elif option.text == "취소":
-                #     pass
 
                 return option.text
 
         return None
-    # -------- 그리기 -------- #
+
     def draw(self):
         self.window.draw()
 
@@ -200,3 +202,6 @@ class CreateRoomWindow:
 
         for option in self.option_make:
             option.draw()
+
+        if self.error_popup:
+            self.error_popup.draw()

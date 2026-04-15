@@ -865,6 +865,7 @@ void IOCPServer::CreateOpenRoom(char* packet, Session& session, int request_gen)
 {
 	C2S_ADD_OPEN_ROOM_PACKET* open_p = reinterpret_cast<C2S_ADD_OPEN_ROOM_PACKET*>(packet);
 	OpenRoomInitData data;
+	constexpr size_t MIN_ROOM_NAME_LENGTH = 4;
 	//std::shared_ptr<TetrisRoom> new_room;
 	bool is_single;
 	if (open_p->max_user == 1) {
@@ -879,6 +880,10 @@ void IOCPServer::CreateOpenRoom(char* packet, Session& session, int request_gen)
 		
 	else return;
 	data.room_name = CharBufToString(open_p->room_name, sizeof(open_p->room_name));
+	if (data.room_name.size() < MIN_ROOM_NAME_LENGTH) {
+		SendError(session, request_gen, ERROR_CODE::INVALID_REQUEST);
+		return;
+	}
 	data.room_gen = GetNewRoomGen();
 	
 	std::shared_ptr<TetrisRoom> new_room;
@@ -910,6 +915,8 @@ void IOCPServer::CreateLockRoom(char* packet, Session& session, int request_gen)
 {
 	C2S_ADD_LOCK_ROOM_PACKET* lock_p = reinterpret_cast<C2S_ADD_LOCK_ROOM_PACKET*>(packet);
 	LockRoomInitData data;
+	constexpr size_t MIN_ROOM_NAME_LENGTH = 4;
+	constexpr size_t MIN_ROOM_PASSWORD_LENGTH = 4;
 	//std::shared_ptr<TetrisRoom> new_room;
 	bool is_single;
 	if (lock_p->max_user == 1) {
@@ -925,6 +932,10 @@ void IOCPServer::CreateLockRoom(char* packet, Session& session, int request_gen)
 	else return;
 	data.room_name = CharBufToString(lock_p->room_name, sizeof(lock_p->room_name));
 	data.room_password = CharBufToString(lock_p->room_password, sizeof(lock_p->room_password));
+	if (data.room_name.size() < MIN_ROOM_NAME_LENGTH || data.room_password.size() < MIN_ROOM_PASSWORD_LENGTH) {
+		SendError(session, request_gen, ERROR_CODE::INVALID_REQUEST);
+		return;
+	}
 	data.room_gen = GetNewRoomGen();
 
 	std::shared_ptr<TetrisRoom> new_room;
