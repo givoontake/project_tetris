@@ -74,7 +74,7 @@ public:
 	std::string CharBufToString(const char* buf, int buf_size);
 	void HandlePacket(char* packet, Session& session, int request_gen);
 	void SendRoomList(Session& session, int request_gen);
-	bool TryJoinRoom(Session& session, int request_gen, int room_gen, const char* room_password);
+	bool TryJoinRoom(Session& session, int request_gen, int room_gen, const std::string& room_password);
 	int FindRoom(int room_gen);
 	int FindUser(int user_id);
 	void SendError(Session& session, int request_gen, int error_code);

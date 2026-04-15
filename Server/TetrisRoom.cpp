@@ -1,4 +1,5 @@
 #include <random>
+#include <utility>
 #include "TetrisRoom.h"
 #include "IOCPServer.h"
 #include "packet_type.h"
@@ -8,8 +9,8 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, OpenRoomInitData d
 	// 생성과 소멸은 스레드 세이프하지는 않지만, 어차피 make_shared하고 CAS해서 룸 리스트에 할당하기 전에는 접근되지 않는다.
 	server = _server;
 	max_user = data.max_user;
-	memcpy(this->room_name, data.room_name, sizeof(this->room_name));
-	room_password = nullptr;
+	room_name = std::move(data.room_name);
+	room_password.clear();
 	room_index = data.room_index;
 	room_gen = data.room_gen;
 	room_state.Store(ROOM_STATE::WAIT);
@@ -28,9 +29,8 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, LockRoomInitData d
 {
 	server = _server;
 	max_user = data.max_user;
-	memcpy(this->room_name, data.room_name, sizeof(this->room_name));
-	room_password = new char[MAX_ROOM_PASSWORD];
-	memcpy(room_password, data.room_password, MAX_ROOM_PASSWORD);
+	room_name = std::move(data.room_name);
+	room_password = std::move(data.room_password);
 	room_index = data.room_index;
 	room_gen = data.room_gen;
 	room_state.Store(ROOM_STATE::WAIT);
@@ -46,7 +46,6 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, LockRoomInitData d
 
 TetrisRoom::~TetrisRoom()
 {
-	if (room_password) delete[] room_password;
 }
 
 void TetrisRoom::InitGame()

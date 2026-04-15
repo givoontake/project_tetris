@@ -132,13 +132,13 @@ void IOCPServer::HandleDisconnectPacket(Session& session)
 void IOCPServer::HandleJoinOpenRoomPacket(char* packet, Session& session, int request_gen)
 {
 	C2S_JOIN_OPEN_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_OPEN_ROOM_PACKET*>(packet);
-	TryJoinRoom(session, request_gen, join_p->room_gen, nullptr);
+	TryJoinRoom(session, request_gen, join_p->room_gen, "");
 }
 
 void IOCPServer::HandleJoinLockRoomPacket(char* packet, Session& session, int request_gen)
 {
 	C2S_JOIN_LOCK_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_LOCK_ROOM_PACKET*>(packet);
-	TryJoinRoom(session, request_gen, join_p->room_gen, join_p->room_password);
+	TryJoinRoom(session, request_gen, join_p->room_gen, CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
 }
 
 void IOCPServer::HandleFastMatchingPacket(char* packet, Session& session, int request_gen)
@@ -336,10 +336,10 @@ void IOCPServer::SendRoomList(Session& session, int request_gen)
 		info_p.size = sizeof(S2C_ROOM_INFO_PACKET);
 		info_p.type = S2C_ROOM_INFO;
 		info_p.room_gen = room_sp->GetRoomGen();
-		const char* name = room_sp->GetRoomName();
+		const std::string& name = room_sp->GetRoomName();
 		info_p.max_user = room_sp->GetMaxUser();
 		info_p.cur_user = room_sp->GetCurrentUser();
-		memcpy(&info_p.room_name, name, MAX_USER_NAME);
+		StringToCharBuf(name, info_p.room_name, sizeof(info_p.room_name));
 		info_p.is_private = room_sp->GetIsPrivate();
 		bool is_play;
 		if (room_sp->GetRoomState() == ROOM_STATE::WAIT) is_play = false;
@@ -361,7 +361,7 @@ void IOCPServer::SendRoomList(Session& session, int request_gen)
 }
 
 // 
-bool IOCPServer::TryJoinRoom(Session& session, int request_gen, int room_gen, const char* room_password)
+bool IOCPServer::TryJoinRoom(Session& session, int request_gen, int room_gen, const std::string& room_password)
 {	
 	int result = ERROR_CODE::ROOM_NOT_FOUND;
 	int room_index = FindRoom(room_gen);
@@ -437,8 +437,9 @@ void IOCPServer::FindMatch(Session& session, int request_gen, int max_user)
 			// 단순히 널을 체크하고 들어가도 그 다음 내부 객체 접근 시 그 객체가 삭제되었을 수 있다.
 			auto room_sp = room.load();
 			if (room_sp) {
+				if (room_sp->GetIsPrivate()) continue;
 				if (room_sp->GetMaxUser() == 2 or room_sp->GetMaxUser() == 5) { // 공개 멀티 방 중 아무 방이나 찾기
-					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), nullptr)) return;
+					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), "")) return;
 				}
 			}
 		}
@@ -448,8 +449,9 @@ void IOCPServer::FindMatch(Session& session, int request_gen, int max_user)
 		for (auto& room : rooms) {
 			auto room_sp = room.load();
 			if (room_sp) {
+				if (room_sp->GetIsPrivate()) continue;
 				if (room_sp->GetMaxUser() == max_user) {
-					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), nullptr)) return;
+					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), "")) return;
 				}
 			}
 		}
@@ -459,8 +461,9 @@ void IOCPServer::FindMatch(Session& session, int request_gen, int max_user)
 		for (auto& room : rooms) {
 			auto room_sp = room.load();
 			if (room_sp) {
+				if (room_sp->GetIsPrivate()) continue;
 				if (room_sp->GetMaxUser() == max_user) {
-					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), nullptr)) return;
+					if (TryJoinRoom(session, request_gen, room_sp->GetRoomGen(), "")) return;
 				}
 			}
 		}
@@ -875,7 +878,7 @@ void IOCPServer::CreateOpenRoom(char* packet, Session& session, int request_gen)
 	}
 		
 	else return;
-	memcpy(data.room_name, open_p->room_name, sizeof(data.room_name));
+	data.room_name = CharBufToString(open_p->room_name, sizeof(open_p->room_name));
 	data.room_gen = GetNewRoomGen();
 	
 	std::shared_ptr<TetrisRoom> new_room;
@@ -920,8 +923,8 @@ void IOCPServer::CreateLockRoom(char* packet, Session& session, int request_gen)
 	}
 
 	else return;
-	memcpy(data.room_name, lock_p->room_name, sizeof(data.room_name));
-	memcpy(data.room_password, lock_p->room_password, sizeof(data.room_password));
+	data.room_name = CharBufToString(lock_p->room_name, sizeof(lock_p->room_name));
+	data.room_password = CharBufToString(lock_p->room_password, sizeof(lock_p->room_password));
 	data.room_gen = GetNewRoomGen();
 
 	std::shared_ptr<TetrisRoom> new_room;

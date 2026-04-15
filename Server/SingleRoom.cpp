@@ -197,13 +197,13 @@ void SingleRoom::DeleteUser(const int id)
 
 void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸고 들어온다
 {
-	if (!room_password) {
+	if (room_password.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
 		open_p.gen = room_gen;
 		open_p.max_user = max_user;
-		memcpy(open_p.room_name, room_name, sizeof(room_name));
+		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
 		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
 	}
 	else {
@@ -212,8 +212,8 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		lock_p.type = S2C_ADD_LOCK_ROOM;
 		lock_p.gen = room_gen;
 		lock_p.max_user = max_user;
-		memcpy(lock_p.room_name, room_name, sizeof(room_name));
-		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
+		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
+		server->StringToCharBuf(room_password, lock_p.room_password, sizeof(lock_p.room_password));
 		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
 	std::cout << "Room[: " << room_index << "] created by : " << session.GetDBInfo().nickname << "\n";

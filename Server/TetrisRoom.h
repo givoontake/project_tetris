@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <array>
+#include <string>
 #include <mutex>
 #include "RoomSession.h"
 #include "Session.h"
@@ -49,15 +50,15 @@ struct OpenRoomInitData {
 	int room_gen = -1;
 	int room_index = -1;
 	char max_user = -1;
-	char room_name[MAX_ROOM_NAME];
+	std::string room_name;
 };
 
 struct LockRoomInitData {
 	int room_gen = -1;
 	int room_index = -1;
 	char max_user = -1;
-	char room_name[MAX_ROOM_NAME];
-	char room_password[MAX_ROOM_PASSWORD];
+	std::string room_name;
+	std::string room_password;
 };
 
 // 현재 룸 세션 내부에 session*를 유지중이라, 유저가 삭제되면 범위기반 스코프 접근 시 해당 참조의 세션이 널일 수 있고, 방이 삭제되어 버리면 범위 자체가 손상되어 범위기반 작업은 모두 뮤텍스로 묶어놓은 상태이다.
@@ -77,8 +78,8 @@ protected:
 
 	int room_index;
 	int room_gen;
-	char room_name[MAX_ROOM_NAME];
-	char* room_password;
+	std::string room_name;
+	std::string room_password;
 	char max_user;
 	char cur_user;
 
@@ -94,10 +95,11 @@ public:
 	std::mutex& GetRoomMutex() { return room_mutex; }
 	int GetRoomGen() const { return room_gen; }
 	int GetRoomIndex() const { return room_index; }
-	bool GetIsPrivate() const { return room_password ? true : false; }
+	bool GetIsPrivate() const { return !room_password.empty(); }
 	int GetMaxUser() const { return static_cast<int>(max_user); }
 	int GetCurrentUser() const { return static_cast<int>(cur_user); }
-	const char* GetRoomName() const { return room_name; }
+	const std::string& GetRoomName() const { return room_name; }
+	const std::string& GetRoomPassword() const { return room_password; }
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, Session& request_session) = 0;

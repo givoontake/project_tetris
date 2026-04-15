@@ -80,12 +80,10 @@ void MultiRoom::HandlePacket(char* packet, Session& request_session)
 }
 
 // add는 외부에서 추가되므로 아직 세션이 안전하지 않음. 방에 완전히 들어와야 안전해짐. 락은 외부에서 건다
-int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_password)
+int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string& input_password)
 {
-	if (room_password) {
-		if (memcmp(room_password, input_password, MAX_ROOM_PASSWORD) != 0) {
-			return ERROR_CODE::ROOM_INVALID_PASSWORD;
-		}
+	if (!room_password.empty() && room_password != input_password) {
+		return ERROR_CODE::ROOM_INVALID_PASSWORD;
 	}
 	//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
 	int result = ERROR_CODE::ROOM_FULL;
@@ -113,13 +111,13 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 	}
 
 	if (result == SUCCESS) {
-		if (!room_password) {
+		if (room_password.empty()) {
 			S2C_ADD_OPEN_ROOM_PACKET open_p;
 			open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 			open_p.type = S2C_ADD_OPEN_ROOM;
 			open_p.gen = room_gen;
 			open_p.max_user = max_user;
-			memcpy(&open_p.room_name, room_name, MAX_ROOM_NAME);
+			server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
 			room_users[added_slot].GetSession()->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
 		}
 		else {
@@ -128,8 +126,8 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 			lock_p.type = S2C_ADD_LOCK_ROOM;
 			lock_p.gen = room_gen;
 			lock_p.max_user = max_user;
-			memcpy(&lock_p.room_name, room_name, MAX_ROOM_NAME);
-			memcpy(&lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
+			server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
+			server->StringToCharBuf(room_password, lock_p.room_password, sizeof(lock_p.room_password));
 			room_users[added_slot].GetSession()->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 		}
 
@@ -142,7 +140,7 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 			add_p.size = sizeof(S2C_ADD_USER_PACKET);
 			add_p.type = S2C_ADD_USER;
 			add_p.id = new_session.GetDBInfo().id;
-			memcpy(&add_p.name, &new_session.GetDBInfo().nickname, MAX_USER_NAME);
+			server->StringToCharBuf(new_session.GetDBInfo().nickname, add_p.name, sizeof(add_p.name));
 			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
 		}
 
@@ -155,7 +153,7 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const char* input_
 			add_p.size = sizeof(S2C_ADD_USER_PACKET);
 			add_p.type = S2C_ADD_USER;
 			add_p.id = r_user.GetSession()->GetDBInfo().id;
-			memcpy(&add_p.name, &r_user.GetSession()->GetDBInfo().nickname, MAX_USER_NAME);
+			server->StringToCharBuf(r_user.GetSession()->GetDBInfo().nickname, add_p.name, sizeof(add_p.name));
 			new_session.SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
 		}
 
@@ -197,13 +195,13 @@ void MultiRoom::DeleteUser(const int id)
 
 void MultiRoom::SendCreateRoom(Session& session)
 {
-	if (!room_password) {
+	if (room_password.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
 		open_p.type = S2C_ADD_OPEN_ROOM;
 		open_p.gen = room_gen;
 		open_p.max_user = max_user;
-		memcpy(open_p.room_name, room_name, sizeof(room_name));
+		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
 		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
 	}
 	else {
@@ -212,8 +210,8 @@ void MultiRoom::SendCreateRoom(Session& session)
 		lock_p.type = S2C_ADD_LOCK_ROOM;
 		lock_p.gen = room_gen;
 		lock_p.max_user = max_user;
-		memcpy(lock_p.room_name, room_name, sizeof(room_name));
-		memcpy(lock_p.room_password, room_password, MAX_ROOM_PASSWORD);
+		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
+		server->StringToCharBuf(room_password, lock_p.room_password, sizeof(lock_p.room_password));
 		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
 	FindNewHost();
