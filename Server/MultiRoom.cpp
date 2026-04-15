@@ -250,6 +250,7 @@ void MultiRoom::KickUser(int id, int kick_user_id)
 {
 	std::lock_guard<std::mutex> lock(room_mutex);
 	if (id != host_id) return;
+	if (kick_user_id == host_id) return;
 
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;

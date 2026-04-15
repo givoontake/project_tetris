@@ -90,6 +90,7 @@ void Session::SendPacket(int request_gen, char* packet, const HANDLE iocp_handle
 		}
 		else {
 			std::cerr << "Session::SendPacket, Session index[" << key.index << "]slot has been reused." << std::endl;
+			delete send_over;
 			return;
 		}
 	}
@@ -126,6 +127,7 @@ void Session::SendBoundPacket(int request_gen, char* packet_buf, int data_size, 
 		}
 		else {
 			std::cerr << "Session::SendPacket, Session index[" << key.index << "]slot has been reused." << std::endl;
+			delete send_over;
 			return;
 		}
 	}

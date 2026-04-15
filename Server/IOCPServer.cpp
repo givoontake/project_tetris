@@ -80,7 +80,6 @@ void IOCPServer::HandleMessagePacket(char* packet, Session& session, int request
 	int msg_size = recv_p->size - sizeof(C2S_MESSAGE_PACKET);
 	if (msg_size == 0) return;
 	int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
-	char* send_p = new char[send_p_size];
 
 	std::string nickname;
 	int id;
@@ -92,6 +91,7 @@ void IOCPServer::HandleMessagePacket(char* packet, Session& session, int request
 		id = session.GetDBInfo().id;
 	}
 
+	char* send_p = new char[send_p_size];
 	S2C_MESSAGE_PACKET front_p;
 	front_p.size = send_p_size;
 	front_p.type = S2C_MESSAGE;
@@ -300,6 +300,7 @@ void IOCPServer::HandlePacket(char* packet, Session& session, int request_gen)
 void IOCPServer::SendRoomList(Session& session, int request_gen)
 {
 	// 더미 방 생성
+	#if 0
 	for (int i = 0; i < 20; ++i) {
 		S2C_ROOM_INFO_PACKET p{};
 		p.size = sizeof(S2C_ROOM_INFO_PACKET);
@@ -318,6 +319,7 @@ void IOCPServer::SendRoomList(Session& session, int request_gen)
 
 		session.SendPacket(request_gen, reinterpret_cast<char*>(&p), iocp_handle);
 	}
+	#endif
 
 	{
 		// 어차피 send의 세션 조건에서 걸러지지만, 방이 많아지면 작업 자체가 길어질 수 있으므로 미리 체크
