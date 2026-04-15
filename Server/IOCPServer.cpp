@@ -1225,13 +1225,13 @@ void IOCPServer::ProcessRankingResult(DBOverlapped* db_over)
 void IOCPServer::StringToCharBuf(const std::string& str, char* buf, int buf_size)
 {
 	ZeroMemory(buf, buf_size);
-	int copy_size = std::min(str.size(), static_cast<size_t>(buf_size));
+	size_t copy_size = std::min(str.size(), static_cast<size_t>(buf_size));
 	memcpy(buf, str.data(), copy_size);
 }
 
 std::string IOCPServer::CharBufToString(const char* buf, int buf_size)
 {
-	int copy_size = strnlen(buf, buf_size);
+	size_t copy_size = strnlen(buf, static_cast<size_t>(buf_size));
 	std::string str(buf, copy_size);
 	return str;
 }
