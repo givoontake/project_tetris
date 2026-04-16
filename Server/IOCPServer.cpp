@@ -6,7 +6,7 @@
 
 #undef min
 
-IOCPServer::IOCPServer()
+IOCPServer::IOCPServer() : packet_handler(*this), db_result_handler(*this)
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		users[i].SetIndex(i);
@@ -220,80 +220,7 @@ void IOCPServer::HandleDeleteFriendPacket(char* packet, Session& session, int re
 void IOCPServer::HandlePacket(char* packet, Session& session, int request_gen)
 {
 	// 작업에 필요한 데이터는 락으로 잡고 전송에 필요한 본인 정보만 복사(전송에 필요한 본인 정보를 읽을 때 연결이 끊기면 데이터 레이스 발생 가능)
-	switch (GetPacketType(packet)) {
-
-	case C2S_LOGIN: {
-		HandleLoginPacket(packet, session, request_gen);
-		break;
-	}
-
-	case C2S_MESSAGE: {
-		HandleMessagePacket(packet, session, request_gen);
-		break;
-	}
-
-	case C2S_TEST: {
-		HandleTestPacket(packet, session);
-		break;
-	}
-
-	case C2S_DISCONNECT: {
-		HandleDisconnectPacket(session);
-		break;
-	}
-
-	case C2S_ADD_OPEN_ROOM: {
-		CreateOpenRoom(packet, session, request_gen);
-		break;
-	}
-
-	case C2S_ADD_LOCK_ROOM: {
-		CreateLockRoom(packet, session, request_gen);
-		break;
-	}
-
-	case C2S_JOIN_OPEN_ROOM: {
-		HandleJoinOpenRoomPacket(packet, session, request_gen);
-		break;
-	}
-	case C2S_JOIN_LOCK_ROOM: {
-		HandleJoinLockRoomPacket(packet, session, request_gen);
-		break;
-	}
-	case C2S_REQUEST_ROOM_LIST: {
-		SendRoomList(session, request_gen);
-		break;
-	}
-	case C2S_REQUEST_LOBBY_USER_LIST: {
-		SendLobbyUserList(session, request_gen);
-		break;
-	}
-	case C2S_REQUEST_FRIEND_LIST: {
-		SendFriendList(session, request_gen);
-		break;
-	}
-	case C2S_REQUEST_RANKING: {
-		SendRanking(session, request_gen);
-		break;
-	}
-	case C2S_FAST_MATCHING: {
-		HandleFastMatchingPacket(packet, session, request_gen);
-		break;
-	}
-	case C2S_REQUEST_FRIEND: {
-		HandleRequestFriendPacket(packet, session, request_gen);
-		break;
-	}
-
-	case C2S_ACCEPT_FRIEND: {
-		HandleAcceptFriendPacket(packet, session, request_gen);
-		break;
-	}
-	case C2S_DELETE_FRIEND: {
-		HandleDeleteFriendPacket(packet, session, request_gen);
-		break;
-	}
-	}
+	packet_handler.HandlePacket(packet, session, request_gen);
 }
 void IOCPServer::SendRoomList(Session& session, int request_gen)
 {
@@ -1204,22 +1131,7 @@ void IOCPServer::HandleLoadFriendListDBResult(DBOverlapped* db_over, Session& se
 
 void IOCPServer::HandleDBResult(DBOverlapped* db_over)
 {
-	switch (db_over->type) {
-	case DBOperationType::ADD_FRIEND_REQUEST:
-		HandleRequestFriendDBResult(db_over);
-		break;
-	case DBOperationType::ADD_FRIEND:
-		HandleAddFriendDBResult(db_over);
-		break;
-	case DBOperationType::DELETE_FRIEND:
-		HandleDeleteFriendDBResult(db_over);
-		break;
-	case DBOperationType::LOAD_RANKING:
-		ProcessRankingResult(db_over);
-		break;
-	default:
-		break;
-	}
+	db_result_handler.HandleDBResult(db_over);
 }
 
 void IOCPServer::HandleDBResult(DBOverlapped* db_over, Session& session)
@@ -1231,38 +1143,7 @@ void IOCPServer::HandleDBResult(DBOverlapped* db_over, Session& session)
 	
 	// IOCP에서 작업 완료하고 얻어온 key만 계속 넘어가면 된다. 최종 검증은 send 직전에 한다.
 	// 만약 재사용됐다? -> GQCS에서 받아온 키가 send 전까지 계속 넘어가므로, 최종 검증은 거기서만 하면 된다.
-	switch (db_over->type) {
-	case DBOperationType::LOGIN:
-		HandleLoginDBResult(db_over, session);
-		break;
-
-	case DBOperationType::UPDATE_SCORE:
-		HandleUpdateScoreDBResult(db_over, session);
-		break;
-
-	case DBOperationType::UPDATE_MATCH_RESULT:
-		HandleUpdateMatchResultDBResult(db_over, session);
-		break;
-
-	case DBOperationType::ADD_FRIEND_REQUEST:
-		HandleRequestFriendDBResult(db_over);
-		break;
-
-	case DBOperationType::ADD_FRIEND:
-		HandleAddFriendDBResult(db_over);
-		break;
-
-	case DBOperationType::DELETE_FRIEND:
-		HandleDeleteFriendDBResult(db_over);
-		break;
-		
-	case DBOperationType::LOAD_FRIEND_LIST:
-		HandleLoadFriendListDBResult(db_over, session);
-		break;
-
-	case DBOperationType::LOAD_RANKING:
-		break;
-	}
+	db_result_handler.HandleDBResult(db_over, session);
 }
 
 void IOCPServer::ProcessRankingResult(DBOverlapped* db_over)

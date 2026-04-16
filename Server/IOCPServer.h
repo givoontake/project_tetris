@@ -9,6 +9,7 @@
 #include "ActiveUserManager.h"
 #include "Session.h"
 #include "PacketHandler.h"
+#include "DBResultHandler.h"
 #include "MQueue.h"
 #include "TetrisRoom.h"
 #include "Atomic.h"
@@ -28,6 +29,8 @@ class IOCPServer
 	RankingManager ranking_manager;
 	ActiveRoomManager active_rooms;
 	ActiveUserManager active_users;
+	PacketHandler packet_handler;
+	DBResultHandler db_result_handler;
 	std::atomic<int> user_gen_generator = -1;
 	std::atomic<int> room_gen_generator = -1;
 	std::atomic<long long> tick_count = 0;
@@ -86,6 +89,9 @@ public:
 	void SendRanking(Session& session, int request_gen);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
 	void SendDeleteFriendResult(int requester_id, int target_id);
+
+	friend class PacketHandler;
+	friend class DBResultHandler;
 
 private:
 	void HandleLoginPacket(char* packet, Session& session, int request_gen);
