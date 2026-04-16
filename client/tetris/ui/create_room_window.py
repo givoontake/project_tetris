@@ -4,7 +4,7 @@ from typing import Optional
 from tetris.config.define import *
 from tetris.net.error_types import ERROR_MESSAGES, ROOM_NAME_TOO_SHORT, ROOM_PASSWORD_TOO_SHORT
 from tetris.net.network import NetworkWorker
-from tetris.net.packet_manager import *
+from tetris.net.packet_structs import MAX_INPUT
 from tetris.net.session import Session
 from tetris.resources.resource_manager import ResourceManager
 from tetris.ui.inputbox import InputBox

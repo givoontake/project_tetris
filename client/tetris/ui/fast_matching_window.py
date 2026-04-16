@@ -8,7 +8,6 @@ from tetris.ui.rectangle import Rectangle
 from tetris.net.network import NetworkWorker
 from tetris.net.session import Session
 from tetris.ui.toggle_button import ToggleButton
-from tetris.net.packet_manager import *
 
 class FastMatchingWindow:
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker):

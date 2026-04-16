@@ -126,25 +126,23 @@ void TetrisRoom::BoundPackets()
 			case EVENT_TYPE::FIX: {
 				auto& t = std::get<TaskFix>(task.task);
 				S2C_FIX_PACKET fix_p;
-				fix_p.size = sizeof(S2C_FIX_PACKET);
-				fix_p.type = S2C_FIX;
+				InitPacketHeader(fix_p, S2C_FIX);
 				fix_p.id = r_user.GetSession()->GetDBInfo().id;
 				fix_p.fixed_x = t.fixed_x; // 실시간 반영된 값을 읽는게 아니라 작업 목록을 가져와서 패킷을 구성하므로, 작업 당시의 값을 가져와야 함. addline과 동시 틱에 처리되면 클라는 공중에 떠 있는 것으로 보이는 버그 발생
 				fix_p.fixed_y = t.fixed_y;
-				r_user.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.size);
+				r_user.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.header.size);
 				break;
 			}
 
 			case EVENT_TYPE::CLEARLINE: {
 				auto& t = std::get<TaskClearLine>(task.task);
 				S2C_CLEARLINE_PACKET clear_line_p;
-				clear_line_p.size = sizeof(S2C_CLEARLINE_PACKET);
-				clear_line_p.type = S2C_CLEARLINE;
+				InitPacketHeader(clear_line_p, S2C_CLEARLINE);
 				clear_line_p.id = r_user.GetSession()->GetDBInfo().id;
 				clear_line_p.score = r_user.GetScore();
 				clear_line_p.line_index = t.line_index;
 				clear_line_p.combo = r_user.GetCombo();
-				r_user.AddToSendBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.size);
+				r_user.AddToSendBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.header.size);
 
 				break;
 			}
@@ -154,14 +152,13 @@ void TetrisRoom::BoundPackets()
 
 				if (SpawnTetromino(r_user.GetSession()->GetDBInfo().id)) {
 					S2C_SPAWN_PACKET spawn_p;
-					spawn_p.size = sizeof(S2C_SPAWN_PACKET);
-					spawn_p.type = S2C_SPAWN;
+					InitPacketHeader(spawn_p, S2C_SPAWN);
 					spawn_p.id = r_user.GetSession()->GetDBInfo().id;
 					spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 					spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 					spawn_p.spawn_x = static_cast<char>(spawn_pos.x);
 					spawn_p.spawn_y = static_cast<char>(spawn_pos.y);
-					r_user.AddToSendBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.size);
+					r_user.AddToSendBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.header.size);
 				}
 				break;
 			}
@@ -169,12 +166,11 @@ void TetrisRoom::BoundPackets()
 			case EVENT_TYPE::ADDLINE: {
 				r_user.GetTetris().GetTickData().SetGarbageLineTick(0);
 				S2C_ADDLINE_PACKET add_line_p;
-				add_line_p.size = sizeof(S2C_ADDLINE_PACKET);
-				add_line_p.type = S2C_ADDLINE;
+				InitPacketHeader(add_line_p, S2C_ADDLINE);
 				add_line_p.id = r_user.GetSession()->GetDBInfo().id;
 				auto& t = std::get<TaskAddLine>(task.task);
 				add_line_p.hole_x = static_cast<char>(t.hole_x);
-				r_user.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.size);
+				r_user.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.header.size);
 				break;
 			}
 
@@ -182,10 +178,9 @@ void TetrisRoom::BoundPackets()
 				// 일단 종료 패킷을 보냄
 				r_user.SetRoomUserState(ROOM_USER_STATE::GAMEOVER);
 				S2C_GAMEOVER_PACKET gameover_p;
-				gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
-				gameover_p.type = S2C_GAMEOVER;
+				InitPacketHeader(gameover_p, S2C_GAMEOVER);
 				gameover_p.id = r_user.GetSession()->GetDBInfo().id;
-				r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameover_p), gameover_p.size);
+				r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameover_p), gameover_p.header.size);
 
 				break;
 			}
@@ -194,10 +189,9 @@ void TetrisRoom::BoundPackets()
 				auto& t = std::get<TaskGameEnd>(task.task);
 
 				S2C_GAMEEND_PACKET gameend_p;
-				gameend_p.size = sizeof(S2C_GAMEEND_PACKET);
-				gameend_p.type = S2C_GAMEEND;
+				InitPacketHeader(gameend_p, S2C_GAMEEND);
 				gameend_p.winner_id = t.winner_id;
-				r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameend_p), gameend_p.size);
+				r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameend_p), gameend_p.header.size);
 				break;
 			}
 			}
@@ -208,11 +202,10 @@ void TetrisRoom::BoundPackets()
 void TetrisRoom::MakeMovePacket(RoomSession& r_session, int move_type)
 {
 	S2C_MOVE_PACKET move_p;
-	move_p.size = sizeof(S2C_MOVE_PACKET);
-	move_p.type = S2C_MOVE;
+	InitPacketHeader(move_p, S2C_MOVE);
 	move_p.id = r_session.GetSession()->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
-	r_session.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
+	r_session.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);
 }
 
 void TetrisRoom::AddGarbageLines()

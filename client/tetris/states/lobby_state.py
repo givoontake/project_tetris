@@ -30,7 +30,7 @@ from tetris.states.single_play_state import SinglePlayState
 from tetris.states.multi_play_state import MultiPlayState
 from tetris.states.ranking_state import RankingState
 from tetris.states.base_state import BaseState
-from tetris.net.packet_manager import *
+from tetris.net.packet_structs import *
 from tetris.net.error_types import *
 from tetris.net.info_types import *
 from tetris.animation.shutter_animaion import ShutterAnimation

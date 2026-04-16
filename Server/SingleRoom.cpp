@@ -18,7 +18,7 @@ void SingleRoom::HandlePacket(char* packet, Session& request_session)
 	//std::cout << "SingleRoom::HandlePacket, Packet type: ";
 	//PrintPacketType(packet[2]);
 
-	switch (packet[2]) {
+	switch (GetPacketType(packet)) {
 
 	case C2S_START: {
 		HandleStartPacket();
@@ -66,8 +66,7 @@ void SingleRoom::HandleGiveupPacket()
 
 	if (room_state == ROOM_STATE::PLAY) {
 		S2C_GAMEOVER_PACKET gameover_p;
-		gameover_p.size = sizeof(S2C_GAMEOVER_PACKET);
-		gameover_p.type = S2C_GAMEOVER;
+		InitPacketHeader(gameover_p, S2C_GAMEOVER);
 		gameover_p.id = room_users[0].GetSession()->GetDBInfo().id;
 		room_users[0].GetSession()->SendPacket(reinterpret_cast<char*>(&gameover_p), server->GetHandle());
 		RequestUpdateScore();
@@ -144,16 +143,14 @@ void SingleRoom::StartGame()
 		}
 
 		S2C_SINGLE_START_PACKET start_p;
-		start_p.size = sizeof(S2C_SINGLE_START_PACKET);
-		start_p.type = S2C_SINGLE_START;
+		InitPacketHeader(start_p, S2C_SINGLE_START);
 		start_p.score = 0;
 		Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
 
 		for (auto& r_user : room_users) {
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			S2C_SPAWN_PACKET spawn_p;
-			spawn_p.size = sizeof(S2C_SPAWN_PACKET);
-			spawn_p.type = S2C_SPAWN;
+			InitPacketHeader(spawn_p, S2C_SPAWN);
 			spawn_p.id = r_user.GetSession()->GetDBInfo().id;
 			spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 			spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
@@ -178,8 +175,7 @@ void SingleRoom::DeleteUser(const int id)
 				//room_mutex.lock();
 				r_user.GetSession()->StoreState(SESS_STATE::LOBBY);
 				S2C_DELETE_USER_PACKET p;
-				p.size = sizeof(S2C_DELETE_USER_PACKET);
-				p.type = S2C_DELETE_USER;
+				InitPacketHeader(p, S2C_DELETE_USER);
 				p.id = id;
 
 				Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
@@ -200,8 +196,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 {
 	if (room_password.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
-		open_p.size = sizeof(S2C_ADD_OPEN_ROOM_PACKET);
-		open_p.type = S2C_ADD_OPEN_ROOM;
+		InitPacketHeader(open_p, S2C_ADD_OPEN_ROOM);
 		open_p.gen = room_gen;
 		open_p.max_user = max_user;
 		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
@@ -209,8 +204,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
-		lock_p.size = sizeof(S2C_ADD_LOCK_ROOM_PACKET);
-		lock_p.type = S2C_ADD_LOCK_ROOM;
+		InitPacketHeader(lock_p, S2C_ADD_LOCK_ROOM);
 		lock_p.gen = room_gen;
 		lock_p.max_user = max_user;
 		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
@@ -294,11 +288,10 @@ void SingleRoom::CalculateScore(int clear_line_count)
 void SingleRoom::MakeMovePacketData(int move_type)
 {
 	S2C_MOVE_PACKET move_p;
-	move_p.size = sizeof(S2C_MOVE_PACKET);
-	move_p.type = S2C_MOVE;
+	InitPacketHeader(move_p, S2C_MOVE);
 	move_p.id = room_users[0].GetSession()->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
-	room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.size);
+	room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);
 }
 
 void SingleRoom::RequestUpdateScore()
