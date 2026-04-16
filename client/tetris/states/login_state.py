@@ -21,7 +21,7 @@ from tetris.ui.label_frame import LabelFrame
 class LoginState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, session: Session):
         super().__init__(screen, rm, net_worker, session)
-        self.background_image = self.rm.images.ui_images[UI_SHUTTER]
+        self.background_image = self.rm.images.ui_images[UI_MAIN_BACKGROUND]
         self.id_label: Optional[LabelFrame] = None
         self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None

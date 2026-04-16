@@ -28,6 +28,7 @@ class Images:
             UI_LOGIN_LABEL_FRAME: self.load_image(UI_IMAGE_PATHS[UI_LOGIN_LABEL_FRAME], 400, 100),
             UI_LOGO: self.load_image(UI_IMAGE_PATHS[UI_LOGO], 250, 100),
             UI_HOST: self.load_image(UI_IMAGE_PATHS[UI_HOST], 100, 100),
+            UI_MAIN_BACKGROUND: self.load_image(UI_IMAGE_PATHS[UI_MAIN_BACKGROUND], BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT),
         })
 
 
