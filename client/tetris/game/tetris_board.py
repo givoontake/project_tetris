@@ -86,6 +86,7 @@ class TetrisBoard:
 
     def find_anim_start_line(self):
         grid = self.grid
+        self.anim_target_line = BOARD_ROWS - 1
 
         while True: # 애니메이션 적용할 첫 라인 찾기(첫 컬러 블록이 포함된 줄 찾기)
             escape = False 
@@ -97,7 +98,10 @@ class TetrisBoard:
             if escape:
                 break
             else:
-                if self.anim_target_line > 0: self.anim_target_line -= 1
+                if self.anim_target_line > 0:
+                    self.anim_target_line -= 1
+                else:
+                    break
 
     def animate_gameover(self, dt_ms) -> bool:
         self.anim_elapsed_ms += dt_ms
