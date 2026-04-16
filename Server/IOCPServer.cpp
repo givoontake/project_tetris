@@ -1052,48 +1052,177 @@ void IOCPServer::Disconnect(int user_index)
 
 }
 
+void IOCPServer::HandleRequestFriendDBResult(DBOverlapped* db_over)
+{
+	if (db_over->ok) {
+		DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
+		int recver_index = FindSessionIndexById(res->recver_info.id);
+		if (recver_index != -1) {
+			Session& recver_session = FindSessionByIndex(recver_index);
+			std::lock_guard<std::mutex> lock(recver_session.GetMutex());
+			if (recver_session.GetState() != SESS_STATE::LOBBY) return;
+			if (recver_session.GetDBInfo().id != res->recver_info.id) return;
+
+			S2C_REQUEST_FRIEND_PACKET request_p;
+			request_p.size = sizeof(S2C_REQUEST_FRIEND_PACKET);
+			request_p.type = S2C_REQUEST_FRIEND;
+			request_p.requester_id = res->requester_info.id;
+			StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
+			recver_session.SendPacket(reinterpret_cast<char*>(&request_p), GetHandle());
+		}
+	}
+}
+
+void IOCPServer::HandleAddFriendDBResult(DBOverlapped* db_over)
+{
+	if (db_over->ok) {
+		DBResultAddFriend* res = static_cast<DBResultAddFriend*>(db_over->result_data.get());
+		SendAddFriendResult(res->requester_info, res->accepter_info);
+	}
+}
+
+void IOCPServer::HandleDeleteFriendDBResult(DBOverlapped* db_over)
+{
+	if (db_over->ok) {
+		DBResultDeleteFriend* res = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
+		SendDeleteFriendResult(res->requester_id, res->target_id);
+	}
+}
+
+void IOCPServer::HandleLoginDBResult(DBOverlapped* db_over, Session& session)
+{
+	int request_gen = db_over->ex_over.key.gen;
+	S2C_LOGIN_PACKET login_p;
+	S2C_ERROR_PACKET error_p;
+	login_p.size = sizeof(S2C_LOGIN_PACKET);
+	login_p.type = S2C_LOGIN;
+	if (db_over->ok) {
+		if (db_over->result_data) {
+			if (CheckDuplicateLoginId(static_cast<DBResultLogin*>(db_over->result_data.get())->login_id)) login_p.id = -2;
+			else {
+				std::lock_guard<std::mutex> lock(session.GetMutex());
+				if (request_gen != session.GetSessionKey().gen) return;
+				if (session.GetState() == SESS_STATE::NONE) return;
+
+				session.InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
+				session.StoreState(SESS_STATE::LOBBY);
+				active_users.AddUser(session.GetDBInfo().id, session.GetSessionKey().index);
+				login_p.id = session.GetDBInfo().id;
+				login_p.max_score = session.GetDBInfo().max_score;
+				login_p.win_count = session.GetDBInfo().win_count;
+				login_p.lose_count = session.GetDBInfo().lose_count;
+				StringToCharBuf(session.GetDBInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
+			}
+		}
+		else {
+			login_p.id = -1;
+		}
+	}
+	else {
+		login_p.id = -1;
+	}
+
+	if (login_p.id == -1) {
+		error_p.size = sizeof(S2C_ERROR_PACKET);
+		error_p.type = S2C_ERROR;
+		error_p.error_code = ERROR_CODE::LOGIN_FAILED;
+		session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
+	}
+
+	else if (login_p.id == -2) {
+		error_p.size = sizeof(S2C_ERROR_PACKET);
+		error_p.type = S2C_ERROR;
+		error_p.error_code = ERROR_CODE::DUPLICATE_LOGIN_ID;
+		session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
+	}
+
+	else {
+		session.SendPacket(request_gen, reinterpret_cast<char*>(&login_p), iocp_handle);
+
+		Database& repr_db = GetDB();
+		std::lock_guard<std::mutex> lock(session.GetMutex());
+		if (session.GetState() == SESS_STATE::NONE) return;
+		if (session.GetSessionKey().gen != request_gen) return;
+		SessionKey key = session.GetSessionKey();
+		int user_id = session.GetDBInfo().id;
+		auto task = [&repr_db, key, user_id]() {
+			repr_db.ExecuteLoadFriendList(key, user_id);
+			};
+		repr_db.Enqueue(task);
+	}
+}
+
+void IOCPServer::HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& session)
+{
+	int request_gen = db_over->ex_over.key.gen;
+	if (db_over->ok) {
+		DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
+		{
+			std::lock_guard<std::mutex> lock(session.GetMutex());
+			if (request_gen != session.GetSessionKey().gen) return;
+			if (session.GetState() == SESS_STATE::NONE) return;
+			session.GetDBInfo().max_score = res->max_score;
+			ranking_manager.UpdateRanking(session.GetDBInfo().id, session.GetDBInfo().nickname, res->max_score);
+		}
+		S2C_UPDATE_SCORE_PACKET us_p;
+		us_p.size = sizeof(S2C_UPDATE_SCORE_PACKET);
+		us_p.type = S2C_UPDATE_SCORE;
+		us_p.max_score = res->max_score;
+		session.SendPacket(request_gen, reinterpret_cast<char*>(&us_p), iocp_handle);
+	}
+}
+
+void IOCPServer::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Session& session)
+{
+	int request_gen = db_over->ex_over.key.gen;
+	if (db_over->ok) {
+		S2C_MATCH_RECORD_PACKET record_p;
+		record_p.size = sizeof(S2C_MATCH_RECORD_PACKET);
+		record_p.type = S2C_MATCH_RECORD;
+		DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
+		{
+			std::lock_guard<std::mutex> lock(session.GetMutex());
+			if (request_gen != session.GetSessionKey().gen) return;
+			if (session.GetState() == SESS_STATE::NONE) return;
+
+			if (res->is_winner) ++session.GetDBInfo().win_count;
+			else ++session.GetDBInfo().lose_count;
+
+			record_p.win_count = session.GetDBInfo().win_count;
+			record_p.lose_count = session.GetDBInfo().lose_count;
+		}
+
+		session.SendPacket(request_gen, reinterpret_cast<char*>(&record_p), iocp_handle);
+	}
+}
+
+void IOCPServer::HandleLoadFriendListDBResult(DBOverlapped* db_over, Session& session)
+{
+	int request_gen = db_over->ex_over.key.gen;
+	if (db_over->ok) {
+		DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
+		std::lock_guard<std::mutex> lock(session.GetMutex());
+		if (session.GetState() == SESS_STATE::NONE) return;
+		if (request_gen != session.GetSessionKey().gen) return;
+		session.InitFriendList(res->friend_list);
+	}
+}
+
 void IOCPServer::HandleDBResult(DBOverlapped* db_over)
 {
 	switch (db_over->type) {
-	case DBOperationType::ADD_FRIEND_REQUEST: {
-		if (db_over->ok) {
-			DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-			int recver_index = FindSessionIndexById(res->recver_info.id);
-			if (recver_index != -1) {
-				Session& recver_session = FindSessionByIndex(recver_index);
-				std::lock_guard<std::mutex> lock(recver_session.GetMutex());
-				if (recver_session.GetState() != SESS_STATE::LOBBY) break;
-				if (recver_session.GetDBInfo().id != res->recver_info.id) break;
-
-				S2C_REQUEST_FRIEND_PACKET request_p;
-				request_p.size = sizeof(S2C_REQUEST_FRIEND_PACKET);
-				request_p.type = S2C_REQUEST_FRIEND;
-				request_p.requester_id = res->requester_info.id;
-				StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
-				recver_session.SendPacket(reinterpret_cast<char*>(&request_p), GetHandle());
-			}
-		}
+	case DBOperationType::ADD_FRIEND_REQUEST:
+		HandleRequestFriendDBResult(db_over);
 		break;
-	}
-
 	case DBOperationType::ADD_FRIEND:
-		if (db_over->ok) {
-			DBResultAddFriend* res = static_cast<DBResultAddFriend*>(db_over->result_data.get());
-			SendAddFriendResult(res->requester_info, res->accepter_info);
-		}
+		HandleAddFriendDBResult(db_over);
 		break;
-
 	case DBOperationType::DELETE_FRIEND:
-		if (db_over->ok) {
-			DBResultDeleteFriend* res = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
-			SendDeleteFriendResult(res->requester_id, res->target_id);
-		}
+		HandleDeleteFriendDBResult(db_over);
 		break;
-
 	case DBOperationType::LOAD_RANKING:
 		ProcessRankingResult(db_over);
 		break;
-
 	default:
 		break;
 	}
@@ -1108,165 +1237,33 @@ void IOCPServer::HandleDBResult(DBOverlapped* db_over, Session& session)
 	
 	// IOCP에서 작업 완료하고 얻어온 key만 계속 넘어가면 된다. 최종 검증은 send 직전에 한다.
 	// 만약 재사용됐다? -> GQCS에서 받아온 키가 send 전까지 계속 넘어가므로, 최종 검증은 거기서만 하면 된다.
-	int request_gen = db_over->ex_over.key.gen;
 	switch (db_over->type) {
-	case DBOperationType::LOGIN: {
-		S2C_LOGIN_PACKET login_p;
-		S2C_ERROR_PACKET error_p;
-		login_p.size = sizeof(S2C_LOGIN_PACKET);
-		login_p.type = S2C_LOGIN;
-		if (db_over->ok) {
-			if (db_over->result_data) { // nullptr이 아니면, 즉 포인터가 존재하면
-				if (CheckDuplicateLoginId(static_cast<DBResultLogin*>(db_over->result_data.get())->login_id)) login_p.id = -2;
-				else {
-					std::lock_guard<std::mutex> lock(session.GetMutex());
-					if (request_gen != session.GetSessionKey().gen) break;
-					if (session.GetState() == SESS_STATE::NONE) break;
-
-					session.InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
-					session.StoreState(SESS_STATE::LOBBY);
-					active_users.AddUser(session.GetDBInfo().id, session.GetSessionKey().index);
-					login_p.id = session.GetDBInfo().id;
-					login_p.max_score = session.GetDBInfo().max_score;
-					login_p.win_count = session.GetDBInfo().win_count;
-					login_p.lose_count = session.GetDBInfo().lose_count;
-					StringToCharBuf(session.GetDBInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
-				}
-			}
-			else {
-				login_p.id = -1;
-			}
-		}
-		else {
-			login_p.id = -1;
-		}
-
-		if (login_p.id == -1) {
-			error_p.size = sizeof(S2C_ERROR_PACKET);
-			error_p.type = S2C_ERROR;
-			error_p.error_code = ERROR_CODE::LOGIN_FAILED;
-			session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
-		}
-
-		else if (login_p.id == -2) {
-			error_p.size = sizeof(S2C_ERROR_PACKET);
-			error_p.type = S2C_ERROR;
-			error_p.error_code = ERROR_CODE::DUPLICATE_LOGIN_ID;
-			session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
-		}
-
-		else {
-			session.SendPacket(request_gen, reinterpret_cast<char*>(&login_p), iocp_handle);
-
-			Database& repr_db = GetDB();
-			std::lock_guard<std::mutex> lock(session.GetMutex());
-			if (session.GetState() == SESS_STATE::NONE) break; // 리턴하면 db_over 해제가 안됨
-			if (session.GetSessionKey().gen != request_gen) break;
-			SessionKey key = session.GetSessionKey();
-			int user_id = session.GetDBInfo().id;
-			auto task = [&repr_db, key, user_id]() {
-				repr_db.ExecuteLoadFriendList(key, user_id);
-				};
-			repr_db.Enqueue(task);
-		}
-
+	case DBOperationType::LOGIN:
+		HandleLoginDBResult(db_over, session);
 		break;
-	}
 
 	case DBOperationType::UPDATE_SCORE:
-		{
-			if (db_over->ok) {
-			// void*는 사용할 때 타입을 명시해야함(컴파일러가 알아들을 수 있도록)
-			// 보이드 유니크 포인터인 db_over->info를 get 함수로 raw 포인터를 가져와 사용할 포인터로 static_cast, void* <-> T* 간에는 static_cast가 허용되고, void*에는 T*를 대입할 수 있다.
-			DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
-			{
-				std::lock_guard<std::mutex> lock(session.GetMutex());
-				if (request_gen != session.GetSessionKey().gen) break;
-				if (session.GetState() == SESS_STATE::NONE) break;
-				session.GetDBInfo().max_score = res->max_score;
-				ranking_manager.UpdateRanking(session.GetDBInfo().id, session.GetDBInfo().nickname, res->max_score);
-			}
-			S2C_UPDATE_SCORE_PACKET us_p;
-			us_p.size = sizeof(S2C_UPDATE_SCORE_PACKET);
-			us_p.type = S2C_UPDATE_SCORE;
-			us_p.max_score = res->max_score;
-			session.SendPacket(request_gen, reinterpret_cast<char*>(&us_p), iocp_handle);
-			}
-		}
+		HandleUpdateScoreDBResult(db_over, session);
 		break;
 
 	case DBOperationType::UPDATE_MATCH_RESULT:
-		{
-			if (db_over->ok) {
-			S2C_MATCH_RECORD_PACKET record_p;
-			record_p.size = sizeof(S2C_MATCH_RECORD_PACKET);
-			record_p.type = S2C_MATCH_RECORD;
-			DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
-			{
-				std::lock_guard<std::mutex> lock(session.GetMutex());
-				if (request_gen != session.GetSessionKey().gen) break;
-				if (session.GetState() == SESS_STATE::NONE) break;
-
-				if (res->is_winner) ++session.GetDBInfo().win_count;
-				else ++session.GetDBInfo().lose_count;
-
-				record_p.win_count = session.GetDBInfo().win_count;
-				record_p.lose_count = session.GetDBInfo().lose_count;
-			}
-
-			session.SendPacket(request_gen, reinterpret_cast<char*>(&record_p), iocp_handle);
-			}
-		}
+		HandleUpdateMatchResultDBResult(db_over, session);
 		break;
 
-	case DBOperationType::ADD_FRIEND_REQUEST: {
-		// 요청한 사람이 받는 IO
-		if (db_over->ok) {
-			DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-			int recver_index = FindSessionIndexById(res->recver_info.id);
-			if (recver_index != -1) { // 요청받는 사람은 실제 본인이어야 함
-				Session& recver_session = users[recver_index];
-				std::lock_guard<std::mutex> lock(recver_session.GetMutex());
-				if (recver_session.GetState() != SESS_STATE::LOBBY) break;
-				if (recver_session.GetDBInfo().id != res->recver_info.id) break;
-
-				S2C_REQUEST_FRIEND_PACKET request_p;
-				request_p.size = sizeof(S2C_REQUEST_FRIEND_PACKET);
-				request_p.type = S2C_REQUEST_FRIEND;
-				request_p.requester_id = res->requester_info.id; // 요청자 정보 넣기
-				StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
-				recver_session.SendPacket(reinterpret_cast<char*>(&request_p), iocp_handle);
-			}
-		}
+	case DBOperationType::ADD_FRIEND_REQUEST:
+		HandleRequestFriendDBResult(db_over);
 		break;
-	}
 
 	case DBOperationType::ADD_FRIEND:
-		if (db_over->ok) {
-			DBResultAddFriend* res = static_cast<DBResultAddFriend*>(db_over->result_data.get());
-			SendAddFriendResult(res->requester_info, res->accepter_info);
-		}
+		HandleAddFriendDBResult(db_over);
 		break;
 
 	case DBOperationType::DELETE_FRIEND:
-		if (db_over->ok) {
-			DBResultDeleteFriend* res = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
-			SendDeleteFriendResult(res->requester_id, res->target_id);
-		}
+		HandleDeleteFriendDBResult(db_over);
 		break;
 		
-	case DBOperationType::LOAD_FRIEND_LIST: // 얘는 검증하면 됨
-		{
-			if (db_over->ok) {
-				DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
-			std::lock_guard<std::mutex> lock(session.GetMutex());
-			if (session.GetState() == SESS_STATE::NONE) break;
-			if (request_gen != session.GetSessionKey().gen) break;
-
-			// 클라는 상태가 변경되어야 친구를 볼 수 있어서(상태에 따라 받을 수 있는 패킷이 다르다) 상태 변경 시 따로 리스트를 요청하게 되어 있다
-				session.InitFriendList(res->friend_list); 
-			}
-		}
+	case DBOperationType::LOAD_FRIEND_LIST:
+		HandleLoadFriendListDBResult(db_over, session);
 		break;
 
 	case DBOperationType::LOAD_RANKING:
