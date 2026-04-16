@@ -54,9 +54,6 @@ class GameLoop:
     def drain_packets(self):
         q = self.net_worker._pm.queue
 
-        if getattr(self.state, "next_state", None) is not None:
-            return
-
         while not q.empty():
             try:
                 data = q.get_nowait()
@@ -65,21 +62,21 @@ class GameLoop:
 
             self.state.handle_packet(data)
 
-            if getattr(self.state, "next_state", None) is not None:
-                break
-
             if data is None:
                 break
 
     def update(self, dt_ms, events):
-        next_state = self.state.update(dt_ms, events)
+        state_events = [] if self.state.is_input_blocked() else events
+        next_state = self.state.update(dt_ms, state_events)
         if next_state is not None and next_state is not self.state:
             self.state = next_state
+            self.state.start_fade_in()
         # if hasattr(self.state, "init"):
         #     self.state.init()
 
     def draw(self):
         self.state.draw()
+        self.state.draw_fade()
         pygame.display.flip()
 
     def run(self):

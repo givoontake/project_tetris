@@ -118,6 +118,7 @@ class RankingState(BaseState):
     def update(self, dt_ms, events):
         for ev in events:
             self.handle_event(ev)
+        self.update_fade(dt_ms)
         return self.consume_state()
 
     def draw(self):

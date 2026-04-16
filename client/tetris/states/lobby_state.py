@@ -34,7 +34,6 @@ from tetris.states.base_state import BaseState
 from tetris.net.packet_structs import *
 from tetris.net.error_types import *
 from tetris.net.info_types import *
-from tetris.animation.shutter_animaion import ShutterAnimation
 
 MENU_WIDTH = 200
 MENU_HEIGHT = 100
@@ -44,7 +43,7 @@ RANKING_MENU_TEXT = "\uB7AD\uD0B9"
 
 class LobbyState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager,
-                 net_worker: NetworkWorker, session: Session, is_animation: bool = False):
+                 net_worker: NetworkWorker, session: Session):
         super().__init__(screen, rm, net_worker, session)
         self.top_menus: list[Button] = []
         self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm)
@@ -56,9 +55,6 @@ class LobbyState(BaseState):
         self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), rm, session)
         self.user_tabs = UserTabs(screen, pygame.Rect(1050, 150, 300, 400), rm, [USER_TAB_NAME, FRIEND_TAB_NAME])
 
-        self.open_shutter = ShutterAnimation(screen, rm)
-        self.is_animation = is_animation
-        
         self.error_popup = None
         self.quick_start_window = None
         self.fast_matching_window = None
@@ -79,9 +75,6 @@ class LobbyState(BaseState):
         self.join_room_gen = None
     
         self.set_layout()
-
-        if is_animation:
-            self.open_shutter.start_animation()
 
     def set_layout(self):
         draw_x, draw_y = 50, 0
@@ -366,10 +359,6 @@ class LobbyState(BaseState):
             return
 
     def update(self, dt_ms, events):
-        if self.is_animation and self.open_shutter.is_active: 
-            self.open_shutter.update(dt_ms)
-            return
-        
         self.chat_input_box.update(dt_ms)
                     
         for ev in events:
@@ -380,7 +369,8 @@ class LobbyState(BaseState):
 
         if self.input_pw_window:
             self.input_pw_window.update(dt_ms)
-        
+
+        self.update_fade(dt_ms)
         return self.consume_state()
 
     def draw(self):
@@ -404,7 +394,6 @@ class LobbyState(BaseState):
         if self.setting_window: self.setting_window.draw()
         if self.exit_popup: self.exit_popup.draw()
         if self.save_success_popup: self.save_success_popup.draw()
-        if self.is_animation and self.open_shutter.is_active: self.open_shutter.draw()
         if self.input_pw_window: self.input_pw_window.draw()
         if self.info_popup: self.info_popup.draw()
         if self.friend_request_popup: self.friend_request_popup.draw()

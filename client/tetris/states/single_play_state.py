@@ -131,6 +131,7 @@ class SinglePlayState(BaseState):
             self.handle_event(ev)
      
         self.tetris_session.update(dt_ms)
+        self.update_fade(dt_ms)
 
         return self.consume_state()
 

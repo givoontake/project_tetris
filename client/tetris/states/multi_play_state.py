@@ -290,6 +290,8 @@ class MultiPlayState(BaseState):
         for player in self.players:
             player.update(dt_ms)
 
+        self.update_fade(dt_ms)
+
         return self.consume_state()
 
     def draw(self):

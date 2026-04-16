@@ -87,7 +87,7 @@ class LoginState(BaseState):
                 self.session.lose = login_data.lose_count
                 self.session.max_score = login_data.max_score
 
-                self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True))
+                self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session))
             
             return self
         
@@ -137,6 +137,7 @@ class LoginState(BaseState):
 
         self.id_label.update(dt_ms)
         self.pw_label.update(dt_ms)
+        self.update_fade(dt_ms)
         return self.consume_state()
 
     def draw(self):
