@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "define.h"
+#include "define_packets.h"
 
 struct DBResultDefault {
 	// 유니크 포인터용 껍데기 구조체

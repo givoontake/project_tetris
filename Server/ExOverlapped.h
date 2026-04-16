@@ -1,7 +1,7 @@
 #pragma once
 #include <WinSock2.h>
 #include <MSWSock.h>
-#include "define.h"
+#include "define_packets.h"
 #include "enum_class.h"
 #include "DBResult.h"
 

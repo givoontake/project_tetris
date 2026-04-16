@@ -93,7 +93,8 @@ void IOCPServer::HandleMessagePacket(char* packet, Session& session, int request
 
 	char* send_p = new char[send_p_size];
 	S2C_MESSAGE_PACKET front_p;
-	front_p.header = MakePacketHeader(static_cast<std::uint16_t>(send_p_size), S2C_MESSAGE);
+	front_p.header.size = static_cast<std::uint16_t>(send_p_size);
+	front_p.header.type = S2C_MESSAGE;
 	front_p.id = id;
 	StringToCharBuf(nickname, front_p.user_name, sizeof(front_p.user_name));
 	memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET));
@@ -110,7 +111,8 @@ void IOCPServer::HandleTestPacket(char* packet, Session& session)
 	char* send_p = new char[recv_p->header.size];
 	int msg_size = recv_p->header.size - sizeof(C2S_TEST_PACKET);
 	S2C_TEST_PACKET front_p;
-	front_p.header = MakePacketHeader(recv_p->header.size, S2C_TEST);
+	front_p.header.size = recv_p->header.size;
+	front_p.header.type = S2C_TEST;
 	front_p.id = session.GetDBInfo().id;
 	front_p.last_time = recv_p->last_time;
 	memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET));
@@ -258,7 +260,8 @@ void IOCPServer::SendRoomList(Session& session, int request_gen)
 		if (!room_sp) continue;
 		S2C_ROOM_INFO_PACKET info_p;
 		if (room_sp->GetRoomState() == ROOM_STATE::EMPTY) continue;
-		InitPacketHeader(info_p, S2C_ROOM_INFO);
+		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
+		info_p.header.type = S2C_ROOM_INFO;
 		info_p.room_gen = room_sp->GetRoomGen();
 		const std::string& name = room_sp->GetRoomName();
 		info_p.max_user = room_sp->GetMaxUser();
@@ -335,7 +338,8 @@ int IOCPServer::FindUser(int user_id)
 void IOCPServer::SendError(Session& session, int request_gen, int error_code)
 {
 	S2C_ERROR_PACKET error_p;
-	InitPacketHeader(error_p, S2C_ERROR);
+	error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
+	error_p.header.type = S2C_ERROR;
 	error_p.error_code = error_code;
 
 	session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
@@ -410,7 +414,8 @@ void IOCPServer::SendLobbyUserList(Session& session, int request_gen)
 	char packet_buf[BUF_SIZE];
 	for (auto& user : users) {
 		S2C_LOBBY_USER_INFO_PACKET info_p;
-		InitPacketHeader(info_p, S2C_LOBBY_USER_INFO);
+		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
+		info_p.header.type = S2C_LOBBY_USER_INFO;
 		//info_p.user_id = -1;
 		{
 			std::lock_guard<std::mutex> lock(user.GetMutex());
@@ -447,7 +452,8 @@ void IOCPServer::SendFriendList(Session& session, int request_gen)
 	char packet_buf[BUF_SIZE];
 	for (auto& friend_info : friend_list) {
 		S2C_FRIEND_INFO_PACKET info_p; // 얘는 그냥 지 세션에 있는 친구 목록이라 미리 다 작성하고 현재 친구 상태만 검사해서 보내주면 됨
-		InitPacketHeader(info_p, S2C_FRIEND_INFO);
+		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
+		info_p.header.type = S2C_FRIEND_INFO;
 		info_p.user_id = friend_info.id;
 		info_p.is_lobby = false;
 		StringToCharBuf(friend_info.nickname, info_p.nickname, MAX_USER_NAME);
@@ -487,7 +493,8 @@ void IOCPServer::SendRanking(Session& session, int request_gen)
 	char packet_buf[BUF_SIZE];
 	for (const auto& ranking : rankings) {
 		S2C_RANKING_INFO_PACKET info_p{};
-		InitPacketHeader(info_p, S2C_RANKING_INFO);
+		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
+		info_p.header.type = S2C_RANKING_INFO;
 		StringToCharBuf(ranking.nickname, info_p.nickname, MAX_USER_NAME);
 		info_p.score = ranking.score;
 
@@ -510,7 +517,8 @@ void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acc
 
 	int requester_gen = -1;
 	S2C_ADD_FRIEND_PACKET add_p;
-	InitPacketHeader(add_p, S2C_ADD_FRIEND);
+	add_p.header.size = static_cast<std::uint16_t>(sizeof(add_p));
+	add_p.header.type = S2C_ADD_FRIEND;
 
 	if (requester_index != -1) {
 		Session& requester_sess = users[requester_index];
@@ -555,7 +563,8 @@ void IOCPServer::SendDeleteFriendResult(int requester_id, int target_id)
 
 	int requester_gen = -1;
 	S2C_DELETE_FRIEND_PACKET delete_p;
-	InitPacketHeader(delete_p, S2C_DELETE_FRIEND);
+	delete_p.header.size = static_cast<std::uint16_t>(sizeof(delete_p));
+	delete_p.header.type = S2C_DELETE_FRIEND;
 
 	if (requester_index != -1){ // 안전성 + 가드
 		Session& requester_sess = users[requester_index];
@@ -728,7 +737,7 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 		if (session.GetRemainDataSize() < PACKET_HEADER_SIZE) return;
 
 		remain_data_size = session.GetRemainDataSize();
-		packet_size = GetPacketSize(session.GetExOver().packet_buf);
+		packet_size = reinterpret_cast<PacketHeader*>(session.GetExOver().packet_buf)->size;
 		memcpy(p_buffer, session.GetExOver().packet_buf, remain_data_size);
 	}
 
@@ -745,7 +754,7 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 
 		offset += packet_size;
 		if (remain_data_size - offset < PACKET_HEADER_SIZE) break;
-		packet_size = GetPacketSize(p_buffer + offset);
+		packet_size = reinterpret_cast<PacketHeader*>(p_buffer + offset)->size;
 		if (packet_size < PACKET_HEADER_SIZE || packet_size > BUF_SIZE) {
 			session.StoreDisconnectFlag(true);
 			Disconnect(session.GetSessionKey().index);
@@ -764,7 +773,7 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 
 void IOCPServer::RoutePacket(char* packet, Session& session, int request_gen)
 {
-	PrintPacketType(GetPacketType(packet));
+	PrintPacketType(reinterpret_cast<PacketHeader*>(packet)->type);
 	switch (session.GetState()) {
 	case SESS_STATE::NONE:
 		return;
@@ -991,7 +1000,8 @@ void IOCPServer::HandleRequestFriendDBResult(DBOverlapped* db_over)
 			if (recver_session.GetDBInfo().id != res->recver_info.id) return;
 
 			S2C_REQUEST_FRIEND_PACKET request_p;
-			InitPacketHeader(request_p, S2C_REQUEST_FRIEND);
+			request_p.header.size = static_cast<std::uint16_t>(sizeof(request_p));
+			request_p.header.type = S2C_REQUEST_FRIEND;
 			request_p.requester_id = res->requester_info.id;
 			StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
 			recver_session.SendPacket(reinterpret_cast<char*>(&request_p), GetHandle());
@@ -1020,7 +1030,8 @@ void IOCPServer::HandleLoginDBResult(DBOverlapped* db_over, Session& session)
 	int request_gen = db_over->ex_over.key.gen;
 	S2C_LOGIN_PACKET login_p;
 	S2C_ERROR_PACKET error_p;
-	InitPacketHeader(login_p, S2C_LOGIN);
+	login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
+	login_p.header.type = S2C_LOGIN;
 	if (db_over->ok) {
 		if (db_over->result_data) {
 			if (CheckDuplicateLoginId(static_cast<DBResultLogin*>(db_over->result_data.get())->login_id)) login_p.id = -2;
@@ -1048,13 +1059,15 @@ void IOCPServer::HandleLoginDBResult(DBOverlapped* db_over, Session& session)
 	}
 
 	if (login_p.id == -1) {
-		InitPacketHeader(error_p, S2C_ERROR);
+		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
+		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ERROR_CODE::LOGIN_FAILED;
 		session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
 	}
 
 	else if (login_p.id == -2) {
-		InitPacketHeader(error_p, S2C_ERROR);
+		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
+		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ERROR_CODE::DUPLICATE_LOGIN_ID;
 		session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
 	}
@@ -1088,7 +1101,8 @@ void IOCPServer::HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& sessi
 			ranking_manager.UpdateRanking(session.GetDBInfo().id, session.GetDBInfo().nickname, res->max_score);
 		}
 		S2C_UPDATE_SCORE_PACKET us_p;
-		InitPacketHeader(us_p, S2C_UPDATE_SCORE);
+		us_p.header.size = static_cast<std::uint16_t>(sizeof(us_p));
+		us_p.header.type = S2C_UPDATE_SCORE;
 		us_p.max_score = res->max_score;
 		session.SendPacket(request_gen, reinterpret_cast<char*>(&us_p), iocp_handle);
 	}
@@ -1099,7 +1113,8 @@ void IOCPServer::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Session&
 	int request_gen = db_over->ex_over.key.gen;
 	if (db_over->ok) {
 		S2C_MATCH_RECORD_PACKET record_p;
-		InitPacketHeader(record_p, S2C_MATCH_RECORD);
+		record_p.header.size = static_cast<std::uint16_t>(sizeof(record_p));
+		record_p.header.type = S2C_MATCH_RECORD;
 		DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
 		{
 			std::lock_guard<std::mutex> lock(session.GetMutex());

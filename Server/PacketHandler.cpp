@@ -23,8 +23,8 @@
 ////}
 //
 #include "PacketHandler.h"
-#include "define.h"
-#include "packet_type.h"
+#include "define_packets.h"
+#include "packet_types.h"
 #include "IOCPServer.h"
 
 PacketHandler::PacketHandler(IOCPServer& server) : server(server)
@@ -83,7 +83,7 @@ void PacketHandler::HandleDeleteFriendPacket(char* packet, Session& session, int
 
 void PacketHandler::HandlePacket(char* packet, Session& session, int request_gen)
 {
-	switch (GetPacketType(packet)) {
+	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
 
 	case C2S_LOGIN: {
 		HandleLoginPacket(packet, session, request_gen);

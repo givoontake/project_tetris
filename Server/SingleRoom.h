@@ -4,7 +4,7 @@
 #include <mutex>
 #include "RoomSession.h"
 #include "Session.h"
-#include "define.h"
+#include "define_packets.h"
 #include "RoomPacketHandler.h"
 #include "IOCPServer.h"
 #include "TetrisRoom.h"

@@ -12,34 +12,6 @@ struct PacketHeader {
 
 constexpr int PACKET_HEADER_SIZE = sizeof(PacketHeader);
 
-inline PacketHeader MakePacketHeader(std::uint16_t size, std::uint8_t type)
-{
-	return PacketHeader{ size, type };
-}
-
-template <typename Packet>
-inline void InitPacketHeader(Packet& packet, std::uint8_t type)
-{
-	packet.header = MakePacketHeader(static_cast<std::uint16_t>(sizeof(Packet)), type);
-}
-
-inline PacketHeader ReadPacketHeader(const char* packet)
-{
-	PacketHeader header{};
-	std::memcpy(&header, packet, sizeof(header));
-	return header;
-}
-
-inline std::uint16_t GetPacketSize(const char* packet)
-{
-	return ReadPacketHeader(packet).size;
-}
-
-inline std::uint8_t GetPacketType(const char* packet)
-{
-	return ReadPacketHeader(packet).type;
-}
-
 struct S2C_ERROR_PACKET {
 	PacketHeader header;
 	int error_code;

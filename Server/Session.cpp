@@ -59,7 +59,7 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 {
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);
-	const auto packet_size = static_cast<int>(GetPacketSize(packet));
+	const auto packet_size = static_cast<int>(reinterpret_cast<const PacketHeader*>(packet)->size);
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	send_over->ex_over.key = key;
@@ -74,7 +74,7 @@ void Session::SendPacket(int request_gen, char* packet, const HANDLE iocp_handle
 {
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);
-	const auto packet_size = static_cast<int>(GetPacketSize(packet));
+	const auto packet_size = static_cast<int>(reinterpret_cast<const PacketHeader*>(packet)->size);
 	memcpy(send_over->packet_buf, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
 	{

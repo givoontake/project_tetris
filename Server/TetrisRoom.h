@@ -5,7 +5,7 @@
 #include <mutex>
 #include "RoomSession.h"
 #include "Session.h"
-#include "define.h"
+#include "define_packets.h"
 #include "MQueue.h"
 
 constexpr int ADD_TIMEOUT = 1;

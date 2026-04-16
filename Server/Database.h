@@ -23,7 +23,7 @@
 
 #include "ExOverlapped.h"
 #include "enum_class.h"
-#include "define.h"
+#include "define_packets.h"
 #include "DBResult.h"
 #include "Session.h"
 

@@ -6,7 +6,7 @@
 #include <array>
 #include "ExOverlapped.h"
 #include "Atomic.h"
-#include "define.h"
+#include "define_packets.h"
 #include "DBResult.h"
 #include "enum_class.h"
 

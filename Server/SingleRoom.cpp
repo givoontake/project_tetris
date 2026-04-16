@@ -1,7 +1,7 @@
 #include <random>
 #include <algorithm>
 #include "SingleRoom.h"
-#include "packet_type.h"
+#include "packet_types.h"
 
 SingleRoom::SingleRoom(IOCPServer* server, Session& session, OpenRoomInitData data)
 	: TetrisRoom(server, session, data)
@@ -18,7 +18,7 @@ void SingleRoom::HandlePacket(char* packet, Session& request_session)
 	//std::cout << "SingleRoom::HandlePacket, Packet type: ";
 	//PrintPacketType(packet[2]);
 
-	switch (GetPacketType(packet)) {
+	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
 
 	case C2S_START: {
 		HandleStartPacket();
@@ -66,7 +66,8 @@ void SingleRoom::HandleGiveupPacket()
 
 	if (room_state == ROOM_STATE::PLAY) {
 		S2C_GAMEOVER_PACKET gameover_p;
-		InitPacketHeader(gameover_p, S2C_GAMEOVER);
+		gameover_p.header.size = static_cast<std::uint16_t>(sizeof(gameover_p));
+		gameover_p.header.type = S2C_GAMEOVER;
 		gameover_p.id = room_users[0].GetSession()->GetDBInfo().id;
 		room_users[0].GetSession()->SendPacket(reinterpret_cast<char*>(&gameover_p), server->GetHandle());
 		RequestUpdateScore();
@@ -143,14 +144,16 @@ void SingleRoom::StartGame()
 		}
 
 		S2C_SINGLE_START_PACKET start_p;
-		InitPacketHeader(start_p, S2C_SINGLE_START);
+		start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
+		start_p.header.type = S2C_SINGLE_START;
 		start_p.score = 0;
 		Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
 
 		for (auto& r_user : room_users) {
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			S2C_SPAWN_PACKET spawn_p;
-			InitPacketHeader(spawn_p, S2C_SPAWN);
+			spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
+			spawn_p.header.type = S2C_SPAWN;
 			spawn_p.id = r_user.GetSession()->GetDBInfo().id;
 			spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 			spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
@@ -175,7 +178,8 @@ void SingleRoom::DeleteUser(const int id)
 				//room_mutex.lock();
 				r_user.GetSession()->StoreState(SESS_STATE::LOBBY);
 				S2C_DELETE_USER_PACKET p;
-				InitPacketHeader(p, S2C_DELETE_USER);
+				p.header.size = static_cast<std::uint16_t>(sizeof(p));
+				p.header.type = S2C_DELETE_USER;
 				p.id = id;
 
 				Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
@@ -196,7 +200,8 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 {
 	if (room_password.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
-		InitPacketHeader(open_p, S2C_ADD_OPEN_ROOM);
+		open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
+		open_p.header.type = S2C_ADD_OPEN_ROOM;
 		open_p.gen = room_gen;
 		open_p.max_user = max_user;
 		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
@@ -204,7 +209,8 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
-		InitPacketHeader(lock_p, S2C_ADD_LOCK_ROOM);
+		lock_p.header.size = static_cast<std::uint16_t>(sizeof(lock_p));
+		lock_p.header.type = S2C_ADD_LOCK_ROOM;
 		lock_p.gen = room_gen;
 		lock_p.max_user = max_user;
 		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
@@ -288,7 +294,8 @@ void SingleRoom::CalculateScore(int clear_line_count)
 void SingleRoom::MakeMovePacketData(int move_type)
 {
 	S2C_MOVE_PACKET move_p;
-	InitPacketHeader(move_p, S2C_MOVE);
+	move_p.header.size = static_cast<std::uint16_t>(sizeof(move_p));
+	move_p.header.type = S2C_MOVE;
 	move_p.id = room_users[0].GetSession()->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
 	room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);

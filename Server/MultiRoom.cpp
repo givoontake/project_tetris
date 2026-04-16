@@ -50,7 +50,7 @@ void MultiRoom::HandleMovePacket(char* packet, Session& request_session)
 // 게임 시작 후에 처리되는 것들 -> 틱 처리 함수에 뮤텍스 넣고, 틱 처리 관련 내부 함수는 뮤텍스 넣지 않음
 void MultiRoom::HandlePacket(char* packet, Session& request_session)
 {
-	switch (GetPacketType(packet)) {
+	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
 
 	case C2S_DELETE_USER: {
 		HandleDeleteUserPacket(request_session);
@@ -113,7 +113,8 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string&
 	if (result == SUCCESS) {
 		if (room_password.empty()) {
 			S2C_ADD_OPEN_ROOM_PACKET open_p;
-			InitPacketHeader(open_p, S2C_ADD_OPEN_ROOM);
+			open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
+			open_p.header.type = S2C_ADD_OPEN_ROOM;
 			open_p.gen = room_gen;
 			open_p.max_user = max_user;
 			server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
@@ -121,7 +122,8 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string&
 		}
 		else {
 			S2C_ADD_LOCK_ROOM_PACKET lock_p;
-			InitPacketHeader(lock_p, S2C_ADD_LOCK_ROOM);
+			lock_p.header.size = static_cast<std::uint16_t>(sizeof(lock_p));
+			lock_p.header.type = S2C_ADD_LOCK_ROOM;
 			lock_p.gen = room_gen;
 			lock_p.max_user = max_user;
 			server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
@@ -135,7 +137,8 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string&
 			auto& r_user = room_users[i];
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			S2C_ADD_USER_PACKET add_p;
-			InitPacketHeader(add_p, S2C_ADD_USER);
+			add_p.header.size = static_cast<std::uint16_t>(sizeof(add_p));
+			add_p.header.type = S2C_ADD_USER;
 			add_p.id = new_session.GetDBInfo().id;
 			server->StringToCharBuf(new_session.GetDBInfo().nickname, add_p.name, sizeof(add_p.name));
 			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
@@ -147,7 +150,8 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string&
 			auto& r_user = room_users[i];
 			if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			S2C_ADD_USER_PACKET add_p;
-			InitPacketHeader(add_p, S2C_ADD_USER);
+			add_p.header.size = static_cast<std::uint16_t>(sizeof(add_p));
+			add_p.header.type = S2C_ADD_USER;
 			add_p.id = r_user.GetSession()->GetDBInfo().id;
 			server->StringToCharBuf(r_user.GetSession()->GetDBInfo().nickname, add_p.name, sizeof(add_p.name));
 			new_session.SendPacket(reinterpret_cast<char*>(&add_p), server->GetHandle());
@@ -155,7 +159,8 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string&
 
 		// 새로 입장한 세션에게 방장이 누구인지
 		S2C_UPDATE_HOST_PACKET host_p;
-		InitPacketHeader(host_p, S2C_UPDATE_HOST);
+		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
+		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id;
 		new_session.SendPacket(reinterpret_cast<char*>(&host_p), server->GetHandle());
 		return result;
@@ -175,7 +180,8 @@ void MultiRoom::DeleteUser(const int id)
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		if (r_user.GetSession()->GetDBInfo().id == id) { // 삭제할 아이디 검색
 			S2C_DELETE_USER_PACKET p;
-			InitPacketHeader(p, S2C_DELETE_USER);
+			p.header.size = static_cast<std::uint16_t>(sizeof(p));
+			p.header.type = S2C_DELETE_USER;
 			p.id = id;
 
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
@@ -191,7 +197,8 @@ void MultiRoom::SendCreateRoom(Session& session)
 {
 	if (room_password.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
-		InitPacketHeader(open_p, S2C_ADD_OPEN_ROOM);
+		open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
+		open_p.header.type = S2C_ADD_OPEN_ROOM;
 		open_p.gen = room_gen;
 		open_p.max_user = max_user;
 		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
@@ -199,7 +206,8 @@ void MultiRoom::SendCreateRoom(Session& session)
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
-		InitPacketHeader(lock_p, S2C_ADD_LOCK_ROOM);
+		lock_p.header.size = static_cast<std::uint16_t>(sizeof(lock_p));
+		lock_p.header.type = S2C_ADD_LOCK_ROOM;
 		lock_p.gen = room_gen;
 		lock_p.max_user = max_user;
 		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
@@ -227,7 +235,8 @@ void MultiRoom::ReadyUser(int id)
 				is_ready = true;
 			}
 			S2C_READY_PACKET p;
-			InitPacketHeader(p, S2C_READY);
+			p.header.size = static_cast<std::uint16_t>(sizeof(p));
+			p.header.type = S2C_READY;
 			p.id = id;
 			p.is_ready = is_ready;
 
@@ -248,12 +257,14 @@ void MultiRoom::KickUser(int id, int kick_user_id)
 		if (r_user.GetSession()->GetDBInfo().id == kick_user_id) { // 삭제할 아이디 검색
 
 			S2C_DELETE_USER_PACKET p;
-			InitPacketHeader(p, S2C_DELETE_USER);
+			p.header.size = static_cast<std::uint16_t>(sizeof(p));
+			p.header.type = S2C_DELETE_USER;
 			p.id = kick_user_id;
 			Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
 			S2C_INFO_PACKET info_p;
-			InitPacketHeader(info_p, S2C_INFO);
+			info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
+			info_p.header.type = S2C_INFO;
 			info_p.info_code = INFO_CODE::KICKED;
 			r_user.GetSession()->SendPacket(reinterpret_cast<char*>(&info_p), server->GetHandle());
 
@@ -290,7 +301,8 @@ void MultiRoom::StartGame(int request_user_id)
 
 	if (result != SUCCESS) {
 		S2C_ERROR_PACKET error_p;
-		InitPacketHeader(error_p, S2C_ERROR);
+		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
+		error_p.header.type = S2C_ERROR;
 		error_p.error_code = result;
 		room_users[FindHostIndex(host_id)].GetSession()->SendPacket(reinterpret_cast<char*>(&error_p), server->GetHandle());
 		return;
@@ -299,7 +311,8 @@ void MultiRoom::StartGame(int request_user_id)
 	if(!TryChangeRoomState(ROOM_STATE::WAIT, ROOM_STATE::PLAY)) return; // 잘못된 요청(동시 요청 등)에 대한 방어 코드 -> CAS에 성공해야만 시작
 	
 	S2C_MULTI_START_PACKET start_p;
-	InitPacketHeader(start_p, S2C_MULTI_START);
+	start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
+	start_p.header.type = S2C_MULTI_START;
 	Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
 	// 모든 조건 통과->게임 시작
 	Add7BagTetrominoList();
@@ -315,7 +328,8 @@ void MultiRoom::StartGame(int request_user_id)
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 		S2C_SPAWN_PACKET spawn_p;
-		InitPacketHeader(spawn_p, S2C_SPAWN);
+		spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
+		spawn_p.header.type = S2C_SPAWN;
 		spawn_p.id = r_user.GetSession()->GetDBInfo().id;
 		spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 		spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
@@ -505,7 +519,8 @@ void MultiRoom::FindNewHost()
 
 	if (find_host) {
 		S2C_UPDATE_HOST_PACKET host_p;
-		InitPacketHeader(host_p, S2C_UPDATE_HOST);
+		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
+		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id;
 		Broadcast(reinterpret_cast<char*>(&host_p), server->GetHandle());
 	}

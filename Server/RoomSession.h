@@ -2,7 +2,7 @@
 #include <string>
 #include <array>
 #include "Tetris.h"
-#include "define.h"
+#include "define_packets.h"
 #include "Session.h"
 
 class RoomSession
