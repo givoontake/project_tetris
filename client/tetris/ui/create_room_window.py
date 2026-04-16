@@ -70,13 +70,14 @@ class CreateRoomWindow:
         self.title = InputBox(self.screen, title_rect, self.rm, "4~16자", MAX_INPUT, False, True)
         draw_y += draw_h + inner_padding_h
 
-        op_player_texts = ["1인", "2인", "5인"]
+        op_player_texts = ["2인", "5인"]
         draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_player_texts) - 1))) // len(op_player_texts)
         for op_text in op_player_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
             option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
             self.option_player.append(option)
             draw_x += draw_w + inner_padding_w
+        self._set_player_value("2인")
         draw_x = self.rect.x + outline_padding_w
         draw_y += draw_h + inner_padding_h
 
@@ -176,9 +177,10 @@ class CreateRoomWindow:
 
                     self.title_val = self.title.extract_text()
                     self.password_val = self.password.extract_text()
+                    player_val = self.player_val if self.player_val in (2, 5) else 2
                     packet = self.net_worker.builder.build_create_room(
                         self.title_val,
-                        self.player_val,
+                        player_val,
                         self.is_open,
                         self.password_val,
                     )
