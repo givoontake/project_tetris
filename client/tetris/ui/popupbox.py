@@ -32,7 +32,7 @@ class PopupBox:
         """현재 screen 사이즈를 기준으로 팝업 사각형을 다시 계산한다."""
         if len(self.buttons_text) < 1:
             raise ValueError("팝업은 최소 1개의 버튼을 포함해야 합니다.")
-        elif len(self.buttons_text) > 2:
+        elif len(self.buttons_text) > 3:
             raise ValueError("팝업은 최대 3개의 버튼을 포함할 수 있습니다.")
 
         sw, sh = self.screen.get_size()

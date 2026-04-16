@@ -23,6 +23,7 @@ from tetris.ui.room_list import RoomList
 from tetris.ui.chat_window import ChatWindow
 from tetris.ui.my_info import Profile
 from tetris.ui.fast_matching_window import FastMatchingWindow
+from tetris.ui.quick_start_window import QuickStartWindow, QUICK_START_SINGLE_TEXT, QUICK_START_MULTI_TEXT, QUICK_START_CANCEL_TEXT
 from tetris.ui.create_room_window import CreateRoomWindow
 from tetris.ui.setting_window import SettingWindow
 from tetris.ui.user_taps import UserTabs, USER_TAB_NAME, FRIEND_TAB_NAME
@@ -37,6 +38,8 @@ from tetris.animation.shutter_animaion import ShutterAnimation
 
 MENU_WIDTH = 200
 MENU_HEIGHT = 100
+QUICK_START_MENU_TEXT = "빠른시작"
+QUICK_START_SINGLE_ROOM_NAME = "빠른 싱글"
 RANKING_MENU_TEXT = "\uB7AD\uD0B9"
 
 class LobbyState(BaseState):
@@ -57,6 +60,7 @@ class LobbyState(BaseState):
         self.is_animation = is_animation
         
         self.error_popup = None
+        self.quick_start_window = None
         self.fast_matching_window = None
         self.room_create_window = None
         self.setting_window = None
@@ -187,8 +191,8 @@ class LobbyState(BaseState):
             
             # 리스트로 만들어놔서 각 버튼마다 이름이 없어서 텍스트로 접근
             if event is not None:
-                if event == "빠른시작":
-                    self.fast_matching_window = FastMatchingWindow(self.screen, self.rm, self.net_worker)
+                if event == QUICK_START_MENU_TEXT:
+                    self.quick_start_window = QuickStartWindow(self.screen, self.rm)
                     self.reactable = False
 
                 elif event == "방만들기":
@@ -278,6 +282,19 @@ class LobbyState(BaseState):
                 if self.error_popup.handle_event(ev):
                     self.error_popup = None
                     self.reactable = True
+
+            elif self.quick_start_window:
+                qsw_event = self.quick_start_window.handle_event(ev)
+                if qsw_event != None:
+                    self.quick_start_window = None
+                    if qsw_event == QUICK_START_SINGLE_TEXT:
+                        packet = self.net_worker.builder.build_create_room(QUICK_START_SINGLE_ROOM_NAME, 1, True)
+                        self.net_worker.send_packet(packet)
+                        self.reactable = True
+                    elif qsw_event == QUICK_START_MULTI_TEXT:
+                        self.fast_matching_window = FastMatchingWindow(self.screen, self.rm, self.net_worker)
+                    elif qsw_event == QUICK_START_CANCEL_TEXT:
+                        self.reactable = True
 
             elif self.fast_matching_window:
                 if self.fast_matching_window.handle_event(ev): 
@@ -381,6 +398,7 @@ class LobbyState(BaseState):
         self.user_tabs.draw()
 
         if self.error_popup: self.error_popup.draw()
+        if self.quick_start_window: self.quick_start_window.draw()
         if self.fast_matching_window: self.fast_matching_window.draw()
         if self.room_create_window: self.room_create_window.draw()
         if self.setting_window: self.setting_window.draw()
