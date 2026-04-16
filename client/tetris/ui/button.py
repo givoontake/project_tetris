@@ -57,7 +57,7 @@ class Button:
                         self.state = ButtonState.IDLE
                         if self.button.image != None:
                             self.button = self.idle
-                    return True # 버튼이 눌렀다 떼져야 클릭 이벤트 처리
+                        return True # 버튼이 눌렀다 떼져야 클릭 이벤트 처리
                 
             else:
                 self.state = ButtonState.IDLE

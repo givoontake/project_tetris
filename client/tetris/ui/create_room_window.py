@@ -7,6 +7,7 @@ from tetris.net.network import NetworkWorker
 from tetris.net.packet_structs import MAX_INPUT
 from tetris.net.session import Session
 from tetris.resources.resource_manager import ResourceManager
+from tetris.ui.button import Button
 from tetris.ui.inputbox import InputBox
 from tetris.ui.popupbox import PopupBox
 from tetris.ui.rectangle import Rectangle
@@ -36,7 +37,7 @@ class CreateRoomWindow:
         self.option_player: list[ToggleButton] = []
         self.option_open: list[ToggleButton] = []
         self.password: InputBox = None
-        self.option_make: list[ToggleButton] = []
+        self.option_make: list[Button] = []
         self.error_popup: Optional[PopupBox] = None
 
         self.col_num = 5
@@ -100,7 +101,7 @@ class CreateRoomWindow:
         draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_make_texts) - 1))) // len(op_make_texts)
         for op_text in op_make_texts:
             op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-            option = ToggleButton(self.screen, op_rect, self.rm, None, op_text)
+            option = Button(self.screen, op_rect, self.rm, None, op_text)
             self.option_make.append(option)
             draw_x += draw_w + inner_padding_w
 
@@ -153,7 +154,7 @@ class CreateRoomWindow:
 
         for option in self.option_make:
             if option.handle_event(ev):
-                if option.text == "만들기":
+                if option.button.text == "만들기":
                     title_val = self.title.get_total_text()
                     password_val = self.password.get_total_text()
 
@@ -186,7 +187,7 @@ class CreateRoomWindow:
                     )
                     self.net_worker.send_packet(packet)
 
-                return option.text
+                return option.button.text
 
         return None
 
