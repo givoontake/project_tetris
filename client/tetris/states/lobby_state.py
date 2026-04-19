@@ -14,9 +14,7 @@ from tetris.resources.fonts import *
 from tetris.resources.define_colors import *
 from tetris.resources.define import *
 
-from tetris.ui.rectangle import Rectangle
 from tetris.ui.button import Button
-from tetris.ui.inputbox import InputBox
 from tetris.ui.popupbox import PopupBox
 from tetris.ui.input_window import InputWindow
 from tetris.ui.room_list import RoomList
@@ -46,14 +44,10 @@ class LobbyState(BaseState):
                  net_worker: NetworkWorker, session: Session):
         super().__init__(screen, rm, net_worker, session)
         self.top_menus: list[Button] = []
-        self.room_list = RoomList(screen, pygame.Rect(50, 150, 1000, 400), rm)
-        self.btn_refresh = Button(screen, pygame.Rect(950, 150, 100, 50), rm, None, "새로고침") # 참가 버튼처럼 취급하려면 room_info에 net_worker가 넘어가야 하는데.. 그러기 싫어서 여기에 둠
-        input_box_rect = pygame.Rect(50, 810, 1000, 30)
-        self.chat_input_box = InputBox(screen, input_box_rect, self.rm,
-                                       "채팅을 입력하세요", MAX_CHAT_INPUT, is_password=False, allow_korean=True)
-        self.chat_window = ChatWindow(screen, pygame.Rect(50, 600, 1000, 200), self.chat_input_box.font)
+        self.room_list = RoomList(screen, pygame.Rect(50, 150, 900, 400), rm)
+        self.chat_window = ChatWindow(screen, pygame.Rect(50, 550, 900, 300), self.rm)
         self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), rm, session)
-        self.user_tabs = UserTabs(screen, pygame.Rect(1050, 150, 300, 400), rm, [USER_TAB_NAME, FRIEND_TAB_NAME])
+        self.user_tabs = UserTabs(screen, pygame.Rect(1100, 150, 300, 400), rm, [USER_TAB_NAME, FRIEND_TAB_NAME])
 
         self.error_popup = None
         self.quick_start_window = None
@@ -78,19 +72,13 @@ class LobbyState(BaseState):
 
     def set_layout(self):
         draw_x, draw_y = 50, 0
-        logo_img = self.rm.images.ui_images[UI_LOGO]
-        logo_w, logo_h = logo_img.get_size()
-        logo_rect = pygame.Rect(draw_x, draw_y, logo_w, logo_h)
-        self.logo = Rectangle(self.screen, logo_rect, self.rm, logo_img, "")
-        
-        draw_x += logo_rect.w
         menu_texts: list[str] = ["빠른시작", "방만들기", "상점", "설정", "", "게임종료"]
         for menu_text in menu_texts:
             menu_rect = pygame.Rect(draw_x, draw_y, MENU_WIDTH, MENU_HEIGHT) 
-            menu = Button(self.screen, menu_rect, self.rm, None, menu_text)
+            menu = Button(self.screen, menu_rect, self.rm, menu_text, 0)
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
-        self.top_menus[4].button.set_text(RANKING_MENU_TEXT)
+        self.top_menus[4].set_text(RANKING_MENU_TEXT)
 
         self.request_room_list()
         self.request_lobby_user_list()
@@ -211,8 +199,14 @@ class LobbyState(BaseState):
                     self.queue_state(RankingState(self.screen, self.rm, self.net_worker, self.session))
                 return
 
-            index = self.room_list.handle_event(ev)
-            if index != None:
+            room_event = self.room_list.handle_event(ev)
+            if room_event == "refresh":
+                self.room_list.clear()
+                packet = self.net_worker.builder.build_request_room_list_pkt()
+                self.net_worker.send_packet(packet)
+
+            elif room_event != None:
+                index = room_event
                 room = self.room_list.show_rooms[index]
                 self.join_room_gen = room.data.room_gen
                 buttons_text = ["참가", "취소"]
@@ -224,13 +218,7 @@ class LobbyState(BaseState):
                     self.net_worker.send_packet(packet)
                     self.join_room_gen = None
             
-            if self.btn_refresh.handle_event(ev):
-                self.room_list.clear()
-                packet = self.net_worker.builder.build_request_room_list_pkt()
-                self.net_worker.send_packet(packet)
-                    
-            self.chat_window.handle_event(ev) # 보여주기만 하므로 반환값은 없음
-            message = self.chat_input_box.handle_event(ev)
+            message = self.chat_window.handle_event(ev)
             if message != None:
                 packet = self.net_worker.builder.build_message_pkt(message)
                 self.net_worker.send_packet(packet)
@@ -268,7 +256,7 @@ class LobbyState(BaseState):
                     elif friend_event.ev_type == "delete":
                         btn_text = "친구삭제"
 
-                    self.friend_ev_btn = Button(self.screen, btn_rect, self.rm, None, btn_text)
+                    self.friend_ev_btn = Button(self.screen, btn_rect, self.rm, btn_text, 0, True)
 
         else:
             if self.error_popup:
@@ -359,7 +347,7 @@ class LobbyState(BaseState):
             return
 
     def update(self, dt_ms, events):
-        self.chat_input_box.update(dt_ms)
+        self.chat_window.update(dt_ms)
                     
         for ev in events:
             self.handle_event(ev)
@@ -374,16 +362,13 @@ class LobbyState(BaseState):
         return self.consume_state()
 
     def draw(self):
-        self.screen.fill(BLACK)
-        self.logo.draw()
+        self.screen.blit(self.rm.images.ui_images[UI_LOBBY_BACKGROUND], (0, 0))
         
         for menu in self.top_menus:
             menu.draw()
 
         self.room_list.draw()
-        self.btn_refresh.draw()
         self.chat_window.draw()
-        self.chat_input_box.draw()
         self.my_info_rect.draw()
         self.user_tabs.draw()
 

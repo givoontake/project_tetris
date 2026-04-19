@@ -2,6 +2,7 @@ import pygame
 from typing import Optional
 
 from tetris.resources.resource_manager import ResourceManager
+from tetris.resources.define import *
 from tetris.resources.define_colors import *
 from tetris.config.define import *
 
@@ -17,12 +18,14 @@ class InputBox:
         max_input_len: int | None = None,  # optional과 같음
         is_password: bool = False,
         allow_korean: bool = True,   # ✅ 한글 허용 여부
+        use_holder: bool = True,
+        holder_key: int = UI_TEXT_HOLDER,
     ):
         self.screen = screen
         self.rect = rect
         self.rm = rm
         self.placeholder = placeholder
-        self.text_h = int(rect.h*0.8)
+        self.text_h = int(rect.h*0.7)
         self.text = ""
         self.editing_text = ""
         self.active = False
@@ -32,6 +35,8 @@ class InputBox:
         self.padding = int(self.text_h / 2)
         self.color = GRAY
         self.font = self.rm.fonts.get_font(self.text_h)
+        self.use_holder = use_holder
+        self.holder_image = self.rm.images.ui_images[holder_key] if use_holder else None
 
         # 커서 점멸
         self.cursor_visible = True
@@ -202,6 +207,10 @@ class InputBox:
 
 
     def draw(self):
+        if self.holder_image is not None:
+            holder_image = self.rm.images.scale_image(self.holder_image, self.rect.w, self.rect.h)
+            self.screen.blit(holder_image, self.rect)
+
         show_text = self.get_render_text()
         if not show_text and not self.active:
             txt = self.font.render(self.placeholder, True, PLACEHOLDER)

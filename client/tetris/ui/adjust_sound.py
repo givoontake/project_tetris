@@ -32,11 +32,11 @@ class AdjustSound:
         name_h = self.rect.h
 
         name_rect = pygame.Rect(name_x, name_y, name_w, name_h)
-        self.name = Rectangle(self.screen, name_rect, self.rm, None, self.volume_type)
+        self.name = Rectangle(self.screen, name_rect, self.rm, False, None, self.volume_type)
 
         volume_value_rect = name_rect.copy()
         volume_value_rect.x += name_rect.w
-        self.volume_value = Rectangle(self.screen, volume_value_rect, self.rm, None, str(self.adjusted_volume))
+        self.volume_value = Rectangle(self.screen, volume_value_rect, self.rm, False, None, str(self.adjusted_volume))
 
         self.sound_bar_frame_rect = volume_value_rect.copy()
         self.sound_bar_frame_rect.x += volume_value_rect.w

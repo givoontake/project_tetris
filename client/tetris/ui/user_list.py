@@ -8,41 +8,28 @@ from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 
 HEADER_HEIGHT_RATE = 0.1
-NICKNAME_WIDTH_RATE = 0.7
 
 
 class UserList(ScrollWindowBase):
     BACKGROUND_1 = GRAY
     BACKGROUND_2 = DARK_GRAY
+    BORDER_RADIUS = 8
+    BORDER_WIDTH = 1
 
     def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager):
         self.screen = screen
         self.rect = rect
         self.rm = rm
 
-        self.background = Rectangle(screen, rect, rm, None, "", 0)
+        self.background = Rectangle(screen, rect, rm, False, None, "", 0)
 
-        header_rect = rect.copy()
-        header_rect.h = int(rect.h * HEADER_HEIGHT_RATE)
-
-        nickname_rect = header_rect.copy()
-        nickname_rect.w = int(header_rect.w * NICKNAME_WIDTH_RATE)
-
-        state_rect = header_rect.copy()
-        state_rect.x = nickname_rect.x + nickname_rect.w
-        state_rect.w = header_rect.w - nickname_rect.w
-
-        self.header_nickname = Rectangle(screen, nickname_rect, rm, None, "닉네임", 1)
-        self.header_state = Rectangle(screen, state_rect, rm, None, "상태", 1)
-
-        self.base_user_rect = header_rect.copy()
-        self.base_user_rect.y += header_rect.h
-        self.base_user_rect.h = self.header_nickname.rect.h
+        self.base_user_rect = rect.copy()
+        self.base_user_rect.h = int(rect.h * HEADER_HEIGHT_RATE)
 
         self.user_infos: list[UserInfo] = []
         self.show_user_infos: list[UserInfo] = []
 
-        super().__init__(screen, pygame.Rect(rect.x, self.base_user_rect.y, rect.w, rect.h - header_rect.h), self.base_user_rect.h)
+        super().__init__(screen, rect, self.base_user_rect.h)
 
         self.set_scroll_info()
         self.set_scroll_len()
@@ -148,9 +135,15 @@ class UserList(ScrollWindowBase):
         user_info.draw()
 
     def draw(self):
-        self.background.draw()
-        self.header_nickname.draw()
-        self.header_state.draw()
+        bg_surface = pygame.Surface((self.background.rect.w, self.background.rect.h), pygame.SRCALPHA)
+        pygame.draw.rect(
+            bg_surface,
+            (0, 0, 0, 120),
+            bg_surface.get_rect(),
+            border_radius=self.BORDER_RADIUS
+        )
+        self.screen.blit(bg_surface, self.background.rect.topleft)
+        pygame.draw.rect(self.screen, WHITE, self.background.rect, self.BORDER_WIDTH, border_radius=self.BORDER_RADIUS)
 
         super().draw()
         self.update_show_user_infos()

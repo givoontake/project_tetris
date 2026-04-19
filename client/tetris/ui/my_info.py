@@ -20,6 +20,9 @@ class Profile:
 
     def draw(self):
         # 세션에서 정보 읽기
+        bg_surface = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
+        bg_surface.fill((0, 0, 0, 120))
+        self.screen.blit(bg_surface, self.rect.topleft)
 
         # 1) 닉네임
         nick_surf = self.font_nickname.render(self.my_session.nickname, True, self.text_color)

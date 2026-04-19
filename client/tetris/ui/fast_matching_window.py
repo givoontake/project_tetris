@@ -35,7 +35,7 @@ class FastMatchingWindow:
         for i in range(len(option_texts)):
             option_x = rect.x + option_w*i + padding_w*(i + 1) # 첫 패딩은 적용된 상태로 그려야함
             option_rect = pygame.Rect(option_x, option_y, option_w, option_h)
-            option = ToggleButton(self.screen, option_rect, self.rm, None, option_texts[i])
+            option = ToggleButton(self.screen, option_rect, self.rm, option_texts[i])
             self.options.append(option)
 
     def set_option_val(self):

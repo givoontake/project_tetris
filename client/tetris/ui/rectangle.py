@@ -9,6 +9,7 @@ class Rectangle:
         screen: pygame.Surface,
         rect: pygame.Rect, 
         rm: ResourceManager,
+        use_image: bool = False,
         image: pygame.Surface = None, 
         text: str = "", 
         border_width = 0
@@ -18,7 +19,7 @@ class Rectangle:
         self.rm = rm
         self.font = rm.fonts.get_font(RECTANGLE_FONT_SIZE)
         self.image = None
-        if image is not None: 
+        if use_image and image is not None: 
             self.set_image(image)
         self.text = text
         self.text_color: tuple[int, int, int] = WHITE

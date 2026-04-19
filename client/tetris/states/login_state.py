@@ -38,18 +38,18 @@ class LoginState(BaseState):
     def set_layout(self):
         sw, sh = self.screen.get_size()
 
-        ADJUST_SCALE_X = 0.85
-        ADJUST_SCALE_Y = 0.7
+        ADJUST_SCALE_X = 1.0
+        ADJUST_SCALE_Y = 1.0
         
-        label_w, label_h = 400, 100
-        label_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_LOGIN_LABEL_FRAME], label_w, label_h)
+        label_w, label_h = 400, 50
+        label_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_TEXT_HOLDER], label_w, label_h)
         button_w, button_h = 200, 100
-        button_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_LOGIN_BUTTON], button_w, button_h)
+        button_gap = 50
         adjust_x = (1-ADJUST_SCALE_X)*label_w
         adjust_y = (1-ADJUST_SCALE_Y)*label_h
         input_box_w, input_box_h = label_w - adjust_x*2, label_h - adjust_y*2
 
-        total_h = label_h * 2 + (button_h // 2) + button_h
+        total_h = label_h * 2 + 10 + button_gap + button_h
 
         group_top = (sh - total_h) // 2
         label_left = (sw - label_w) // 2
@@ -59,15 +59,15 @@ class LoginState(BaseState):
         id_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
         self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, self.rm, "아이디", MAX_INPUT, False, False)
 
-        draw_y += label_h
+        draw_y += label_h + 10
         pw_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
         pw_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
         self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, self.rm, "비밀번호", MAX_INPUT, True, False)
 
         draw_x += (label_w - button_w) // 2
-        draw_y += label_h + (button_h // 2)
+        draw_y += label_h + button_gap
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
-        self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인")
+        self.btn_login = Button(self.screen, btn_rect, self.rm, "로그인", 0)
 
     def handle_packet(self, data: Optional[RecvPacketStruct]):
         if data:

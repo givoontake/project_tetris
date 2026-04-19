@@ -5,6 +5,7 @@ from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 from tetris.ui.rectangle import Rectangle
 from tetris.ui.button import Button
+from tetris.ui.toggle_button import ToggleButton
 from tetris.ui.setting_base import SettingBase
 from tetris.ui.setting_sound import SettingSound
 class SettingWindow:
@@ -25,7 +26,7 @@ class SettingWindow:
         # 빼야겠다 그럼
         self.buttom_menu_texts = ["적용", "취소"] 
         self.activated_setting = self.top_menu_texts[0]
-        self.top_menus: list[Rectangle] = []
+        self.top_menus: list[ToggleButton] = []
         self.buttom_menus: list[Button] = []
         
         top_menu_w = self.rect.w // len(self.top_menu_texts)
@@ -35,7 +36,7 @@ class SettingWindow:
 
         for top_menu_text in self.top_menu_texts:
             top_menu_rect = pygame.Rect(top_menu_x, top_menu_y, top_menu_w, top_menu_h)
-            top_menu = Rectangle(self.screen, top_menu_rect, self.rm, None, top_menu_text, 1)
+            top_menu = ToggleButton(self.screen, top_menu_rect, self.rm, top_menu_text, 1)
             self.top_menus.append(top_menu)
             top_menu_x += top_menu_w
 
@@ -46,7 +47,7 @@ class SettingWindow:
 
         for buttom_menu_text in self.buttom_menu_texts:
             buttom_menu_rect = pygame.Rect(buttom_menu_x, buttom_menu_y, buttom_menu_w, buttom_menu_h)
-            buttom_menu = Button(self.screen, buttom_menu_rect, self.rm, None, buttom_menu_text, 1)
+            buttom_menu = Button(self.screen, buttom_menu_rect, self.rm, buttom_menu_text, 1)
             self.buttom_menus.append(buttom_menu)
             buttom_menu_x += buttom_menu_w
 
@@ -85,9 +86,9 @@ class SettingWindow:
     def draw(self):
         for top_menu in self.top_menus:
             if top_menu.text == self.activated_setting:
-                top_menu.set_background_color(GREEN)
+                top_menu.set_pressed(True)
             else:
-                top_menu.set_background_color(BLACK)
+                top_menu.set_pressed(False)
             top_menu.draw()
 
         self.setting_types[self.activated_setting].draw()

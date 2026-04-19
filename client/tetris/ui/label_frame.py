@@ -19,7 +19,7 @@ class LabelFrame:
         self.screen = screen
         self.frame_image = image
         self.frame_rect = label_rect
-        self.input_box = InputBox(screen, input_rect, rm, placeholder, max_input_len, is_password, allow_korean)
+        self.input_box = InputBox(screen, input_rect, rm, placeholder, max_input_len, is_password, allow_korean, False)
         
     def _set_rect_scale(self, rect: pygame.Rect, scale_x: float, scale_y: float) -> pygame.Rect: # x = 가로, y = 세로 스케일
         if scale_x < 0.1 or scale_x > 2.0: # 최소 범위는 너무 작은 스케일을 방지하기 위함. 최대는 큰 스케일 방지를 위한 적당한 값임
@@ -56,7 +56,8 @@ class LabelFrame:
         self.input_box.update(dt_ms)
     
     def draw(self):
-        self.screen.blit(self.frame_image, self.frame_rect)
+        if self.frame_image is not None:
+            self.screen.blit(self.frame_image, self.frame_rect)
         self.input_box.draw()
 
         

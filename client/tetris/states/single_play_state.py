@@ -11,6 +11,7 @@ from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.fonts import Fonts
+from tetris.resources.define import *
 
 from tetris.ui.button import Button
 from tetris.game.tetris_board import *
@@ -53,7 +54,7 @@ class SinglePlayState(BaseState):
         draw_x, draw_y = 0, 0
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
-        self.title_box = Rectangle(self.screen, title_rect, self.rm, None, title)
+        self.title_box = Rectangle(self.screen, title_rect, self.rm, False, None, title)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -61,7 +62,7 @@ class SinglePlayState(BaseState):
             pw_val = "비밀번호: 없음"
         else:
             pw_val = f"비밀번호: {self.password}"
-        self.password_box = Rectangle(self.screen, password_rect, self.rm, None, pw_val)
+        self.password_box = Rectangle(self.screen, password_rect, self.rm, False, None, pw_val)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -69,10 +70,10 @@ class SinglePlayState(BaseState):
         draw_w = MENU_WIDTH
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, "나가기", 0)
         giveup_rect = exit_rect.copy()
         giveup_rect.x -= MENU_WIDTH
-        self.btn_giveup = Button(self.screen, giveup_rect, self.rm, None, "포기")
+        self.btn_giveup = Button(self.screen, giveup_rect, self.rm, "포기", 0)
 
     def clear(self):
         self.tetris_session.clear()
@@ -139,7 +140,7 @@ class SinglePlayState(BaseState):
         if self.tetris_session.board is None:
             return
 
-        self.screen.fill((0, 0, 0))
+        self.screen.blit(self.rm.images.ui_images[UI_INGAME_BACKGROUND], (0, 0))
 
         # 상단 방 제목/비밀번호
         self.draw_room_header()

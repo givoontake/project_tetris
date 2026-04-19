@@ -4,9 +4,11 @@ from typing import cast
 
 from tetris.models.dataclass import EventFriend
 from tetris.ui.button import Button
+from tetris.ui.toggle_button import ToggleButton
 from tetris.ui.user_list import UserList
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
+from tetris.resources.define import *
 from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 
@@ -30,7 +32,7 @@ class UserTabs:
         self.tab_names = tab_names
         self.cur_tab_index = 0
 
-        self.tab_buttons: list[Button] = []
+        self.tab_buttons: list[ToggleButton] = []
         self.tab_rects: list[pygame.Rect] = []
         self.user_lists: dict[str, UserList] = {}
         self.refresh_buttons: dict[str, Button] = {}
@@ -60,7 +62,7 @@ class UserTabs:
         draw_x = tab_rect.x
         for tab_name in self.tab_names:
             button_rect = pygame.Rect(draw_x, tab_rect.y, tab_w, tab_rect.h)
-            button = Button(self.screen, button_rect, self.rm, None, tab_name, 1)
+            button = ToggleButton(self.screen, button_rect, self.rm, tab_name, 0)
             self.tab_buttons.append(button)
             self.tab_rects.append(button_rect)
             self.user_lists[tab_name] = UserList(self.screen, list_rect, self.rm)
@@ -71,7 +73,7 @@ class UserTabs:
                 REFRESH_BUTTON_WIDTH,
                 REFRESH_BUTTON_HEIGHT,
             )
-            self.refresh_buttons[tab_name] = Button(self.screen, refresh_rect, self.rm, None, "새로고침")
+            self.refresh_buttons[tab_name] = Button(self.screen, refresh_rect, self.rm, "새로고침", 0)
             draw_x += tab_w + TAB_GAP
 
     def get_cur_user_list(self) -> UserList:
@@ -140,6 +142,8 @@ class UserTabs:
         for index in range(len(self.tab_buttons)):
             if self.tab_buttons[index].handle_event(ev):
                 self.cur_tab_index = index
+                for btn_index in range(len(self.tab_buttons)):
+                    self.tab_buttons[btn_index].set_pressed(btn_index == self.cur_tab_index)
                 return None
 
         cur_tab_name = self.get_cur_tab_name()
@@ -162,10 +166,8 @@ class UserTabs:
 
     def draw(self):
         for index in range(len(self.tab_buttons)):
+            self.tab_buttons[index].set_pressed(index == self.cur_tab_index)
             self.tab_buttons[index].draw()
-
-            if index == self.cur_tab_index:
-                pygame.draw.rect(self.screen, ORANGE, self.tab_rects[index], 2)
 
         self.get_cur_user_list().draw()
         refresh_btn = self.refresh_buttons.get(self.get_cur_tab_name())

@@ -11,6 +11,7 @@ from tetris.net.packet_structs import *
 from tetris.net.error_types import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.fonts import Fonts, RECTANGLE_FONT_SIZE
+from tetris.resources.define import *
 
 from tetris.ui.button import Button
 from tetris.ui.popupbox import PopupBox
@@ -76,7 +77,7 @@ class MultiPlayState(BaseState):
         draw_x, draw_y = 0, 0
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
-        self.title_box = Rectangle(self.screen, title_rect, self.rm, None, title)
+        self.title_box = Rectangle(self.screen, title_rect, self.rm, False, None, title)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -84,7 +85,7 @@ class MultiPlayState(BaseState):
             pw_val = "비밀번호: 없음"
         else:
             pw_val = f"비밀번호: {self.password}"
-        self.password_box = Rectangle(self.screen, password_rect, self.rm, None, pw_val)
+        self.password_box = Rectangle(self.screen, password_rect, self.rm, False, None, pw_val)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -92,7 +93,7 @@ class MultiPlayState(BaseState):
         draw_w = MENU_WIDTH
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, "나가기", 0)
 
     def set_layout_5player(self):
         self.set_layout_2player()
@@ -295,7 +296,7 @@ class MultiPlayState(BaseState):
         return self.consume_state()
 
     def draw(self):
-        self.screen.fill((0, 0, 0))
+        self.screen.blit(self.rm.images.ui_images[UI_INGAME_BACKGROUND], (0, 0))
 
         # 상단 방 제목/비밀번호
         self.draw_room_header()

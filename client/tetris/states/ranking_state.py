@@ -6,6 +6,7 @@ from tetris.net.packet_structs import *
 from tetris.net.network import NetworkWorker
 from tetris.net.session import Session
 from tetris.resources.resource_manager import ResourceManager
+from tetris.resources.define import *
 from tetris.resources.define_colors import *
 from tetris.ui.button import Button
 from tetris.ui.rectangle import Rectangle
@@ -40,7 +41,13 @@ class RankingState(BaseState):
 
         sw, sh = self.screen.get_size()
         back_rect = pygame.Rect(sw - MENU_WIDTH, 0, MENU_WIDTH, MENU_HEIGHT)
-        self.btn_back = Button(self.screen, back_rect, self.rm, None, BACK_BUTTON_TEXT)
+        self.btn_back = Button(
+            self.screen,
+            back_rect,
+            self.rm,
+            BACK_BUTTON_TEXT,
+            0,
+        )
 
         content_top = MENU_HEIGHT
         content_height = sh - content_top
@@ -50,7 +57,7 @@ class RankingState(BaseState):
         panel_y = content_top + (content_height - panel_h) // 2
         panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
 
-        self.panel = Rectangle(self.screen, panel_rect, self.rm, None, "", 3)
+        self.panel = Rectangle(self.screen, panel_rect, self.rm, False, None, "", 3)
         self.panel.set_background_color(DARK_GRAY)
 
         header_h = max(60, panel_h // 12)
@@ -58,9 +65,9 @@ class RankingState(BaseState):
         header_name_rect = pygame.Rect(panel_x, panel_y, half_w, header_h)
         header_score_rect = pygame.Rect(panel_x + half_w, panel_y, panel_w - half_w, header_h)
 
-        self.header_name = Rectangle(self.screen, header_name_rect, self.rm, None, NAME_HEADER_TEXT, 2)
+        self.header_name = Rectangle(self.screen, header_name_rect, self.rm, False, None, NAME_HEADER_TEXT, 2)
         self.header_name.set_background_color(BLACK)
-        self.header_score = Rectangle(self.screen, header_score_rect, self.rm, None, SCORE_HEADER_TEXT, 2)
+        self.header_score = Rectangle(self.screen, header_score_rect, self.rm, False, None, SCORE_HEADER_TEXT, 2)
         self.header_score.set_background_color(BLACK)
 
         self.rebuild_rows()
@@ -90,8 +97,8 @@ class RankingState(BaseState):
             name_rect = pygame.Rect(panel_rect.x, row_y, half_w, row_h)
             score_rect = pygame.Rect(panel_rect.x + half_w, row_y, panel_rect.w - half_w, row_h)
 
-            name_box = Rectangle(self.screen, name_rect, self.rm, None, rank_text, 1)
-            score_box = Rectangle(self.screen, score_rect, self.rm, None, score_text, 1)
+            name_box = Rectangle(self.screen, name_rect, self.rm, False, None, rank_text, 1)
+            score_box = Rectangle(self.screen, score_rect, self.rm, False, None, score_text, 1)
             name_box.set_background_color(BLACK)
             score_box.set_background_color(BLACK)
             name_box.set_text_size(26)
@@ -122,7 +129,7 @@ class RankingState(BaseState):
         return self.consume_state()
 
     def draw(self):
-        self.screen.fill(BLACK)
+        self.screen.blit(self.rm.images.ui_images[UI_LOBBY_BACKGROUND], (0, 0))
 
         if self.btn_back:
             self.btn_back.draw()
