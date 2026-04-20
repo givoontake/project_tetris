@@ -59,15 +59,23 @@ class LoginState(BaseState):
         id_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
         self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, self.rm, "아이디", MAX_INPUT, False, False)
 
+        self.id_label.input_box.text_h = 30
+        self.id_label.input_box.padding = 15
+        self.id_label.input_box.font = self.rm.fonts.get_font(30)
         draw_y += label_h + 10
         pw_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
         pw_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
         self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, self.rm, "비밀번호", MAX_INPUT, True, False)
 
+        self.pw_label.input_box.text_h = 30
+        self.pw_label.input_box.padding = 15
+        self.pw_label.input_box.font = self.rm.fonts.get_font(30)
         draw_x += (label_w - button_w) // 2
         draw_y += label_h + button_gap
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
         self.btn_login = Button(self.screen, btn_rect, self.rm, "로그인", 0)
+
+        self.btn_login.set_text_size(30)
 
     def handle_packet(self, data: Optional[RecvPacketStruct]):
         if data:

@@ -12,7 +12,7 @@ STATE_WIDTH_RATE = 0.3
 
 
 class UserInfo:
-    BORDER_RADIUS = 8
+    BORDER_RADIUS = 0
     BORDER_WIDTH = 1
 
     def __init__(self,
@@ -48,7 +48,11 @@ class UserInfo:
         state_rect.w = self.rect.w - nickname_rect.w
 
         self.nickname_rect = Rectangle(self.screen, nickname_rect, self.rm, False, None, "", 0)
+        self.nickname_rect.set_text_size(15)
+        self.nickname_rect.set_border(0)
         self.state_rect = Rectangle(self.screen, state_rect, self.rm, False, None, "", 0)
+        self.state_rect.set_text_size(15)
+        self.state_rect.set_border(0)
 
         self.info_rects = [self.nickname_rect, self.state_rect]
 

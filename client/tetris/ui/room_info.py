@@ -12,14 +12,14 @@ from tetris.resources.define_colors import *
 from tetris.resources.define import *
 from tetris.models.dataclass import RoomData
 
-# ???섎굹(諛??섎굹)瑜??쒗쁽?섎뒗 酉??ㅻ툕?앺듃
+
 class RoomInfo:
-    LOCKED_WIDTH_RATE = 0.1
+    LOCKED_WIDTH_RATE = 0.2
     TITLE_WIDTH_RATE = 0.4
-    CAPACITY_WIDTH_RATE = 0.3
+    CAPACITY_WIDTH_RATE = 0.2
     STATUS_WIDTH_RATE = 0.1
     JOIN_WIDTH_RATE = 0.1
-    BORDER_RADIUS = 8
+    BORDER_RADIUS = 0
     BORDER_WIDTH = 1
 
     def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager,
@@ -30,7 +30,8 @@ class RoomInfo:
         self.data = data
         self.is_reactable = False
         if data != None:
-            if data.is_play == False: self.is_reactable = True
+            if data.is_play == False:
+                self.is_reactable = True
         self.background_color = background_color
 
         self.background = Rectangle(self.screen, self.rect, self.rm, False, None, "")
@@ -40,53 +41,62 @@ class RoomInfo:
 
         self.set_layout()
 
+    def _make_info_rect(self, rect: pygame.Rect, text: str) -> Rectangle:
+        info = Rectangle(self.screen, rect, self.rm, False, None, text)
+        info.set_background_color((0, 0, 0, 0))
+        return info
+
     def set_layout(self):
-        # [?좉툑?꾩씠肄? ?쒕ぉ, ?몄썝, ?곹깭]???곷???鍮꾩쑉
-
-        if self.data == None: is_private = "怨듦컻?щ?"
+        if self.data == None:
+            is_private = "공개 여부"
         else:
-            if self.data.is_private: is_private = "鍮꾧났媛?"
-            else: is_private = "怨듦컻"
+            if self.data.is_private:
+                is_private = "비공개"
+            else:
+                is_private = "공개"
 
-        locked_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.w*self.LOCKED_WIDTH_RATE, self.rect.h)
-        self.is_private = Rectangle(self.screen, locked_rect, self.rm, False, None, is_private)
+        locked_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.w * self.LOCKED_WIDTH_RATE, self.rect.h)
+        self.is_private = self._make_info_rect(locked_rect, is_private)
         self.info_rects.append(self.is_private)
 
         title_rect = locked_rect.copy()
         title_rect.x += locked_rect.w
-        title_rect.w = self.rect.w*self.TITLE_WIDTH_RATE
-        if self.data == None: room_name = "諛??대쫫"
-        else: room_name = self.data.room_name
-        self.title = Rectangle(self.screen, title_rect, self.rm, False, None, room_name)
+        title_rect.w = self.rect.w * self.TITLE_WIDTH_RATE
+        if self.data == None:
+            room_name = "방 제목"
+        else:
+            room_name = self.data.room_name
+        self.title = self._make_info_rect(title_rect, room_name)
         self.info_rects.append(self.title)
 
         capacity_rect = title_rect.copy()
         capacity_rect.x += title_rect.w
-        capacity_rect.w = self.rect.w*self.CAPACITY_WIDTH_RATE
+        capacity_rect.w = self.rect.w * self.CAPACITY_WIDTH_RATE
         if self.data == None:
-            cur_user = "?꾩옱?몄썝"
-            max_user = "理쒕??몄썝"
+            capacity_text = "인원 수"
         else:
-            cur_user = str(self.data.cur_user)
-            max_user = str(self.data.max_user)
-        self.capacity = Rectangle(self.screen, capacity_rect, self.rm, False, None, f"{cur_user}/{max_user}")
+            capacity_text = f"{self.data.cur_user}/{self.data.max_user}"
+        self.capacity = self._make_info_rect(capacity_rect, capacity_text)
         self.info_rects.append(self.capacity)
 
         status_rect = capacity_rect.copy()
         status_rect.x += capacity_rect.w
-        status_rect.w = self.rect.w*self.STATUS_WIDTH_RATE
-        if self.data == None: is_play = "諛??곹깭"
+        status_rect.w = self.rect.w * self.STATUS_WIDTH_RATE
+        if self.data == None:
+            is_play = "상태"
         else:
-            if self.data.is_play: is_play = "寃뚯엫以?"
-            else: is_play = "?湲?"
-        self.is_play = Rectangle(self.screen, status_rect, self.rm, False, None, f"{is_play}")
+            if self.data.is_play:
+                is_play = "게임중"
+            else:
+                is_play = "대기"
+        self.is_play = self._make_info_rect(status_rect, is_play)
         self.info_rects.append(self.is_play)
 
         self.join_button = None
         self.join_red = None
         self.join_rect = status_rect.copy()
         self.join_rect.x += status_rect.w
-        self.join_rect.w = self.rect.w*self.JOIN_WIDTH_RATE
+        self.join_rect.w = self.rect.w * self.JOIN_WIDTH_RATE
         if self.is_reactable and self.data.is_play == False:
             self.join_button = Button(self.screen, self.join_rect, self.rm, "참가", 0)
             self.join_button.set_images(
@@ -94,6 +104,7 @@ class RoomInfo:
                 self.rm.images.ui_images[UI_BUTTON_BLUE],
                 self.rm.images.ui_images[UI_BUTTON_ORANGE]
             )
+            self.join_button.set_text_size(25)
         else:
             self.join_red = Rectangle(
                 self.screen,
@@ -114,7 +125,8 @@ class RoomInfo:
         self.set_layout()
 
     def handle_event(self, ev: pygame.event.Event) -> bool:
-        if self.is_reactable == False: return None
+        if self.is_reactable == False:
+            return None
 
         if self.join_button:
             return self.join_button.handle_event(ev)
@@ -124,7 +136,7 @@ class RoomInfo:
     def set_background_color(self, color: tuple[int, int, int]): # r, g, b
         self.background.set_background_color(color)
         for info in self.info_rects:
-            info.set_background_color(color)
+            info.set_background_color((0, 0, 0, 0))
 
     def update_info_rects(self, new_rect_y: int):
         self.rect.y = new_rect_y
@@ -153,5 +165,7 @@ class RoomInfo:
         for info in self.info_rects:
             info.draw()
 
-        if self.join_button: self.join_button.draw()
-        if self.join_red: self.join_red.draw()
+        if self.join_button:
+            self.join_button.draw()
+        if self.join_red:
+            self.join_red.draw()

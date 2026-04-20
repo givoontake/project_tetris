@@ -44,10 +44,10 @@ class LobbyState(BaseState):
                  net_worker: NetworkWorker, session: Session):
         super().__init__(screen, rm, net_worker, session)
         self.top_menus: list[Button] = []
-        self.room_list = RoomList(screen, pygame.Rect(50, 150, 900, 400), rm)
-        self.chat_window = ChatWindow(screen, pygame.Rect(50, 550, 900, 300), self.rm)
-        self.my_info_rect = Profile(screen, pygame.Rect(1050, 600, 300, 300), rm, session)
-        self.user_tabs = UserTabs(screen, pygame.Rect(1100, 150, 300, 400), rm, [USER_TAB_NAME, FRIEND_TAB_NAME])
+        self.room_list = RoomList(screen, pygame.Rect(50, 135, 900, 400), rm)
+        self.chat_window = ChatWindow(screen, pygame.Rect(50, 575, 900, 260), self.rm)
+        self.my_info_rect = Profile(screen, pygame.Rect(1100, 575, 300, 260), rm, session)
+        self.user_tabs = UserTabs(screen, pygame.Rect(1100, 150, 300, 375), rm, [USER_TAB_NAME, FRIEND_TAB_NAME])
 
         self.error_popup = None
         self.quick_start_window = None
@@ -79,6 +79,20 @@ class LobbyState(BaseState):
             self.top_menus.append(menu)
             draw_x += MENU_WIDTH
         self.top_menus[4].set_text(RANKING_MENU_TEXT)
+        exit_rect = self.top_menus[5].button.rect.copy()
+        exit_rect.x = self.screen.get_width() - MENU_WIDTH
+        self.top_menus[5] = Button(self.screen, exit_rect, self.rm, "게임종료", 0)
+        self.top_menus[5].set_images(
+            self.rm.images.ui_images[UI_BUTTON_RED],
+            self.rm.images.ui_images[UI_BUTTON_BLUE],
+            self.rm.images.ui_images[UI_BUTTON_ORANGE],
+        )
+        self.top_menus[0].set_text(QUICK_START_MENU_TEXT)
+        self.top_menus[1].set_text("방만들기")
+        self.top_menus[2].set_text(RANKING_MENU_TEXT)
+        self.top_menus[3].set_text("상점")
+        self.top_menus[4].set_text("설정")
+        self.top_menus[5].set_text("게임종료")
 
         self.request_room_list()
         self.request_lobby_user_list()
@@ -165,13 +179,44 @@ class LobbyState(BaseState):
         
         event = None
         if self.reactable:
-            for menu in self.top_menus:
+            for index, menu in enumerate(self.top_menus):
                 if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
-                    event = menu.button.text
+                    event = index
                     break
             
             # 리스트로 만들어놔서 각 버튼마다 이름이 없어서 텍스트로 접근
             if event is not None:
+                if event == 0:
+                    self.quick_start_window = QuickStartWindow(self.screen, self.rm)
+                    self.reactable = False
+                    return
+
+                elif event == 1:
+                    self.room_create_window = CreateRoomWindow(self.screen, self.rm, self.net_worker, self.session)
+                    self.reactable = False
+                    return
+
+                elif event == 2:
+                    self.queue_state(RankingState(self.screen, self.rm, self.net_worker, self.session))
+                    return
+
+                elif event == 4:
+                    sw, sh = self.screen.get_size()
+                    setting_window_w = sw // 4
+                    setting_window_h = sh // 3
+                    setting_window_x = sw // 2 - setting_window_w // 2
+                    setting_window_y = sh // 2 - setting_window_h // 2
+                    setting_window_rect = pygame.Rect(setting_window_x, setting_window_y, setting_window_w, setting_window_h)
+                    self.setting_window = SettingWindow(self.screen, setting_window_rect, self.rm)
+                    self.reactable = False
+                    return
+
+                elif event == 5:
+                    popup_texts = ["게임종료", "계속하기"]
+                    self.exit_popup = PopupBox(self.screen, self.rm, "종료하시겠습니까?", popup_texts)
+                    self.reactable = False
+                    return
+
                 if event == QUICK_START_MENU_TEXT:
                     self.quick_start_window = QuickStartWindow(self.screen, self.rm)
                     self.reactable = False
@@ -248,7 +293,7 @@ class LobbyState(BaseState):
                     self.request_friend_list()
                     return
                 if friend_event != None:
-                    btn_rect = pygame.Rect(friend_event.pos[0], friend_event.pos[1], 100, 50)
+                    btn_rect = pygame.Rect(friend_event.pos[0], friend_event.pos[1], 50, 25)
                     self.friend_ev_target_id = friend_event.target_id
                     if friend_event.ev_type == "add":
                         btn_text = "친구추가"
@@ -257,6 +302,7 @@ class LobbyState(BaseState):
                         btn_text = "친구삭제"
 
                     self.friend_ev_btn = Button(self.screen, btn_rect, self.rm, btn_text, 0, True)
+                    self.friend_ev_btn.set_text_size(10)
 
         else:
             if self.error_popup:

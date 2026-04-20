@@ -10,7 +10,7 @@ from tetris.net.network import NetworkWorker
 from tetris.net.packet_structs import *
 from tetris.net.error_types import *
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.fonts import Fonts, RECTANGLE_FONT_SIZE
+from tetris.resources.fonts import Fonts, DEFAULT_FONT_SIZE
 from tetris.resources.define import *
 
 from tetris.ui.button import Button
@@ -78,6 +78,7 @@ class MultiPlayState(BaseState):
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
         self.title_box = Rectangle(self.screen, title_rect, self.rm, False, None, title)
+        self.title_box.set_text_size(20)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -86,6 +87,7 @@ class MultiPlayState(BaseState):
         else:
             pw_val = f"비밀번호: {self.password}"
         self.password_box = Rectangle(self.screen, password_rect, self.rm, False, None, pw_val)
+        self.password_box.set_text_size(20)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -94,6 +96,12 @@ class MultiPlayState(BaseState):
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.btn_exit = Button(self.screen, exit_rect, self.rm, "나가기", 0)
+
+        self.btn_exit.set_images(
+            self.rm.images.ui_images[UI_BUTTON_RED],
+            self.rm.images.ui_images[UI_BUTTON_BLUE],
+            self.rm.images.ui_images[UI_BUTTON_ORANGE],
+        )
 
     def set_layout_5player(self):
         self.set_layout_2player()
@@ -111,7 +119,7 @@ class MultiPlayState(BaseState):
                     sub_h,
                 )
                 tetris_player = TetrisSession(self.screen, sub_rect, self.rm, self.net_worker, False)
-                tetris_player.set_multiplayer_text_size(RECTANGLE_FONT_SIZE // 2)
+                tetris_player.set_multiplayer_text_size(DEFAULT_FONT_SIZE // 2)
                 self.players.append(tetris_player)
 
     def reset_room(self):

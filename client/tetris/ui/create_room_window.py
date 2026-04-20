@@ -16,14 +16,13 @@ from tetris.ui.toggle_button import ToggleButton
 
 
 class CreateRoomWindow:
-    TOP_PADDING = 50
-    BOTTOM_PADDING = 50
-    ROW_HEIGHT = 50
-    GAP = 50
-    WIDTH = 600
-
-    LEFT_PADDING = 20
-    RIGHT_PADDING = 20
+    WINDOW_WIDTH = 500
+    WINDOW_HEIGHT = 500
+    INPUT_HEIGHT = 50
+    BUTTON_WIDTH = 120
+    BUTTON_HEIGHT = 60
+    TOP_PADDING = 35
+    GAP = 20
 
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, my_session: Session):
         self.screen = screen
@@ -53,58 +52,58 @@ class CreateRoomWindow:
     def set_layout(self):
         sw, sh = self.screen.get_size()
 
-        self.rect.w = sw // 2
-        self.rect.h = sh // 2
+        self.rect.w = self.WINDOW_WIDTH
+        self.rect.h = self.WINDOW_HEIGHT
         self.rect.x = (sw // 2) - (self.rect.w // 2)
         self.rect.y = (sh // 2) - (self.rect.h // 2)
-        outline_padding_w = self.rect.w // 10
-        outline_padding_h = self.rect.h // 10
-        inner_padding_w = self.rect.w // 20
-        inner_padding_h = self.rect.h // 20
-        self.window = Rectangle(self.screen, self.rect, self.rm, False, None, "")
+        self.window = Rectangle(self.screen, self.rect, self.rm, True, self.rm.images.ui_images[UI_WINDOW_BACKGROUND], "")
 
-        draw_x = self.rect.x + outline_padding_w
-        draw_y = self.rect.y + outline_padding_h
-        draw_h = (self.rect.h - (outline_padding_h * 2 + inner_padding_h * (self.col_num - 1))) // self.col_num
+        total_h = self.INPUT_HEIGHT * 2 + self.BUTTON_HEIGHT * 3 + self.GAP * 4
+        draw_y = self.rect.y + (self.rect.h - total_h) // 2
+        draw_h = self.INPUT_HEIGHT
 
-        draw_w = self.rect.w - outline_padding_w * 2
+        draw_w = self.rect.w - 80
+        draw_x = self.rect.x + (self.rect.w - draw_w) // 2
         title_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.title = InputBox(self.screen, title_rect, self.rm, "4~16자", MAX_INPUT, False, True)
-        draw_y += draw_h + inner_padding_h
+        self.title = InputBox(self.screen, title_rect, self.rm, "방 제목 (4~16자)", MAX_INPUT, False, True)
+        draw_y += draw_h + self.GAP
 
         op_player_texts = ["2인", "5인"]
-        draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_player_texts) - 1))) // len(op_player_texts)
+        padding_w = (self.rect.w - self.BUTTON_WIDTH * len(op_player_texts)) // (len(op_player_texts) + 1)
+        draw_x = self.rect.x + padding_w
         for op_text in op_player_texts:
-            op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+            op_rect = pygame.Rect(draw_x, draw_y, self.BUTTON_WIDTH, self.BUTTON_HEIGHT)
             option = ToggleButton(self.screen, op_rect, self.rm, op_text)
             self.option_player.append(option)
-            draw_x += draw_w + inner_padding_w
+            draw_x += self.BUTTON_WIDTH + padding_w
         self._set_player_value("2인")
-        draw_x = self.rect.x + outline_padding_w
-        draw_y += draw_h + inner_padding_h
+        draw_y += self.BUTTON_HEIGHT + self.GAP
 
         op_open_texts = ["공개", "비공개"]
-        draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_open_texts) - 1))) // len(op_open_texts)
+        padding_w = (self.rect.w - self.BUTTON_WIDTH * len(op_open_texts)) // (len(op_open_texts) + 1)
+        draw_x = self.rect.x + padding_w
         for op_text in op_open_texts:
-            op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+            op_rect = pygame.Rect(draw_x, draw_y, self.BUTTON_WIDTH, self.BUTTON_HEIGHT)
             option = ToggleButton(self.screen, op_rect, self.rm, op_text)
             self.option_open.append(option)
-            draw_x += draw_w + inner_padding_w
-        draw_x = self.rect.x + outline_padding_w
-        draw_y += draw_h + inner_padding_h
+            draw_x += self.BUTTON_WIDTH + padding_w
+        draw_y += self.BUTTON_HEIGHT + self.GAP
 
-        draw_w = self.rect.w - outline_padding_w * 2
+        draw_w = self.rect.w - 80
+        draw_x = self.rect.x + (self.rect.w - draw_w) // 2
         pw_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.password = InputBox(self.screen, pw_rect, self.rm, "4~16자", MAX_INPUT, False, True)
-        draw_y += draw_h + inner_padding_h
+        self.password = InputBox(self.screen, pw_rect, self.rm, "비밀번호 (4~16자)", MAX_INPUT, False, True)
+        self._set_open_value("공개")
+        draw_y += draw_h + self.GAP
 
         op_make_texts = ["만들기", "취소"]
-        draw_w = (self.rect.w - (outline_padding_w * 2 + inner_padding_w * (len(op_make_texts) - 1))) // len(op_make_texts)
+        padding_w = (self.rect.w - self.BUTTON_WIDTH * len(op_make_texts)) // (len(op_make_texts) + 1)
+        draw_x = self.rect.x + padding_w
         for op_text in op_make_texts:
-            op_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
+            op_rect = pygame.Rect(draw_x, draw_y, self.BUTTON_WIDTH, self.BUTTON_HEIGHT)
             option = Button(self.screen, op_rect, self.rm, op_text, 0)
             self.option_make.append(option)
-            draw_x += draw_w + inner_padding_w
+            draw_x += self.BUTTON_WIDTH + padding_w
 
     def _set_player_value(self, val: str):
         for option in self.option_player:

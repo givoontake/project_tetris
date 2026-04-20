@@ -716,6 +716,7 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 	int offset = 0;
 	char p_buffer[BUF_SIZE];
 	int remain_data_size = 0;
+	bool disconnect_flag = false;
 
 	// 작업에 사용해야 할 세션 내의 값들을 세션 락을 걸고 안전하게 복사해온다.
 	// 복사한 값을 그 다음에 처리하는 것은 문제 없다. 처리 도중 재사용된다고 해도 어차피 같은 세션인지 계속 검증하므로 걸러진다
@@ -964,7 +965,7 @@ int IOCPServer::FindSessionIndexById(int user_id)
 	return active_users.FindSessionIndexById(user_id);
 }
 
-void IOCPServer::Disconnect(int user_index)
+void IOCPServer::Disconnect(int user_index) // 생각해보니 GEN이 없으면 무조건 DISCONNECT라서 조금 문제가 있을 것 같은데?? + 중간상태 검토가 필요할 것 같다..
 {
 	Session& target = users[user_index];
 	if (target.GetState() == SESS_STATE::NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지

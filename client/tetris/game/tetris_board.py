@@ -70,12 +70,9 @@ class TetrisBoard:
         draw_h = self.cell_length*VALID_ROWS
         self.valid_grid_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.full_grid_rect = pygame.Rect(self.rect.x, self.rect.y, draw_w, self.cell_length*BOARD_ROWS)
-        frame_w = int(self.valid_grid_rect.w * 1.0)
-        frame_h = int(self.valid_grid_rect.h * 1.0)
-        frame_x = self.valid_grid_rect.centerx - (frame_w // 2)
-        frame_y = self.valid_grid_rect.centery - (frame_h // 2)
-        self.board_frame_rect = pygame.Rect(frame_x, frame_y, frame_w, frame_h)
-        self.board_frame = Rectangle(self.screen, self.board_frame_rect, self.rm, True, self.rm.images.ui_images[UI_FRAME12], "")
+        self.board_frame_rect = self.valid_grid_rect.copy()
+        self.board_frame = Rectangle(self.screen, self.board_frame_rect, self.rm, False, None, "")
+        self.board_frame.border_color = GOLD
 
         # profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         # self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
@@ -84,7 +81,10 @@ class TetrisBoard:
         draw_w = self.cell_length*PREVIEW_COLS
         draw_h = draw_w
         self.preview_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.preview_box = Rectangle(self.screen, self.preview_rect, self.rm, True, self.rm.images.ui_images[UI_FRAME11], "")
+        self.preview_box = Rectangle(self.screen, self.preview_rect, self.rm, False, None, "")
+        self.preview_box.set_background_color((0, 0, 0, 96))
+        self.preview_box.border_color = GOLD
+        self.preview_box.set_border(1)
 
     def _set_texture_size(self):
         for key, texture in self.block_textures.items():
@@ -243,10 +243,14 @@ class TetrisBoard:
         self.combo_effects = [effect for effect in self.combo_effects if effect.active] # 리스트 컴프리헨션으로 조건에 맞는 새 리스트 생성
     # ------------ 렌더링 ------------ #
     def draw_board_frame(self):
-        self.board_frame.draw()
-        board_background = pygame.Surface((self.valid_grid_rect.w, self.valid_grid_rect.h), pygame.SRCALPHA)
-        board_background.fill((0, 0, 0, 96))
-        self.screen.blit(board_background, self.valid_grid_rect.topleft)
+        line_w = 1
+        left_top = self.board_frame_rect.topleft
+        left_bottom = self.board_frame_rect.bottomleft
+        right_top = self.board_frame_rect.topright
+        right_bottom = self.board_frame_rect.bottomright
+        pygame.draw.line(self.screen, self.board_frame.border_color, left_top, left_bottom, line_w)
+        pygame.draw.line(self.screen, self.board_frame.border_color, right_top, right_bottom, line_w)
+        pygame.draw.line(self.screen, self.board_frame.border_color, left_bottom, right_bottom, line_w)
 
     def draw_cells(self):
         tex_map = self.block_textures

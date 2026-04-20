@@ -55,6 +55,8 @@ class GameLoop:
         q = self.net_worker._pm.queue
 
         while not q.empty():
+            if self.state.next_state is not None:
+                break
             try:
                 data = q.get_nowait()
             except queue.Empty:

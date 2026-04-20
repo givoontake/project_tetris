@@ -3,7 +3,7 @@ import pygame
 from typing import cast
 
 from tetris.models.dataclass import EventFriend
-from tetris.ui.button import Button
+from tetris.ui.button import Button, ButtonStyle
 from tetris.ui.toggle_button import ToggleButton
 from tetris.ui.user_list import UserList
 from tetris.resources.resource_manager import ResourceManager
@@ -12,12 +12,12 @@ from tetris.resources.define import *
 from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 
-TAB_HEIGHT = 40
-TAB_GAP = 5
-FOOTER_HEIGHT = 70
-REFRESH_BUTTON_WIDTH = 100
+TAB_WIDTH = 100
+TAB_HEIGHT = 50
+TAB_GAP = 0
+FOOTER_HEIGHT = 0
+REFRESH_BUTTON_WIDTH = 50
 REFRESH_BUTTON_HEIGHT = 50
-REFRESH_BUTTON_MARGIN = 10
 
 USER_TAB_NAME = "유저"
 FRIEND_TAB_NAME = "친구"
@@ -56,25 +56,30 @@ class UserTabs:
         if tab_count <= 0:
             return
 
-        total_gap = TAB_GAP * (tab_count - 1)
-        tab_w = (tab_rect.w - total_gap) // tab_count
-
         draw_x = tab_rect.x
         for tab_name in self.tab_names:
-            button_rect = pygame.Rect(draw_x, tab_rect.y, tab_w, tab_rect.h)
+            button_rect = pygame.Rect(draw_x, tab_rect.y, TAB_WIDTH, tab_rect.h)
             button = ToggleButton(self.screen, button_rect, self.rm, tab_name, 0)
+            button.set_text_size(20)
             self.tab_buttons.append(button)
             self.tab_rects.append(button_rect)
             self.user_lists[tab_name] = UserList(self.screen, list_rect, self.rm)
 
             refresh_rect = pygame.Rect(
-                self.rect.right - REFRESH_BUTTON_MARGIN - REFRESH_BUTTON_WIDTH,
-                self.rect.bottom - REFRESH_BUTTON_MARGIN - REFRESH_BUTTON_HEIGHT,
+                list_rect.right - REFRESH_BUTTON_WIDTH,
+                list_rect.y - REFRESH_BUTTON_HEIGHT,
                 REFRESH_BUTTON_WIDTH,
                 REFRESH_BUTTON_HEIGHT,
             )
-            self.refresh_buttons[tab_name] = Button(self.screen, refresh_rect, self.rm, "새로고침", 0)
-            draw_x += tab_w + TAB_GAP
+            refresh_button = Button(self.screen, refresh_rect, self.rm, "", 0, True, ButtonStyle.SMALL)
+            refresh_button.set_images(
+                self.rm.images.ui_images[UI_BUTTON2_GREEN],
+                self.rm.images.ui_images[UI_BUTTON2_BLUE],
+                self.rm.images.ui_images[UI_BUTTON2_ORANGE],
+            )
+            refresh_button.set_icon(self.rm.images.ui_images[UI_REFRESH_ICON])
+            self.refresh_buttons[tab_name] = refresh_button
+            draw_x += TAB_WIDTH + TAB_GAP
 
     def get_cur_user_list(self) -> UserList:
         return self.user_lists[self.tab_names[self.cur_tab_index]]

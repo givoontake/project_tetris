@@ -7,7 +7,7 @@ from tetris.net.packet_structs import S2C_ROOM_INFO_PACKET
 from tetris.ui.scroll_window_base import ScrollWindowBase
 from tetris.ui.rectangle import Rectangle
 from tetris.ui.room_info import RoomInfo
-from tetris.ui.button import Button
+from tetris.ui.button import Button, ButtonStyle
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.fonts import Fonts
 from tetris.resources.define_colors import *
@@ -15,12 +15,13 @@ from tetris.resources.define import *
 
 
 class RoomList(ScrollWindowBase):
-    VISIBLE_ROOM = 6
+    VISIBLE_ROOM = 8
+    ROOM_INFO_HEIGHT = 40
     BACKGROUND_1 = GRAY
     BACKGROUND_2 = DARK_GRAY
     PAGE_INFO_GAP = 10
     PAGE_INFO_HEIGHT = 50
-    BORDER_RADIUS = 8
+    BORDER_RADIUS = 0
     BORDER_WIDTH = 1
 
     def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager):
@@ -28,27 +29,62 @@ class RoomList(ScrollWindowBase):
         self.rect = rect
         self.rm = rm
         self.background = Rectangle(screen, rect, rm, False, None, "")
+        self.header_info_rects: list[Rectangle] = []
         self.rooms: list[RoomInfo] = []
         self.show_rooms: list[RoomInfo] = []
 
         self.set_layout()
-        super().__init__(screen, self.background.rect, self.show_room_start_rect.h)
+        super().__init__(screen, self.list_rect, self.show_room_start_rect.h)
         self.set_scroll_info()
         self.set_scroll_len()
         self.update_show_rooms()
 
     def set_layout(self):
         background_rect = self.rect.copy()
-        background_rect.h -= self.PAGE_INFO_GAP + self.PAGE_INFO_HEIGHT
         self.background.update_rect(background_rect)
 
-        self.show_room_start_rect = background_rect.copy()
-        self.show_room_start_rect.h = int(background_rect.h / self.VISIBLE_ROOM)
+        header_rect = background_rect.copy()
+        header_rect.h = self.ROOM_INFO_HEIGHT
+        self.header_info_rects.clear()
 
-        refresh_rect = pygame.Rect(0, 0, 100, self.PAGE_INFO_HEIGHT)
-        refresh_rect.x = self.rect.x + self.rect.w - refresh_rect.w
-        refresh_rect.y = background_rect.y + background_rect.h + self.PAGE_INFO_GAP
-        self.btn_refresh = Button(self.screen, refresh_rect, self.rm, "새로고침", 0)
+        locked_rect = pygame.Rect(header_rect.x, header_rect.y, int(header_rect.w * RoomInfo.LOCKED_WIDTH_RATE), header_rect.h)
+        title_rect = locked_rect.copy()
+        title_rect.x += locked_rect.w
+        title_rect.w = int(header_rect.w * RoomInfo.TITLE_WIDTH_RATE)
+        capacity_rect = title_rect.copy()
+        capacity_rect.x += title_rect.w
+        capacity_rect.w = int(header_rect.w * RoomInfo.CAPACITY_WIDTH_RATE)
+        status_rect = capacity_rect.copy()
+        status_rect.x += capacity_rect.w
+        status_rect.w = int(header_rect.w * RoomInfo.STATUS_WIDTH_RATE)
+
+        for rect, text in [
+            (locked_rect, "공개 여부"),
+            (title_rect, "방 제목"),
+            (capacity_rect, "인원 수"),
+            (status_rect, "상태"),
+        ]:
+            info = Rectangle(self.screen, rect, self.rm, False, None, text)
+            info.set_background_color((0, 0, 0, 0))
+            self.header_info_rects.append(info)
+
+        self.list_rect = background_rect.copy()
+        self.list_rect.y += self.ROOM_INFO_HEIGHT
+        self.list_rect.h -= self.ROOM_INFO_HEIGHT
+
+        self.show_room_start_rect = self.list_rect.copy()
+        self.show_room_start_rect.h = self.ROOM_INFO_HEIGHT
+
+        refresh_rect = pygame.Rect(0, 0, 50, 50)
+        refresh_rect.x = self.rect.right
+        refresh_rect.y = self.rect.y + self.ROOM_INFO_HEIGHT - refresh_rect.h
+        self.btn_refresh = Button(self.screen, refresh_rect, self.rm, "", 0, True, ButtonStyle.SMALL)
+        self.btn_refresh.set_images(
+            self.rm.images.ui_images[UI_BUTTON2_GREEN],
+            self.rm.images.ui_images[UI_BUTTON2_BLUE],
+            self.rm.images.ui_images[UI_BUTTON2_ORANGE],
+        )
+        self.btn_refresh.set_icon(self.rm.images.ui_images[UI_REFRESH_ICON])
 
     def get_items_len(self) -> int:
         return len(self.rooms)
@@ -120,6 +156,14 @@ class RoomList(ScrollWindowBase):
         )
         self.screen.blit(bg_surface, self.background.rect.topleft)
         pygame.draw.rect(self.screen, WHITE, self.background.rect, self.BORDER_WIDTH, border_radius=self.BORDER_RADIUS)
+        for info in self.header_info_rects:
+            info.draw()
         super().draw()
         self.update_show_rooms()
+        if len(self.rooms) == 0:
+            empty_font = self.rm.fonts.get_font(30)
+            empty_surface = empty_font.render("참가 가능한 방이 없습니다", True, WHITE)
+            empty_rect = empty_surface.get_rect()
+            empty_rect.center = self.background.rect.center
+            self.screen.blit(empty_surface, empty_rect)
         self.btn_refresh.draw()

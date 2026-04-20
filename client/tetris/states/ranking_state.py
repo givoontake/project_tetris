@@ -58,7 +58,7 @@ class RankingState(BaseState):
         panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
 
         self.panel = Rectangle(self.screen, panel_rect, self.rm, False, None, "", 3)
-        self.panel.set_background_color(DARK_GRAY)
+        self.panel.set_background_color((0, 0, 0, 120))
 
         header_h = max(60, panel_h // 12)
         half_w = panel_w // 2
@@ -66,9 +66,9 @@ class RankingState(BaseState):
         header_score_rect = pygame.Rect(panel_x + half_w, panel_y, panel_w - half_w, header_h)
 
         self.header_name = Rectangle(self.screen, header_name_rect, self.rm, False, None, NAME_HEADER_TEXT, 2)
-        self.header_name.set_background_color(BLACK)
+        self.header_name.set_background_color((0, 0, 0, 120))
         self.header_score = Rectangle(self.screen, header_score_rect, self.rm, False, None, SCORE_HEADER_TEXT, 2)
-        self.header_score.set_background_color(BLACK)
+        self.header_score.set_background_color((0, 0, 0, 120))
 
         self.rebuild_rows()
 
@@ -99,8 +99,8 @@ class RankingState(BaseState):
 
             name_box = Rectangle(self.screen, name_rect, self.rm, False, None, rank_text, 1)
             score_box = Rectangle(self.screen, score_rect, self.rm, False, None, score_text, 1)
-            name_box.set_background_color(BLACK)
-            score_box.set_background_color(BLACK)
+            name_box.set_background_color((0, 0, 0, 120))
+            score_box.set_background_color((0, 0, 0, 120))
             name_box.set_text_size(26)
             score_box.set_text_size(26)
             self.rows.append((name_box, score_box))

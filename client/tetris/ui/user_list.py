@@ -2,18 +2,18 @@
 import pygame
 
 from tetris.ui.scroll_window_base import ScrollWindowBase
-from tetris.ui.user_info import UserInfo
+from tetris.ui.user_info import UserInfo, NICKNAME_WIDTH_RATE
 from tetris.ui.rectangle import Rectangle
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
 
-HEADER_HEIGHT_RATE = 0.1
+HEADER_HEIGHT = 25
 
 
 class UserList(ScrollWindowBase):
     BACKGROUND_1 = GRAY
     BACKGROUND_2 = DARK_GRAY
-    BORDER_RADIUS = 8
+    BORDER_RADIUS = 0
     BORDER_WIDTH = 1
 
     def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager):
@@ -22,14 +22,41 @@ class UserList(ScrollWindowBase):
         self.rm = rm
 
         self.background = Rectangle(screen, rect, rm, False, None, "", 0)
+        self.header_rects: list[Rectangle] = []
 
-        self.base_user_rect = rect.copy()
-        self.base_user_rect.h = int(rect.h * HEADER_HEIGHT_RATE)
+        header_height = HEADER_HEIGHT
+        header_rect = rect.copy()
+        header_rect.h = header_height
+        self.header_rect = header_rect.copy()
+
+        nickname_rect = header_rect.copy()
+        nickname_rect.w = int(header_rect.w * NICKNAME_WIDTH_RATE)
+
+        state_rect = header_rect.copy()
+        state_rect.x = nickname_rect.x + nickname_rect.w
+        state_rect.w = header_rect.w - nickname_rect.w
+
+        self.nickname_header = Rectangle(screen, nickname_rect, rm, False, None, "닉네임", 0)
+        self.nickname_header.set_background_color((0, 0, 0, 0))
+        self.nickname_header.set_text_size(15)
+        self.nickname_header.set_border(0)
+        self.state_header = Rectangle(screen, state_rect, rm, False, None, "상태", 0)
+        self.state_header.set_background_color((0, 0, 0, 0))
+        self.state_header.set_text_size(15)
+        self.state_header.set_border(0)
+        self.header_rects = [self.nickname_header, self.state_header]
+
+        self.list_rect = rect.copy()
+        self.list_rect.y += header_height
+        self.list_rect.h -= header_height
+
+        self.base_user_rect = self.list_rect.copy()
+        self.base_user_rect.h = header_height
 
         self.user_infos: list[UserInfo] = []
         self.show_user_infos: list[UserInfo] = []
 
-        super().__init__(screen, rect, self.base_user_rect.h)
+        super().__init__(screen, self.list_rect, self.base_user_rect.h)
 
         self.set_scroll_info()
         self.set_scroll_len()
@@ -144,6 +171,9 @@ class UserList(ScrollWindowBase):
         )
         self.screen.blit(bg_surface, self.background.rect.topleft)
         pygame.draw.rect(self.screen, WHITE, self.background.rect, self.BORDER_WIDTH, border_radius=self.BORDER_RADIUS)
+        pygame.draw.rect(self.screen, WHITE, self.header_rect, self.BORDER_WIDTH, border_radius=self.BORDER_RADIUS)
+        for header in self.header_rects:
+            header.draw()
 
         super().draw()
         self.update_show_user_infos()

@@ -106,6 +106,13 @@ class Button:
         self.press = Rectangle(self.screen, rect, self.rm, True, press_image, text, border_width)
         self.button = self.idle
 
+    def set_icon(self, icon: pygame.Surface = None):
+        self.button.set_icon(icon)
+        if self.idle:
+            self.idle.set_icon(icon)
+            self.hover.set_icon(icon)
+            self.press.set_icon(icon)
+
     def set_text(self, text: str):
         self.button.set_text(text)
         if self.idle:

@@ -2,6 +2,7 @@ import pygame
 from typing import Optional
 from tetris.ui.popupbox import PopupBox
 from tetris.config.define import *
+from tetris.resources.define import *
 from tetris.resources.resource_manager import *
 from tetris.resources.fonts import Fonts
 from tetris.ui.rectangle import Rectangle
@@ -10,13 +11,28 @@ from tetris.net.session import Session
 from tetris.ui.toggle_button import ToggleButton
 
 class FastMatchingWindow:
+    WINDOW_WIDTH = 500
+    WINDOW_HEIGHT = 500
+    BUTTON_WIDTH = 120
+    BUTTON_HEIGHT = 60
+
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker):
         self.screen = screen
         self.rm = rm
         self.net_worker = net_worker
 
         self.rect = pygame.Rect(0, 0, 0, 0)
-        self.popup = PopupBox(self.screen, self.rm, "", ["찾기", "취소"])
+        self.popup = PopupBox(
+            self.screen,
+            self.rm,
+            "",
+            ["찾기", "취소"],
+            self.WINDOW_WIDTH,
+            self.WINDOW_HEIGHT,
+            UI_WINDOW_BACKGROUND,
+            self.BUTTON_WIDTH,
+            self.BUTTON_HEIGHT,
+        )
         self.options: list[ToggleButton] = []
         self.option_val = None
 
@@ -27,9 +43,9 @@ class FastMatchingWindow:
         option_texts = ["전체", "2인", "5인"]
         option_num = len(option_texts) # 옵션 수
         padding_num = option_num + 1 # 사용될 패딩 수
-        padding_w = int(rect.w*0.2) // padding_num
-        option_w = int(rect.w*0.8) // option_num
-        option_h = option_w
+        option_w = self.BUTTON_WIDTH
+        option_h = self.BUTTON_HEIGHT
+        padding_w = (rect.w - option_w * option_num) // padding_num
         option_y = rect.y + (rect.h - option_h) // 2
         
         for i in range(len(option_texts)):

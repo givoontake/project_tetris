@@ -43,17 +43,20 @@ UI_IMAGE_PATHS = {
     UI_BUTTON_SKY: "button/button_sky.png",
     UI_TEXT_HOLDER: "button/text_holder.png",
     UI_BUTTON2_BLUE: "button/button2_blue.png",
+    UI_BUTTON2_GREEN: "button/button2_green.png",
     UI_BUTTON2_ORANGE: "button/button2_orange.png",
     UI_BUTTON2_SKY: "button/button2_sky.png",
     UI_CHAT_INPUT_HOLDER: "button/chat_input_holder.png",
     UI_CHAT_WINDOW_BACKGROUND: "backgrounds/chat_window_background.png",
     UI_LOBBY_BACKGROUND: "backgrounds/default_background.png",
     UI_POPUP_BACKGROUND: "backgrounds/popup_background.png",
+    UI_WINDOW_BACKGROUND: "backgrounds/window_background.png",
     UI_INGAME_BACKGROUND: "backgrounds/ingame_background.png",
     UI_FRAME11: "frames/gold_frame11.png",
     UI_FRAME12: "frames/gold_frame12.png",
     UI_FRAME21: "frames/gold_frame21.png",
     UI_FRAME51: "frames/gold_frame51.png",
+    UI_REFRESH_ICON: "icons/refresh_icon.png",
 }
 
 # ===== Sound Paths =====
