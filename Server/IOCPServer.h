@@ -40,6 +40,9 @@ class IOCPServer
 
 	bool is_running = true;
 
+	friend class PacketHandler;
+	friend class DBResultHandler;
+
 public:
 	IOCPServer();
 	~IOCPServer();
@@ -61,7 +64,7 @@ public:
 	Session& FindSessionByIndex(int user_index) { return users[user_index]; }
 	int FindSessionIndexById(int user_id);
 
-	void Disconnect(int user_index);
+	void Disconnect(SessionKey session_key);
 	void StartServer();
 	void ProcessGQCS();
 	void ProcessPacket(Session& session, int request_gen, int recv_bytes);
@@ -70,13 +73,9 @@ public:
 	void CreateOpenRoom(char* packet, Session& session, int request_gen);
 	void CreateLockRoom(char* packet, Session& session, int request_gen);
 	void DeleteRoom(int room_index);
-	void HandleDBResult(DBOverlapped* db_over, Session& session);
-	void HandleDBResult(DBOverlapped* db_over);
-	void ProcessRankingResult(DBOverlapped* db_over);
 	void RequestLoadRanking();
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
-	void HandlePacket(char* packet, Session& session, int request_gen);
 	void SendRoomList(Session& session, int request_gen);
 	bool TryJoinRoom(Session& session, int request_gen, int room_gen, const std::string& room_password);
 	int FindRoom(int room_gen);
@@ -89,26 +88,4 @@ public:
 	void SendRanking(Session& session, int request_gen);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
 	void SendDeleteFriendResult(int requester_id, int target_id);
-
-	friend class PacketHandler;
-	friend class DBResultHandler;
-
-private:
-	void HandleLoginPacket(char* packet, Session& session, int request_gen);
-	void HandleMessagePacket(char* packet, Session& session, int request_gen);
-	void HandleTestPacket(char* packet, Session& session);
-	void HandleDisconnectPacket(Session& session);
-	void HandleJoinOpenRoomPacket(char* packet, Session& session, int request_gen);
-	void HandleJoinLockRoomPacket(char* packet, Session& session, int request_gen);
-	void HandleFastMatchingPacket(char* packet, Session& session, int request_gen);
-	void HandleRequestFriendPacket(char* packet, Session& session, int request_gen);
-	void HandleAcceptFriendPacket(char* packet, Session& session, int request_gen);
-	void HandleDeleteFriendPacket(char* packet, Session& session, int request_gen);
-	void HandleRequestFriendDBResult(DBOverlapped* db_over);
-	void HandleAddFriendDBResult(DBOverlapped* db_over);
-	void HandleDeleteFriendDBResult(DBOverlapped* db_over);
-	void HandleLoginDBResult(DBOverlapped* db_over, Session& session);
-	void HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& session);
-	void HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Session& session);
-	void HandleLoadFriendListDBResult(DBOverlapped* db_over, Session& session);
 };

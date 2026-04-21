@@ -1,4 +1,4 @@
-#include <iostream>
+﻿#include <iostream>
 #include <algorithm>
 #include "IOCPServer.h"
 #include "SingleRoom.h"
@@ -53,177 +53,7 @@ IOCPServer::~IOCPServer()
 	WSACleanup();
 }
 
-void IOCPServer::HandleLoginPacket(char* packet, Session& session, int request_gen)
-{
-	C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
-	SessionKey key;
-	{
-		std::lock_guard<std::mutex> lock(session.GetMutex());
-		if (session.GetSessionKey().gen != request_gen) return;
-		if (session.GetState() != SESS_STATE::LOGIN) return;
-		key = session.GetSessionKey();
-	}
 
-	std::string login_id = CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
-	std::string password = CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
-	Database& repr_db = db;
-	auto task_login = [&repr_db, key, login_id, password]() {
-		repr_db.ExecuteLogin(key, login_id, password);
-		};
-
-	db.Enqueue(task_login);
-}
-
-void IOCPServer::HandleMessagePacket(char* packet, Session& session, int request_gen)
-{
-	C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
-	int msg_size = recv_p->header.size - sizeof(C2S_MESSAGE_PACKET);
-	if (msg_size == 0) return;
-	int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
-
-	std::string nickname;
-	int id;
-	{
-		std::lock_guard<std::mutex> lock(session.GetMutex());
-		if (session.GetSessionKey().gen != request_gen) return;
-		if (session.GetState() != SESS_STATE::LOBBY) return;
-		nickname = session.GetDBInfo().nickname;
-		id = session.GetDBInfo().id;
-	}
-
-	char* send_p = new char[send_p_size];
-	S2C_MESSAGE_PACKET front_p;
-	front_p.header.size = static_cast<std::uint16_t>(send_p_size);
-	front_p.header.type = S2C_MESSAGE;
-	front_p.id = id;
-	StringToCharBuf(nickname, front_p.user_name, sizeof(front_p.user_name));
-	memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET));
-	memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size);
-
-	BroadCastToLobby(send_p);
-
-	delete[] send_p;
-}
-
-void IOCPServer::HandleTestPacket(char* packet, Session& session)
-{
-	C2S_TEST_PACKET* recv_p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
-	char* send_p = new char[recv_p->header.size];
-	int msg_size = recv_p->header.size - sizeof(C2S_TEST_PACKET);
-	S2C_TEST_PACKET front_p;
-	front_p.header.size = recv_p->header.size;
-	front_p.header.type = S2C_TEST;
-	front_p.id = session.GetDBInfo().id;
-	front_p.last_time = recv_p->last_time;
-	memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET));
-	memcpy(send_p + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_TEST_PACKET), msg_size);
-
-	BroadCastToLobby(send_p);
-
-	delete[] send_p;
-}
-
-void IOCPServer::HandleDisconnectPacket(Session& session)
-{
-	session.StoreDisconnectFlag(true);
-	Disconnect(session.GetSessionKey().index);
-}
-
-void IOCPServer::HandleJoinOpenRoomPacket(char* packet, Session& session, int request_gen)
-{
-	C2S_JOIN_OPEN_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_OPEN_ROOM_PACKET*>(packet);
-	TryJoinRoom(session, request_gen, join_p->room_gen, "");
-}
-
-void IOCPServer::HandleJoinLockRoomPacket(char* packet, Session& session, int request_gen)
-{
-	C2S_JOIN_LOCK_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_LOCK_ROOM_PACKET*>(packet);
-	TryJoinRoom(session, request_gen, join_p->room_gen, CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
-}
-
-void IOCPServer::HandleFastMatchingPacket(char* packet, Session& session, int request_gen)
-{
-	C2S_FAST_MATCHING_PACKET* matching_p = reinterpret_cast<C2S_FAST_MATCHING_PACKET*>(packet);
-	FindMatch(session, request_gen, matching_p->max_user);
-}
-
-void IOCPServer::HandleRequestFriendPacket(char* packet, Session& session, int request_gen)
-{
-	C2S_REQUEST_FRIEND_PACKET* friend_p = reinterpret_cast<C2S_REQUEST_FRIEND_PACKET*>(packet);
-
-	Session& requester_sess = session;
-	FriendInfo requester_info;
-	{
-		std::lock_guard<std::mutex> lock(requester_sess.GetMutex());
-		if (requester_sess.GetState() != SESS_STATE::LOBBY) return;
-		if (requester_sess.GetSessionKey().gen == request_gen) {
-			requester_info.id = requester_sess.GetDBInfo().id;
-			requester_info.nickname = requester_sess.GetDBInfo().nickname;
-		}
-		else return;
-	}
-
-	int recver_id = friend_p->recver_id;
-	Database& repr_db = db;
-	auto task_afr = [&repr_db, requester_info, recver_id]() {
-		repr_db.ExecuteAddFriendRequest(requester_info, recver_id);
-		};
-
-	db.Enqueue(task_afr);
-}
-
-void IOCPServer::HandleAcceptFriendPacket(char* packet, Session& session, int request_gen)
-{
-	C2S_ACCEPT_FRIEND_PACKET* accept_p = reinterpret_cast<C2S_ACCEPT_FRIEND_PACKET*>(packet);
-	Session& accepter_session = session;
-
-	FriendInfo accepter_info;
-	{
-		std::lock_guard<std::mutex> lock(accepter_session.GetMutex());
-		if (accepter_session.GetState() != SESS_STATE::LOBBY) return;
-		if (accepter_session.GetSessionKey().gen == request_gen) {
-			accepter_info.id = accepter_session.GetDBInfo().id;
-			accepter_info.nickname = accepter_session.GetDBInfo().nickname;
-		}
-		else return;
-	}
-
-	int requester_id = accept_p->requester_id;
-	Database& repr_db = db;
-	auto task_af = [&repr_db, requester_id, accepter_info]() {
-		repr_db.ExecuteAddFriend(requester_id, accepter_info);
-		};
-
-	db.Enqueue(task_af);
-}
-
-void IOCPServer::HandleDeleteFriendPacket(char* packet, Session& session, int request_gen)
-{
-	C2S_DELETE_FRIEND_PACKET* delete_p = reinterpret_cast<C2S_DELETE_FRIEND_PACKET*>(packet);
-	Session& requester_session = session;
-	int target_id = delete_p->target_id;
-	int requester_id = -1;
-	{
-		std::lock_guard<std::mutex> lock(requester_session.GetMutex());
-		if (requester_session.GetState() != SESS_STATE::LOBBY) return;
-		if (requester_session.GetSessionKey().gen == request_gen) {
-			requester_id = requester_session.GetDBInfo().id;
-		}
-		else return;
-	}
-	Database& repr_db = db;
-	auto task_df = [&repr_db, requester_id, target_id]() {
-		repr_db.ExecuteDeleteFriend(requester_id, target_id);
-		};
-
-	db.Enqueue(task_df);
-}
-
-void IOCPServer::HandlePacket(char* packet, Session& session, int request_gen)
-{
-	// 작업에 필요한 데이터는 락으로 잡고 전송에 필요한 본인 정보만 복사(전송에 필요한 본인 정보를 읽을 때 연결이 끊기면 데이터 레이스 발생 가능)
-	packet_handler.HandlePacket(packet, session, request_gen);
-}
 void IOCPServer::SendRoomList(Session& session, int request_gen)
 {
 	// 더미 방 생성
@@ -655,12 +485,12 @@ void IOCPServer::ProcessGQCS()
 
 		case SESSION_IO_COMPLETION: {
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
-			Session& sess = users[io_over->ex_over.key.index];
+			Session& sess = users[ex_over->key.index];
 			switch (ex_over->op_type) {
 			case OP_TYPE::RECV: {
 				if (!result || transferred_bytes == 0) {
 					sess.StoreDisconnectFlag(true);
-					Disconnect(sess.GetSessionKey().index);
+					Disconnect(sess.GetSessionKey());
 					break;
 				}
 				ProcessPacket(sess, io_over->ex_over.key.gen, transferred_bytes);
@@ -671,11 +501,16 @@ void IOCPServer::ProcessGQCS()
 			case OP_TYPE::SEND: {
 				if ((!result || transferred_bytes == 0)) {
 					sess.StoreDisconnectFlag(true);
-					Disconnect(sess.GetSessionKey().index);
+					Disconnect(sess.GetSessionKey());
 				}
 				delete io_over;
 				break;
 			}
+
+			case OP_TYPE::DISCONNECT:
+				Disconnect(ex_over->key);
+				delete ex_over;
+				break;
 
 			default:
 				break;
@@ -697,9 +532,9 @@ void IOCPServer::ProcessGQCS()
 			int index = db_over->ex_over.key.index;
 			if (index > -1) {
 				Session& sess = users[db_over->ex_over.key.index];
-				HandleDBResult(db_over, sess);
+				db_result_handler.HandleDBResult(db_over, sess);
 			}
-			else HandleDBResult(db_over);
+			else db_result_handler.HandleDBResult(db_over);
 
 			delete db_over;
 			break;
@@ -729,7 +564,10 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 
 		if (recv_bytes + session.GetRemainDataSize() > BUF_SIZE) {
 			session.StoreDisconnectFlag(true);
-			Disconnect(session.GetSessionKey().index);
+			ExOverlapped* disconnect_over = new ExOverlapped;
+			disconnect_over->op_type = OP_TYPE::DISCONNECT;
+			disconnect_over->key = session.GetSessionKey();
+			PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(disconnect_over));
 			return;
 		}
 		
@@ -744,7 +582,10 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 
 	if (packet_size < PACKET_HEADER_SIZE || packet_size > BUF_SIZE) {
 		session.StoreDisconnectFlag(true);
-		Disconnect(session.GetSessionKey().index);
+		ExOverlapped* disconnect_over = new ExOverlapped;
+		disconnect_over->op_type = OP_TYPE::DISCONNECT;
+		disconnect_over->key = session.GetSessionKey();
+		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(disconnect_over));
 		return;
 	}
 
@@ -758,7 +599,10 @@ void IOCPServer::ProcessPacket(Session& session, int request_gen, int recv_bytes
 		packet_size = reinterpret_cast<PacketHeader*>(p_buffer + offset)->size;
 		if (packet_size < PACKET_HEADER_SIZE || packet_size > BUF_SIZE) {
 			session.StoreDisconnectFlag(true);
-			Disconnect(session.GetSessionKey().index);
+			ExOverlapped* disconnect_over = new ExOverlapped;
+			disconnect_over->op_type = OP_TYPE::DISCONNECT;
+			disconnect_over->key = session.GetSessionKey();
+			PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(disconnect_over));
 			return;
 		}
 	}
@@ -779,10 +623,10 @@ void IOCPServer::RoutePacket(char* packet, Session& session, int request_gen)
 	case SESS_STATE::NONE:
 		return;
 	case SESS_STATE::LOGIN:
-		HandlePacket(packet, session, request_gen);
+		packet_handler.HandlePacket(packet, session, request_gen);
 		break;
 	case SESS_STATE::LOBBY:
-		HandlePacket(packet, session, request_gen);
+		packet_handler.HandlePacket(packet, session, request_gen);
 		break;
 	case SESS_STATE::ROOM: {
 		auto room_ptr = rooms[session.GetRoomIndex()].load();
@@ -965,10 +809,12 @@ int IOCPServer::FindSessionIndexById(int user_id)
 	return active_users.FindSessionIndexById(user_id);
 }
 
-void IOCPServer::Disconnect(int user_index) // 생각해보니 GEN이 없으면 무조건 DISCONNECT라서 조금 문제가 있을 것 같은데?? + 중간상태 검토가 필요할 것 같다..
+void IOCPServer::Disconnect(SessionKey session_key) // 생각해보니 GEN이 없으면 무조건 DISCONNECT라서 조금 문제가 있을 것 같은데?? + 중간상태 검토가 필요할 것 같다..
 {
+	const int user_index = session_key.index;
 	Session& target = users[user_index];
 	if (target.GetState() == SESS_STATE::NONE) return; // 이미 끊김->또 send -> send 실패 -> PQCS -> Disconnect 무한루프 방지
+	if (target.GetSessionKey().gen != session_key.gen) return;
 
 	if (target.TryChangeDisconnectFlag(true, false)) {
 		int user_id = target.GetDBInfo().id;
@@ -987,187 +833,6 @@ void IOCPServer::Disconnect(int user_index) // 생각해보니 GEN이 없으면 
 	//p.type = S2C_DISCONNECT;
 	//SendToSelf(reinterpret_cast<char*>(&p), user_index);
 
-}
-
-void IOCPServer::HandleRequestFriendDBResult(DBOverlapped* db_over)
-{
-	if (db_over->ok) {
-		DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-		int recver_index = FindSessionIndexById(res->recver_info.id);
-		if (recver_index != -1) {
-			Session& recver_session = FindSessionByIndex(recver_index);
-			std::lock_guard<std::mutex> lock(recver_session.GetMutex());
-			if (recver_session.GetState() != SESS_STATE::LOBBY) return;
-			if (recver_session.GetDBInfo().id != res->recver_info.id) return;
-
-			S2C_REQUEST_FRIEND_PACKET request_p;
-			request_p.header.size = static_cast<std::uint16_t>(sizeof(request_p));
-			request_p.header.type = S2C_REQUEST_FRIEND;
-			request_p.requester_id = res->requester_info.id;
-			StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
-			recver_session.SendPacket(reinterpret_cast<char*>(&request_p), GetHandle());
-		}
-	}
-}
-
-void IOCPServer::HandleAddFriendDBResult(DBOverlapped* db_over)
-{
-	if (db_over->ok) {
-		DBResultAddFriend* res = static_cast<DBResultAddFriend*>(db_over->result_data.get());
-		SendAddFriendResult(res->requester_info, res->accepter_info);
-	}
-}
-
-void IOCPServer::HandleDeleteFriendDBResult(DBOverlapped* db_over)
-{
-	if (db_over->ok) {
-		DBResultDeleteFriend* res = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
-		SendDeleteFriendResult(res->requester_id, res->target_id);
-	}
-}
-
-void IOCPServer::HandleLoginDBResult(DBOverlapped* db_over, Session& session)
-{
-	int request_gen = db_over->ex_over.key.gen;
-	S2C_LOGIN_PACKET login_p;
-	S2C_ERROR_PACKET error_p;
-	login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
-	login_p.header.type = S2C_LOGIN;
-	if (db_over->ok) {
-		if (db_over->result_data) {
-			if (CheckDuplicateLoginId(static_cast<DBResultLogin*>(db_over->result_data.get())->login_id)) login_p.id = -2;
-			else {
-				std::lock_guard<std::mutex> lock(session.GetMutex());
-				if (request_gen != session.GetSessionKey().gen) return;
-				if (session.GetState() == SESS_STATE::NONE) return;
-
-				session.InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
-				session.StoreState(SESS_STATE::LOBBY);
-				active_users.AddUser(session.GetDBInfo().id, session.GetSessionKey().index);
-				login_p.id = session.GetDBInfo().id;
-				login_p.max_score = session.GetDBInfo().max_score;
-				login_p.win_count = session.GetDBInfo().win_count;
-				login_p.lose_count = session.GetDBInfo().lose_count;
-				StringToCharBuf(session.GetDBInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
-			}
-		}
-		else {
-			login_p.id = -1;
-		}
-	}
-	else {
-		login_p.id = -1;
-	}
-
-	if (login_p.id == -1) {
-		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
-		error_p.header.type = S2C_ERROR;
-		error_p.error_code = ERROR_CODE::LOGIN_FAILED;
-		session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
-	}
-
-	else if (login_p.id == -2) {
-		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
-		error_p.header.type = S2C_ERROR;
-		error_p.error_code = ERROR_CODE::DUPLICATE_LOGIN_ID;
-		session.SendPacket(request_gen, reinterpret_cast<char*>(&error_p), iocp_handle);
-	}
-
-	else {
-		session.SendPacket(request_gen, reinterpret_cast<char*>(&login_p), iocp_handle);
-
-		Database& repr_db = GetDB();
-		std::lock_guard<std::mutex> lock(session.GetMutex());
-		if (session.GetState() == SESS_STATE::NONE) return;
-		if (session.GetSessionKey().gen != request_gen) return;
-		SessionKey key = session.GetSessionKey();
-		int user_id = session.GetDBInfo().id;
-		auto task = [&repr_db, key, user_id]() {
-			repr_db.ExecuteLoadFriendList(key, user_id);
-			};
-		repr_db.Enqueue(task);
-	}
-}
-
-void IOCPServer::HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& session)
-{
-	int request_gen = db_over->ex_over.key.gen;
-	if (db_over->ok) {
-		DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
-		{
-			std::lock_guard<std::mutex> lock(session.GetMutex());
-			if (request_gen != session.GetSessionKey().gen) return;
-			if (session.GetState() == SESS_STATE::NONE) return;
-			session.GetDBInfo().max_score = res->max_score;
-			ranking_manager.UpdateRanking(session.GetDBInfo().id, session.GetDBInfo().nickname, res->max_score);
-		}
-		S2C_UPDATE_SCORE_PACKET us_p;
-		us_p.header.size = static_cast<std::uint16_t>(sizeof(us_p));
-		us_p.header.type = S2C_UPDATE_SCORE;
-		us_p.max_score = res->max_score;
-		session.SendPacket(request_gen, reinterpret_cast<char*>(&us_p), iocp_handle);
-	}
-}
-
-void IOCPServer::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Session& session)
-{
-	int request_gen = db_over->ex_over.key.gen;
-	if (db_over->ok) {
-		S2C_MATCH_RECORD_PACKET record_p;
-		record_p.header.size = static_cast<std::uint16_t>(sizeof(record_p));
-		record_p.header.type = S2C_MATCH_RECORD;
-		DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
-		{
-			std::lock_guard<std::mutex> lock(session.GetMutex());
-			if (request_gen != session.GetSessionKey().gen) return;
-			if (session.GetState() == SESS_STATE::NONE) return;
-
-			if (res->is_winner) ++session.GetDBInfo().win_count;
-			else ++session.GetDBInfo().lose_count;
-
-			record_p.win_count = session.GetDBInfo().win_count;
-			record_p.lose_count = session.GetDBInfo().lose_count;
-		}
-
-		session.SendPacket(request_gen, reinterpret_cast<char*>(&record_p), iocp_handle);
-	}
-}
-
-void IOCPServer::HandleLoadFriendListDBResult(DBOverlapped* db_over, Session& session)
-{
-	int request_gen = db_over->ex_over.key.gen;
-	if (db_over->ok) {
-		DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
-		std::lock_guard<std::mutex> lock(session.GetMutex());
-		if (session.GetState() == SESS_STATE::NONE) return;
-		if (request_gen != session.GetSessionKey().gen) return;
-		session.InitFriendList(res->friend_list);
-	}
-}
-
-void IOCPServer::HandleDBResult(DBOverlapped* db_over)
-{
-	db_result_handler.HandleDBResult(db_over);
-}
-
-void IOCPServer::HandleDBResult(DBOverlapped* db_over, Session& session)
-{
-	// DB 작업 이후 결과를 세션에 통지하기 전에, 세션이 종료되었을 수 있다.
-	// 만약 세션이 즉시 재사용된다면, 우연히 세션을 초기화하는 과정에서 아이디가 바뀌기 전에 다른 부분이 먼저 변경되었을 가능성이 있다.
-	// DB 작업만 문제가 되는게 아니다. 일반 IO도 오퍼레이션 아이디를 넣기는 하지만, 위와 같이 다른 세션인데 우연히 아이디는 바뀌지 않았을 가능성이 있다.
-	// 따라서 세션의 초기화는 뮤텍스로 처리해야 한다. 클리어는 굳이 뮤텍스로 처리하지 않아도 될 것 같다. 세션이 비었다는 상태를 클리어 맨 마지막에 저장하면 즉시 재사용된다고 해도 문제는 생기지 않는다.
-	
-	// IOCP에서 작업 완료하고 얻어온 key만 계속 넘어가면 된다. 최종 검증은 send 직전에 한다.
-	// 만약 재사용됐다? -> GQCS에서 받아온 키가 send 전까지 계속 넘어가므로, 최종 검증은 거기서만 하면 된다.
-	db_result_handler.HandleDBResult(db_over, session);
-}
-
-void IOCPServer::ProcessRankingResult(DBOverlapped* db_over)
-{
-	if (db_over->ok && db_over->result_data) {
-		DBResultLoadRanking* res = static_cast<DBResultLoadRanking*>(db_over->result_data.get());
-		ranking_manager.InitRanking(res->rankings);
-	}
 }
 
 void IOCPServer::StringToCharBuf(const std::string& str, char* buf, int buf_size)
