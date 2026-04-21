@@ -49,12 +49,10 @@ class RankingState(BaseState):
             0,
         )
 
-        content_top = MENU_HEIGHT
-        content_height = sh - content_top
         panel_w = int(sw * 0.75)
-        panel_h = int(content_height * 0.8)
+        panel_h = int((sh - MENU_HEIGHT) * 0.8)
         panel_x = (sw - panel_w) // 2
-        panel_y = content_top + (content_height - panel_h) // 2
+        panel_y = (sh - panel_h) // 2
         panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
 
         self.panel = Rectangle(self.screen, panel_rect, self.rm, False, None, "", 3)
