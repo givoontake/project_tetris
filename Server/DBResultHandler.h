@@ -10,8 +10,8 @@ class DBResultHandler
 
 public:
 	DBResultHandler(IOCPServer& server);
-	void HandleDBResult(DBOverlapped* db_over);
-	void HandleDBResult(DBOverlapped* db_over, Session& session);
+	void HandleIOResult(DBOverlapped* db_over, Session& session);
+	void HandleInitServerResult(DBOverlapped* db_over);
 
 private:
 	void HandleRequestFriendDBResult(DBOverlapped* db_over);

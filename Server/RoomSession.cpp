@@ -13,7 +13,7 @@ RoomSession::~RoomSession()
 void RoomSession::InitRoomSession(Session& s)
 {
 	session = &s;
-	session->StoreState(SESS_STATE::ROOM);
+	session->StoreState(MODE_STATE::ROOM);
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);
 	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
@@ -25,7 +25,7 @@ void RoomSession::InitRoomSession(Session& s)
 
 void RoomSession::ClearRoomSession()
 {
-	session->StoreState(SESS_STATE::LOBBY);
+	session->StoreState(MODE_STATE::LOBBY);
 	session = nullptr;
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::EMPTY);

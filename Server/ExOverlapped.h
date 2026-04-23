@@ -7,13 +7,13 @@
 
 struct SessionKey {
 	int index = -1;
-	int gen = -1;
 };
 
 constexpr ULONG_PTR LISTEN_IO_COMPLETION = 1;
 constexpr ULONG_PTR SESSION_IO_COMPLETION = 2;
 constexpr ULONG_PTR ROOM_IO_COMPLETION = 3;
 constexpr ULONG_PTR DB_IO_COMPLETION = 4;
+constexpr ULONG_PTR DB_INIT_SERVER_COMPLETION = 5;
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;

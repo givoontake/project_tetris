@@ -11,5 +11,6 @@ public:
 	void AddUser(int user_id, int session_index);
 	void RemoveUser(int user_id, int session_index);
 	int FindSessionIndexById(int user_id) const;
+	bool IsActiveSession(int user_id) const;	
 	void Clear();
 };

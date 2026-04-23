@@ -23,6 +23,14 @@ int ActiveUserManager::FindSessionIndexById(int user_id) const
 	return it->second;
 }
 
+bool ActiveUserManager::IsActiveSession(int user_id) const
+{
+	std::lock_guard<std::mutex> lock(active_users_mutex);
+	auto it = active_users.find(user_id);
+	if (it != active_users.end()) return true;
+	return false;
+}
+
 void ActiveUserManager::Clear()
 {
 	std::lock_guard<std::mutex> lock(active_users_mutex);

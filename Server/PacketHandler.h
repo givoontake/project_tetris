@@ -8,18 +8,18 @@ class PacketHandler
 
 public:
 	PacketHandler(IOCPServer& server);
-	void HandlePacket(char* packet, Session& session, int request_gen);
+	void HandlePacket(char* packet, Session& session);
 
 private:
-	void HandleLoginPacket(char* packet, Session& session, int request_gen);
-	void HandleMessagePacket(char* packet, Session& session, int request_gen);
+	void HandleLoginPacket(char* packet, Session& session);
+	void HandleMessagePacket(char* packet, Session& session);
 	void HandleTestPacket(char* packet, Session& session);
 	void HandleDisconnectPacket(Session& session);
-	void HandleJoinOpenRoomPacket(char* packet, Session& session, int request_gen);
-	void HandleJoinLockRoomPacket(char* packet, Session& session, int request_gen);
-	void HandleFastMatchingPacket(char* packet, Session& session, int request_gen);
-	void HandleRequestFriendPacket(char* packet, Session& session, int request_gen);
-	void HandleAcceptFriendPacket(char* packet, Session& session, int request_gen);
-	void HandleDeleteFriendPacket(char* packet, Session& session, int request_gen);
+	void HandleJoinOpenRoomPacket(char* packet, Session& session);
+	void HandleJoinLockRoomPacket(char* packet, Session& session);
+	void HandleFastMatchingPacket(char* packet, Session& session);
+	void HandleRequestFriendPacket(char* packet, Session& session);
+	void HandleAcceptFriendPacket(char* packet, Session& session);
+	void HandleDeleteFriendPacket(char* packet, Session& session);
 };
 

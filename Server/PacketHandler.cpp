@@ -31,43 +31,32 @@ PacketHandler::PacketHandler(IOCPServer& server) : server(server)
 {
 }
 
-void PacketHandler::HandleLoginPacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleLoginPacket(char* packet, Session& session)
 {
 	C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
-	SessionKey key;
-	{
-		std::lock_guard<std::mutex> lock(session.GetMutex());
-		if (session.GetSessionKey().gen != request_gen) return;
-		if (session.GetState() != SESS_STATE::LOGIN) return;
-		key = session.GetSessionKey();
-	}
+	if (session.GetState() != MODE_STATE::LOGIN) return;
 
 	std::string login_id = server.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
 	std::string password = server.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
 	Database& repr_db = server.GetDB();
-	auto task_login = [&repr_db, key, login_id, password]() {
-		repr_db.ExecuteLogin(key, login_id, password);
+	Session* session_ptr = &session;
+	auto task_login = [&repr_db, session_ptr, login_id, password]() {
+		repr_db.ExecuteLogin(*session_ptr, login_id, password);
 		};
 
-	repr_db.Enqueue(task_login);
+	repr_db.Enqueue(task_login, &session);
 }
 
-void PacketHandler::HandleMessagePacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleMessagePacket(char* packet, Session& session)
 {
 	C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
 	int msg_size = recv_p->header.size - sizeof(C2S_MESSAGE_PACKET);
 	if (msg_size == 0) return;
 	int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
 
-	std::string nickname;
-	int id;
-	{
-		std::lock_guard<std::mutex> lock(session.GetMutex());
-		if (session.GetSessionKey().gen != request_gen) return;
-		if (session.GetState() != SESS_STATE::LOBBY) return;
-		nickname = session.GetDBInfo().nickname;
-		id = session.GetDBInfo().id;
-	}
+	if (session.GetState() != MODE_STATE::LOBBY) return;
+	std::string nickname = session.GetDBInfo().nickname;
+	int id = session.GetDBInfo().id;
 
 	char* send_p = new char[send_p_size];
 	S2C_MESSAGE_PACKET front_p;
@@ -103,111 +92,87 @@ void PacketHandler::HandleTestPacket(char* packet, Session& session)
 
 void PacketHandler::HandleDisconnectPacket(Session& session)
 {
-	session.StoreDisconnectFlag(true);
-	server.Disconnect(session.GetSessionKey());
+	server.Disconnect(session);
 }
 
-void PacketHandler::HandleJoinOpenRoomPacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleJoinOpenRoomPacket(char* packet, Session& session)
 {
 	C2S_JOIN_OPEN_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_OPEN_ROOM_PACKET*>(packet);
-	server.TryJoinRoom(session, request_gen, join_p->room_gen, "");
+	server.TryJoinRoom(session, join_p->room_gen, "");
 }
 
-void PacketHandler::HandleJoinLockRoomPacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleJoinLockRoomPacket(char* packet, Session& session)
 {
 	C2S_JOIN_LOCK_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_LOCK_ROOM_PACKET*>(packet);
-	server.TryJoinRoom(session, request_gen, join_p->room_gen, server.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
+	server.TryJoinRoom(session, join_p->room_gen, server.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
 }
 
-void PacketHandler::HandleFastMatchingPacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleFastMatchingPacket(char* packet, Session& session)
 {
 	C2S_FAST_MATCHING_PACKET* matching_p = reinterpret_cast<C2S_FAST_MATCHING_PACKET*>(packet);
-	server.FindMatch(session, request_gen, matching_p->max_user);
+	server.FindMatch(session, matching_p->max_user);
 }
 
-void PacketHandler::HandleRequestFriendPacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleRequestFriendPacket(char* packet, Session& session)
 {
 	C2S_REQUEST_FRIEND_PACKET* friend_p = reinterpret_cast<C2S_REQUEST_FRIEND_PACKET*>(packet);
 
 	Session& requester_sess = session;
-	FriendInfo requester_info;
-	{
-		std::lock_guard<std::mutex> lock(requester_sess.GetMutex());
-		if (requester_sess.GetState() != SESS_STATE::LOBBY) return;
-		if (requester_sess.GetSessionKey().gen == request_gen) {
-			requester_info.id = requester_sess.GetDBInfo().id;
-			requester_info.nickname = requester_sess.GetDBInfo().nickname;
-		}
-		else return;
-	}
+	if (requester_sess.GetState() != MODE_STATE::LOBBY) return;
 
 	int recver_id = friend_p->recver_id;
 	Database& repr_db = server.GetDB();
-	auto task_afr = [&repr_db, requester_info, recver_id]() {
-		repr_db.ExecuteAddFriendRequest(requester_info, recver_id);
+	Session* requester_sess_ptr = &requester_sess;
+	auto task_afr = [&repr_db, requester_sess_ptr, recver_id]() {
+		repr_db.ExecuteAddFriendRequest(*requester_sess_ptr, recver_id);
 		};
 
-	repr_db.Enqueue(task_afr);
+	repr_db.Enqueue(task_afr, &requester_sess);
 }
 
-void PacketHandler::HandleAcceptFriendPacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleAcceptFriendPacket(char* packet, Session& session)
 {
 	C2S_ACCEPT_FRIEND_PACKET* accept_p = reinterpret_cast<C2S_ACCEPT_FRIEND_PACKET*>(packet);
 	Session& accepter_session = session;
 
-	FriendInfo accepter_info;
-	{
-		std::lock_guard<std::mutex> lock(accepter_session.GetMutex());
-		if (accepter_session.GetState() != SESS_STATE::LOBBY) return;
-		if (accepter_session.GetSessionKey().gen == request_gen) {
-			accepter_info.id = accepter_session.GetDBInfo().id;
-			accepter_info.nickname = accepter_session.GetDBInfo().nickname;
-		}
-		else return;
-	}
+	if (accepter_session.GetState() != MODE_STATE::LOBBY) return;
 
 	int requester_id = accept_p->requester_id;
 	Database& repr_db = server.GetDB();
-	auto task_af = [&repr_db, requester_id, accepter_info]() {
-		repr_db.ExecuteAddFriend(requester_id, accepter_info);
+	Session* accepter_session_ptr = &accepter_session;
+	auto task_af = [&repr_db, accepter_session_ptr, requester_id]() {
+		repr_db.ExecuteAddFriend(*accepter_session_ptr, requester_id);
 		};
 
-	repr_db.Enqueue(task_af);
+	repr_db.Enqueue(task_af, &accepter_session);
 }
 
-void PacketHandler::HandleDeleteFriendPacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandleDeleteFriendPacket(char* packet, Session& session)
 {
 	C2S_DELETE_FRIEND_PACKET* delete_p = reinterpret_cast<C2S_DELETE_FRIEND_PACKET*>(packet);
 	Session& requester_session = session;
 	int target_id = delete_p->target_id;
-	int requester_id = -1;
-	{
-		std::lock_guard<std::mutex> lock(requester_session.GetMutex());
-		if (requester_session.GetState() != SESS_STATE::LOBBY) return;
-		if (requester_session.GetSessionKey().gen == request_gen) {
-			requester_id = requester_session.GetDBInfo().id;
-		}
-		else return;
-	}
+	if (requester_session.GetState() != MODE_STATE::LOBBY) return;
 	Database& repr_db = server.GetDB();
-	auto task_df = [&repr_db, requester_id, target_id]() {
-		repr_db.ExecuteDeleteFriend(requester_id, target_id);
+	Session* requester_session_ptr = &requester_session;
+	auto task_df = [&repr_db, requester_session_ptr, target_id]() {
+		repr_db.ExecuteDeleteFriend(*requester_session_ptr, target_id);
 		};
 
-	repr_db.Enqueue(task_df);
+	repr_db.Enqueue(task_df, &requester_session);
 }
 
-void PacketHandler::HandlePacket(char* packet, Session& session, int request_gen)
+void PacketHandler::HandlePacket(char* packet, Session& session)
 {
 	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
 
 	case C2S_LOGIN: {
-		HandleLoginPacket(packet, session, request_gen);
+		HandleLoginPacket(packet, session);
 		break;
 	}
 
 	case C2S_MESSAGE: {
-		HandleMessagePacket(packet, session, request_gen);
+		HandleMessagePacket(packet, session);
 		break;
 	}
 
@@ -222,62 +187,62 @@ void PacketHandler::HandlePacket(char* packet, Session& session, int request_gen
 	}
 
 	case C2S_ADD_OPEN_ROOM: {
-		server.CreateOpenRoom(packet, session, request_gen);
+		server.CreateOpenRoom(packet, session);
 		break;
 	}
 
 	case C2S_ADD_LOCK_ROOM: {
-		server.CreateLockRoom(packet, session, request_gen);
+		server.CreateLockRoom(packet, session);
 		break;
 	}
 
 	case C2S_JOIN_OPEN_ROOM: {
-		HandleJoinOpenRoomPacket(packet, session, request_gen);
+		HandleJoinOpenRoomPacket(packet, session);
 		break;
 	}
 
 	case C2S_JOIN_LOCK_ROOM: {
-		HandleJoinLockRoomPacket(packet, session, request_gen);
+		HandleJoinLockRoomPacket(packet, session);
 		break;
 	}
 
 	case C2S_REQUEST_ROOM_LIST: {
-		server.SendRoomList(session, request_gen);
+		server.SendRoomList(session);
 		break;
 	}
 
 	case C2S_REQUEST_LOBBY_USER_LIST: {
-		server.SendLobbyUserList(session, request_gen);
+		server.SendLobbyUserList(session);
 		break;
 	}
 
 	case C2S_REQUEST_FRIEND_LIST: {
-		server.SendFriendList(session, request_gen);
+		server.SendFriendList(session);
 		break;
 	}
 
 	case C2S_REQUEST_RANKING: {
-		server.SendRanking(session, request_gen);
+		server.SendRanking(session);
 		break;
 	}
 
 	case C2S_FAST_MATCHING: {
-		HandleFastMatchingPacket(packet, session, request_gen);
+		HandleFastMatchingPacket(packet, session);
 		break;
 	}
 
 	case C2S_REQUEST_FRIEND: {
-		HandleRequestFriendPacket(packet, session, request_gen);
+		HandleRequestFriendPacket(packet, session);
 		break;
 	}
 
 	case C2S_ACCEPT_FRIEND: {
-		HandleAcceptFriendPacket(packet, session, request_gen);
+		HandleAcceptFriendPacket(packet, session);
 		break;
 	}
 
 	case C2S_DELETE_FRIEND: {
-		HandleDeleteFriendPacket(packet, session, request_gen);
+		HandleDeleteFriendPacket(packet, session);
 		break;
 	}
 	}

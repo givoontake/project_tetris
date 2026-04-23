@@ -1,9 +1,9 @@
 #pragma once
 #include <WinSock2.h>
 #include <MSWSock.h>
-#include <mutex>
 #include <vector>
 #include <array>
+#include <mutex>
 #include "ExOverlapped.h"
 #include "Atomic.h"
 #include "define_packets.h"
@@ -21,29 +21,31 @@ class Session
 	SessionKey key;
 	int room_index = -1;
 	int remain_data_size = 0;
+	std::atomic<int> io_pending_count = 0;
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
-	Atomic<bool> disconnect_flag = false; // 상태에 추가하려고 해도 DISCONNECT 전에 어떤 상태인지 알 수가 없어서 CAS가 불가능해 따로 추가한 값
-	Atomic<SESS_STATE> state = SESS_STATE::NONE;
-	DBResultLogin db_info;
 	std::mutex sess_mutex;
+	Atomic<LIFE_STATE> life_state = LIFE_STATE::NONE;
+	Atomic<MODE_STATE> state = MODE_STATE::NONE;
+	DBResultLogin db_info;
 
 	std::vector<FriendInfo> friend_list;
 
 public:
 	Session();
 
-	void InitSession(int new_gen, SOCKET new_socket);
+	void InitSession(SOCKET new_socket);
 	void ClearSession();
 	void InitDBInfo(DBResultLogin* info);
 	void SendPacket(char* packet, const HANDLE iocp_handle);
-	void SendPacket(int request_gen, char* packet, const HANDLE iocp_handle);
 	void SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp_handle);
-	void SendBoundPacket(int request_gen, char* packet_buf, int data_size, const HANDLE iocp_handle);
-	void RecvPacket(int request_gen, const HANDLE iocp_handle);
+	void RecvPacket(const HANDLE iocp_handle);
 	void AddFriend(FriendInfo& new_friend);
 	void DeleteFriend(const int target_id);
 	void InitFriendList(std::vector<FriendInfo>& db_friend_list);
+	bool TryAddPending();
+	void ReducePending() { io_pending_count--; }
+	bool IsDisconnectable();
 
 	//getters
 	SOCKET GetSocket() const { return socket; }
@@ -54,19 +56,18 @@ public:
 	SessionKey GetSessionKey() const { return key; }
 	int GetRoomIndex() const { return room_index; }
 	int GetRemainDataSize() const { return remain_data_size; }
-	SESS_STATE GetState() const { return state.Load(); }
+	LIFE_STATE GetLifeState() const { return life_state.Load(); }
+	MODE_STATE GetState() const { return state.Load(); }
 	DBResultLogin& GetDBInfo() { return db_info; }
-	std::mutex& GetMutex(){ return sess_mutex; }
 	//std::string GetPrimaryKey() const { return login_id; }
 
 	//setters
-	void SetGen(int new_gen) { key.gen = new_gen; }
 	void SetIndex(int new_index) { key.index = new_index; }
 	void SetRoomIndex(int new_room_index) { room_index = new_room_index; }
 	void AddDataSize(int new_data_size) { remain_data_size += new_data_size; }
-	void StoreState(SESS_STATE new_state) { state.Store(new_state); }
-	bool TryChangeState(SESS_STATE expected, SESS_STATE desired);
-	void StoreDisconnectFlag(bool new_flag) { disconnect_flag.Store(new_flag); }
-	bool TryChangeDisconnectFlag(bool expected, bool desired);
+	void StoreLifeState(LIFE_STATE new_state);
+	void StoreState(MODE_STATE new_state);
+	bool TryChangeLifeState(LIFE_STATE expected, LIFE_STATE desired);
+	bool TryChangeState(MODE_STATE expected, MODE_STATE desired);
 	//void SetPrimaryKey(std::string val) { login_id = val; }
 };

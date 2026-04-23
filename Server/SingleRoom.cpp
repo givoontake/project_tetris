@@ -176,7 +176,7 @@ void SingleRoom::DeleteUser(const int id)
 			if (r_user.GetSession()->GetDBInfo().id == id) { // 삭제할 아이디 검색
 				//std::cout << "delete user id: " << id << std::endl;
 				//room_mutex.lock();
-				r_user.GetSession()->StoreState(SESS_STATE::LOBBY);
+	r_user.GetSession()->StoreState(MODE_STATE::LOBBY);
 				S2C_DELETE_USER_PACKET p;
 				p.header.size = static_cast<std::uint16_t>(sizeof(p));
 				p.header.type = S2C_DELETE_USER;
@@ -304,15 +304,12 @@ void SingleRoom::MakeMovePacketData(int move_type)
 void SingleRoom::RequestUpdateScore()
 {
 	if (room_users[0].GetSession()->GetDBInfo().max_score < room_users[0].GetScore()) {
-		SessionKey key;
-		key.gen = room_users[0].GetSession()->GetSessionKey().gen;
-		key.index = room_users[0].GetSession()->GetSessionKey().index;
-		int user_id = room_users[0].GetSession()->GetDBInfo().id;
 		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
-		auto task_update_score = [key, user_id, new_score, &db] {
-			db.ExecuteUpdateScore(key, user_id, new_score);
+		Session* session_ptr = room_users[0].GetSession();
+		auto task_update_score = [session_ptr, new_score, &db] {
+			db.ExecuteUpdateScore(*session_ptr, new_score);
 			};
-		server->GetDB().Enqueue(task_update_score);
+		server->GetDB().Enqueue(task_update_score, room_users[0].GetSession());
 	}
 }

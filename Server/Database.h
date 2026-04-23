@@ -88,20 +88,20 @@ public:
     // ---- 외부에서 작업을 큐에 넣는 API ----
     // 외부에서 람다를 만들어 그대로 큐에 넣는다.
     // (람다 내부에서 실제 쿼리 실행 함수(ExecuteXXX)를 호출하는 방식)
-    void Enqueue(Task job);
+    bool Enqueue(Task job, Session* session = nullptr);
 
     // ---- DB 스레드에서 실행될 "실제 DB 작업" 함수들 ----
     // ⚠️ 이 함수들은 "DB 스레드에서만" 호출되어야 한다.
     // 외부는 보통 아래처럼 람다에 넣어 Enqueue 한다:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
-    void ExecuteLogin(SessionKey key, const std::string login_id, const std::string password);
+    void ExecuteLogin(Session& session, const std::string login_id, const std::string password);
     void ExecuteLoadRanking();
-    void ExecuteUpdateScore(SessionKey key, int user_id, int new_score);
-	void ExecuteUpdateMatchResult(SessionKey key, int user_id, bool is_winner);
-    void ExecuteAddFriend(int requester_id, const FriendInfo& accepter_info);
-	void ExecuteDeleteFriend(int requester_id, int target_id);
-    void ExecuteAddFriendRequest(const FriendInfo& requester_info, int recver_id);
-	void ExecuteLoadFriendList(SessionKey key, int user_id);
+    void ExecuteUpdateScore(Session& session, int new_score);
+	void ExecuteUpdateMatchResult(Session& session, bool is_winner);
+    void ExecuteAddFriend(Session& session, int requester_id);
+	void ExecuteDeleteFriend(Session& session, int target_id);
+    void ExecuteAddFriendRequest(Session& session, int recver_id);
+	void ExecuteLoadFriendList(Session& session);
 
 private:
     // ---- 설정 파일 로드 ----

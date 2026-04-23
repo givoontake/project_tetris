@@ -80,7 +80,7 @@ void MultiRoom::HandlePacket(char* packet, Session& request_session)
 }
 
 // add는 외부에서 추가되므로 아직 세션이 안전하지 않음. 방에 완전히 들어와야 안전해짐. 락은 외부에서 건다
-int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string& input_password)
+int MultiRoom::AddUser(Session& new_session, const std::string& input_password)
 {
 	if (!room_password.empty() && room_password != input_password) {
 		return ERROR_CODE::ROOM_INVALID_PASSWORD;
@@ -95,11 +95,9 @@ int MultiRoom::AddUser(Session& new_session, int request_gen, const std::string&
 			if (r_user.GetRoomUserState() != ROOM_USER_STATE::EMPTY) continue;
 
 			else {
-				std::lock_guard<std::mutex> lock(new_session.GetMutex());
-				if (new_session.GetState() == SESS_STATE::NONE) return ERROR_CODE::INVALID_REQUEST; // 반환값이 있어야 해서 일단 억지로 넣은 느낌..
-				if (new_session.GetSessionKey().gen != request_gen) return ERROR_CODE::INVALID_REQUEST;
+				if (new_session.GetLifeState() == LIFE_STATE::NONE) return ERROR_CODE::INVALID_REQUEST; // 반환값이 있어야 해서 일단 억지로 넣은 느낌..
 
-				new_session.StoreState(SESS_STATE::ROOM);
+	new_session.StoreState(MODE_STATE::ROOM);
 				new_session.SetRoomIndex(room_index);
 				r_user.InitRoomSession(new_session);
 				++cur_user;
@@ -491,14 +489,11 @@ void MultiRoom::RequestUpdateMatchResult()
 				is_winner = true;
 			}
 			Database& db = server->GetDB();
-			SessionKey key;
-			key.gen = r_user.GetSession()->GetSessionKey().gen;
-			key.index = r_user.GetSession()->GetSessionKey().index;
-			int user_id = r_user.GetSession()->GetDBInfo().id;
-			auto task_update_match_result = [key, user_id, is_winner, &db] {
-				db.ExecuteUpdateMatchResult(key, user_id, is_winner);
+			Session* session_ptr = r_user.GetSession();
+			auto task_update_match_result = [session_ptr, is_winner, &db] {
+				db.ExecuteUpdateMatchResult(*session_ptr, is_winner);
 				};
-			db.Enqueue(task_update_match_result);
+			db.Enqueue(task_update_match_result, r_user.GetSession());
 		}
 	}
 }
