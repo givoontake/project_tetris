@@ -65,6 +65,7 @@ void Session::SendPacket(char* packet, const HANDLE iocp_handle)
 
 void Session::SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp_handle)
 {
+	if (data_size == 0) return;
 	if (!TryAddPending()) return;
 	IOOverlapped* send_over = new IOOverlapped;
 	send_over->SetOperationType(OP_TYPE::SEND);

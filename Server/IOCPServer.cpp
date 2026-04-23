@@ -766,8 +766,8 @@ void IOCPServer::TryDisconnect(Session& session)
 
 void IOCPServer::Disconnect(Session& session)
 {
-	LIFE_STATE desired = LIFE_STATE::DISCONNECT_PENDING;
-	LIFE_STATE expected = LIFE_STATE::DISCONNECTING;
+	LIFE_STATE desired = LIFE_STATE::DISCONNECTING;
+	LIFE_STATE expected = LIFE_STATE::DISCONNECT_PENDING;
 	if (!session.TryChangeLifeState(expected, desired)) return; // 두 스레드가 동시에 0을 읽고 디스커넥트에 들어갈 수 있다.
 	int user_id = session.GetDBInfo().id;
 	int user_index = session.GetSessionKey().index;
