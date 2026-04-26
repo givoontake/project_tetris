@@ -1,13 +1,14 @@
 #pragma once
 #include <string>
 #include <array>
+#include <memory>
 #include "Tetris.h"
 #include "define_packets.h"
 #include "Session.h"
 
 class RoomSession
 {
-	Session* session = nullptr; // 상속으로 하면 세션을 받아올 수가 없음
+	std::weak_ptr<Session> session; // 상속으로 하면 세션을 받아올 수가 없음
 	Tetris tetris;
 	char send_buf[BUF_SIZE];
 	int send_data_size = 0;
@@ -25,7 +26,7 @@ public:
 	RoomSession();
 	~RoomSession();
 
-	Session* GetSession() const { return session; }
+	std::shared_ptr<Session> GetSession() const { return session.lock(); }
 	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.Load(); }
 	ROOM_USER_STATE GetPrevRoomUserState() const { return prev_r_user_state.Load(); }
 	Tetris& GetTetris() { return tetris; }

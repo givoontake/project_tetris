@@ -217,7 +217,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		server->StringToCharBuf(room_password, lock_p.room_password, sizeof(lock_p.room_password));
 		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
-	std::cout << "Room[: " << room_index << "] created by : " << session.GetDBInfo().nickname << "\n";
+	std::cout << "방 생성 - 방 이름: " << room_name << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
 }
 
 void SingleRoom::ReduceTimeouts(int type)
@@ -306,10 +306,12 @@ void SingleRoom::RequestUpdateScore()
 	if (room_users[0].GetSession()->GetDBInfo().max_score < room_users[0].GetScore()) {
 		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
-		Session* session_ptr = room_users[0].GetSession();
+		auto session_shared = room_users[0].GetSession();
+		if (!session_shared) return;
+		Session* session_ptr = session_shared.get();
 		auto task_update_score = [session_ptr, new_score, &db] {
 			db.ExecuteUpdateScore(*session_ptr, new_score);
 			};
-		server->GetDB().Enqueue(task_update_score, room_users[0].GetSession());
+		server->GetDB().Enqueue(task_update_score, session_ptr);
 	}
 }

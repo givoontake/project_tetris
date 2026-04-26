@@ -3,6 +3,7 @@
 #include <MSWSock.h>
 #include <vector>
 #include <array>
+#include <memory>
 #include <mutex>
 #include "ExOverlapped.h"
 #include "Atomic.h"
@@ -13,7 +14,7 @@
 // 이 값은 send 및 recv 전에 최종 검증에 사용된다. GQCS에 이 값을 등록하고 값을 send, recv 까지 계속 전달하면, 만약 재사용됐을 경우 등록 직전에 세션 값과 이 값을 비교하면 된다.
 // 다르다면 재사용된 것이므로 작업만 취소하면 된다. 같다면 같은 세션이므로 이전의 모든 작업을 신뢰할 수 있다. 당연히 비교 및 작업 등록은 세션 뮤텍스가 필요하다.
 
-class Session
+class Session : public std::enable_shared_from_this<Session>
 {
 	SOCKET socket;
 	IOOverlapped recv_over;
@@ -44,7 +45,8 @@ public:
 	void DeleteFriend(const int target_id);
 	void InitFriendList(std::vector<FriendInfo>& db_friend_list);
 	bool TryAddPending();
-	void ReducePending() { io_pending_count--; }
+	void ReducePending();
+	bool ReducePendingAndCheckDisconnectable();
 	bool IsDisconnectable();
 
 	//getters

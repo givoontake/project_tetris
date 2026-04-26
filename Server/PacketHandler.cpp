@@ -92,7 +92,8 @@ void PacketHandler::HandleTestPacket(char* packet, Session& session)
 
 void PacketHandler::HandleDisconnectPacket(Session& session)
 {
-	server.Disconnect(session);
+	server.BeginDisconnect(session);
+	server.TryDisconnect(session);
 }
 
 void PacketHandler::HandleJoinOpenRoomPacket(char* packet, Session& session)

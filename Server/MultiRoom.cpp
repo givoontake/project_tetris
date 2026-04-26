@@ -213,7 +213,7 @@ void MultiRoom::SendCreateRoom(Session& session)
 		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
 	FindNewHost();
-	std::cout << "Room[: " << room_index << "] created by : " << session.GetDBInfo().nickname << "\n";
+	std::cout << "방 생성 - 방 이름: " << room_name << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
 }
 
 void MultiRoom::ReadyUser(int id)
@@ -489,11 +489,13 @@ void MultiRoom::RequestUpdateMatchResult()
 				is_winner = true;
 			}
 			Database& db = server->GetDB();
-			Session* session_ptr = r_user.GetSession();
+			auto session_shared = r_user.GetSession();
+			if (!session_shared) continue;
+			Session* session_ptr = session_shared.get();
 			auto task_update_match_result = [session_ptr, is_winner, &db] {
 				db.ExecuteUpdateMatchResult(*session_ptr, is_winner);
 				};
-			db.Enqueue(task_update_match_result, r_user.GetSession());
+			db.Enqueue(task_update_match_result, session_ptr);
 		}
 	}
 }

@@ -12,8 +12,8 @@ RoomSession::~RoomSession()
 
 void RoomSession::InitRoomSession(Session& s)
 {
-	session = &s;
-	session->StoreState(MODE_STATE::ROOM);
+	session = s.shared_from_this();
+	s.StoreState(MODE_STATE::ROOM);
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);
 	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
@@ -25,8 +25,8 @@ void RoomSession::InitRoomSession(Session& s)
 
 void RoomSession::ClearRoomSession()
 {
-	session->StoreState(MODE_STATE::LOBBY);
-	session = nullptr;
+	if (auto session_ptr = session.lock()) session_ptr->StoreState(MODE_STATE::LOBBY);
+	session.reset();
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::EMPTY);
 	prev_r_user_state.Store(ROOM_USER_STATE::EMPTY);

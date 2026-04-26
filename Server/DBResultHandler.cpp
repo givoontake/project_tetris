@@ -1,6 +1,7 @@
 #include "DBResultHandler.h"
 #include "packet_types.h"
 #include "IOCPServer.h"
+#include <iostream>
 
 DBResultHandler::DBResultHandler(IOCPServer& server) : server(server)
 {
@@ -10,17 +11,16 @@ void DBResultHandler::HandleRequestFriendDBResult(DBOverlapped* db_over)
 {
 	if (db_over->ok) {
 		DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-		int recver_index = server.FindSessionIndexById(res->recver_info.id);
-		if (recver_index != -1) {
-			Session& recver_session = server.FindSessionByIndex(recver_index);
-			if (recver_session.GetDBInfo().id != res->recver_info.id) return;
+		auto recver_session = server.active_user_manager.FindSessionById(res->recver_info.id);
+		if (recver_session) {
+			if (recver_session->GetDBInfo().id != res->recver_info.id) return;
 
 			S2C_REQUEST_FRIEND_PACKET request_p;
 			request_p.header.size = static_cast<std::uint16_t>(sizeof(request_p));
 			request_p.header.type = S2C_REQUEST_FRIEND;
 			request_p.requester_id = res->requester_info.id;
 			server.StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
-			recver_session.SendPacket(reinterpret_cast<char*>(&request_p), server.GetHandle());
+			recver_session->SendPacket(reinterpret_cast<char*>(&request_p), server.GetHandle());
 		}
 	}
 }
@@ -61,7 +61,8 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, Session& sessio
 			else {
 				session.InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
 				session.StoreState(MODE_STATE::LOBBY);
-				server.active_users.AddUser(session.GetDBInfo().id, session.GetSessionKey().index);
+				auto session_ptr = server.FindSessionByIndex(session.GetSessionKey().index);
+				if (session_ptr) server.active_user_manager.AddUser(session.GetDBInfo().id, session_ptr);
 				login_p.id = session.GetDBInfo().id;
 				login_p.max_score = session.GetDBInfo().max_score;
 				login_p.win_count = session.GetDBInfo().win_count;
@@ -92,6 +93,7 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, Session& sessio
 	}
 
 	else {
+		std::cout << "로그인 - 플레이어: " << session.GetDBInfo().nickname << std::endl;
 		session.SendPacket(reinterpret_cast<char*>(&login_p), server.GetHandle());
 
 		Database& repr_db = server.GetDB();

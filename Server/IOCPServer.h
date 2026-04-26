@@ -28,13 +28,13 @@ class IOCPServer
 	Database db;
 	RankingManager ranking_manager;
 	ActiveRoomManager active_rooms;
-	ActiveUserManager active_users;
+	ActiveUserManager active_user_manager;
 	PacketHandler packet_handler;
 	DBResultHandler db_result_handler;
 	std::atomic<int> room_gen_generator = -1;
 	std::atomic<long long> tick_count = 0;
-	std::array<Session, MAX_USER> users;
-
+	std::array<std::atomic<std::shared_ptr<Session>>, MAX_USER> users;
+	
 	std::array<std::atomic<std::shared_ptr<TetrisRoom>>, MAX_ROOM> rooms;
 
 	bool is_running = true;
@@ -59,9 +59,9 @@ public:
 
 	void AddTickCount() { tick_count.fetch_add(1); }
 
-	Session& FindSessionByIndex(int user_index) { return users[user_index]; }
-	int FindSessionIndexById(int user_id);
+	std::shared_ptr<Session> FindSessionByIndex(int user_index);
 
+	void BeginDisconnect(Session& session);
 	void TryDisconnect(Session& session);
 	void Disconnect(Session& session);
 	void StartServer();

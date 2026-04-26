@@ -11,11 +11,13 @@ void Session::InitSession(SOCKET new_socket)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	socket = new_socket;
-	io_pending_count = 0;
+	io_pending_count = 1; // recv 토큰은 정상 수신 중에는 계속 유지하고 disconnect 경로에서만 내려놓는다.
 	db_info.clear();
 	friend_list.reserve(MAX_FRIENDS);
 	remain_data_size = 0;
 	recv_over.ex_over.key = key;
+	life_state.Store(LIFE_STATE::ACTIVE);
+	state.Store(MODE_STATE::LOGIN);
 
 	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
@@ -82,7 +84,7 @@ void Session::SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp
 
 void Session::RecvPacket(const HANDLE iocp_handle)
 {
-	if (!TryAddPending()) return;
+	if (life_state.Load() != LIFE_STATE::ACTIVE) return;
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over.ex_over.over, sizeof(recv_over.ex_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
 	recv_over.ex_over.key = key;
@@ -119,9 +121,23 @@ void Session::InitFriendList(std::vector<FriendInfo>& db_friend_list)
 bool Session::TryAddPending()
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return false;
+	if (life_state.Load() != LIFE_STATE::ACTIVE) return false;
 	io_pending_count++;
 	return true;	
+}
+
+void Session::ReducePending()
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	--io_pending_count;
+}
+
+bool Session::ReducePendingAndCheckDisconnectable()
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	--io_pending_count;
+	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) return true;
+	return false;
 }
 
 bool Session::IsDisconnectable()
@@ -133,22 +149,26 @@ bool Session::IsDisconnectable()
 
 void Session::StoreLifeState(LIFE_STATE new_state)
 {
+	std::lock_guard<std::mutex> lock(sess_mutex);
 	life_state.Store(new_state);
 }
 
 void Session::StoreState(MODE_STATE new_state)
 {
+	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return;
 	state.Store(new_state);
 }
 
 bool Session::TryChangeLifeState(LIFE_STATE expected, LIFE_STATE desired)
 {
+	std::lock_guard<std::mutex> lock(sess_mutex);
 	return life_state.Compare_exchange_strong(expected, desired);
 }
 
 bool Session::TryChangeState(MODE_STATE expected, MODE_STATE desired)
 {
+	std::lock_guard<std::mutex> lock(sess_mutex);
 	return state.Compare_exchange_strong(expected, desired);
 }
 
