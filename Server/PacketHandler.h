@@ -1,4 +1,6 @@
 #pragma once
+#include "Types.h"
+
 class IOCPServer;
 class Session;
 
@@ -11,7 +13,7 @@ public:
 	void HandlePacket(char* packet, Session& session);
 
 private:
-	void HandleLoginPacket(char* packet, Session& session);
+	void HandleLoginPacket(char* packet, const SP<Session>& session);
 	void HandleMessagePacket(char* packet, Session& session);
 	void HandleTestPacket(char* packet, Session& session);
 	void HandleDisconnectPacket(Session& session);

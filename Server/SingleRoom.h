@@ -13,8 +13,8 @@ class SingleRoom : public TetrisRoom
 {
 
 public:
-	SingleRoom(IOCPServer* server, Session& session, OpenRoomInitData data);
-	SingleRoom(IOCPServer* server, Session& session, LockRoomInitData data);
+	SingleRoom(IOCPServer* server, OpenRoomInitData data);
+	SingleRoom(IOCPServer* server, LockRoomInitData data);
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, Session& request_session) override;

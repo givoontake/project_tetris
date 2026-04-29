@@ -11,7 +11,7 @@ void DBResultHandler::HandleRequestFriendDBResult(DBOverlapped* db_over)
 {
 	if (db_over->ok) {
 		DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-		auto recver_session = server.active_user_manager.FindSessionById(res->recver_info.id);
+		auto recver_session = server.active_users.FindSessionById(res->recver_info.id);
 		if (recver_session) {
 			if (recver_session->GetDBInfo().id != res->recver_info.id) return;
 
@@ -49,59 +49,57 @@ void DBResultHandler::HandleLoadRankingDBResult(DBOverlapped* db_over)
 	}
 }
 
-void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, Session& session)
+void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, const SP<Session>& session)
 {
+	if (!session) return;
+
 	S2C_LOGIN_PACKET login_p;
 	S2C_ERROR_PACKET error_p;
 	login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
 	login_p.header.type = S2C_LOGIN;
+	login_p.id = -1;
 	if (db_over->ok) {
 		if (db_over->result_data) {
-			if (server.CheckDuplicateId(static_cast<DBResultLogin*>(db_over->result_data.get())->id)) login_p.id = -2;
+			DBResultLogin* login_result = static_cast<DBResultLogin*>(db_over->result_data.get());
+
+			if (!server.active_users.AddUser(session, login_result)) {
+				login_p.id = -2;
+			}
 			else {
-				session.InitDBInfo(static_cast<DBResultLogin*>(db_over->result_data.get()));
-				session.StoreState(MODE_STATE::LOBBY);
-				auto session_ptr = server.FindSessionByIndex(session.GetSessionKey().index);
-				if (session_ptr) server.active_user_manager.AddUser(session.GetDBInfo().id, session_ptr);
-				login_p.id = session.GetDBInfo().id;
-				login_p.max_score = session.GetDBInfo().max_score;
-				login_p.win_count = session.GetDBInfo().win_count;
-				login_p.lose_count = session.GetDBInfo().lose_count;
-				server.StringToCharBuf(session.GetDBInfo().nickname, login_p.nickname, sizeof(login_p.nickname));
+				DBResultLogin db_info = session->GetDBInfo();
+				login_p.id = db_info.id;
+				login_p.max_score = db_info.max_score;
+				login_p.win_count = db_info.win_count;
+				login_p.lose_count = db_info.lose_count;
+				server.StringToCharBuf(db_info.nickname, login_p.nickname, sizeof(login_p.nickname));
 			}
 		}
-		else {
-			login_p.id = -1;
-		}
-	}
-	else {
-		login_p.id = -1;
 	}
 
 	if (login_p.id == -1) {
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ERROR_CODE::LOGIN_FAILED;
-		session.SendPacket(reinterpret_cast<char*>(&error_p), server.GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&error_p), server.GetHandle());
 	}
 
 	else if (login_p.id == -2) {
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ERROR_CODE::DUPLICATE_LOGIN_ID;
-		session.SendPacket(reinterpret_cast<char*>(&error_p), server.GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&error_p), server.GetHandle());
 	}
 
 	else {
-		std::cout << "로그인 - 플레이어: " << session.GetDBInfo().nickname << std::endl;
-		session.SendPacket(reinterpret_cast<char*>(&login_p), server.GetHandle());
+		std::cout << "로그인 - 플레이어: " << session->GetDBInfo().nickname << std::endl;
+		session->SendPacket(reinterpret_cast<char*>(&login_p), server.GetHandle());
 
 		Database& repr_db = server.GetDB();
-		Session* session_ptr = &session;
+		Session* session_ptr = session.get();
 		auto task = [&repr_db, session_ptr]() {
 			repr_db.ExecuteLoadFriendList(*session_ptr);
 			};
-		repr_db.Enqueue(task, &session);
+		repr_db.Enqueue(task, session_ptr);
 	}
 }
 
@@ -109,8 +107,8 @@ void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& 
 {
 	if (db_over->ok) {
 		DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
-		session.GetDBInfo().max_score = res->max_score;
-		server.GetRankingManager().UpdateRanking(session.GetDBInfo().id, session.GetDBInfo().nickname, res->max_score);
+		DBResultLogin db_info = session.UpdateMaxScore(res->max_score);
+		server.GetRankingManager().UpdateRanking(db_info.id, db_info.nickname, res->max_score);
 		S2C_UPDATE_SCORE_PACKET us_p;
 		us_p.header.size = static_cast<std::uint16_t>(sizeof(us_p));
 		us_p.header.type = S2C_UPDATE_SCORE;
@@ -126,11 +124,10 @@ void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Ses
 		record_p.header.size = static_cast<std::uint16_t>(sizeof(record_p));
 		record_p.header.type = S2C_MATCH_RECORD;
 		DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
-		if (res->is_winner) ++session.GetDBInfo().win_count;
-		else ++session.GetDBInfo().lose_count;
+		DBResultLogin db_info = session.UpdateMatchRecord(res->is_winner);
 
-		record_p.win_count = session.GetDBInfo().win_count;
-		record_p.lose_count = session.GetDBInfo().lose_count;
+		record_p.win_count = db_info.win_count;
+		record_p.lose_count = db_info.lose_count;
 
 		session.SendPacket(reinterpret_cast<char*>(&record_p), server.GetHandle());
 	}
@@ -144,19 +141,21 @@ void DBResultHandler::HandleLoadFriendListDBResult(DBOverlapped* db_over, Sessio
 	}
 }
 
-void DBResultHandler::HandleIOResult(DBOverlapped* db_over, Session& session)
+void DBResultHandler::HandleIOResult(DBOverlapped* db_over, const SP<Session>& session)
 {
+	if (!session) return;
+
 	switch (db_over->type) {
 	case DBOperationType::LOGIN:
 		HandleLoginDBResult(db_over, session);
 		break;
 
 	case DBOperationType::UPDATE_SCORE:
-		HandleUpdateScoreDBResult(db_over, session);
+		HandleUpdateScoreDBResult(db_over, *session);
 		break;
 
 	case DBOperationType::UPDATE_MATCH_RESULT:
-		HandleUpdateMatchResultDBResult(db_over, session);
+		HandleUpdateMatchResultDBResult(db_over, *session);
 		break;
 
 	case DBOperationType::ADD_FRIEND_REQUEST:
@@ -172,7 +171,7 @@ void DBResultHandler::HandleIOResult(DBOverlapped* db_over, Session& session)
 		break;
 
 	case DBOperationType::LOAD_FRIEND_LIST:
-		HandleLoadFriendListDBResult(db_over, session);
+		HandleLoadFriendListDBResult(db_over, *session);
 		break;
 	}
 }

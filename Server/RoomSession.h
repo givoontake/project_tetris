@@ -2,13 +2,14 @@
 #include <string>
 #include <array>
 #include <memory>
+#include "Types.h"
 #include "Tetris.h"
 #include "define_packets.h"
 #include "Session.h"
 
 class RoomSession
 {
-	std::weak_ptr<Session> session; // 상속으로 하면 세션을 받아올 수가 없음
+	WP<Session> session; 
 	Tetris tetris;
 	char send_buf[BUF_SIZE];
 	int send_data_size = 0;
@@ -26,7 +27,7 @@ public:
 	RoomSession();
 	~RoomSession();
 
-	std::shared_ptr<Session> GetSession() const { return session.lock(); }
+	SP<Session> GetSession() const { return session.lock(); }
 	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.Load(); }
 	ROOM_USER_STATE GetPrevRoomUserState() const { return prev_r_user_state.Load(); }
 	Tetris& GetTetris() { return tetris; }
@@ -43,7 +44,7 @@ public:
 	void ResetCombo() { combo = 0; }
 	void AddCombo() { ++combo; }
 
-	void InitRoomSession(Session& s);
+	bool InitRoomSession(const SP<Session>& s, int room_index);
 	void ClearRoomSession();
 	void ClearData();
 	void AddToSendBuffer(const char* data, int data_size);

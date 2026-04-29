@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include "Types.h"
 #include "ExOverlapped.h"
 #include "ActiveRoomManager.h"
 #include "ActiveUserManager.h"
@@ -28,14 +29,14 @@ class IOCPServer
 	Database db;
 	RankingManager ranking_manager;
 	ActiveRoomManager active_rooms;
-	ActiveUserManager active_user_manager;
+	ActiveUserManager active_users;
 	PacketHandler packet_handler;
 	DBResultHandler db_result_handler;
 	std::atomic<int> room_gen_generator = -1;
 	std::atomic<long long> tick_count = 0;
-	std::array<std::atomic<std::shared_ptr<Session>>, MAX_USER> users;
+	std::array<std::atomic<SP<Session>>, MAX_USER> users;
 	
-	std::array<std::atomic<std::shared_ptr<TetrisRoom>>, MAX_ROOM> rooms;
+	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM> rooms;
 
 	bool is_running = true;
 
@@ -53,20 +54,20 @@ public:
 	HANDLE GetHandle() const { return iocp_handle; }
 
 	long long GetTickCount() const { return tick_count.load(); }
-	std::shared_ptr<TetrisRoom> GetRoom(int room_index) const { return std::atomic_load(&rooms[room_index]); }
+	SP<TetrisRoom> GetRoom(int room_index) const { return std::atomic_load(&rooms[room_index]); }
 	Database& GetDB() { return db; }
 	RankingManager& GetRankingManager() { return ranking_manager; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
 
-	std::shared_ptr<Session> FindSessionByIndex(int user_index);
+	SP<Session> FindSessionByIndex(int user_index);
 
 	void BeginDisconnect(Session& session);
 	void TryDisconnect(Session& session);
 	void Disconnect(Session& session);
 	void StartServer();
 	void ProcessGQCS();
-	bool ProcessPacket(Session& session, int recv_bytes);
+	void ProcessPacket(Session& session, int recv_bytes);
 	void RoutePacket(char* packet, Session& session);
 	void BroadCastToLobby(char* packet);
 	void CreateOpenRoom(char* packet, Session& session);
@@ -77,10 +78,9 @@ public:
 	std::string CharBufToString(const char* buf, int buf_size);
 	void SendRoomList(Session& session);
 	bool TryJoinRoom(Session& session, int room_gen, const std::string& room_password);
-	int FindRoom(int room_gen);
+	SP<TetrisRoom> FindRoom(int room_gen);
 	int FindUser(int user_id);
 	void SendError(Session& session, int error_code);
-	bool CheckDuplicateId(const int user_id);
 	void FindMatch(Session& session, int max_user);
 	void SendLobbyUserList(Session& session);
 	void SendFriendList(Session& session);

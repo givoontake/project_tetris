@@ -43,10 +43,10 @@ IOCPServer::IOCPServer() : packet_handler(*this), db_result_handler(*this)
 IOCPServer::~IOCPServer()
 {
 	for(auto& room : rooms) {
-		std::atomic_store(&room, std::shared_ptr<TetrisRoom>{}); // nullptr과 같은 논리
+		std::atomic_store(&room, SP<TetrisRoom>{}); // nullptr과 같은 논리
 	}
 	active_rooms.Clear();
-	active_user_manager.Clear();
+	active_users.Clear();
 	closesocket(listen_socket);
 	closesocket(client_socket);
 	db.SetRunning(false);
@@ -78,21 +78,20 @@ void IOCPServer::SendRoomList(Session& session)
 	
 	char packet_buf[BUF_SIZE];
 	int packet_size = 0;
-	for (auto& room : rooms) {
-		auto room_sp = room.load(); // 먼저 참조 카운트를 늘려야함
+	for (auto& room_sp : active_rooms.GetActiveRoomsSnapshot()) {
 		if (!room_sp) continue;
 		S2C_ROOM_INFO_PACKET info_p;
-		if (room_sp->GetRoomState() == ROOM_STATE::EMPTY) continue;
+		RoomInfoSnapshot room_snapshot = room_sp->GetRoomInfoSnapshot();
+		if (room_snapshot.room_state == ROOM_STATE::EMPTY) continue;
 		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 		info_p.header.type = S2C_ROOM_INFO;
-		info_p.room_gen = room_sp->GetRoomGen();
-		const std::string& name = room_sp->GetRoomName();
-		info_p.max_user = room_sp->GetMaxUser();
-		info_p.cur_user = room_sp->GetCurrentUser();
-		StringToCharBuf(name, info_p.room_name, sizeof(info_p.room_name));
-		info_p.is_private = room_sp->GetIsPrivate();
+		info_p.room_gen = room_snapshot.room_gen;
+		info_p.max_user = room_snapshot.max_user;
+		info_p.cur_user = room_snapshot.cur_user;
+		StringToCharBuf(room_snapshot.room_name, info_p.room_name, sizeof(info_p.room_name));
+		info_p.is_private = room_snapshot.is_private;
 		bool is_play;
-		if (room_sp->GetRoomState() == ROOM_STATE::WAIT) is_play = false;
+		if (room_snapshot.room_state == ROOM_STATE::WAIT) is_play = false;
 		else is_play = true;
 		info_p.is_play = is_play;
 
@@ -114,27 +113,26 @@ void IOCPServer::SendRoomList(Session& session)
 bool IOCPServer::TryJoinRoom(Session& session, int room_gen, const std::string& room_password)
 {	
 	int result = ERROR_CODE::ROOM_NOT_FOUND;
-	int room_index = FindRoom(room_gen);
-	if (room_index != -1) {
-		std::shared_ptr<TetrisRoom> room_sp = rooms[room_index].load();
-		if (room_sp) {
-			std::lock_guard<std::mutex> lock(room_sp->GetRoomMutex());
-			if (room_sp->GetRoomState() == ROOM_STATE::WAITING_DELETE) result = ERROR_CODE::ROOM_NOT_FOUND;
-			else {
-				if (room_sp->GetMaxUser() != 1) { // 싱글이 아닌 경우
-					auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
-					if (!multi_sp) result = ERROR_CODE::SERVER_ERROR;
-					else {
-						result = multi_sp->AddUser(session, room_password); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
-					}
-				}
+	auto session_ptr = FindSessionByIndex(session.GetSessionKey().index);
+	if (!session_ptr || session_ptr.get() != &session) {
+		SendError(session, ERROR_CODE::INVALID_REQUEST);
+		return false;
+	}
+	SP<TetrisRoom> room_sp = FindRoom(room_gen);
+	if (room_sp) {
+		std::lock_guard<std::mutex> lock(room_sp->GetRoomMutex());
+		if (room_sp->GetRoomState() == ROOM_STATE::WAITING_DELETE) result = ERROR_CODE::ROOM_NOT_FOUND;
+		else {
+			if (room_sp->GetMaxUser() != 1) { // 싱글이 아닌 경우
+				auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
+				if (!multi_sp) result = ERROR_CODE::SERVER_ERROR;
 				else {
-					result = ERROR_CODE::INVALID_REQUEST;
+					result = multi_sp->AddUser(session_ptr, room_password); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
 				}
 			}
-		}
-		else {
-			result = ERROR_CODE::ROOM_NOT_FOUND;
+			else {
+				result = ERROR_CODE::INVALID_REQUEST;
+			}
 		}
 	}
 
@@ -144,9 +142,9 @@ bool IOCPServer::TryJoinRoom(Session& session, int room_gen, const std::string& 
 	return false;
 }
 
-int IOCPServer::FindRoom(int room_gen)
+SP<TetrisRoom> IOCPServer::FindRoom(int room_gen)
 {
-	return active_rooms.FindRoomIndex(room_gen);
+	return active_rooms.FindRoom(room_gen);
 }
 
 int IOCPServer::FindUser(int user_id)
@@ -167,11 +165,6 @@ void IOCPServer::SendError(Session& session, int error_code)
 	error_p.error_code = error_code;
 
 	session.SendPacket(reinterpret_cast<char*>(&error_p), iocp_handle);
-}
-
-bool IOCPServer::CheckDuplicateId(const int user_id)
-{
-	return active_user_manager.IsActiveSession(user_id);
 }
 
 void IOCPServer::FindMatch(Session& session, int max_user)
@@ -223,19 +216,19 @@ void IOCPServer::SendLobbyUserList(Session& session)
 {
 	{
 		// 비용을 줄이기 위한 선체크
-		if (session.GetState() != MODE_STATE::LOBBY) return;
+		if (session.GetModeState() != MODE_STATE::LOBBY) return;
 	}
 	
 	int packet_size = 0;
 	char packet_buf[BUF_SIZE];
-	for (auto& user : active_user_manager.GetActiveSessions()) {
+	for (auto& user : active_users.GetActiveSessions()) {
 		S2C_LOBBY_USER_INFO_PACKET info_p;
 		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 		info_p.header.type = S2C_LOBBY_USER_INFO;
 		//info_p.user_id = -1;
 		{
 			if (user->GetDBInfo().id == session.GetDBInfo().id) continue;
-			if (user->GetState() == MODE_STATE::LOBBY) {
+			if (user->GetModeState() == MODE_STATE::LOBBY) {
 				info_p.user_id = user->GetDBInfo().id;
 				StringToCharBuf(user->GetDBInfo().nickname, info_p.nickname, MAX_ROOM_NAME);
 			}
@@ -257,7 +250,7 @@ void IOCPServer::SendFriendList(Session& session)
 {
 	std::vector<FriendInfo> friend_list;
 	{
-		if (session.GetState() != MODE_STATE::LOBBY) return;
+		if (session.GetModeState() != MODE_STATE::LOBBY) return;
 		friend_list = session.GetFriendList();
 	}
 
@@ -272,10 +265,10 @@ void IOCPServer::SendFriendList(Session& session)
 		StringToCharBuf(friend_info.nickname, info_p.nickname, MAX_USER_NAME);
 
 		// 로비인지 체크만 함
-		auto sess = active_user_manager.FindSessionById(friend_info.id);
+		auto sess = active_users.FindSessionById(friend_info.id);
 		if (sess) {
 			if (sess->GetDBInfo().id != friend_info.id) continue;
-			if (sess->GetState() == MODE_STATE::LOBBY) info_p.is_lobby = true;
+			if (sess->GetModeState() == MODE_STATE::LOBBY) info_p.is_lobby = true;
 		}
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
@@ -292,7 +285,7 @@ void IOCPServer::SendFriendList(Session& session)
 void IOCPServer::SendRanking(Session& session)
 {
 	{
-		if (session.GetState() != MODE_STATE::LOBBY) return;
+		if (session.GetModeState() != MODE_STATE::LOBBY) return;
 	}
 
 	std::vector<RankingInfo> rankings = ranking_manager.GetRankings();
@@ -326,10 +319,10 @@ void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acc
 	add_p.header.size = static_cast<std::uint16_t>(sizeof(add_p));
 	add_p.header.type = S2C_ADD_FRIEND;
 
-	auto requester_sess = active_user_manager.FindSessionById(requester_info.id);
+	auto requester_sess = active_users.FindSessionById(requester_info.id);
 	if (requester_sess && requester_sess->GetDBInfo().id == requester_info.id) {
 		requester_sess->AddFriend(accepter_info);
-		if ((requester_sess->GetState() == MODE_STATE::LOBBY)) requester_connected = true;
+		if ((requester_sess->GetModeState() == MODE_STATE::LOBBY)) requester_connected = true;
 	}
 
 	if (requester_connected) {
@@ -339,10 +332,10 @@ void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acc
 	}
 	
 	bool accepter_connected = false;
-	auto accepter_sess = active_user_manager.FindSessionById(accepter_info.id);
+	auto accepter_sess = active_users.FindSessionById(accepter_info.id);
 	if (accepter_sess && accepter_sess->GetDBInfo().id == accepter_info.id) {
 		accepter_sess->AddFriend(requester_info);
-		if (accepter_sess->GetState() == MODE_STATE::LOBBY) accepter_connected = true;
+		if (accepter_sess->GetModeState() == MODE_STATE::LOBBY) accepter_connected = true;
 	}
 
 	if (accepter_connected) {
@@ -361,10 +354,10 @@ void IOCPServer::SendDeleteFriendResult(int requester_id, int target_id)
 	delete_p.header.size = static_cast<std::uint16_t>(sizeof(delete_p));
 	delete_p.header.type = S2C_DELETE_FRIEND;
 
-	auto requester_sess = active_user_manager.FindSessionById(requester_id);
+	auto requester_sess = active_users.FindSessionById(requester_id);
 	if (requester_sess && requester_sess->GetDBInfo().id == requester_id) { // 안전성 + 가드
 		requester_sess->DeleteFriend(target_id);
-		if (requester_sess->GetState() == MODE_STATE::LOBBY) requester_connected = true;
+		if (requester_sess->GetModeState() == MODE_STATE::LOBBY) requester_connected = true;
 	}
 
 	if (requester_connected) {
@@ -373,10 +366,10 @@ void IOCPServer::SendDeleteFriendResult(int requester_id, int target_id)
 	}
 	
 	bool target_connected = false;
-	auto target_sess = active_user_manager.FindSessionById(target_id);
+	auto target_sess = active_users.FindSessionById(target_id);
 	if (target_sess && target_sess->GetDBInfo().id == target_id) {
 		target_sess->DeleteFriend(requester_id);
-		if (target_sess->GetState() == MODE_STATE::LOBBY)  target_connected = true;
+		if (target_sess->GetModeState() == MODE_STATE::LOBBY)  target_connected = true;
 	}
 
 	if (target_connected) {
@@ -421,7 +414,7 @@ void IOCPServer::ProcessGQCS()
 				auto new_session = std::make_shared<Session>();
 				new_session->SetIndex(new_index);
 				new_session->InitSession(client_socket);
-				std::shared_ptr<Session> expected = nullptr;
+				SP<Session> expected = nullptr;
 				if (users[new_index].compare_exchange_strong(expected, new_session)) {
 					CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, SESSION_IO_COMPLETION, 0);
 					new_session->RecvPacket(iocp_handle);
@@ -459,30 +452,35 @@ void IOCPServer::ProcessGQCS()
 			switch (ex_over->op_type) {
 			case OP_TYPE::RECV: {
 				if (!result || transferred_bytes == 0) {
-					BeginDisconnect(sess);
-					if (sess.ReducePendingAndCheckDisconnectable()) Disconnect(sess);
+					if (sess.BeginDeactivate()) {
+						BeginDisconnect(sess); // 팬딩이 0으로 노출되면 다른 곳에서 disconnect 관련 작업이 일어날 수 있다.
+						sess.ReducePending();
+					}
+					if (sess.TryDeactivate()) TryDisconnect(sess);
+
 					break;
 				}
 				else {
 					ProcessPacket(sess, transferred_bytes); // recv 토큰은 정상 수신 중 유지하고 disconnect 경로에서만 줄인다.
-					if (sess.GetLifeState() == LIFE_STATE::DISCONNECT_PENDING) {
-						if (sess.ReducePendingAndCheckDisconnectable()) Disconnect(sess);
-					}
-					else sess.RecvPacket(iocp_handle);
+					sess.ReducePending();
+					if (sess.TryDeactivate()) TryDisconnect(sess);
+					sess.RecvPacket(iocp_handle);
 				}
 				break;
 			}
 
 			case OP_TYPE::SEND: {
-				bool is_disconnectable = sess.ReducePendingAndCheckDisconnectable(); // 딱히 작업이 없으므로 미리 줄여도 된다.
 				if ((!result || transferred_bytes == 0)) {
-					BeginDisconnect(sess);
-					TryDisconnect(sess);
+					if (sess.BeginDeactivate()) {
+						BeginDisconnect(sess);
+						sess.ReducePending();
+					}
+					if (sess.TryDeactivate()) TryDisconnect(sess);
 				}
 				else {
-					if (is_disconnectable) Disconnect(sess);
-					else if (sess.GetLifeState() == LIFE_STATE::DISCONNECT_PENDING) TryDisconnect(sess);
+					if (sess.TryDeactivate()) TryDisconnect(sess);
 				}
+				
 				delete io_over;
 				break;
 			}
@@ -508,19 +506,24 @@ void IOCPServer::ProcessGQCS()
 			}
 			Session& sess = *sess_ptr;
 			if (!result) {
-				if (index > -1 && sess.ReducePendingAndCheckDisconnectable()) Disconnect(sess);
+				if (sess.BeginDeactivate()) {
+					BeginDisconnect(sess);
+					sess.ReducePending();
+				}
 			}
 			else {
-				db_result_handler.HandleIOResult(db_over, sess);
-				if (sess.ReducePendingAndCheckDisconnectable()) Disconnect(sess);
+				db_result_handler.HandleIOResult(db_over, sess_ptr);
+				sess.ReducePending();
 			}
-
-			if (sess.GetLifeState() == LIFE_STATE::DISCONNECT_PENDING) TryDisconnect(sess);
+			if (sess.TryDeactivate()) TryDisconnect(sess);
 			delete db_over;
 			break;
 		}
 
 		case DB_INIT_SERVER_COMPLETION: {
+			if (!result) {
+				is_running = false;
+			}
 			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
 			db_result_handler.HandleInitServerResult(db_over);
 			delete db_over;
@@ -532,17 +535,17 @@ void IOCPServer::ProcessGQCS()
 		}
 	}
 }
-bool IOCPServer::ProcessPacket(Session& session, int recv_bytes)
+void IOCPServer::ProcessPacket(Session& session, int recv_bytes)
 {   
 	std::uint16_t packet_size = 0;
 	int offset = 0;
 	char p_buffer[BUF_SIZE];
 	int remain_data_size = 0;
 
-	if (recv_bytes + session.GetRemainDataSize() > BUF_SIZE) return false; // 버퍼가 더 이상 없다면 종료
+	if (recv_bytes + session.GetRemainDataSize() > BUF_SIZE) return; // 버퍼가 더 이상 없다면 종료
 	else session.AddDataSize(recv_bytes);
 
-	if (session.GetRemainDataSize() < PACKET_HEADER_SIZE) return false; // 처리할 최소 데이터(헤더 크기 이상)가 없다면 종료
+	if (session.GetRemainDataSize() < PACKET_HEADER_SIZE) return; // 처리할 최소 데이터(헤더 크기 이상)가 없다면 종료
 
 	// 우선 사이즈 - 타입 관계는 신뢰를 전제로 간다. 보안 처리는 나중에 고민할 예정
 	remain_data_size = session.GetRemainDataSize();
@@ -567,13 +570,13 @@ bool IOCPServer::ProcessPacket(Session& session, int recv_bytes)
 
 	session.AddDataSize(-offset);
 	memmove(session.GetExOver().packet_buf, session.GetExOver().packet_buf + offset, session.GetRemainDataSize());
-	return true;
 }
 
 void IOCPServer::RoutePacket(char* packet, Session& session)
 {
 	PrintPacketType(reinterpret_cast<PacketHeader*>(packet)->type);
-	switch (session.GetState()) {
+	auto room_snapshot = session.GetRoomSnapShot();
+	switch (room_snapshot.state) {
 	case MODE_STATE::NONE:
 		return;
 	case MODE_STATE::LOGIN:
@@ -583,7 +586,7 @@ void IOCPServer::RoutePacket(char* packet, Session& session)
 		packet_handler.HandlePacket(packet, session);
 		break;
 	case MODE_STATE::ROOM: {
-		auto room_ptr = rooms[session.GetRoomIndex()].load();
+		auto room_ptr = rooms[room_snapshot.room_index].load();
 		if (room_ptr) room_ptr->HandlePacket(packet, session); // 방에 들어가있는 상태라면 내부에서 세션은 키 없이도 안전하게 관리된다.
 		break;
 	}
@@ -593,8 +596,8 @@ void IOCPServer::RoutePacket(char* packet, Session& session)
 
 void IOCPServer::BroadCastToLobby(char* packet)
 {
-	for (auto& user : active_user_manager.GetActiveSessions()) {
-		if (user && user->GetState() == MODE_STATE::LOBBY) {
+	for (auto& user : active_users.GetActiveSessions()) {
+		if (user && user->GetModeState() == MODE_STATE::LOBBY) {
 			user->SendPacket(packet, iocp_handle);
 		}
 	}
@@ -630,20 +633,27 @@ void IOCPServer::CreateOpenRoom(char* packet, Session& session)
 	}
 	data.room_gen = GetNewRoomGen();
 	
-	std::shared_ptr<TetrisRoom> new_room;
+	auto session_ptr = FindSessionByIndex(session.GetSessionKey().index);
+	if (!session_ptr || session_ptr.get() != &session) return;
+	SP<TetrisRoom> new_room;
 	
 	for (int i = 0; i < MAX_ROOM; ++i) {
 		if (rooms[i].load() == nullptr) {
 			data.room_index = i;
 			{
-				if (session.GetLifeState() == LIFE_STATE::NONE) return;
-
-				if (is_single) new_room = std::make_shared<SingleRoom>(this, session, data);
-				else new_room = std::make_shared<MultiRoom>(this, session, data);
-				std::shared_ptr<TetrisRoom> expected = nullptr;
+				if (is_single) new_room = std::make_shared<SingleRoom>(this, data);
+				else new_room = std::make_shared<MultiRoom>(this, data);
+				SP<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
-					active_rooms.AddRoom(data.room_gen, i);
-					new_room->SendCreateRoom(session);
+					if (!new_room->AddHostSession(session_ptr)) {
+						SP<TetrisRoom> expected_room = new_room;
+						SP<TetrisRoom> empty_room = nullptr;
+						std::atomic_compare_exchange_strong(&rooms[i], &expected_room, empty_room);
+						SendError(session, ERROR_CODE::INVALID_REQUEST);
+						return;
+					}
+					active_rooms.AddRoom(data.room_gen, new_room);
+					new_room->SendCreateRoom(*session_ptr);
 					return;
 				}
 			}
@@ -680,20 +690,27 @@ void IOCPServer::CreateLockRoom(char* packet, Session& session)
 	}
 	data.room_gen = GetNewRoomGen();
 
-	std::shared_ptr<TetrisRoom> new_room;
+	auto session_ptr = FindSessionByIndex(session.GetSessionKey().index);
+	if (!session_ptr || session_ptr.get() != &session) return;
+	SP<TetrisRoom> new_room;
 
 	for (int i = 0; i < MAX_ROOM; ++i) {
 		if (rooms[i].load() == nullptr) {
 			data.room_index = i;
 			{
-				if (session.GetLifeState() == LIFE_STATE::NONE) return;
-
-				if (is_single) new_room = std::make_shared<SingleRoom>(this, session, data);
-				else new_room = std::make_shared<MultiRoom>(this, session, data);
-				std::shared_ptr<TetrisRoom> expected = nullptr;
+				if (is_single) new_room = std::make_shared<SingleRoom>(this, data);
+				else new_room = std::make_shared<MultiRoom>(this, data);
+				SP<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
-					active_rooms.AddRoom(data.room_gen, i);
-					new_room->SendCreateRoom(session);
+					if (!new_room->AddHostSession(session_ptr)) {
+						SP<TetrisRoom> expected_room = new_room;
+						SP<TetrisRoom> empty_room = nullptr;
+						std::atomic_compare_exchange_strong(&rooms[i], &expected_room, empty_room);
+						SendError(session, ERROR_CODE::INVALID_REQUEST);
+						return;
+					}
+					active_rooms.AddRoom(data.room_gen, new_room);
+					new_room->SendCreateRoom(*session_ptr);
 					return;
 				}
 			}
@@ -705,7 +722,7 @@ void IOCPServer::DeleteRoom(int room_index)
 {
 	auto room = rooms[room_index].load();
 	if (room) {
-		active_rooms.RemoveRoom(room->GetRoomGen(), room_index);
+		active_rooms.RemoveRoom(room->GetRoomGen(), room);
 	}
 	rooms[room_index].store(nullptr);
 	std::cout << "방 삭제 - 방 이름: " << (room ? room->GetRoomName() : "") << std::endl;
@@ -745,46 +762,42 @@ int IOCPServer::GetEmptyRoomIndex()
 	return -1;
 }
 
-std::shared_ptr<Session> IOCPServer::FindSessionByIndex(int user_index)
+SP<Session> IOCPServer::FindSessionByIndex(int user_index)
 {
 	if (user_index < 0 || user_index >= MAX_USER) return nullptr;
 	return users[user_index].load();
 }
 
-void IOCPServer::BeginDisconnect(Session& session)
+void IOCPServer::BeginDisconnect(Session& session) // 첫 disconnect
 {
-	LIFE_STATE expected = LIFE_STATE::ACTIVE;
-	if (!session.TryChangeLifeState(expected, LIFE_STATE::DISCONNECT_PENDING)) return;
 	auto session_ptr = FindSessionByIndex(session.GetSessionKey().index);
-	active_user_manager.RemoveUser(session.GetDBInfo().id, session_ptr);
+	active_users.RemoveUser(session.GetDBInfo().id, session_ptr);
 }
 
-void IOCPServer::TryDisconnect(Session& session)
+void IOCPServer::TryDisconnect(Session& session) // disconnect 대기 중인 세션 disconnect 시도
 {
-	if (session.GetLifeState() != LIFE_STATE::DISCONNECT_PENDING) return;
-	if (session.IsDisconnectable()) Disconnect(session);
+	Disconnect(session);
 }
 
 void IOCPServer::Disconnect(Session& session)
 {
-	LIFE_STATE desired = LIFE_STATE::DISCONNECTING;
-	LIFE_STATE expected = LIFE_STATE::DISCONNECT_PENDING;
 	int user_index = session.GetSessionKey().index;
 	auto session_ptr = FindSessionByIndex(user_index);
 	if (!session_ptr || session_ptr.get() != &session) return;
-	if (!session.TryChangeLifeState(expected, desired)) return; // 두 스레드가 동시에 0을 읽고 디스커넥트에 들어갈 수 있다.
+
 	int user_id = session.GetDBInfo().id;
-	if (session.GetState() == MODE_STATE::ROOM) {
-		auto room = rooms[session.GetRoomIndex()].load();
+	auto room_snapshot = session.GetRoomSnapShot();
+	if (room_snapshot.state == MODE_STATE::ROOM) {
+		auto room = rooms[room_snapshot.room_index].load();
 		if (room) room->DeleteUser(user_id);
 	}
 
-	active_user_manager.RemoveUser(session.GetDBInfo().id, session_ptr);
+	active_users.RemoveUser(session.GetDBInfo().id, session_ptr);
 	std::cout << "로그아웃 - 플레이어: " << session.GetDBInfo().nickname << std::endl;
-	session.ClearSession();
+	closesocket(session.GetSocket());
 	if (user_index >= 0 && user_index < MAX_USER) {
-		std::shared_ptr<Session> expected_session = session_ptr;
-		std::shared_ptr<Session> empty_session = nullptr;
+		SP<Session> expected_session = session_ptr;
+		SP<Session> empty_session = nullptr;
 		users[user_index].compare_exchange_strong(expected_session, empty_session);
 	}
 }

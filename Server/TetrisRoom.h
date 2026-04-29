@@ -61,6 +61,15 @@ struct LockRoomInitData {
 	std::string room_password;
 };
 
+struct RoomInfoSnapshot {
+	ROOM_STATE room_state = ROOM_STATE::EMPTY;
+	int room_gen = -1;
+	int max_user = 0;
+	int cur_user = 0;
+	std::string room_name;
+	bool is_private = false;
+};
+
 // 현재 룸 세션 내부에 session*를 유지중이라, 유저가 삭제되면 범위기반 스코프 접근 시 해당 참조의 세션이 널일 수 있고, 방이 삭제되어 버리면 범위 자체가 손상되어 범위기반 작업은 모두 뮤텍스로 묶어놓은 상태이다.
 // 포인터가 아니라 다르게 관리한다면 이 문제를 좀 더 효율적으로 해결할 수 있을 것 같다.
 
@@ -85,9 +94,11 @@ protected:
 
 	std::mutex room_mutex;
 
+	bool InitHostSession(const SP<Session>& session);
+
 public:
-	TetrisRoom(IOCPServer* server, Session& session, OpenRoomInitData data);
-	TetrisRoom(IOCPServer* server, Session& session, LockRoomInitData data);
+	TetrisRoom(IOCPServer* server, OpenRoomInitData data);
+	TetrisRoom(IOCPServer* server, LockRoomInitData data);
 	virtual ~TetrisRoom();
 
 	ROOM_STATE GetRoomState() const { return room_state.Load(); }
@@ -97,7 +108,8 @@ public:
 	int GetRoomIndex() const { return room_index; }
 	bool GetIsPrivate() const { return !room_password.empty(); }
 	int GetMaxUser() const { return static_cast<int>(max_user); }
-	int GetCurrentUser() const { return static_cast<int>(cur_user); }
+	int GetCurrentUser() const;
+	RoomInfoSnapshot GetRoomInfoSnapshot();
 	const std::string& GetRoomName() const { return room_name; }
 	const std::string& GetRoomPassword() const { return room_password; }
 
@@ -106,6 +118,7 @@ public:
 	virtual void ProcessPlayTasks() = 0;
 	virtual void DeleteUser(const int id) = 0;	
 	virtual void SendCreateRoom(Session& session) = 0;
+	virtual bool AddHostSession(const SP<Session>& session);
 	// 공통
 	void SetRoomIndex(const int val);
 	void SetRoomGen(const int val);

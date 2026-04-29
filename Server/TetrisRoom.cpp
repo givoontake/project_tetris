@@ -4,7 +4,7 @@
 #include "IOCPServer.h"
 #include "packet_types.h"
 
-TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, OpenRoomInitData data)
+TetrisRoom::TetrisRoom(IOCPServer* _server, OpenRoomInitData data)
 {
 	// 생성과 소멸은 스레드 세이프하지는 않지만, 어차피 make_shared하고 CAS해서 룸 리스트에 할당하기 전에는 접근되지 않는다.
 	server = _server;
@@ -19,13 +19,11 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, OpenRoomInitData d
 		room_users.emplace_back();
 	}
 
-	session.SetRoomIndex(room_index);
-	room_users[0].InitRoomSession(session);
-	cur_user = 1;
 	//SendAddRoom(session);
+	cur_user = 0;
 }
 
-TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, LockRoomInitData data)
+TetrisRoom::TetrisRoom(IOCPServer* _server, LockRoomInitData data)
 {
 	server = _server;
 	max_user = data.max_user;
@@ -38,20 +36,59 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, Session& session, LockRoomInitData d
 	for (int i = 0; i < max_user; ++i) {
 		room_users.emplace_back();
 	}
-	session.SetRoomIndex(room_index);
-	room_users[0].InitRoomSession(session);
-	cur_user = 1;
 	//SendAddRoom(session);
+	cur_user = 0;
 }
 
 TetrisRoom::~TetrisRoom()
 {
 }
 
+int TetrisRoom::GetCurrentUser() const
+{
+	int count = 0;
+	for (auto& r_user : room_users) {
+		if (r_user.GetSession()) ++count;
+	}
+	return count;
+}
+
+bool TetrisRoom::InitHostSession(const SP<Session>& session)
+{
+	if (!session) return false;
+	if (room_users.empty()) return false;
+	if (room_users[0].GetSession()) return false;
+	if (!room_users[0].InitRoomSession(session, room_index)) return false;
+	cur_user = 1;
+	return true;
+}
+
+bool TetrisRoom::AddHostSession(const SP<Session>& session)
+{
+	std::lock_guard<std::mutex> lock(room_mutex);
+	return InitHostSession(session);
+}
+
+RoomInfoSnapshot TetrisRoom::GetRoomInfoSnapshot()
+{
+	std::lock_guard<std::mutex> lock(room_mutex);
+	RoomInfoSnapshot snapshot;
+	snapshot.room_state = room_state.Load();
+	snapshot.room_gen = room_gen;
+	snapshot.max_user = static_cast<int>(max_user);
+	for (auto& r_user : room_users) {
+		if (r_user.GetSession()) ++snapshot.cur_user;
+	}
+	snapshot.room_name = room_name;
+	snapshot.is_private = !room_password.empty();
+	return snapshot;
+}
+
 void TetrisRoom::InitGame()
 {
 	for (auto& r_user : room_users) { 
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		auto session = r_user.GetSession();
+		if (!session) continue;
 		r_user.GetTetris().Clear();
 	}
 }
@@ -62,7 +99,8 @@ void TetrisRoom::ClearGame()
 	tasks.Clear();
 	tetromino_spawn_list.clear();
 	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		auto session = r_user.GetSession();
+		if (!session) continue;
 		r_user.ClearData();
 	}
 }
@@ -82,8 +120,9 @@ void TetrisRoom::Add7BagTetrominoList()
 bool TetrisRoom::SpawnTetromino(int id) // 내가 이걸 왜 반환형을 bool이라고 했을까
 {
 	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		if (r_user.GetSession()->GetDBInfo().id == id){
+		auto session = r_user.GetSession();
+		if (!session) continue;
+		if (session->GetDBInfo().id == id){
 			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]), spawn_pos);
 			return true;
 		}
@@ -103,7 +142,8 @@ void TetrisRoom::ClearRoom()
 void TetrisRoom::UpdateTick()
 {
 	for(auto& r_user : room_users){
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		auto session = r_user.GetSession();
+		if (!session) continue;
 		r_user.GetTetris().GetTickData().UpdateTickData();
 	}
 }
@@ -113,6 +153,9 @@ void TetrisRoom::BoundPackets()
 {
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() != ROOM_USER_STATE::PLAY) continue; // 게임오버 되어도 상태 변경은 여기서 이루어지므로 진입 시에는 게임오버 상태는 아님
+		auto session = r_user.GetSession();
+		if (!session) continue;
+		int user_id = session->GetDBInfo().id;
 
 		for (auto& task : r_user.GetTetris().GetSendTasks()) {
 			switch (task.event_type) {
@@ -128,7 +171,7 @@ void TetrisRoom::BoundPackets()
 				S2C_FIX_PACKET fix_p;
 				fix_p.header.size = static_cast<std::uint16_t>(sizeof(fix_p));
 				fix_p.header.type = S2C_FIX;
-				fix_p.id = r_user.GetSession()->GetDBInfo().id;
+				fix_p.id = user_id;
 				fix_p.fixed_x = t.fixed_x; // 실시간 반영된 값을 읽는게 아니라 작업 목록을 가져와서 패킷을 구성하므로, 작업 당시의 값을 가져와야 함. addline과 동시 틱에 처리되면 클라는 공중에 떠 있는 것으로 보이는 버그 발생
 				fix_p.fixed_y = t.fixed_y;
 				r_user.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.header.size);
@@ -140,7 +183,7 @@ void TetrisRoom::BoundPackets()
 				S2C_CLEARLINE_PACKET clear_line_p;
 				clear_line_p.header.size = static_cast<std::uint16_t>(sizeof(clear_line_p));
 				clear_line_p.header.type = S2C_CLEARLINE;
-				clear_line_p.id = r_user.GetSession()->GetDBInfo().id;
+				clear_line_p.id = user_id;
 				clear_line_p.score = r_user.GetScore();
 				clear_line_p.line_index = t.line_index;
 				clear_line_p.combo = r_user.GetCombo();
@@ -152,11 +195,11 @@ void TetrisRoom::BoundPackets()
 				if (r_user.GetTetrominoIndex() == (tetromino_spawn_list.size() - 2)) Add7BagTetrominoList();
 				r_user.AddTetrominoIndex();
 
-				if (SpawnTetromino(r_user.GetSession()->GetDBInfo().id)) {
+				if (SpawnTetromino(user_id)) {
 					S2C_SPAWN_PACKET spawn_p;
 					spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
 					spawn_p.header.type = S2C_SPAWN;
-					spawn_p.id = r_user.GetSession()->GetDBInfo().id;
+					spawn_p.id = user_id;
 					spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
 					spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 					spawn_p.spawn_x = static_cast<char>(spawn_pos.x);
@@ -171,7 +214,7 @@ void TetrisRoom::BoundPackets()
 				S2C_ADDLINE_PACKET add_line_p;
 				add_line_p.header.size = static_cast<std::uint16_t>(sizeof(add_line_p));
 				add_line_p.header.type = S2C_ADDLINE;
-				add_line_p.id = r_user.GetSession()->GetDBInfo().id;
+				add_line_p.id = user_id;
 				auto& t = std::get<TaskAddLine>(task.task);
 				add_line_p.hole_x = static_cast<char>(t.hole_x);
 				r_user.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.header.size);
@@ -184,7 +227,7 @@ void TetrisRoom::BoundPackets()
 				S2C_GAMEOVER_PACKET gameover_p;
 				gameover_p.header.size = static_cast<std::uint16_t>(sizeof(gameover_p));
 				gameover_p.header.type = S2C_GAMEOVER;
-				gameover_p.id = r_user.GetSession()->GetDBInfo().id;
+				gameover_p.id = user_id;
 				r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameover_p), gameover_p.header.size);
 
 				break;
@@ -207,10 +250,12 @@ void TetrisRoom::BoundPackets()
 
 void TetrisRoom::MakeMovePacket(RoomSession& r_session, int move_type)
 {
+	auto session = r_session.GetSession();
+	if (!session) return;
 	S2C_MOVE_PACKET move_p;
 	move_p.header.size = static_cast<std::uint16_t>(sizeof(move_p));
 	move_p.header.type = S2C_MOVE;
-	move_p.id = r_session.GetSession()->GetDBInfo().id;
+	move_p.id = session->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
 	r_session.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);
 }
@@ -250,7 +295,8 @@ void TetrisRoom::AddSpawnTask()
 void TetrisRoom::ResetUsersTickData()
 {
 	for(auto& r_user : room_users){
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		auto session = r_user.GetSession();
+		if (!session) continue;
 		r_user.GetTetris().ResetTickData();
 	}
 }
@@ -259,22 +305,27 @@ void TetrisRoom::BroadcastTickDataForUsers()
 {
 	for (int i = 0; i < room_users.size(); ++i) {
 		RoomSession& source = room_users[i];
-		if (source.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		auto source_session = source.GetSession();
+		if (!source_session) continue;
 		//IOKey key = source.GetSession()->GetIOKey();
 		char* send_buffer = source.GetSendBuf();
 		int data_size = source.GetSendDataSize();
 
 		for (int j = 0; j < room_users.size(); ++j) {
 			RoomSession& target = room_users[j];
-			if (target.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
 			// data_size = 0이 IOCP로 들어가면 연결이 종료되는 것에 주의해야함
 			// 게임 시작 시 틱마다 자동 전송하므로 조건이 꼭 필요
-			if (data_size > 0) target.GetSession()->SendBoundPacket(send_buffer, data_size, server->GetHandle());
+			if (data_size > 0) {
+				auto target_session = target.GetSession();
+				if (!target_session) continue;
+				target_session->SendBoundPacket(send_buffer, data_size, server->GetHandle());
+			}
 		}
 	}
 
 	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
+		auto session = r_user.GetSession();
+		if (!session) continue;
 		r_user.ClearSendBuf();
 	}
 }
@@ -287,8 +338,9 @@ void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 	// 우선 외부에서 잠그는걸로 다시 변경. 범위기반 탐색과 삭제 사이의 관계 때문에 락이 필요한데, 멀티와 같은 경우 범위기반 탐색 내에 다시 범위기반 탐색을 하는 경우도 꽤 있으므로 외부에서 하는게 효율적인 것 같다.
 	std::vector<int> target_index;
 	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::EMPTY) continue;
-		r_user.GetSession()->SendPacket(packet, iocp_handle);
+		auto session = r_user.GetSession();
+		if (!session) continue;
+		session->SendPacket(packet, iocp_handle);
 	}
 }
 

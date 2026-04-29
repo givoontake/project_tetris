@@ -2,7 +2,8 @@
 
 RoomSession::RoomSession()
 {
-	r_user_state.Store(ROOM_USER_STATE::EMPTY);
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
 }
 
 RoomSession::~RoomSession()
@@ -10,10 +11,11 @@ RoomSession::~RoomSession()
 
 }
 
-void RoomSession::InitRoomSession(Session& s)
+bool RoomSession::InitRoomSession(const SP<Session>& s, int room_index)
 {
-	session = s.shared_from_this();
-	s.StoreState(MODE_STATE::ROOM);
+	if (!s) return false;
+	if (!s->TrySetRoomMode(room_index)) return false;
+	session = s;
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);
 	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
@@ -21,15 +23,16 @@ void RoomSession::InitRoomSession(Session& s)
 
 	score = 0;
 	ClearSendBuf();
+	return true;
 }
 
 void RoomSession::ClearRoomSession()
 {
-	if (auto session_ptr = session.lock()) session_ptr->StoreState(MODE_STATE::LOBBY);
+	if (auto session_ptr = session.lock()) session_ptr->SetRoomSnapShot(MODE_STATE::LOBBY, -1);
 	session.reset();
 	tetris.Clear();
-	r_user_state.Store(ROOM_USER_STATE::EMPTY);
-	prev_r_user_state.Store(ROOM_USER_STATE::EMPTY);
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
 	tetromino_index = 0;
 
 	score = 0;

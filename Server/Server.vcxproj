@@ -65,6 +65,7 @@
     <ClInclude Include="Tetris.h" />
     <ClInclude Include="TetrisRoom.h" />
     <ClInclude Include="TetrisTickData.h" />
+    <ClInclude Include="Types.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

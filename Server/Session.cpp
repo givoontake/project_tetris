@@ -11,9 +11,10 @@ void Session::InitSession(SOCKET new_socket)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	socket = new_socket;
-	io_pending_count = 1; // recv 토큰은 정상 수신 중에는 계속 유지하고 disconnect 경로에서만 내려놓는다.
+	io_pending_count = 0; // recv 토큰은 정상 수신 중에는 계속 유지하고 disconnect 경로에서만 내려놓는다.
 	db_info.clear();
 	friend_list.reserve(MAX_FRIENDS);
+	room_index = -1;
 	remain_data_size = 0;
 	recv_over.ex_over.key = key;
 	life_state.Store(LIFE_STATE::ACTIVE);
@@ -23,29 +24,18 @@ void Session::InitSession(SOCKET new_socket)
 	//state = LOGIN;
 }
 
-void Session::ClearSession()
+bool Session::InitDBInfo(DBResultLogin* new_info)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	closesocket(socket);
-	io_pending_count = 0;
-	db_info.clear();
-	friend_list.clear();
-	// tcp에서 패킷을 나누어 보낼 때 비정상 종료되면 일부만 보내고 끝날 수도 있다고 한다
-	// 따라서 remain_data_size는 항상 초기화가 필요하다
-	remain_data_size = 0;
-	recv_over.ex_over.key = key;
-	life_state.Store(LIFE_STATE::NONE);
-	state.Store(MODE_STATE::NONE);
-}
-
-void Session::InitDBInfo(DBResultLogin* new_info)
-{
+	if (state.Load() != MODE_STATE::LOGIN) return false;
 	db_info.id = new_info->id;
 	db_info.login_id = new_info->login_id;
 	db_info.nickname = new_info->nickname;
 	db_info.lose_count = new_info->lose_count;
 	db_info.win_count = new_info->win_count;
 	db_info.max_score = new_info->max_score;
+	state.Store(MODE_STATE::LOBBY);
+	return true;
 }
 
 void Session::SendPacket(char* packet, const HANDLE iocp_handle)
@@ -86,7 +76,7 @@ void Session::RecvPacket(const HANDLE iocp_handle)
 {
 	if (life_state.Load() != LIFE_STATE::ACTIVE) return;
 	DWORD recv_flag = 0;
-	ZeroMemory(&recv_over.ex_over.over, sizeof(recv_over.ex_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
+	ZeroMemory(&recv_over.ex_over.over, sizeof(recv_over.ex_over.over)); // io 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
 	recv_over.ex_over.key = key;
 	recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
 	recv_over.wsabuf.buf = recv_over.packet_buf + remain_data_size;
@@ -99,11 +89,13 @@ void Session::RecvPacket(const HANDLE iocp_handle)
 
 void Session::AddFriend(FriendInfo& new_friend)
 {
+	std::lock_guard<std::mutex> lock(sess_mutex);
 	friend_list.emplace_back(new_friend);
 }
 
 void Session::DeleteFriend(int target_id)
 {
+	std::lock_guard<std::mutex> lock(sess_mutex);
 	auto it = std::find_if(friend_list.begin(), friend_list.end(), [&target_id](const FriendInfo& friend_info) {
 		return friend_info.id == target_id;
 		});
@@ -114,7 +106,35 @@ void Session::DeleteFriend(int target_id)
 
 void Session::InitFriendList(std::vector<FriendInfo>& db_friend_list)
 {
+	std::lock_guard<std::mutex> lock(sess_mutex);
 	friend_list = std::move(db_friend_list);
+}
+
+DBResultLogin Session::UpdateMaxScore(int max_score)
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	db_info.max_score = max_score;
+	return db_info;
+}
+
+DBResultLogin Session::UpdateMatchRecord(bool is_winner)
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	if (is_winner) ++db_info.win_count;
+	else ++db_info.lose_count;
+	return db_info;
+}
+
+void Session::SetIndex(int new_index)
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	key.index = new_index;
+}
+
+void Session::AddDataSize(int new_data_size)
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	remain_data_size += new_data_size;
 }
 
 // 현재 디스커넥팅 예외 케이스는 disconnect->방에서 deleteuser할 때 본인에게도 전송하는 로직이 있어서 그 부분이 방지. 세션 정리 단계이므로 넣는게 정배
@@ -132,19 +152,73 @@ void Session::ReducePending()
 	--io_pending_count;
 }
 
-bool Session::ReducePendingAndCheckDisconnectable()
-{
-	std::lock_guard<std::mutex> lock(sess_mutex);
-	--io_pending_count;
-	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) return true;
-	return false;
-}
-
 bool Session::IsDisconnectable()
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) return true;
 	return false;
+}
+
+bool Session::BeginDeactivate()
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	if (life_state.Load() == LIFE_STATE::ACTIVE) {
+		life_state.Store(LIFE_STATE::DISCONNECT_PENDING);
+		return true;
+	}
+	return false;
+}
+
+bool Session::TryDeactivate()
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) {
+		life_state.Store(LIFE_STATE::DISCONNECTING);
+		return true;
+	}
+	return false;
+}
+
+SOCKET Session::GetSocket() const
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	return socket;
+}
+
+std::vector<FriendInfo> Session::GetFriendList() const
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	return friend_list;
+}
+
+SessionKey Session::GetSessionKey() const
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	return key;
+}
+
+int Session::GetRoomIndex() const
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	return room_index;
+}
+
+RoomSnapShot Session::GetRoomSnapShot() const
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	return { state.Load(), room_index };
+}
+
+int Session::GetRemainDataSize() const
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	return remain_data_size;
+}
+
+DBResultLogin Session::GetDBInfo() const
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	return db_info;
 }
 
 void Session::StoreLifeState(LIFE_STATE new_state)
@@ -158,6 +232,25 @@ void Session::StoreState(MODE_STATE new_state)
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return;
 	state.Store(new_state);
+}
+
+void Session::SetRoomSnapShot(MODE_STATE new_state, int new_room_index)
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return;
+	room_index = new_room_index;
+	state.Store(new_state);
+}
+
+bool Session::TrySetRoomMode(int new_room_index)
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	if (new_room_index < 0) return false;
+	if (life_state.Load() != LIFE_STATE::ACTIVE) return false;
+	if (state.Load() != MODE_STATE::LOBBY) return false;
+	room_index = new_room_index;
+	state.Store(MODE_STATE::ROOM);
+	return true;
 }
 
 bool Session::TryChangeLifeState(LIFE_STATE expected, LIFE_STATE desired)
