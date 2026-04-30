@@ -1,5 +1,5 @@
 #pragma once
-#include "define_packets.h"
+#include "define.h"
 #include "settings.h"
 
 class TetrisTickCounters

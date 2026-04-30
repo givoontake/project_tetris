@@ -70,9 +70,6 @@ class TetrisBoard:
         draw_h = self.cell_length*VALID_ROWS
         self.valid_grid_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         self.full_grid_rect = pygame.Rect(self.rect.x, self.rect.y, draw_w, self.cell_length*BOARD_ROWS)
-        self.board_frame_rect = self.valid_grid_rect.copy()
-        self.board_frame = Rectangle(self.screen, self.board_frame_rect, self.rm, False, None, "")
-        self.board_frame.border_color = GOLD
 
         # profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
         # self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
@@ -81,10 +78,7 @@ class TetrisBoard:
         draw_w = self.cell_length*PREVIEW_COLS
         draw_h = draw_w
         self.preview_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.preview_box = Rectangle(self.screen, self.preview_rect, self.rm, False, None, "")
-        self.preview_box.set_background_color((0, 0, 0, 96))
-        self.preview_box.border_color = GOLD
-        self.preview_box.set_border(1)
+        self.preview_box = Rectangle(self.screen, self.preview_rect, self.rm, None, "", 1)
 
     def _set_texture_size(self):
         for key, texture in self.block_textures.items():
@@ -92,7 +86,6 @@ class TetrisBoard:
 
     def find_anim_start_line(self):
         grid = self.grid
-        self.anim_target_line = BOARD_ROWS - 1
 
         while True: # 애니메이션 적용할 첫 라인 찾기(첫 컬러 블록이 포함된 줄 찾기)
             escape = False 
@@ -104,10 +97,7 @@ class TetrisBoard:
             if escape:
                 break
             else:
-                if self.anim_target_line > 0:
-                    self.anim_target_line -= 1
-                else:
-                    break
+                if self.anim_target_line > 0: self.anim_target_line -= 1
 
     def animate_gameover(self, dt_ms) -> bool:
         self.anim_elapsed_ms += dt_ms
@@ -243,14 +233,15 @@ class TetrisBoard:
         self.combo_effects = [effect for effect in self.combo_effects if effect.active] # 리스트 컴프리헨션으로 조건에 맞는 새 리스트 생성
     # ------------ 렌더링 ------------ #
     def draw_board_frame(self):
-        line_w = 1
-        left_top = self.board_frame_rect.topleft
-        left_bottom = self.board_frame_rect.bottomleft
-        right_top = self.board_frame_rect.topright
-        right_bottom = self.board_frame_rect.bottomright
-        pygame.draw.line(self.screen, self.board_frame.border_color, left_top, left_bottom, line_w)
-        pygame.draw.line(self.screen, self.board_frame.border_color, right_top, right_bottom, line_w)
-        pygame.draw.line(self.screen, self.board_frame.border_color, left_bottom, right_bottom, line_w)
+        """보드 전체 테두리."""
+        # pygame.draw.rect(self.screen, (0, 0, 0), self.board_rect)
+        valid_x = self.rect.x 
+        valid_y = self.rect.y + self.cell_length*HIDDEN_ROWS
+        valid_w = self.cell_length*self.cols
+        valid_h = self.cell_length*VALID_ROWS
+        pygame.draw.line(self.screen, WHITE, (valid_x,  valid_y), (valid_x, valid_y + valid_h))
+        pygame.draw.line(self.screen, WHITE, (valid_x,  valid_y + valid_h), (valid_x + valid_w, valid_y + valid_h))
+        pygame.draw.line(self.screen, WHITE, (valid_x + valid_w, valid_y + valid_h), (valid_x + valid_w, valid_y))
 
     def draw_cells(self):
         tex_map = self.block_textures

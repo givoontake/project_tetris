@@ -16,29 +16,6 @@ class SettingSound(SettingBase):
     
     def set_layout(self):
         setting_x = self.rect.x
-        setting_w = self.rect.w
-
-        self.adjusted_sound_volumes = self.rm.sounds.volumes.copy()
-        sound_types = []
-        for type, _ in self.adjusted_sound_volumes.items():
-            sound_types.append(type)
-
-        sound_num = len(sound_types)
-        if sound_num == 0:
-            return
-
-        setting_h = self.rect.h // (sound_num * 2 - 1)
-        total_h = setting_h * sound_num + setting_h * (sound_num - 1)
-        setting_y = self.rect.y + (self.rect.h - total_h) // 2
-
-        for sound_type in sound_types:
-            setting_rect = pygame.Rect(setting_x, setting_y, setting_w, setting_h)
-            setting = AdjustSound(self.screen, setting_rect, self.rm, sound_type)
-            self.sound_settings.append(setting)
-            setting_y += setting_h * 2
-        return
-
-        setting_x = self.rect.x
         setting_y = self.rect.y
         setting_w = self.rect.w
         setting_h = int(self.rect.h*0.2)

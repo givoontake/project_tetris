@@ -19,15 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ActiveRoomManager.cpp" />
-    <ClCompile Include="ActiveUserManager.cpp" />
     <ClCompile Include="Database.cpp" />
-    <ClCompile Include="DBResultHandler.cpp" />
     <ClCompile Include="IOCPServer.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MultiRoom.cpp" />
     <ClCompile Include="PacketHandler.cpp" />
-    <ClCompile Include="RankingManager.cpp" />
     <ClCompile Include="RoomPacketHandler.cpp" />
     <ClCompile Include="RoomSession.cpp" />
     <ClCompile Include="Session.cpp" />
@@ -37,13 +33,10 @@
     <ClCompile Include="TetrisTickData.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ActiveRoomManager.h" />
-    <ClInclude Include="ActiveUserManager.h" />
     <ClInclude Include="Atomic.h" />
     <ClInclude Include="Database.h" />
-    <ClInclude Include="DBResultHandler.h" />
     <ClInclude Include="DBResult.h" />
-    <ClInclude Include="define_packets.h" />
+    <ClInclude Include="define.h" />
     <ClInclude Include="enum_class.h" />
     <ClInclude Include="error_code.h" />
     <ClInclude Include="info_code.h" />
@@ -57,15 +50,13 @@
     <ClInclude Include="IOCPServer.h" />
     <ClInclude Include="MQueue.h" />
     <ClInclude Include="PacketHandler.h" />
-    <ClInclude Include="packet_types.h" />
-    <ClInclude Include="RankingManager.h" />
+    <ClInclude Include="packet_type.h" />
     <ClInclude Include="RoomPacketHandler.h" />
     <ClInclude Include="RoomSession.h" />
     <ClInclude Include="Session.h" />
     <ClInclude Include="Tetris.h" />
     <ClInclude Include="TetrisRoom.h" />
     <ClInclude Include="TetrisTickData.h" />
-    <ClInclude Include="Types.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

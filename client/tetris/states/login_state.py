@@ -21,7 +21,7 @@ from tetris.ui.label_frame import LabelFrame
 class LoginState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, net_worker: NetworkWorker, session: Session):
         super().__init__(screen, rm, net_worker, session)
-        self.background_image = self.rm.images.ui_images[UI_MAIN_BACKGROUND]
+        self.background_image = self.rm.images.ui_images[UI_SHUTTER]
         self.id_label: Optional[LabelFrame] = None
         self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
@@ -38,18 +38,18 @@ class LoginState(BaseState):
     def set_layout(self):
         sw, sh = self.screen.get_size()
 
-        ADJUST_SCALE_X = 1.0
-        ADJUST_SCALE_Y = 1.0
+        ADJUST_SCALE_X = 0.85
+        ADJUST_SCALE_Y = 0.7
         
-        label_w, label_h = 400, 50
-        label_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_TEXT_HOLDER], label_w, label_h)
+        label_w, label_h = 400, 100
+        label_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_LOGIN_LABEL_FRAME], label_w, label_h)
         button_w, button_h = 200, 100
-        button_gap = 50
+        button_image = self.rm.images.scale_image(self.rm.images.ui_images[UI_LOGIN_BUTTON], button_w, button_h)
         adjust_x = (1-ADJUST_SCALE_X)*label_w
         adjust_y = (1-ADJUST_SCALE_Y)*label_h
         input_box_w, input_box_h = label_w - adjust_x*2, label_h - adjust_y*2
 
-        total_h = label_h * 2 + 10 + button_gap + button_h
+        total_h = label_h * 2 + (button_h // 2) + button_h
 
         group_top = (sh - total_h) // 2
         label_left = (sw - label_w) // 2
@@ -59,23 +59,15 @@ class LoginState(BaseState):
         id_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
         self.id_label = LabelFrame(self.screen, label_image, id_input_box_rect, id_label_rect, self.rm, "아이디", MAX_INPUT, False, False)
 
-        self.id_label.input_box.text_h = 30
-        self.id_label.input_box.padding = 15
-        self.id_label.input_box.font = self.rm.fonts.get_font(30)
-        draw_y += label_h + 10
+        draw_y += label_h
         pw_label_rect = pygame.Rect(draw_x, draw_y, label_w, label_h)
         pw_input_box_rect = pygame.Rect(draw_x + adjust_x, draw_y + adjust_y, input_box_w, input_box_h)
         self.pw_label = LabelFrame(self.screen, label_image, pw_input_box_rect, pw_label_rect, self.rm, "비밀번호", MAX_INPUT, True, False)
 
-        self.pw_label.input_box.text_h = 30
-        self.pw_label.input_box.padding = 15
-        self.pw_label.input_box.font = self.rm.fonts.get_font(30)
         draw_x += (label_w - button_w) // 2
-        draw_y += label_h + button_gap
+        draw_y += label_h + (button_h // 2)
         btn_rect = pygame.Rect(draw_x, draw_y, button_w, button_h)
-        self.btn_login = Button(self.screen, btn_rect, self.rm, "로그인", 0)
-
-        self.btn_login.set_text_size(30)
+        self.btn_login = Button(self.screen, btn_rect, self.rm, button_image, "로그인")
 
     def handle_packet(self, data: Optional[RecvPacketStruct]):
         if data:
@@ -95,7 +87,7 @@ class LoginState(BaseState):
                 self.session.lose = login_data.lose_count
                 self.session.max_score = login_data.max_score
 
-                self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session))
+                return LobbyState(self.screen, self.rm, self.net_worker, self.session, is_animation=True)
             
             return self
         
@@ -145,8 +137,7 @@ class LoginState(BaseState):
 
         self.id_label.update(dt_ms)
         self.pw_label.update(dt_ms)
-        self.update_fade(dt_ms)
-        return self.consume_state()
+        return self
 
     def draw(self):
         background_rect = pygame.Rect(0,0,BASE_SCREEN_WIDTH, BASE_SCREEN_HEIGHT)

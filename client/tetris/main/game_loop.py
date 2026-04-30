@@ -55,30 +55,25 @@ class GameLoop:
         q = self.net_worker._pm.queue
 
         while not q.empty():
-            if self.state.next_state is not None:
-                break
             try:
                 data = q.get_nowait()
             except queue.Empty:
                 data = None
 
-            self.state.handle_packet(data)
+            next_state = self.state.handle_packet(data)            
+            if next_state is not self.state:
+                self.state = next_state
 
             if data is None:
                 break
 
     def update(self, dt_ms, events):
-        state_events = [] if self.state.is_input_blocked() else events
-        next_state = self.state.update(dt_ms, state_events)
-        if next_state is not None and next_state is not self.state:
-            self.state = next_state
-            self.state.start_fade_in()
+        self.state.update(dt_ms, events) 
         # if hasattr(self.state, "init"):
         #     self.state.init()
 
     def draw(self):
         self.state.draw()
-        self.state.draw_fade()
         pygame.display.flip()
 
     def run(self):

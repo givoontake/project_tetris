@@ -79,21 +79,13 @@ void Database::init(HANDLE iocp)
     iocp_handle = iocp;
 }
 
-bool Database::Enqueue(Task db_task, const SP<Session>& session)
+void Database::Enqueue(Task db_task)
 {
-    if (session && !session->TryAddPending()) return false;
-    try {
     {
         std::lock_guard<std::mutex> lock(mutex);
         pending_db_tasks.push(std::move(db_task));
     }
-    }
-    catch (...) {
-        if (session) session->ReducePending();
-        return false;
-    }
     cv.notify_one();
-    return true;
 }
 
 bool Database::LoadDBConfigFromFile(const std::string& file_path)
@@ -158,7 +150,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = key;
+    db_over->ex_over.request_id = key.id;
     db_over->type = DBOperationType::LOGIN;
     db_over->ok = false; // 기본 실패로 두고, 성공 조건에서만 true
 
@@ -180,7 +172,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
             if (!stmt)
             {
                 db_over->ok = false;
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -254,7 +246,7 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
                 if (info_rs && info_rs->next()) // 가져온 결과(행)이 있는지 판별
                 {
                     p->login_id = login_id;
-					p->id = info_rs->getInt(1);
+					p->db_pk = info_rs->getInt(1);
                     p->nickname = info_rs->getString(2);
                     p->max_score = info_rs->getInt(3);
                     p->win_count = info_rs->getInt(4);
@@ -279,70 +271,16 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
         }
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteLoadRanking()
+void Database::ExecuteUpdateScore(SessionKey key, const int db_PK, int new_score)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->type = DBOperationType::LOAD_RANKING;
-    db_over->ok = false;
-
-    try
-    {
-        auto* stmt = caches.GetStmt(DBOperationType::LOAD_RANKING);
-        if (!stmt)
-        {
-            const char* SQL_LOAD_RANKING =
-                "SELECT user_id, nickname, single_score "
-                "FROM users "
-                "WHERE single_score > 0 "
-                "ORDER BY single_score DESC, user_id ASC "
-                "LIMIT 10";
-
-            caches.stmt_cache[DBOperationType::LOAD_RANKING]
-                .reset(caches.conn->prepareStatement(SQL_LOAD_RANKING));
-
-            stmt = caches.GetStmt(DBOperationType::LOAD_RANKING);
-            if (!stmt)
-            {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
-                return;
-            }
-        }
-
-        std::unique_ptr<sql::ResultSet> rs(stmt->executeQuery());
-        db_over->result_data = std::make_unique<DBResultLoadRanking>();
-        DBResultLoadRanking* res = static_cast<DBResultLoadRanking*>(db_over->result_data.get());
-
-        while (rs && rs->next()) {
-            RankingInfo info;
-            info.id = rs->getInt(1);
-            info.nickname = rs->getString(2);
-            info.score = rs->getInt(3);
-            res->rankings.emplace_back(std::move(info));
-        }
-
-        db_over->ok = true;
-    }
-    catch (const sql::SQLException& e)
-    {
-        PrintErrorLog(__func__, e);
-        db_over->ok = false;
-    }
-
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_INIT_SERVER_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
-}
-
-void Database::ExecuteUpdateScore(SessionKey key, int new_score)
-{
-    auto* db_over = new DBOverlapped{};
-    db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = key;
+    db_over->ex_over.request_id = key.id;
     db_over->type = DBOperationType::UPDATE_SCORE;
     db_over->ok = false;
-    int user_id = key.id;
 
     try
     {
@@ -356,15 +294,15 @@ void Database::ExecuteUpdateScore(SessionKey key, int new_score)
             stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over)); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
                 return;
             }
         }
 
         // 바인딩
         stmt->setInt(1, new_score);
-        stmt->setInt(2, user_id);
-        //std::cout << "ExecuteUpdateScore() user_id: " << user_id << std::endl;
+        stmt->setInt(2, db_PK);
+        //std::cout << "ExecuteUpdateScore() login_id: " << db_PK << std::endl;
 
         // 실행
         const int affected = stmt->executeUpdate();
@@ -388,17 +326,16 @@ void Database::ExecuteUpdateScore(SessionKey key, int new_score)
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteUpdateMatchResult(SessionKey key, bool is_winner)
+void Database::ExecuteUpdateMatchResult(SessionKey key, const int db_PK, bool is_winner)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = key;
+    db_over->ex_over.request_id = key.id;
     db_over->type = DBOperationType::UPDATE_MATCH_RESULT;
     db_over->ok = false;
-    int user_id = key.id;
 
     try
     {
@@ -417,7 +354,7 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, bool is_winner)
             stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
@@ -427,7 +364,7 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, bool is_winner)
 
         stmt->setInt(1, win_delta);
         stmt->setInt(2, lose_delta);
-        stmt->setInt(3, user_id);
+        stmt->setInt(3, db_PK);
 
         const int affected = stmt->executeUpdate();
 
@@ -448,15 +385,14 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, bool is_winner)
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int requester_id)
+void Database::ExecuteAddFriend(const int requester_pk, const FriendInfo& accepter_info)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = key;
-    //db_over->ex_over.request_gen; // 사실 여기서는 의미가 없음. 적용된 두 클라에게 모두 보내야해서 두 클라의 키값이 모두 필요
+    //db_over->ex_over.request_id; // 사실 여기서는 의미가 없음. 적용된 두 클라에게 모두 보내야해서 두 클라의 키값이 모두 필요
     db_over->type = DBOperationType::ADD_FRIEND;
     db_over->ok = false;
 
@@ -475,10 +411,10 @@ void Database::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int re
             if (!af_stmt) goto POST_RESULT;
         }
 
-        af_stmt->setInt(1, accepter_info.id);
-        af_stmt->setInt(2, requester_id);
-        af_stmt->setInt(3, requester_id);
-        af_stmt->setInt(4, accepter_info.id);
+        af_stmt->setInt(1, accepter_info.db_pk);
+        af_stmt->setInt(2, requester_pk);
+        af_stmt->setInt(3, requester_pk);
+        af_stmt->setInt(4, accepter_info.db_pk);
 
         const int af_affected = af_stmt->executeUpdate(); // INSERT, UPDATE, DELETE -> 영향을 받은 행의 수를 반환
 
@@ -495,8 +431,8 @@ void Database::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int re
 				if (!dfr_stmt) goto POST_RESULT;
             }
             
-            dfr_stmt->setInt(1, requester_id);
-            dfr_stmt->setInt(2, accepter_info.id);
+            dfr_stmt->setInt(1, requester_pk);
+            dfr_stmt->setInt(2, accepter_info.db_pk);
 
             int dfr_affected = dfr_stmt->executeUpdate();
             if (dfr_affected > 0) {
@@ -511,7 +447,7 @@ void Database::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int re
                     if (!gri_stmt) goto POST_RESULT;
                 }
 
-                gri_stmt->setInt(1, requester_id);
+                gri_stmt->setInt(1, requester_pk);
                 std::unique_ptr<sql::ResultSet> rs(gri_stmt->executeQuery());
 
                 if (rs && rs->next()) {
@@ -519,7 +455,7 @@ void Database::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int re
                     db_over->result_data = std::make_unique<DBResultAddFriend>();
                     DBResultAddFriend* p = static_cast<DBResultAddFriend*>(db_over->result_data.get());
                     p->requester_info.nickname = rs->getString(1);
-                    p->requester_info.id = requester_id;
+                    p->requester_info.db_pk = requester_pk;
                     p->accepter_info = accepter_info;
                     caches.conn->commit();
                 }
@@ -537,18 +473,16 @@ POST_RESULT:
 	if (!db_over->ok) caches.conn->rollback();
 
     caches.conn->setAutoCommit(true);
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteDeleteFriend(SessionKey key, int target_id)
+void Database::ExecuteDeleteFriend(const int requester_pk, const int target_pk)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = key;
-    //db_over->ex_over.request_gen = key.gen;
+    //db_over->ex_over.request_id = key.id;
     db_over->type = DBOperationType::DELETE_FRIEND;
     db_over->ok = false;
-    int requester_id = key.id;
 
     try
     {
@@ -564,15 +498,15 @@ void Database::ExecuteDeleteFriend(SessionKey key, int target_id)
             df_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND);
             if (!df_stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
 
-        df_stmt->setInt(1, requester_id);
-        df_stmt->setInt(2, target_id);
-        df_stmt->setInt(3, target_id);
-        df_stmt->setInt(4, requester_id);
+        df_stmt->setInt(1, requester_pk);
+        df_stmt->setInt(2, target_pk);
+        df_stmt->setInt(3, target_pk);
+        df_stmt->setInt(4, requester_pk);
 
         const int affected = df_stmt->executeUpdate(); // INSERT, UPDATE, DELETE -> 영향을 받은 행의 수를 반환
 
@@ -581,8 +515,8 @@ void Database::ExecuteDeleteFriend(SessionKey key, int target_id)
             db_over->ok = true;
             db_over->result_data = std::make_unique<DBResultDeleteFriend>();
             DBResultDeleteFriend* p = static_cast<DBResultDeleteFriend*>(db_over->result_data.get()); 
-            p->requester_id = requester_id;
-			p->target_id = target_id;
+            p->requester_pk = requester_pk;
+			p->target_pk = target_pk;
         }
     }
     catch (const sql::SQLException& e)
@@ -591,17 +525,16 @@ void Database::ExecuteDeleteFriend(SessionKey key, int target_id)
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteLoadFriendList(SessionKey key)
+void Database::ExecuteLoadFriendList(SessionKey key, const int db_PK) 
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = key;
+    db_over->ex_over.request_id = key.id;
     db_over->type = DBOperationType::LOAD_FRIEND_LIST;
     db_over->ok = false;
-    int user_id = key.id;
 
     try
     {
@@ -612,7 +545,7 @@ void Database::ExecuteLoadFriendList(SessionKey key)
             // FROM: 테이블 선택(단일 뿐만 아니라 조인된 테이블도 당연히 가능)
             // WHERE: 테이블에서 조건에 맞는 행 선택
             const char* SQL_GET_FRIEND_LIST = // 쿼리 안에서 몇 개를 요청하던 1번의 요청 결과는 원자적
-                "SELECT user_id, nickname " // 헷갈리지만, 직접 해보면 맞다. 친구 목록 뒤에 친구에 대한 부가 정보를 붙이고(친구 닉네임 알려고), 그 중 내 친구들만 골라서 그 중 user_id, nickname을 받는다.
+                "SELECT user_id, nickname " // 헷갈리지만, 직접 해보면 맞다. 친구 목록 뒤에 친구에 대한 부가 정보를 붙이고(친구 닉네임 알려고), 그 중 내 친구들만 골라서 그 중 user_id(db_PK), nickname을 받는다.
 				"FROM friends JOIN users " 
                 "ON friends.friend_id = users.user_id "
 			    "WHERE my_id = ?";
@@ -622,12 +555,12 @@ void Database::ExecuteLoadFriendList(SessionKey key)
             stmt = caches.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
                 return;
             }
         }
 
-        stmt->setInt(1, user_id);
+        stmt->setInt(1, db_PK);
 
         std::unique_ptr<sql::ResultSet> rs(stmt->executeQuery());
 
@@ -637,7 +570,7 @@ void Database::ExecuteLoadFriendList(SessionKey key)
             DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
             while (rs->next()) { // rs->next()는 다음 결과로 이동하며, 결과가 있는지 여부를 반환한다.
                 FriendInfo info;
-				info.id = rs->getInt(1);
+				info.db_pk = rs->getInt(1);
                 info.nickname = rs->getString(2);
 				res->friend_list.emplace_back(info);
             }
@@ -649,14 +582,13 @@ void Database::ExecuteLoadFriendList(SessionKey key)
         db_over->ok = false;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), key.index, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_info, int recver_id)
+void Database::ExecuteAddFriendRequest(const FriendInfo& requester_info, const int recver_pk)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = key;
     db_over->type = DBOperationType::ADD_FRIEND_REQUEST;
     db_over->ok = false;
 
@@ -673,8 +605,8 @@ void Database::ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_info
             afr_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND_REQUEST);
 			if (!afr_stmt) goto POST_RESULT;
         }
-        afr_stmt->setInt(1, requester_info.id);
-        afr_stmt->setInt(2, recver_id);
+        afr_stmt->setInt(1, requester_info.db_pk);
+        afr_stmt->setInt(2, recver_pk);
         const int afr_affected = afr_stmt->executeUpdate();
         
         if (afr_affected >= 1)
@@ -690,12 +622,12 @@ void Database::ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_info
 				if (!gri_stmt) goto POST_RESULT;
             }
 
-			gri_stmt->setInt(1, recver_id);
+			gri_stmt->setInt(1, recver_pk);
             std::unique_ptr<sql::ResultSet> gri_rs(gri_stmt->executeQuery());
 
             if (gri_rs && gri_rs->next()) {
                 FriendInfo recver_info;
-                recver_info.id = recver_id;
+                recver_info.db_pk = recver_pk;
                 recver_info.nickname = gri_rs->getString(1);
 
                 db_over->ok = true;
@@ -715,7 +647,7 @@ POST_RESULT:
     if (!db_over->ok) caches.conn->rollback();
 	caches.conn->setAutoCommit(true);
 
-	PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+	PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), -1, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 // ---- DB 스레드 루프 ----

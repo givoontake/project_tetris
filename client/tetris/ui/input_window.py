@@ -1,7 +1,6 @@
 import pygame
 
 from tetris.net.packet_structs import MAX_ROOM_PASSWORD
-from tetris.resources.define import *
 from tetris.ui.popupbox import PopupBox
 from tetris.ui.inputbox import InputBox
 from tetris.resources.resource_manager import ResourceManager
@@ -9,25 +8,10 @@ from tetris.resources.fonts import *
 from tetris.ui.rectangle import Rectangle
 
 class InputWindow:
-    WINDOW_WIDTH = 500
-    WINDOW_HEIGHT = 500
-    BUTTON_WIDTH = 120
-    BUTTON_HEIGHT = 60
-
     def __init__(self, screen: pygame.Surface, rm: ResourceManager, buttons_text: list[str]):
         self.screen = screen
         self.rm = rm
-        self.window = PopupBox(
-            screen,
-            rm,
-            "",
-            buttons_text,
-            self.WINDOW_WIDTH,
-            self.WINDOW_HEIGHT,
-            UI_WINDOW_BACKGROUND,
-            self.BUTTON_WIDTH,
-            self.BUTTON_HEIGHT,
-        )
+        self.window = PopupBox(screen, rm, "", buttons_text)
 
         self.set_layout()
 

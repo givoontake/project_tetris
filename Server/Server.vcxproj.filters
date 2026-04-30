@@ -59,7 +59,7 @@
     <ClInclude Include="IOCPServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="define_packets.h">
+    <ClInclude Include="define.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="Session.h">
@@ -86,7 +86,7 @@
     <ClInclude Include="TetrisRoom.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="packet_types.h">
+    <ClInclude Include="packet_type.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="RoomPacketHandler.h">
@@ -126,9 +126,6 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="info_code.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Types.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

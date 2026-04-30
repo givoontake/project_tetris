@@ -10,8 +10,7 @@ from tetris.net.network import NetworkWorker
 from tetris.net.packet_structs import *
 from tetris.net.error_types import *
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.fonts import Fonts, DEFAULT_FONT_SIZE
-from tetris.resources.define import *
+from tetris.resources.fonts import Fonts
 
 from tetris.ui.button import Button
 from tetris.ui.popupbox import PopupBox
@@ -77,8 +76,7 @@ class MultiPlayState(BaseState):
         draw_x, draw_y = 0, 0
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
-        self.title_box = Rectangle(self.screen, title_rect, self.rm, False, None, title)
-        self.title_box.set_text_size(20)
+        self.title_box = Rectangle(self.screen, title_rect, self.rm, None, title)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -86,8 +84,7 @@ class MultiPlayState(BaseState):
             pw_val = "비밀번호: 없음"
         else:
             pw_val = f"비밀번호: {self.password}"
-        self.password_box = Rectangle(self.screen, password_rect, self.rm, False, None, pw_val)
-        self.password_box.set_text_size(20)
+        self.password_box = Rectangle(self.screen, password_rect, self.rm, None, pw_val)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -95,32 +92,7 @@ class MultiPlayState(BaseState):
         draw_w = MENU_WIDTH
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.btn_exit = Button(self.screen, exit_rect, self.rm, "나가기", 0)
-
-        self.btn_exit.set_images(
-            self.rm.images.ui_images[UI_BUTTON_RED],
-            self.rm.images.ui_images[UI_BUTTON_BLUE],
-            self.rm.images.ui_images[UI_BUTTON_ORANGE],
-        )
-
-    def set_layout_5player(self):
-        self.set_layout_2player()
-        right_rect = self.players.pop().rect.copy()
-
-        sub_w = right_rect.w // 2
-        sub_h = right_rect.h // 2
-
-        for row in range(2):
-            for col in range(2):
-                sub_rect = pygame.Rect(
-                    right_rect.x + (sub_w * col),
-                    right_rect.y + (sub_h * row),
-                    sub_w,
-                    sub_h,
-                )
-                tetris_player = TetrisSession(self.screen, sub_rect, self.rm, self.net_worker, False)
-                tetris_player.set_multiplayer_text_size(DEFAULT_FONT_SIZE // 2)
-                self.players.append(tetris_player)
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
 
     def reset_room(self):
         pygame.mixer.music.stop()
@@ -130,16 +102,10 @@ class MultiPlayState(BaseState):
 
     def add_user(self, session: Session):
         for player in self.players:
-            if player.session == None: continue
-            if player.session.id == session.id:
-                return
-
-        for player in self.players:
             if player.session == None:
                 player.init_session(session)
-                if self.host_index != -1 and self.players[self.host_index].session and self.players[self.host_index].session.is_self:
+                if self.players[self.host_index].session.is_self:
                     player.make_btn_kick()
-                break
 
     def find_host_index(self) -> int:
         for i in range(len(self.players)):
@@ -229,7 +195,7 @@ class MultiPlayState(BaseState):
                 if delete_user.id == player.session.id:
                     if player.session.is_self:     
                         pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 음악나오면 안되니까
-                        self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session))
+                        return LobbyState(self.screen, self.rm, self.net_worker, self.session)
                     else:
                         player.clear()
                         player.nickname.set_text("")
@@ -267,7 +233,7 @@ class MultiPlayState(BaseState):
                     player.session.lose = match_data.lose_count
                     break
 
-        elif isinstance(data, IngamePacket):
+        else:
             ingame_data = cast(IngamePacket, data)
             id = ingame_data.id
             for player in self.players:
@@ -299,12 +265,10 @@ class MultiPlayState(BaseState):
         for player in self.players:
             player.update(dt_ms)
 
-        self.update_fade(dt_ms)
-
-        return self.consume_state()
+        return self
 
     def draw(self):
-        self.screen.blit(self.rm.images.ui_images[UI_INGAME_BACKGROUND], (0, 0))
+        self.screen.fill((0, 0, 0))
 
         # 상단 방 제목/비밀번호
         self.draw_room_header()

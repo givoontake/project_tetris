@@ -209,9 +209,7 @@ class ScrollWindowBase(ABC):
         self.set_scroll_info()
 
     def draw(self):
-        bg_surface = pygame.Surface((self.bg_scroll_rect.w, self.bg_scroll_rect.h), pygame.SRCALPHA)
-        bg_surface.fill((0, 0, 0, 192))
-        self.screen.blit(bg_surface, self.bg_scroll_rect.topleft)
+        pygame.draw.rect(self.screen, GRAY, self.bg_scroll_rect)
         if self.can_drag:
             pygame.draw.rect(self.screen, ORANGE, self.scroll_rect)
         else:

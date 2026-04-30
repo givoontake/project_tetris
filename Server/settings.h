@@ -5,7 +5,7 @@ constexpr int MAX_TICK_WORKERS = 4;
 
 constexpr int CLEAR_LINE_SCORE = 10;
 
-constexpr int BUF_SIZE = 2048;
+constexpr int BUF_SIZE = 1024;
 constexpr int MAX_MESSAGE_SIZE = 512;
 constexpr int PORT_NUM = 12345;
 

@@ -38,9 +38,10 @@ void TickWorkerThread(int num)
         lock.unlock();
 
         for (int i = thread_num; i < MAX_ROOM; i += MAX_TICK_WORKERS) {
-            auto room = iocp_server.GetRoom(i);
-            if (room) {
-                room->ProcessPlayTasks();
+            
+            if (iocp_server.GetRoom(i) && (iocp_server.GetRoom(i)->GetRoomState() == ROOM_STATE::PLAY)) { // 널이 아니고 플레이 중이면
+                iocp_server.GetRoom(i)->ProcessPlayTasks();
+                iocp_server.GetRoom(i)->UpdateTick();
             }
         }
 
@@ -96,7 +97,6 @@ int main()
 
     std::thread db_thread(DBThread);
     --num_threads;
-    iocp_server.RequestLoadRanking();
 
     for (int i = 0; i < num_threads; ++i)
         worker_threads.emplace_back(WorkerThread);

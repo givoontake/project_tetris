@@ -1,3 +1,2 @@
-# Keep text files checked out with CRLF line endings.
-* text=auto eol=crlf
-
+# Auto detect text files and perform LF normalization
+* text=auto

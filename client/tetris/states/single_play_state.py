@@ -11,7 +11,6 @@ from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.fonts import Fonts
-from tetris.resources.define import *
 
 from tetris.ui.button import Button
 from tetris.game.tetris_board import *
@@ -54,8 +53,7 @@ class SinglePlayState(BaseState):
         draw_x, draw_y = 0, 0
         title_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
         title = f"방 제목: {self.title}"
-        self.title_box = Rectangle(self.screen, title_rect, self.rm, False, None, title)
-        self.title_box.set_text_size(20)
+        self.title_box = Rectangle(self.screen, title_rect, self.rm, None, title)
 
         draw_x += header_w 
         password_rect = pygame.Rect(draw_x, draw_y, header_w, header_h)
@@ -63,8 +61,7 @@ class SinglePlayState(BaseState):
             pw_val = "비밀번호: 없음"
         else:
             pw_val = f"비밀번호: {self.password}"
-        self.password_box = Rectangle(self.screen, password_rect, self.rm, False, None, pw_val)
-        self.password_box.set_text_size(20)
+        self.password_box = Rectangle(self.screen, password_rect, self.rm, None, pw_val)
 
         from tetris.states.lobby_state import MENU_WIDTH, MENU_HEIGHT
         draw_x = sw - MENU_WIDTH
@@ -72,15 +69,10 @@ class SinglePlayState(BaseState):
         draw_w = MENU_WIDTH
         draw_h = MENU_HEIGHT
         exit_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        self.btn_exit = Button(self.screen, exit_rect, self.rm, "나가기", 0)
-        self.btn_exit.set_images(
-            self.rm.images.ui_images[UI_BUTTON_RED],
-            self.rm.images.ui_images[UI_BUTTON_BLUE],
-            self.rm.images.ui_images[UI_BUTTON_ORANGE],
-        )
+        self.btn_exit = Button(self.screen, exit_rect, self.rm, None, "나가기")
         giveup_rect = exit_rect.copy()
         giveup_rect.x -= MENU_WIDTH
-        self.btn_giveup = Button(self.screen, giveup_rect, self.rm, "포기", 0)
+        self.btn_giveup = Button(self.screen, giveup_rect, self.rm, None, "포기")
 
     def clear(self):
         self.tetris_session.clear()
@@ -98,7 +90,7 @@ class SinglePlayState(BaseState):
             delete_user = cast(S2C_DELETE_USER_PACKET, data)
             if delete_user.id == self.tetris_session.session.id:
                 pygame.mixer.music.stop()
-                self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session))
+                return LobbyState(self.screen, self.rm, self.net_worker, self.session)
 
         elif data.type == S2C_GAMEOVER:
             self.tetris_session.process_gameover()
@@ -108,7 +100,7 @@ class SinglePlayState(BaseState):
             update_score = cast(S2C_UPDATE_SCORE_PACKET, data)
             self.tetris_session.session.max_score = update_score.max_score
 
-        elif isinstance(data, IngamePacket):
+        else:
             self.tetris_session.handle_packet(data)
 
         # 그 외 패킷은 현재 싱글플레이에서는 사용하지 않음
@@ -128,8 +120,8 @@ class SinglePlayState(BaseState):
             packet = self.net_worker.builder.build_delete_user_pkt()
             self.net_worker.send_packet(packet)
 
-        if self.tetris_session.state == TSessionState.PLAY:
-            if self.btn_giveup.handle_event(ev):
+        if self.btn_giveup.handle_event(ev):
+            if self.tetris_session.state == TSessionState.PLAY:
                 packet = self.net_worker.builder.build_giveup_pkt()
                 self.net_worker.send_packet(packet)
 
@@ -139,21 +131,19 @@ class SinglePlayState(BaseState):
             self.handle_event(ev)
      
         self.tetris_session.update(dt_ms)
-        self.update_fade(dt_ms)
 
-        return self.consume_state()
+        return self
 
     def draw(self):
         if self.tetris_session.board is None:
             return
 
-        self.screen.blit(self.rm.images.ui_images[UI_INGAME_BACKGROUND], (0, 0))
+        self.screen.fill((0, 0, 0))
 
         # 상단 방 제목/비밀번호
         self.draw_room_header()
         self.btn_exit.draw()
-        if self.tetris_session.state == TSessionState.PLAY:
-            self.btn_giveup.draw()
+        self.btn_giveup.draw()
 
         # 보드 및 미리보기/프로필/블록
         self.tetris_session.draw()

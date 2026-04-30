@@ -22,9 +22,8 @@
 #include <jdbc/cppconn/exception.h>
 
 #include "ExOverlapped.h"
-#include "Types.h"
 #include "enum_class.h"
-#include "define_packets.h"
+#include "define.h"
 #include "DBResult.h"
 #include "Session.h"
 
@@ -71,6 +70,7 @@ private:
 
 public:
     // IOCP 완료 통지에 사용할 completion key (서버에서 이 키로 DB 완료인지 분기)
+    static constexpr ULONG_PTR DB_COMPLETION_KEY = 0xDBDBDBDB;
 
 public:
     // 생성자에서 DB 설정 파일을 읽어 멤버(db_host/db_port/...)를 초기화한다.
@@ -89,20 +89,19 @@ public:
     // ---- 외부에서 작업을 큐에 넣는 API ----
     // 외부에서 람다를 만들어 그대로 큐에 넣는다.
     // (람다 내부에서 실제 쿼리 실행 함수(ExecuteXXX)를 호출하는 방식)
-    bool Enqueue(Task job, const SP<Session>& session);
+    void Enqueue(Task job);
 
     // ---- DB 스레드에서 실행될 "실제 DB 작업" 함수들 ----
     // ⚠️ 이 함수들은 "DB 스레드에서만" 호출되어야 한다.
     // 외부는 보통 아래처럼 람다에 넣어 Enqueue 한다:
     //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
     void ExecuteLogin(SessionKey key, const std::string login_id, const std::string password);
-    void ExecuteLoadRanking();
-    void ExecuteUpdateScore(SessionKey key, int new_score);
-	void ExecuteUpdateMatchResult(SessionKey key, bool is_winner);
-    void ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int requester_id);
-	void ExecuteDeleteFriend(SessionKey key, int target_id);
-    void ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_info, int recver_id);
-	void ExecuteLoadFriendList(SessionKey key);
+    void ExecuteUpdateScore(SessionKey key, const int db_PK, int new_score);
+	void ExecuteUpdateMatchResult(SessionKey key, const int db_PK, bool is_winner);
+    void ExecuteAddFriend(const int requester_pk, const FriendInfo& accepter_info);
+	void ExecuteDeleteFriend(const int requester_pk, const int target_pk);
+    void ExecuteAddFriendRequest(const FriendInfo& requester_info, const int recver_pk);
+	void ExecuteLoadFriendList(SessionKey key, const int db_pk);
 
 private:
     // ---- 설정 파일 로드 ----
