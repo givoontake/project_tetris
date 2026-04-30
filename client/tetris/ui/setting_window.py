@@ -2,65 +2,83 @@ import pygame
 from typing import Optional
 
 from tetris.resources.resource_manager import ResourceManager
-from tetris.resources.define_colors import *
+from tetris.resources.define import *
 from tetris.ui.rectangle import Rectangle
 from tetris.ui.button import Button
+from tetris.ui.toggle_button import ToggleButton
 from tetris.ui.setting_base import SettingBase
 from tetris.ui.setting_sound import SettingSound
+
+
 class SettingWindow:
+    WINDOW_WIDTH = 500
+    WINDOW_HEIGHT = 500
+    BUTTON_WIDTH = 120
+    BUTTON_HEIGHT = 60
+    TOP_PADDING = 35
+    BOTTOM_PADDING = 35
+    SETTING_GAP = 25
+
     def __init__(self, screen: pygame.Surface, rect: pygame.Rect, rm: ResourceManager):
         self.screen = screen
         self.rect = rect
         self.rm = rm
+        self.window: Rectangle
 
         self.set_layout()
 
     def set_layout(self):
+        sw, sh = self.screen.get_size()
+        self.rect.w = self.WINDOW_WIDTH
+        self.rect.h = self.WINDOW_HEIGHT
+        self.rect.x = (sw // 2) - (self.rect.w // 2)
+        self.rect.y = (sh // 2) - (self.rect.h // 2)
+        self.window = Rectangle(self.screen, self.rect, self.rm, True, self.rm.images.ui_images[UI_WINDOW_BACKGROUND], "")
+
         self.setting_types: dict[str, SettingBase] = {}
         self.top_menu_texts = ["소리"]
-        # 바텀은 모두 동일하므로, 세팅 클래스로 텍스트를 전달하여 내부에서 구현중
-        # 여기서 구현하고 어떤 세팅이 활성화되어 있는지를 알고 여기서 적용을 때려도 상관없긴 한데..
-        # 어차피 어떤 세팅 화면을 그리고 있는지 구현하려면 상태 값이 필요하려나? 그렇다면 여기로 빼는게 자연스러워 보인다
-        # 어차피 세팅 화면이 여러개라면 모두 보유한 상태에서 창만 이동할거니까.. 상태로 관리하자
-        # 빼야겠다 그럼
-        self.buttom_menu_texts = ["적용", "취소"] 
+        self.buttom_menu_texts = ["적용", "취소"]
         self.activated_setting = self.top_menu_texts[0]
-        self.top_menus: list[Rectangle] = []
+        self.top_menus: list[ToggleButton] = []
         self.buttom_menus: list[Button] = []
-        
-        top_menu_w = self.rect.w // len(self.top_menu_texts)
-        top_menu_h = int(self.rect.h*0.2)
-        top_menu_x = self.rect.x
-        top_menu_y = self.rect.y
+
+        top_menu_w = self.BUTTON_WIDTH
+        top_menu_h = self.BUTTON_HEIGHT
+        top_padding_w = (self.rect.w - top_menu_w * len(self.top_menu_texts)) // (len(self.top_menu_texts) + 1)
+        top_menu_x = self.rect.x + top_padding_w
+        top_menu_y = self.rect.y + self.TOP_PADDING
 
         for top_menu_text in self.top_menu_texts:
             top_menu_rect = pygame.Rect(top_menu_x, top_menu_y, top_menu_w, top_menu_h)
-            top_menu = Rectangle(self.screen, top_menu_rect, self.rm, None, top_menu_text, 1)
+            top_menu = ToggleButton(self.screen, top_menu_rect, self.rm, top_menu_text, 1)
             self.top_menus.append(top_menu)
-            top_menu_x += top_menu_w
+            top_menu_x += top_menu_w + top_padding_w
 
-        buttom_menu_w = self.rect.w // len(self.buttom_menu_texts)
-        buttom_menu_h = top_menu_h
-        buttom_menu_x = self.rect.x
-        buttom_menu_y = self.rect.y + self.rect.h - top_menu_rect.h # 탑과 바텀의 메뉴 높이는 같다.
+        buttom_menu_w = self.BUTTON_WIDTH
+        buttom_menu_h = self.BUTTON_HEIGHT
+        buttom_padding_w = (self.rect.w - buttom_menu_w * len(self.buttom_menu_texts)) // (len(self.buttom_menu_texts) + 1)
+        buttom_menu_x = self.rect.x + buttom_padding_w
+        buttom_menu_y = self.rect.bottom - self.BOTTOM_PADDING - buttom_menu_h
 
         for buttom_menu_text in self.buttom_menu_texts:
             buttom_menu_rect = pygame.Rect(buttom_menu_x, buttom_menu_y, buttom_menu_w, buttom_menu_h)
-            buttom_menu = Button(self.screen, buttom_menu_rect, self.rm, None, buttom_menu_text, 1)
+            buttom_menu = Button(self.screen, buttom_menu_rect, self.rm, buttom_menu_text, 1)
             self.buttom_menus.append(buttom_menu)
-            buttom_menu_x += buttom_menu_w
+            buttom_menu_x += buttom_menu_w + buttom_padding_w
 
         setting_x = self.rect.x
-        setting_y = self.rect.y + top_menu_h
+        setting_y = top_menu_y + top_menu_h + self.SETTING_GAP
         setting_w = self.rect.w
-        setting_h = int(self.rect.h*0.6)
+        setting_h = buttom_menu_y - self.SETTING_GAP - setting_y
+        setting_w = int(setting_w * 0.8)
+        setting_h = int(setting_h * 0.8)
+        setting_x = self.rect.x + (self.rect.w - setting_w) // 2
+        setting_y = setting_y + ((buttom_menu_y - self.SETTING_GAP - setting_y) - setting_h) // 2
         setting_rect = pygame.Rect(setting_x, setting_y, setting_w, setting_h)
-        
+
         for top_menu_text in self.top_menu_texts:
             if top_menu_text == "소리":
                 self.setting_types[top_menu_text] = SettingSound(self.screen, setting_rect, self.rm)
-
-            # 나중에 설정 창 추가되면 추가로 구현
 
     def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
         for top_menu in self.top_menus:
@@ -74,26 +92,25 @@ class SettingWindow:
             if buttom_menu.handle_event(ev):
                 if buttom_menu.button.text == "적용":
                     if self.setting_types[self.activated_setting].apply_settings():
-                        event = "성공" 
+                        event = "성공"
                     else:
                         event = None
                 elif buttom_menu.button.text == "취소":
                     event = "취소"
 
         return event
-                    
+
     def draw(self):
+        self.window.draw()
+
         for top_menu in self.top_menus:
             if top_menu.text == self.activated_setting:
-                top_menu.set_background_color(GREEN)
+                top_menu.set_pressed(True)
             else:
-                top_menu.set_background_color(BLACK)
+                top_menu.set_pressed(False)
             top_menu.draw()
 
         self.setting_types[self.activated_setting].draw()
 
         for buttom_menu in self.buttom_menus:
             buttom_menu.draw()
-                
-
-            

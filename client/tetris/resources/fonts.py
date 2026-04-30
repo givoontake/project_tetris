@@ -4,15 +4,19 @@ from typing import Optional
 MIN_SIZE = 10
 MAX_SIZE = 50
 
-RECTANGLE_FONT_SIZE = 30
-POPUPBOX_FONT_SIZE = 40
+DEFAULT_FONT_SIZE = 30
+MINI_FONT_SIZE = 20
+POPUPBOX_FONT_SIZE = 35
 COMBO_FONT_SIZE = 40
 class Fonts:
     def __init__(self):
         self.fonts: dict[int, Optional[pygame.font.Font]] = {}
 
         for i in range(MIN_SIZE, MAX_SIZE + 1, 2):
-            if i == RECTANGLE_FONT_SIZE:
+            if i == DEFAULT_FONT_SIZE:
+                font = self.load_font(i)
+                self.fonts[i] = font
+            elif i == MINI_FONT_SIZE:
                 font = self.load_font(i)
                 self.fonts[i] = font
             elif i == POPUPBOX_FONT_SIZE:
@@ -34,5 +38,5 @@ class Fonts:
             return self.fonts[_font_size]
             
     def load_font(self, font_size: int) -> pygame.font.Font:
-        font = pygame.font.Font("tetris/resources/fonts/dodamdodam.ttf", font_size)
+        font = pygame.font.Font("tetris/resources/fonts/Galmuri11.ttf", font_size)
         return font

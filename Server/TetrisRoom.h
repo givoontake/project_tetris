@@ -1,10 +1,11 @@
 #pragma once
 #include <vector>
 #include <array>
+#include <string>
 #include <mutex>
 #include "RoomSession.h"
 #include "Session.h"
-#include "define.h"
+#include "define_packets.h"
 #include "MQueue.h"
 
 constexpr int ADD_TIMEOUT = 1;
@@ -46,18 +47,27 @@ struct Tasks
 };
 
 struct OpenRoomInitData {
-	int room_id = -1;
+	int room_gen = -1;
 	int room_index = -1;
 	char max_user = -1;
-	char room_name[MAX_ROOM_NAME];
+	std::string room_name;
 };
 
 struct LockRoomInitData {
-	int room_id = -1;
+	int room_gen = -1;
 	int room_index = -1;
 	char max_user = -1;
-	char room_name[MAX_ROOM_NAME];
-	char room_password[MAX_ROOM_PASSWORD];
+	std::string room_name;
+	std::string room_password;
+};
+
+struct RoomInfoSnapshot {
+	ROOM_STATE room_state = ROOM_STATE::EMPTY;
+	int room_gen = -1;
+	int max_user = 0;
+	int cur_user = 0;
+	std::string room_name;
+	bool is_private = false;
 };
 
 // 현재 룸 세션 내부에 session*를 유지중이라, 유저가 삭제되면 범위기반 스코프 접근 시 해당 참조의 세션이 널일 수 있고, 방이 삭제되어 버리면 범위 자체가 손상되어 범위기반 작업은 모두 뮤텍스로 묶어놓은 상태이다.
@@ -76,37 +86,42 @@ protected:
 	Position spawn_pos{ 3, 0 };
 
 	int room_index;
-	int room_id;
-	char room_name[MAX_ROOM_NAME];
-	char* room_password;
+	int room_gen;
+	std::string room_name;
+	std::string room_password;
 	char max_user;
 	char cur_user;
 
 	std::mutex room_mutex;
 
+	bool InitHostSession(const SP<Session>& session);
+
 public:
-	TetrisRoom(IOCPServer* server, Session* session, OpenRoomInitData data);
-	TetrisRoom(IOCPServer* server, Session* session, LockRoomInitData data);
+	TetrisRoom(IOCPServer* server, OpenRoomInitData data);
+	TetrisRoom(IOCPServer* server, LockRoomInitData data);
 	virtual ~TetrisRoom();
 
 	ROOM_STATE GetRoomState() const { return room_state.Load(); }
 	Tasks& GetTasks() { return tasks; }
 	std::mutex& GetRoomMutex() { return room_mutex; }
-	int GetRoomId() const { return room_id; }
+	int GetRoomGen() const { return room_gen; }
 	int GetRoomIndex() const { return room_index; }
-	bool GetIsPrivate() const { return room_password ? true : false; }
+	bool GetIsPrivate() const { return !room_password.empty(); }
 	int GetMaxUser() const { return static_cast<int>(max_user); }
-	int GetCurrentUser() const { return static_cast<int>(cur_user); }
-	const char* GetRoomName() const { return room_name; }
+	int GetCurrentUser() const;
+	RoomInfoSnapshot GetRoomInfoSnapshot();
+	const std::string& GetRoomName() const { return room_name; }
+	const std::string& GetRoomPassword() const { return room_password; }
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session* request_session) = 0;
+	virtual void HandlePacket(char* packet, const SP<Session>& request_session) = 0;
 	virtual void ProcessPlayTasks() = 0;
 	virtual void DeleteUser(const int id) = 0;	
-	virtual void SendCreateRoom(Session* session) = 0;
+	virtual void SendCreateRoom(const SP<Session>& session) = 0;
+	virtual bool AddHostSession(const SP<Session>& session);
 	// 공통
 	void SetRoomIndex(const int val);
-	void SetRoomId(const int val);
+	void SetRoomGen(const int val);
 	void StoreRoomState(const ROOM_STATE new_state);
 	bool TryChangeRoomState(ROOM_STATE expected, ROOM_STATE desired);
 	void InitGame();
@@ -117,9 +132,9 @@ public:
 	bool SpawnTetromino(int id);
 	void ClearRoom(); // 이제 재사용이 아니라 아예 없앨거라서 굳이 방이 비워진 상태를 관리할 필요는 없다. 나중에 없애면 될 듯
 	void UpdateTick();
-	void BoundPackets();
+	int BoundPackets();
 	//void SendAddRoom(Session* session);
-	void MakeMovePacket(RoomSession& r_session, int move_type);
+	bool MakeMovePacket(RoomSession& r_session, int move_type);
 	void AddGarbageLines();
 	void AddSpawnTask();
 	void ResetUsersTickData();

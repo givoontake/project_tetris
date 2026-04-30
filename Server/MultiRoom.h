@@ -5,32 +5,33 @@
 #include <mutex>
 #include "RoomSession.h"
 #include "Session.h"
-#include "define.h"
-#include "packet_type.h"
+#include "define_packets.h"
+#include "packet_types.h"
 #include "RoomPacketHandler.h"
 #include "IOCPServer.h"
 #include "TetrisRoom.h"
 
 class MultiRoom : public TetrisRoom
 {
-	int host_id;
+	int host_id = -1;
 	int winner_id = -1;
 public:
-	MultiRoom(IOCPServer* server, Session* session, OpenRoomInitData data);
-	MultiRoom(IOCPServer* server, Session* session, LockRoomInitData data);
+	MultiRoom(IOCPServer* server, OpenRoomInitData data);
+	MultiRoom(IOCPServer* server, LockRoomInitData data);
 	~MultiRoom();
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session* request_session) override;
+	virtual void HandlePacket(char* packet, const SP<Session>& request_session) override;
 	virtual void ProcessPlayTasks() override;
 	virtual void DeleteUser(const int id) override;
-	virtual void SendCreateRoom(Session* session) override;
+	virtual void SendCreateRoom(const SP<Session>& session) override;
+	virtual bool AddHostSession(const SP<Session>& session) override;
 
-	void StartGame(int id);
+	void StartGame(int request_user_id);
 
 	void FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
 	int FindHostIndex(int host_id); // 현재 호스트의 인덱스를 반환
-	int AddUser(Session* new_session, int request_sess_id, const char* room_password);
+	int AddUser(const SP<Session>& new_session, const std::string& room_password);
 	void ReadyUser(int id);
 	void KickUser(int id, int kick_user_id);
 	bool FindWinner();
@@ -39,5 +40,12 @@ public:
 	void UpdatePrevUsersState();
 
 	void RequestUpdateMatchResult();
+
+private:
+	void HandleDeleteUserPacket(const SP<Session>& request_session);
+	void HandleReadyPacket(const SP<Session>& request_session);
+	void HandleKickPacket(char* packet, const SP<Session>& request_session);
+	void HandleStartPacket(const SP<Session>& request_session);
+	void HandleMovePacket(char* packet, const SP<Session>& request_session);
 };
 

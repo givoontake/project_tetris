@@ -1,20 +1,30 @@
 #pragma once
 #include <WinSock2.h>
 #include <MSWSock.h>
-#include "define.h"
+#include "define_packets.h"
 #include "enum_class.h"
 #include "DBResult.h"
+
+struct SessionKey {
+	int index = -1;
+	int id = -1;
+};
+
+constexpr ULONG_PTR LISTEN_IO_COMPLETION = 1;
+constexpr ULONG_PTR SESSION_IO_COMPLETION = 2;
+constexpr ULONG_PTR ROOM_IO_COMPLETION = 3;
+constexpr ULONG_PTR DB_IO_COMPLETION = 4;
+constexpr ULONG_PTR DB_INIT_SERVER_COMPLETION = 5;
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;
 	OP_TYPE op_type;
-	int request_id = -1;
+	SessionKey key;
+	int room_index = -1;
 
 	ExOverlapped() {
 		ZeroMemory(&over, sizeof(over));
 	}
-
-	void SetRequestId(int new_id) { request_id = new_id; }
 };
 
 struct IOOverlapped {

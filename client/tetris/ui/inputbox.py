@@ -2,10 +2,12 @@ import pygame
 from typing import Optional
 
 from tetris.resources.resource_manager import ResourceManager
+from tetris.resources.define import *
 from tetris.resources.define_colors import *
 from tetris.config.define import *
 
 PLACEHOLDER = (100, 100, 100)
+
 
 class InputBox:
     def __init__(
@@ -14,15 +16,17 @@ class InputBox:
         rect: pygame.Rect,
         rm: ResourceManager,
         placeholder: str = "",
-        max_input_len: int | None = None,  # optional과 같음
+        max_input_len: int | None = None,  # optional怨?媛숈쓬
         is_password: bool = False,
-        allow_korean: bool = True,   # ✅ 한글 허용 여부
+        allow_korean: bool = True,   # ???쒓? ?덉슜 ?щ?
+        use_holder: bool = True,
+        holder_key: int = UI_TEXT_HOLDER,
     ):
         self.screen = screen
         self.rect = rect
         self.rm = rm
         self.placeholder = placeholder
-        self.text_h = int(rect.h*0.8)
+        self.text_h = int(rect.h * 0.7)
         self.text = ""
         self.editing_text = ""
         self.active = False
@@ -32,13 +36,15 @@ class InputBox:
         self.padding = int(self.text_h / 2)
         self.color = GRAY
         self.font = self.rm.fonts.get_font(self.text_h)
+        self.use_holder = use_holder
+        self.holder_image = self.rm.images.ui_images[holder_key] if use_holder else None
 
-        # 커서 점멸
+        # 而ㅼ꽌 ?먮㈇
         self.cursor_visible = True
         self.cursor_timer_ms = 0
         self.cursor_blink_ms = 500
 
-        # 키 입력은 윈도우 입력기를 통해 처리하지만 완성된 글자만 반환하므로 지우기는 따로 처리해야함
+        # ???낅젰? ?덈룄???낅젰湲곕? ?듯빐 泥섎━?섏?留??꾩꽦??湲?먮쭔 諛섑솚?섎?濡?吏?곌린???곕줈 泥섎━?댁빞??
         self.backspace_pressed = False
         #self.backspace_repeat_active = False
         self.backspace_repeat_timer = 0
@@ -69,20 +75,20 @@ class InputBox:
     def add_char(self, ch: str):
         if not self.active:
             return
-        # 빈 문자, 제어문자 필터링
+        # 鍮?臾몄옄, ?쒖뼱臾몄옄 ?꾪꽣留?
         if not ch or not ch.isprintable():
             return
-        # 한글 비허용이면 ASCII만 받음
+        # ?쒓? 鍮꾪뿀?⑹씠硫?ASCII留?諛쏆쓬
         if not self.allow_korean and not ch.isascii():
             return
-        # 길이 초과 방지
+        # 湲몄씠 珥덇낵 諛⑹?
         if self.max_input_len is not None and len(self.text) >= self.max_input_len:
             return
         
         if not ch.isascii():
             self.backspace_repeat_time1_active = False
             self.backspace_repeat_time2_active = True
-        # 통과했으면 추가
+        # ?듦낵?덉쑝硫?異붽?
         self.text += ch
 
     def delete_char(self):
@@ -103,7 +109,7 @@ class InputBox:
             total_text = self.text
         
         # if self.is_password:
-        #     total_text = "●" * len(total_text)
+        #     total_text = "*" * len(total_text)
 
         return total_text
 
@@ -117,11 +123,11 @@ class InputBox:
             render_text = self.text
             text_px_len = self.get_text_width(self.text)
 
-        box_px_len = self.rect.w - self.padding * 2# 좌우 기본 패딩
+        box_px_len = self.rect.w - self.padding * 2# 醫뚯슦 湲곕낯 ?⑤뵫
         offset = 0
         
         if self.is_password:
-            render_text = "●" * (len(self.text) + len(self.editing_text))
+            render_text = "*" * (len(self.text) + len(self.editing_text))
                                       
         while True:            
             if text_px_len <= box_px_len:
@@ -137,7 +143,7 @@ class InputBox:
 
 
     def handle_event(self, ev: pygame.event.Event) -> Optional[str]:
-        # 마우스 클릭으로 포커스 on/off
+        # 留덉슦???대┃?쇰줈 ?ъ빱??on/off
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             self.active = self.rect.collidepoint(ev.pos)
             if self.active:
@@ -145,19 +151,19 @@ class InputBox:
             else:
                 self.color = GRAY
 
-        # ===== 한글/영문 조합 중 문자열 (프리뷰) =====
+        # ===== ?쒓?/?곷Ц 議고빀 以?臾몄옄??(?꾨━酉? =====
         elif ev.type == pygame.TEXTEDITING:
-            # 한글 허용인 필드만 조합 상태 표시
+            # ?쒓? ?덉슜???꾨뱶留?議고빀 ?곹깭 ?쒖떆
             if self.active and self.allow_korean:
                 self.editing_text = ev.text
 
-        # ===== 최종 확정된 문자 입력 =====
+        # ===== 理쒖쥌 ?뺤젙??臾몄옄 ?낅젰 =====
         elif ev.type == pygame.TEXTINPUT:
             self.add_char(ev.text)
  
-        # ===== 제어키 처리 (백스페이스 + 엔터) =====
+        # ===== ?쒖뼱??泥섎━ (諛깆뒪?섏씠??+ ?뷀꽣) =====
         elif ev.type == pygame.KEYDOWN:
-            if ev.key == pygame.K_BACKSPACE:  # TEXTINPUT으로는 문자 아니면 처리 안됨, 따로 처리 필요
+            if ev.key == pygame.K_BACKSPACE:  # TEXTINPUT?쇰줈??臾몄옄 ?꾨땲硫?泥섎━ ?덈맖, ?곕줈 泥섎━ ?꾩슂
                 self.delete_char()
                 self.backspace_pressed = True
 
@@ -172,7 +178,7 @@ class InputBox:
         return None
 
     def update(self, dt_ms: int):
-        # 커서 점멸만 유지
+        # 而ㅼ꽌 ?먮㈇留??좎?
         if self.active:
             self.cursor_timer_ms += dt_ms
             if self.cursor_timer_ms >= self.cursor_blink_ms:
@@ -202,6 +208,10 @@ class InputBox:
 
 
     def draw(self):
+        if self.holder_image is not None:
+            holder_image = self.rm.images.scale_image(self.holder_image, self.rect.w, self.rect.h)
+            self.screen.blit(holder_image, self.rect)
+
         show_text = self.get_render_text()
         if not show_text and not self.active:
             txt = self.font.render(self.placeholder, True, PLACEHOLDER)
@@ -213,7 +223,7 @@ class InputBox:
         text_pos = (text_x, text_y)
         self.screen.blit(txt, text_pos)
 
-        # 커서
+        # 而ㅼ꽌
         if self.active and self.cursor_visible:
             cursor_x = text_x + txt.get_width()
             cursor_y = text_y
