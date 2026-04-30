@@ -1,13 +1,14 @@
 #pragma once
 #include <string>
-#include <array>
+#include <memory>
+#include "Types.h"
 #include "Tetris.h"
-#include "define.h"
+#include "define_packets.h"
 #include "Session.h"
 
 class RoomSession
 {
-	Session* session = nullptr; // 상속으로 하면 세션을 받아올 수가 없음
+	WP<Session> session; 
 	Tetris tetris;
 	char send_buf[BUF_SIZE];
 	int send_data_size = 0;
@@ -25,7 +26,7 @@ public:
 	RoomSession();
 	~RoomSession();
 
-	Session* GetSession() const { return session; }
+	SP<Session> GetSession() const { return session.lock(); }
 	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.Load(); }
 	ROOM_USER_STATE GetPrevRoomUserState() const { return prev_r_user_state.Load(); }
 	Tetris& GetTetris() { return tetris; }
@@ -42,10 +43,10 @@ public:
 	void ResetCombo() { combo = 0; }
 	void AddCombo() { ++combo; }
 
-	void InitRoomSession(Session* s);
+	bool InitRoomSession(const SP<Session>& s, int room_index);
 	void ClearRoomSession();
 	void ClearData();
-	void AddToSendBuffer(const char* data, int data_size);
+	bool AddToSendBuffer(const char* data, int data_size);
 	//void SendTickData(HANDLE iocp_handle);
 	void ClearSendBuf();
 };

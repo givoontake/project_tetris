@@ -4,13 +4,18 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include "Types.h"
 #include "ExOverlapped.h"
+#include "ActiveRoomManager.h"
+#include "ActiveUserManager.h"
 #include "Session.h"
 #include "PacketHandler.h"
+#include "DBResultHandler.h"
 #include "MQueue.h"
 #include "TetrisRoom.h"
 #include "Atomic.h"
 #include "Database.h"
+#include "RankingManager.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -22,66 +27,64 @@ class IOCPServer
 	SOCKADDR_IN server_addr;
 	IOOverlapped accept_over;
 	Database db;
-	std::atomic<int> user_id_generator = -1;
-	std::atomic<int> room_id_generator = -1;
+	RankingManager ranking_manager;
+	ActiveRoomManager active_rooms;
+	ActiveUserManager active_users;
+	PacketHandler packet_handler;
+	DBResultHandler db_result_handler;
+	std::atomic<int> room_gen_generator = -1;
 	std::atomic<long long> tick_count = 0;
-	std::array<Session*, MAX_USER> users;
+	std::array<std::atomic<SP<Session>>, MAX_USER> users;
 	
-	std::array<std::atomic<std::shared_ptr<TetrisRoom>>, MAX_ROOM> rooms;
-	
-	// 변수-> 컨테이너 생성 시 객체 생성자에 인자 넣는게 안된다.
-	// 포인터 -> 생성자에서 인자 넣고 동적할당 하면 된다.
+	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM> rooms;
 
-	bool is_running = true;
-	
+	std::atomic<bool> is_running = true;
+
+	friend class PacketHandler;
+	friend class DBResultHandler;
+
 public:
 	IOCPServer();
 	~IOCPServer();
 
-	//getters
-	//std::array<std::unique_ptr<Session>, MAX_USER>& GetSessionList() { return users; };
-	//std::array<std::unique_ptr<TetrisRoom>, MAX_ROOM>& GetRoomList() { return rooms; };
 	int GetEmptyUserIndex();
 	int GetEmptyRoomIndex();
-	int GetNewUserId();
-	int GetNewRoomId();
-	bool GetRunning() const { return is_running; }
+	int GetNewRoomGen();
+	bool GetRunning() const { return is_running.load(); }
 	HANDLE GetHandle() const { return iocp_handle; }
-	
+
 	long long GetTickCount() const { return tick_count.load(); }
-	std::shared_ptr<TetrisRoom> GetRoom(int room_index) const { return std::atomic_load(&rooms[room_index]); }
+	SP<TetrisRoom> GetRoom(int room_index) const;
 	Database& GetDB() { return db; }
+	RankingManager& GetRankingManager() { return ranking_manager; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
 
-	//virtual MQueue& GetTaskQueue() override;
-	Session* FindSessionByIndex(int user_index) const { return users[user_index]; }
-	Session* FindSessionByPK(int db_PK) const;
+	SP<Session> FindSessionByIndex(int user_index);
 
-	void Disconnect(int user_index);
+	void BeginDisconnect(const SP<Session>& session);
+	void TryDisconnect(const SP<Session>& session);
+	void Disconnect(const SP<Session>& session);
 	void StartServer();
 	void ProcessGQCS();
-	void ProcessPacket(Session* session, int reqeust_sess_id, int recv_bytes);
-	void RoutePacket(char* packet, Session* session, int request_sess_id);
+	void ProcessPacket(const SP<Session>& session, int recv_bytes);
+	void RoutePacket(char* packet, const SP<Session>& session);
 	void BroadCastToLobby(char* packet);
-	//void BroadCastRoom(char* packet, int room_id);
-	//void SendToSelf(char* packet, int self_index);
-	void CreateOpenRoom(char* packet, Session* session, int request_sess_id); // 컨테이너 조작이 필요한 패킷은 서버에 함수를 일단 만들어 두고 처리
-	void CreateLockRoom(char* packet, Session* session, int request_sess_id);
+	void CreateOpenRoom(char* packet, const SP<Session>& session);
+	void CreateLockRoom(char* packet, const SP<Session>& session);
 	void DeleteRoom(int room_index);
-	void ProcessDBResult(DBOverlapped* db_over, Session* session, int request_sess_id);
+	void RequestLoadRanking();
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
-	void HandlePacket(char* packet, Session* session, int request_sess_id);
-	void SendRoomList(Session* session, int reqeust_sess_id);
-	bool TryJoinRoom(Session* session, int request_sess_id, int room_id, const char* room_password);
-	int FindRoom(int room_id);
+	void SendRoomList(const SP<Session>& session);
+	int TryJoinRoom(const SP<Session>& session, int room_gen, const std::string& room_password);
+	SP<TetrisRoom> FindRoom(int room_gen);
 	int FindUser(int user_id);
-	void SendError(Session* session, int request_sess_id, int error_code);
-	bool CheckDuplicateLoginId(const std::string& login_id);
-	void FindMatch(Session* session, int request_sess_id, int max_user);
-	void SendLobbyUserList(Session* session, int request_sess_id);
-	void SendFriendList(Session* session, int request_sess_id);
+	void SendError(const SP<Session>& session, int error_code);
+	void FindMatch(const SP<Session>& session, int max_user);
+	void SendLobbyUserList(const SP<Session>& session);
+	void SendFriendList(const SP<Session>& session);
+	void SendRanking(const SP<Session>& session);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
-	void SendDeleteFriendResult(const int requester_pk, const int target_pk);
+	void SendDeleteFriendResult(int requester_id, int target_id);
 };

@@ -3,19 +3,21 @@ import pygame
 from typing import cast
 
 from tetris.models.dataclass import EventFriend
-from tetris.ui.button import Button
+from tetris.ui.button import Button, ButtonStyle
+from tetris.ui.toggle_button import ToggleButton
 from tetris.ui.user_list import UserList
 from tetris.resources.resource_manager import ResourceManager
 from tetris.resources.define_colors import *
+from tetris.resources.define import *
 from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 
-TAB_HEIGHT = 40
-TAB_GAP = 5
-FOOTER_HEIGHT = 70
-REFRESH_BUTTON_WIDTH = 100
+TAB_WIDTH = 100
+TAB_HEIGHT = 50
+TAB_GAP = 0
+FOOTER_HEIGHT = 0
+REFRESH_BUTTON_WIDTH = 50
 REFRESH_BUTTON_HEIGHT = 50
-REFRESH_BUTTON_MARGIN = 10
 
 USER_TAB_NAME = "유저"
 FRIEND_TAB_NAME = "친구"
@@ -30,7 +32,7 @@ class UserTabs:
         self.tab_names = tab_names
         self.cur_tab_index = 0
 
-        self.tab_buttons: list[Button] = []
+        self.tab_buttons: list[ToggleButton] = []
         self.tab_rects: list[pygame.Rect] = []
         self.user_lists: dict[str, UserList] = {}
         self.refresh_buttons: dict[str, Button] = {}
@@ -54,25 +56,30 @@ class UserTabs:
         if tab_count <= 0:
             return
 
-        total_gap = TAB_GAP * (tab_count - 1)
-        tab_w = (tab_rect.w - total_gap) // tab_count
-
         draw_x = tab_rect.x
         for tab_name in self.tab_names:
-            button_rect = pygame.Rect(draw_x, tab_rect.y, tab_w, tab_rect.h)
-            button = Button(self.screen, button_rect, self.rm, None, tab_name, 1)
+            button_rect = pygame.Rect(draw_x, tab_rect.y, TAB_WIDTH, tab_rect.h)
+            button = ToggleButton(self.screen, button_rect, self.rm, tab_name, 0)
+            button.set_text_size(20)
             self.tab_buttons.append(button)
             self.tab_rects.append(button_rect)
             self.user_lists[tab_name] = UserList(self.screen, list_rect, self.rm)
 
             refresh_rect = pygame.Rect(
-                self.rect.right - REFRESH_BUTTON_MARGIN - REFRESH_BUTTON_WIDTH,
-                self.rect.bottom - REFRESH_BUTTON_MARGIN - REFRESH_BUTTON_HEIGHT,
+                list_rect.right - REFRESH_BUTTON_WIDTH,
+                list_rect.y - REFRESH_BUTTON_HEIGHT,
                 REFRESH_BUTTON_WIDTH,
                 REFRESH_BUTTON_HEIGHT,
             )
-            self.refresh_buttons[tab_name] = Button(self.screen, refresh_rect, self.rm, None, "새로고침")
-            draw_x += tab_w + TAB_GAP
+            refresh_button = Button(self.screen, refresh_rect, self.rm, "", 0, True, ButtonStyle.SMALL)
+            refresh_button.set_images(
+                self.rm.images.ui_images[UI_BUTTON2_GREEN],
+                self.rm.images.ui_images[UI_BUTTON2_BLUE],
+                self.rm.images.ui_images[UI_BUTTON2_ORANGE],
+            )
+            refresh_button.set_icon(self.rm.images.ui_images[UI_REFRESH_ICON])
+            self.refresh_buttons[tab_name] = refresh_button
+            draw_x += TAB_WIDTH + TAB_GAP
 
     def get_cur_user_list(self) -> UserList:
         return self.user_lists[self.tab_names[self.cur_tab_index]]
@@ -116,11 +123,11 @@ class UserTabs:
 
         if data.type == S2C_LOBBY_USER_INFO:
             user_data = cast(S2C_LOBBY_USER_INFO_PACKET, data)
-            self.add_user(USER_TAB_NAME, user_data.user_pk, user_data.nickname, True)
+            self.add_user(USER_TAB_NAME, user_data.user_id, user_data.nickname, True)
 
         elif data.type == S2C_FRIEND_INFO:
             friend_data = cast(S2C_FRIEND_INFO_PACKET, data)
-            self.add_user(FRIEND_TAB_NAME, friend_data.user_pk, friend_data.nickname, friend_data.is_lobby)
+            self.add_user(FRIEND_TAB_NAME, friend_data.user_id, friend_data.nickname, friend_data.is_lobby)
 
         elif data.type == S2C_ADD_FRIEND:
             add_data = cast(S2C_ADD_FRIEND_PACKET, data)
@@ -128,7 +135,7 @@ class UserTabs:
 
         elif data.type == S2C_DELETE_FRIEND:
             delete_data = cast(S2C_DELETE_FRIEND_PACKET, data)
-            self.delete_user(FRIEND_TAB_NAME, delete_data.target_pk)
+            self.delete_user(FRIEND_TAB_NAME, delete_data.target_id)
 
         elif data.type == S2C_REQUEST_FRIEND:
             request_data = cast(S2C_REQUEST_FRIEND_PACKET, data)
@@ -140,6 +147,8 @@ class UserTabs:
         for index in range(len(self.tab_buttons)):
             if self.tab_buttons[index].handle_event(ev):
                 self.cur_tab_index = index
+                for btn_index in range(len(self.tab_buttons)):
+                    self.tab_buttons[btn_index].set_pressed(btn_index == self.cur_tab_index)
                 return None
 
         cur_tab_name = self.get_cur_tab_name()
@@ -162,10 +171,8 @@ class UserTabs:
 
     def draw(self):
         for index in range(len(self.tab_buttons)):
+            self.tab_buttons[index].set_pressed(index == self.cur_tab_index)
             self.tab_buttons[index].draw()
-
-            if index == self.cur_tab_index:
-                pygame.draw.rect(self.screen, ORANGE, self.tab_rects[index], 2)
 
         self.get_cur_user_list().draw()
         refresh_btn = self.refresh_buttons.get(self.get_cur_tab_name())

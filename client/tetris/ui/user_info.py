@@ -12,6 +12,9 @@ STATE_WIDTH_RATE = 0.3
 
 
 class UserInfo:
+    BORDER_RADIUS = 0
+    BORDER_WIDTH = 1
+
     def __init__(self,
         screen: pygame.Surface,
         rect: pygame.Rect,
@@ -29,6 +32,7 @@ class UserInfo:
         self.nickname = nickname
         self.state = state
         self.border_width = border_width
+        self.background_color = BLACK
 
         self.info_rects: list[Rectangle] = []
 
@@ -43,8 +47,12 @@ class UserInfo:
         state_rect.x = nickname_rect.x + nickname_rect.w
         state_rect.w = self.rect.w - nickname_rect.w
 
-        self.nickname_rect = Rectangle(self.screen, nickname_rect, self.rm, None, "", self.border_width)
-        self.state_rect = Rectangle(self.screen, state_rect, self.rm, None, "", self.border_width)
+        self.nickname_rect = Rectangle(self.screen, nickname_rect, self.rm, False, None, "", 0)
+        self.nickname_rect.set_text_size(15)
+        self.nickname_rect.set_border(0)
+        self.state_rect = Rectangle(self.screen, state_rect, self.rm, False, None, "", 0)
+        self.state_rect.set_text_size(15)
+        self.state_rect.set_border(0)
 
         self.info_rects = [self.nickname_rect, self.state_rect]
 
@@ -64,6 +72,7 @@ class UserInfo:
         self.update_info()
 
     def set_background_color(self, color: tuple[int, int, int]):
+        self.background_color = color
         for info in self.info_rects:
             info.set_background_color(color)
 
@@ -96,5 +105,23 @@ class UserInfo:
         return None
 
     def draw(self):
+        bg_color = self.background_color
+        if len(bg_color) == 3:
+            bg_color = (bg_color[0], bg_color[1], bg_color[2], 120)
+        bg_surface = pygame.Surface((self.rect.w, self.rect.h), pygame.SRCALPHA)
+        pygame.draw.rect(
+            bg_surface,
+            bg_color,
+            bg_surface.get_rect(),
+            border_radius=self.BORDER_RADIUS
+        )
+        self.screen.blit(bg_surface, self.rect.topleft)
+        pygame.draw.rect(self.screen, WHITE, self.rect, self.BORDER_WIDTH, border_radius=self.BORDER_RADIUS)
+
         for info in self.info_rects:
-            info.draw()
+            font_rect = info.font_surface.get_rect()
+            center_x = info.rect.x + info.rect.w // 2
+            center_y = info.rect.y + info.rect.h // 2
+            font_rect.x = center_x - font_rect.w / 2
+            font_rect.y = center_y - font_rect.h / 2
+            self.screen.blit(info.font_surface, font_rect)

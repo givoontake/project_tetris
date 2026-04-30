@@ -1,86 +1,89 @@
 #pragma once
+#include <cstdint>
 #include <iostream>
-constexpr char S2C_ERROR = 0;
-constexpr char S2C_LOGIN = 1;
-constexpr char C2S_LOGIN = 2;
-constexpr char S2C_MESSAGE = 3;
-constexpr char C2S_MESSAGE = 4;
-constexpr char S2C_TEST = 5;
-constexpr char C2S_TEST = 6;
-constexpr char S2C_DISCONNECT = 7;
-constexpr char C2S_DISCONNECT = 8;
+constexpr std::uint8_t S2C_ERROR = 0;
+constexpr std::uint8_t S2C_LOGIN = 1;
+constexpr std::uint8_t C2S_LOGIN = 2;
+constexpr std::uint8_t S2C_MESSAGE = 3;
+constexpr std::uint8_t C2S_MESSAGE = 4;
+constexpr std::uint8_t S2C_TEST = 5;
+constexpr std::uint8_t C2S_TEST = 6;
+constexpr std::uint8_t S2C_DISCONNECT = 7;
+constexpr std::uint8_t C2S_DISCONNECT = 8;
 
-constexpr char C2S_ADD_OPEN_ROOM = 9;
-constexpr char S2C_ADD_OPEN_ROOM = 10;
+constexpr std::uint8_t C2S_ADD_OPEN_ROOM = 9;
+constexpr std::uint8_t S2C_ADD_OPEN_ROOM = 10;
 
-constexpr char C2S_ADD_LOCK_ROOM = 11;
-constexpr char S2C_ADD_LOCK_ROOM = 12;
+constexpr std::uint8_t C2S_ADD_LOCK_ROOM = 11;
+constexpr std::uint8_t S2C_ADD_LOCK_ROOM = 12;
 
-constexpr char C2S_JOIN_OPEN_ROOM = 13;
-constexpr char S2C_ADD_USER = 14;
+constexpr std::uint8_t C2S_JOIN_OPEN_ROOM = 13;
+constexpr std::uint8_t S2C_ADD_USER = 14;
 
-constexpr char C2S_DELETE_USER = 15;
-constexpr char S2C_DELETE_USER = 16;
+constexpr std::uint8_t C2S_DELETE_USER = 15;
+constexpr std::uint8_t S2C_DELETE_USER = 16;
 
-constexpr char C2S_READY = 17;
-constexpr char S2C_READY = 18;
+constexpr std::uint8_t C2S_READY = 17;
+constexpr std::uint8_t S2C_READY = 18;
 
-constexpr char C2S_START = 19;
-constexpr char S2C_SINGLE_START = 20;
+constexpr std::uint8_t C2S_START = 19;
+constexpr std::uint8_t S2C_SINGLE_START = 20;
 
-constexpr char C2S_KICK = 21;
-constexpr char S2C_KICK = 22;
+constexpr std::uint8_t C2S_KICK = 21;
+constexpr std::uint8_t S2C_KICK = 22;
 
-constexpr char C2S_MOVE = 23;
-constexpr char S2C_MOVE = 24;
+constexpr std::uint8_t C2S_MOVE = 23;
+constexpr std::uint8_t S2C_MOVE = 24;
 
-constexpr char S2C_SPAWN = 25;
+constexpr std::uint8_t S2C_SPAWN = 25;
 
-constexpr char S2C_GAMEOVER = 27;
+constexpr std::uint8_t S2C_GAMEOVER = 27;
 
-constexpr char S2C_GAMEEND = 29;
+constexpr std::uint8_t S2C_GAMEEND = 29;
 
-constexpr char S2C_CLEARLINE = 31;
+constexpr std::uint8_t S2C_CLEARLINE = 31;
 
-constexpr char S2C_FIX = 33;
+constexpr std::uint8_t S2C_FIX = 33;
 
-constexpr char S2C_ADDLINE = 35;
+constexpr std::uint8_t S2C_ADDLINE = 35;
 
-constexpr char S2C_UPDATE_SCORE = 37;
+constexpr std::uint8_t S2C_UPDATE_SCORE = 37;
 
-constexpr char S2C_MULTI_START = 39;
+constexpr std::uint8_t S2C_MULTI_START = 39;
 
-constexpr char S2C_MATCH_RECORD = 41;
+constexpr std::uint8_t S2C_MATCH_RECORD = 41;
 
-constexpr char S2C_UPDATE_HOST = 43;
+constexpr std::uint8_t S2C_UPDATE_HOST = 43;
 
-constexpr char C2S_GIVEUP = 45;
+constexpr std::uint8_t C2S_GIVEUP = 45;
 
-constexpr char C2S_REQUEST_ROOM_LIST = 47;
+constexpr std::uint8_t C2S_REQUEST_ROOM_LIST = 47;
 
-constexpr char S2C_ROOM_INFO = 49;
-constexpr char C2S_JOIN_LOCK_ROOM = 50;
-constexpr char C2S_FAST_MATCHING = 51;  
+constexpr std::uint8_t S2C_ROOM_INFO = 49;
+constexpr std::uint8_t C2S_JOIN_LOCK_ROOM = 50;
+constexpr std::uint8_t C2S_FAST_MATCHING = 51;  
 
-constexpr char C2S_REQUEST_FRIEND = 52;
-constexpr char C2S_DELETE_FRIEND = 53;
-constexpr char C2S_ACCEPT_FRIEND = 54;
+constexpr std::uint8_t C2S_REQUEST_FRIEND = 52;
+constexpr std::uint8_t C2S_DELETE_FRIEND = 53;
+constexpr std::uint8_t C2S_ACCEPT_FRIEND = 54;
 
-constexpr char S2C_REQUEST_FRIEND = 55;
-constexpr char S2C_DELETE_FRIEND = 56;
-constexpr char S2C_ADD_FRIEND = 57;
+constexpr std::uint8_t S2C_REQUEST_FRIEND = 55;
+constexpr std::uint8_t S2C_DELETE_FRIEND = 56;
+constexpr std::uint8_t S2C_ADD_FRIEND = 57;
 
-constexpr char C2S_REQUEST_LOBBY_USER_LIST = 58;
-constexpr char S2C_LOBBY_USER_INFO = 59;
+constexpr std::uint8_t C2S_REQUEST_LOBBY_USER_LIST = 58;
+constexpr std::uint8_t S2C_LOBBY_USER_INFO = 59;
 
-constexpr char C2S_REQUEST_FRIEND_LIST = 60;
-constexpr char S2C_FRIEND_INFO = 61;
+constexpr std::uint8_t C2S_REQUEST_FRIEND_LIST = 60;
+constexpr std::uint8_t S2C_FRIEND_INFO = 61;
+constexpr std::uint8_t C2S_REQUEST_RANKING = 62;
+constexpr std::uint8_t S2C_RANKING_INFO = 63;
 
-constexpr char S2C_INFO = 100;
-constexpr char S2C_TEST_LOGIN = 101;
-constexpr char C2S_TEST_LOGIN = 102;
+constexpr std::uint8_t S2C_INFO = 100;
+constexpr std::uint8_t S2C_TEST_LOGIN = 101;
+constexpr std::uint8_t C2S_TEST_LOGIN = 102;
 
-inline void PrintPacketType(char type)
+inline void PrintPacketType(std::uint8_t type)
 {
     switch (type)
     {
@@ -141,11 +144,13 @@ inline void PrintPacketType(char type)
 
     case S2C_TEST_LOGIN:        std::cout << "S2C_TEST_LOGIN"; break;
     case C2S_TEST_LOGIN:        std::cout << "C2S_TEST_LOGIN"; break;
+    case C2S_REQUEST_RANKING:   std::cout << "C2S_REQUEST_RANKING"; break;
+    case S2C_RANKING_INFO:      std::cout << "S2C_RANKING_INFO"; break;
 
     default:                    std::cout << "UNKNOWN_PACKET_TYPE"; break;
     }
 
-    std::cout << " (" << static_cast<int>(static_cast<unsigned char>(type)) << ")\n";
+    std::cout << " (" << static_cast<int>(type) << ")\n";
 }
 
 

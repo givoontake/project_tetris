@@ -2,7 +2,8 @@
 
 RoomSession::RoomSession()
 {
-	r_user_state.Store(ROOM_USER_STATE::EMPTY);
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
 }
 
 RoomSession::~RoomSession()
@@ -10,10 +11,11 @@ RoomSession::~RoomSession()
 
 }
 
-void RoomSession::InitRoomSession(Session* s)
+bool RoomSession::InitRoomSession(const SP<Session>& s, int room_index)
 {
+	if (!s) return false;
+	if (!s->TrySetRoomMode(room_index)) return false;
 	session = s;
-	session->StoreState(SESS_STATE::ROOM);
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);
 	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
@@ -21,15 +23,16 @@ void RoomSession::InitRoomSession(Session* s)
 
 	score = 0;
 	ClearSendBuf();
+	return true;
 }
 
 void RoomSession::ClearRoomSession()
 {
-	session->StoreState(SESS_STATE::LOBBY);
-	session = nullptr;
+	if (auto session_ptr = session.lock()) session_ptr->SetRoomSnapShot(MODE_STATE::LOBBY, -1);
+	session.reset();
 	tetris.Clear();
-	r_user_state.Store(ROOM_USER_STATE::EMPTY);
-	prev_r_user_state.Store(ROOM_USER_STATE::EMPTY);
+	r_user_state.Store(ROOM_USER_STATE::WAIT);
+	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
 	tetromino_index = 0;
 
 	score = 0;
@@ -47,10 +50,14 @@ void RoomSession::ClearData()
 	ClearSendBuf();
 }
 
-void RoomSession::AddToSendBuffer(const char* data, int data_size)
+bool RoomSession::AddToSendBuffer(const char* data, int data_size)
 {
+	if (data_size <= 0) return true;
+	const int need_size = send_data_size + data_size;
+	if (need_size > BUF_SIZE) return false;
 	memcpy(send_buf + send_data_size, data, data_size);
 	send_data_size += data_size;
+	return true;
 }
 
 //void RoomSession::SendTickData(HANDLE iocp_handle)
