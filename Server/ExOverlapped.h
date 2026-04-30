@@ -7,6 +7,7 @@
 
 struct SessionKey {
 	int index = -1;
+	int id = -1;
 };
 
 constexpr ULONG_PTR LISTEN_IO_COMPLETION = 1;

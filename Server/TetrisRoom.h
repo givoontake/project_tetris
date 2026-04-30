@@ -114,10 +114,10 @@ public:
 	const std::string& GetRoomPassword() const { return room_password; }
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session& request_session) = 0;
+	virtual void HandlePacket(char* packet, const SP<Session>& request_session) = 0;
 	virtual void ProcessPlayTasks() = 0;
 	virtual void DeleteUser(const int id) = 0;	
-	virtual void SendCreateRoom(Session& session) = 0;
+	virtual void SendCreateRoom(const SP<Session>& session) = 0;
 	virtual bool AddHostSession(const SP<Session>& session);
 	// 공통
 	void SetRoomIndex(const int val);
@@ -132,9 +132,9 @@ public:
 	bool SpawnTetromino(int id);
 	void ClearRoom(); // 이제 재사용이 아니라 아예 없앨거라서 굳이 방이 비워진 상태를 관리할 필요는 없다. 나중에 없애면 될 듯
 	void UpdateTick();
-	void BoundPackets();
+	int BoundPackets();
 	//void SendAddRoom(Session* session);
-	void MakeMovePacket(RoomSession& r_session, int move_type);
+	bool MakeMovePacket(RoomSession& r_session, int move_type);
 	void AddGarbageLines();
 	void AddSpawnTask();
 	void ResetUsersTickData();

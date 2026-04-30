@@ -38,7 +38,7 @@ class IOCPServer
 	
 	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM> rooms;
 
-	bool is_running = true;
+	std::atomic<bool> is_running = true;
 
 	friend class PacketHandler;
 	friend class DBResultHandler;
@@ -50,11 +50,11 @@ public:
 	int GetEmptyUserIndex();
 	int GetEmptyRoomIndex();
 	int GetNewRoomGen();
-	bool GetRunning() const { return is_running; }
+	bool GetRunning() const { return is_running.load(); }
 	HANDLE GetHandle() const { return iocp_handle; }
 
 	long long GetTickCount() const { return tick_count.load(); }
-	SP<TetrisRoom> GetRoom(int room_index) const { return std::atomic_load(&rooms[room_index]); }
+	SP<TetrisRoom> GetRoom(int room_index) const;
 	Database& GetDB() { return db; }
 	RankingManager& GetRankingManager() { return ranking_manager; }
 
@@ -62,29 +62,29 @@ public:
 
 	SP<Session> FindSessionByIndex(int user_index);
 
-	void BeginDisconnect(Session& session);
-	void TryDisconnect(Session& session);
-	void Disconnect(Session& session);
+	void BeginDisconnect(const SP<Session>& session);
+	void TryDisconnect(const SP<Session>& session);
+	void Disconnect(const SP<Session>& session);
 	void StartServer();
 	void ProcessGQCS();
-	void ProcessPacket(Session& session, int recv_bytes);
-	void RoutePacket(char* packet, Session& session);
+	void ProcessPacket(const SP<Session>& session, int recv_bytes);
+	void RoutePacket(char* packet, const SP<Session>& session);
 	void BroadCastToLobby(char* packet);
-	void CreateOpenRoom(char* packet, Session& session);
-	void CreateLockRoom(char* packet, Session& session);
+	void CreateOpenRoom(char* packet, const SP<Session>& session);
+	void CreateLockRoom(char* packet, const SP<Session>& session);
 	void DeleteRoom(int room_index);
 	void RequestLoadRanking();
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
-	void SendRoomList(Session& session);
-	bool TryJoinRoom(Session& session, int room_gen, const std::string& room_password);
+	void SendRoomList(const SP<Session>& session);
+	int TryJoinRoom(const SP<Session>& session, int room_gen, const std::string& room_password);
 	SP<TetrisRoom> FindRoom(int room_gen);
 	int FindUser(int user_id);
-	void SendError(Session& session, int error_code);
-	void FindMatch(Session& session, int max_user);
-	void SendLobbyUserList(Session& session);
-	void SendFriendList(Session& session);
-	void SendRanking(Session& session);
+	void SendError(const SP<Session>& session, int error_code);
+	void FindMatch(const SP<Session>& session, int max_user);
+	void SendLobbyUserList(const SP<Session>& session);
+	void SendFriendList(const SP<Session>& session);
+	void SendRanking(const SP<Session>& session);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
 	void SendDeleteFriendResult(int requester_id, int target_id);
 };

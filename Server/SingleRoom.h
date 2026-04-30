@@ -17,10 +17,10 @@ public:
 	SingleRoom(IOCPServer* server, LockRoomInitData data);
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session& request_session) override;
+	virtual void HandlePacket(char* packet, const SP<Session>& request_session) override;
 	virtual void ProcessPlayTasks() override;
 	virtual void DeleteUser(const int id) override;
-	virtual void SendCreateRoom(Session& session) override;
+	virtual void SendCreateRoom(const SP<Session>& session) override;
 	void StartGame();
 
 	// 싱글 전용
@@ -32,7 +32,7 @@ public:
 
 private:
 	void HandleStartPacket();
-	void HandleDeleteUserPacket(Session& request_session);
+	void HandleDeleteUserPacket(const SP<Session>& request_session);
 	void HandleMovePacket(char* packet);
 	void HandleGiveupPacket();
 };

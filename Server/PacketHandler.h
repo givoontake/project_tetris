@@ -10,18 +10,18 @@ class PacketHandler
 
 public:
 	PacketHandler(IOCPServer& server);
-	void HandlePacket(char* packet, Session& session);
+	void HandlePacket(char* packet, const SP<Session>& session);
 
 private:
 	void HandleLoginPacket(char* packet, const SP<Session>& session);
-	void HandleMessagePacket(char* packet, Session& session);
-	void HandleTestPacket(char* packet, Session& session);
-	void HandleDisconnectPacket(Session& session);
-	void HandleJoinOpenRoomPacket(char* packet, Session& session);
-	void HandleJoinLockRoomPacket(char* packet, Session& session);
-	void HandleFastMatchingPacket(char* packet, Session& session);
-	void HandleRequestFriendPacket(char* packet, Session& session);
-	void HandleAcceptFriendPacket(char* packet, Session& session);
-	void HandleDeleteFriendPacket(char* packet, Session& session);
+	void HandleMessagePacket(char* packet, const SP<Session>& session);
+	void HandleTestPacket(char* packet, const SP<Session>& session);
+	void HandleDisconnectPacket(const SP<Session>& session);
+	void HandleJoinOpenRoomPacket(char* packet, const SP<Session>& session);
+	void HandleJoinLockRoomPacket(char* packet, const SP<Session>& session);
+	void HandleFastMatchingPacket(char* packet, const SP<Session>& session);
+	void HandleRequestFriendPacket(char* packet, const SP<Session>& session);
+	void HandleAcceptFriendPacket(char* packet, const SP<Session>& session);
+	void HandleDeleteFriendPacket(char* packet, const SP<Session>& session);
 };
 

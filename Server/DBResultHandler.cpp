@@ -95,49 +95,52 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, const SP<Sessio
 		session->SendPacket(reinterpret_cast<char*>(&login_p), server.GetHandle());
 
 		Database& repr_db = server.GetDB();
-		Session* session_ptr = session.get();
-		auto task = [&repr_db, session_ptr]() {
-			repr_db.ExecuteLoadFriendList(*session_ptr);
+		SessionKey key = session->GetSessionKey();
+		auto task = [&repr_db, key]() {
+			repr_db.ExecuteLoadFriendList(key);
 			};
-		repr_db.Enqueue(task, session_ptr);
+		repr_db.Enqueue(task, session);
 	}
 }
 
-void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& session)
+void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<Session>& session)
 {
+	if (!session) return;
 	if (db_over->ok) {
 		DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
-		DBResultLogin db_info = session.UpdateMaxScore(res->max_score);
+		DBResultLogin db_info = session->UpdateMaxScore(res->max_score);
 		server.GetRankingManager().UpdateRanking(db_info.id, db_info.nickname, res->max_score);
 		S2C_UPDATE_SCORE_PACKET us_p;
 		us_p.header.size = static_cast<std::uint16_t>(sizeof(us_p));
 		us_p.header.type = S2C_UPDATE_SCORE;
 		us_p.max_score = res->max_score;
-		session.SendPacket(reinterpret_cast<char*>(&us_p), server.GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&us_p), server.GetHandle());
 	}
 }
 
-void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Session& session)
+void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, const SP<Session>& session)
 {
+	if (!session) return;
 	if (db_over->ok) {
 		S2C_MATCH_RECORD_PACKET record_p;
 		record_p.header.size = static_cast<std::uint16_t>(sizeof(record_p));
 		record_p.header.type = S2C_MATCH_RECORD;
 		DBResultUpdateMatchResult* res = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
-		DBResultLogin db_info = session.UpdateMatchRecord(res->is_winner);
+		DBResultLogin db_info = session->UpdateMatchRecord(res->is_winner);
 
 		record_p.win_count = db_info.win_count;
 		record_p.lose_count = db_info.lose_count;
 
-		session.SendPacket(reinterpret_cast<char*>(&record_p), server.GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&record_p), server.GetHandle());
 	}
 }
 
-void DBResultHandler::HandleLoadFriendListDBResult(DBOverlapped* db_over, Session& session)
+void DBResultHandler::HandleLoadFriendListDBResult(DBOverlapped* db_over, const SP<Session>& session)
 {
+	if (!session) return;
 	if (db_over->ok) {
 		DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
-		session.InitFriendList(res->friend_list);
+		session->InitFriendList(res->friend_list);
 	}
 }
 
@@ -151,11 +154,11 @@ void DBResultHandler::HandleIOResult(DBOverlapped* db_over, const SP<Session>& s
 		break;
 
 	case DBOperationType::UPDATE_SCORE:
-		HandleUpdateScoreDBResult(db_over, *session);
+		HandleUpdateScoreDBResult(db_over, session);
 		break;
 
 	case DBOperationType::UPDATE_MATCH_RESULT:
-		HandleUpdateMatchResultDBResult(db_over, *session);
+		HandleUpdateMatchResultDBResult(db_over, session);
 		break;
 
 	case DBOperationType::ADD_FRIEND_REQUEST:
@@ -171,7 +174,7 @@ void DBResultHandler::HandleIOResult(DBOverlapped* db_over, const SP<Session>& s
 		break;
 
 	case DBOperationType::LOAD_FRIEND_LIST:
-		HandleLoadFriendListDBResult(db_over, *session);
+		HandleLoadFriendListDBResult(db_over, session);
 		break;
 	}
 }

@@ -32,7 +32,7 @@ class Session
 
 	mutable std::mutex sess_mutex;
 	Atomic<LIFE_STATE> life_state = LIFE_STATE::NONE;
-	Atomic<MODE_STATE> state = MODE_STATE::NONE;
+	Atomic<MODE_STATE> mode_state = MODE_STATE::NONE;
 	DBResultLogin db_info;
 
 	std::vector<FriendInfo> friend_list;
@@ -69,8 +69,8 @@ public:
 	RoomSnapShot GetRoomSnapShot() const;
 	int GetRemainDataSize() const;
 	LIFE_STATE GetLifeState() const { return life_state.Load(); }
-	MODE_STATE GetState() const { return state.Load(); }
-	MODE_STATE GetModeState() const { return state.Load(); }
+	MODE_STATE GetState() const { return mode_state.Load(); }
+	MODE_STATE GetModeState() const { return mode_state.Load(); }
 	DBResultLogin GetDBInfo() const;
 	//std::string GetPrimaryKey() const { return login_id; }
 

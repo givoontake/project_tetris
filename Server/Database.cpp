@@ -79,10 +79,9 @@ void Database::init(HANDLE iocp)
     iocp_handle = iocp;
 }
 
-bool Database::Enqueue(Task db_task, Session* session)
+bool Database::Enqueue(Task db_task, const SP<Session>& session)
 {
     if (session && !session->TryAddPending()) return false;
-
     try {
     {
         std::lock_guard<std::mutex> lock(mutex);
@@ -91,7 +90,7 @@ bool Database::Enqueue(Task db_task, Session* session)
     }
     catch (...) {
         if (session) session->ReducePending();
-        throw;
+        return false;
     }
     cv.notify_one();
     return true;
@@ -155,11 +154,11 @@ bool Database::LoadDBConfigFromFile(const std::string& file_path)
 // ---- DB 스레드에서 실행될 "실제 DB 작업" ----
 // 외부는 보통 아래처럼 람다로 감싸 Enqueue:
 //   db.Enqueue([&db, sid, id, pw]{ db.ExecuteLogin(sid, id, pw); });
-void Database::ExecuteLogin(Session& session, const std::string login_id, const std::string password)
+void Database::ExecuteLogin(SessionKey key, const std::string login_id, const std::string password)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = session.GetSessionKey();
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::LOGIN;
     db_over->ok = false; // 기본 실패로 두고, 성공 조건에서만 true
 
@@ -336,14 +335,14 @@ void Database::ExecuteLoadRanking()
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_INIT_SERVER_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteUpdateScore(Session& session, int new_score)
+void Database::ExecuteUpdateScore(SessionKey key, int new_score)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = session.GetSessionKey();
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::UPDATE_SCORE;
     db_over->ok = false;
-    int user_id = session.GetDBInfo().id;
+    int user_id = key.id;
 
     try
     {
@@ -392,14 +391,14 @@ void Database::ExecuteUpdateScore(Session& session, int new_score)
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteUpdateMatchResult(Session& session, bool is_winner)
+void Database::ExecuteUpdateMatchResult(SessionKey key, bool is_winner)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = session.GetSessionKey();
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::UPDATE_MATCH_RESULT;
     db_over->ok = false;
-    int user_id = session.GetDBInfo().id;
+    int user_id = key.id;
 
     try
     {
@@ -452,17 +451,14 @@ void Database::ExecuteUpdateMatchResult(Session& session, bool is_winner)
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteAddFriend(Session& session, int requester_id)
+void Database::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int requester_id)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = session.GetSessionKey();
+    db_over->ex_over.key = key;
     //db_over->ex_over.request_gen; // 사실 여기서는 의미가 없음. 적용된 두 클라에게 모두 보내야해서 두 클라의 키값이 모두 필요
     db_over->type = DBOperationType::ADD_FRIEND;
     db_over->ok = false;
-    FriendInfo accepter_info;
-    accepter_info.id = session.GetDBInfo().id;
-    accepter_info.nickname = session.GetDBInfo().nickname;
 
     caches.conn->setAutoCommit(false);
     try
@@ -544,15 +540,15 @@ POST_RESULT:
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteDeleteFriend(Session& session, int target_id)
+void Database::ExecuteDeleteFriend(SessionKey key, int target_id)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = session.GetSessionKey();
+    db_over->ex_over.key = key;
     //db_over->ex_over.request_gen = key.gen;
     db_over->type = DBOperationType::DELETE_FRIEND;
     db_over->ok = false;
-    int requester_id = session.GetDBInfo().id;
+    int requester_id = key.id;
 
     try
     {
@@ -598,14 +594,14 @@ void Database::ExecuteDeleteFriend(Session& session, int target_id)
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteLoadFriendList(Session& session) 
+void Database::ExecuteLoadFriendList(SessionKey key)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = session.GetSessionKey();
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::LOAD_FRIEND_LIST;
     db_over->ok = false;
-    int user_id = session.GetDBInfo().id;
+    int user_id = key.id;
 
     try
     {
@@ -656,16 +652,13 @@ void Database::ExecuteLoadFriendList(Session& session)
     PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
-void Database::ExecuteAddFriendRequest(Session& session, int recver_id)
+void Database::ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_info, int recver_id)
 {
     auto* db_over = new DBOverlapped{};
     db_over->ex_over.op_type = OP_TYPE::DB;
-    db_over->ex_over.key = session.GetSessionKey();
+    db_over->ex_over.key = key;
     db_over->type = DBOperationType::ADD_FRIEND_REQUEST;
     db_over->ok = false;
-    FriendInfo requester_info;
-    requester_info.id = session.GetDBInfo().id;
-    requester_info.nickname = session.GetDBInfo().nickname;
 
 	caches.conn->setAutoCommit(false);
     try

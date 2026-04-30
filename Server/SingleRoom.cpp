@@ -13,8 +13,9 @@ SingleRoom::SingleRoom(IOCPServer* server, LockRoomInitData data)
 {
 }
 
-void SingleRoom::HandlePacket(char* packet, Session& request_session) 
+void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 {
+	if (!request_session) return;
 	//std::cout << "SingleRoom::HandlePacket, Packet type: ";
 	//PrintPacketType(packet[2]);
 
@@ -46,20 +47,24 @@ void SingleRoom::HandleStartPacket()
 	StartGame();
 }
 
-void SingleRoom::HandleDeleteUserPacket(Session& request_session)
+void SingleRoom::HandleDeleteUserPacket(const SP<Session>& request_session)
 {
-	DeleteUser(request_session.GetDBInfo().id);
+	if (!request_session) return;
+	DeleteUser(request_session->GetDBInfo().id);
 }
 
 void SingleRoom::HandleMovePacket(char* packet)
 {
-	C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
-	auto session = room_users[0].GetSession();
-	if (!session) return;
-	TaskInfo new_task;
-	new_task.id = session->GetDBInfo().id;
-	new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
-	GetTasks().AddTask(new_task);
+	std::lock_guard<std::mutex> lock(room_mutex);
+	if (room_state == ROOM_STATE::PLAY) {
+		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
+		auto session = room_users[0].GetSession();
+		if (!session) return;
+		TaskInfo new_task;
+		new_task.id = session->GetDBInfo().id;
+		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+		GetTasks().AddTask(new_task);
+	}
 }
 
 void SingleRoom::HandleGiveupPacket()
@@ -81,56 +86,59 @@ void SingleRoom::HandleGiveupPacket()
 
 void SingleRoom::ProcessPlayTasks()
 {
-	{
-		// delete가 도중에 일어나면 문제가 되는 일이 많아진다.
-		// 싱글에서 유저 제거는 방 삭제를 동반한다. 클리어 작업 후 [0]에 접근할 수도 있고, 범위기반 반복문 진입 전에는 있었는데 막상 실행할 때는 없을 수도 있음. 즉 처음에 잡은 범위 스코프 메모리를 무효화된다.
-		// 따라서 삭제는 틱 처리 도중에 일어나서는 안된다.
-		std::lock_guard<std::mutex> lock(room_mutex);
-		if (room_state.Load() != ROOM_STATE::PLAY) return;
-		UpdateTick();
-		tasks.SwapTask();
-		while (!tasks.task_queue.IsEmpty()) {
-			TaskInfo task = tasks.GetTask();
-			for (auto& r_user : room_users) {
-				auto session = r_user.GetSession();
-				if (!session) continue;
-				if (session->GetDBInfo().id == task.id) {
-					// 각 작업들을 각 세션에 분배
-					r_user.GetTetris().GetInputTasks().emplace_back(task.type);
-
-					//r_user.GetTetris().DebugPrintBoard();
-					break;
-				}
-			}
-		}
-
+	// delete가 도중에 일어나면 문제가 되는 일이 많아진다.
+	// 싱글에서 유저 제거는 방 삭제를 동반한다. 클리어 작업 후 [0]에 접근할 수도 있고, 범위기반 반복문 진입 전에는 있었는데 막상 실행할 때는 없을 수도 있음. 즉 처음에 잡은 범위 스코프 메모리를 무효화된다.
+	// 따라서 삭제는 틱 처리 도중에 일어나서는 안된다.
+	std::unique_lock<std::mutex> lock(room_mutex);
+	if (room_state.Load() != ROOM_STATE::PLAY) return;
+	UpdateTick();
+	tasks.SwapTask();
+	while (!tasks.task_queue.IsEmpty()) {
+		TaskInfo task = tasks.GetTask();
 		for (auto& r_user : room_users) {
 			auto session = r_user.GetSession();
 			if (!session) continue;
-			r_user.GetTetris().TickProcess();
+			if (session->GetDBInfo().id == task.id) {
+				// 각 작업들을 각 세션에 분배
+				r_user.GetTetris().GetInputTasks().emplace_back(task.type);
+
+				//r_user.GetTetris().DebugPrintBoard();
+				break;
+			}
 		}
+	}
 
-		AddGarbageLines();
-		bool is_over = false;
-		is_over = room_users[0].GetTetris().CheckGameover();
-		if (!is_over) AddSpawnTask();
+	for (auto& r_user : room_users) {
+		auto session = r_user.GetSession();
+		if (!session) continue;
+		r_user.GetTetris().TickProcess();
+	}
 
-		auto tasks = room_users[0].GetTetris().GetSendTasks();
-		auto it = std::find_if(tasks.begin(), tasks.end(), [](const TaskType& t_type) {
-			return t_type.event_type == EVENT_TYPE::FIX;
-			});
+	AddGarbageLines();
+	bool is_over = false;
+	is_over = room_users[0].GetTetris().CheckGameover();
+	if (!is_over) AddSpawnTask();
 
-		if (it != tasks.end()) { // 고정 이벤트가 있어야 점수 및 콤보계산
-			CalculateScore(room_users[0].GetTetris().GetClearedLines());
-		}
-		BoundPackets();
+	auto tasks = room_users[0].GetTetris().GetSendTasks();
+	auto it = std::find_if(tasks.begin(), tasks.end(), [](const TaskType& t_type) {
+		return t_type.event_type == EVENT_TYPE::FIX;
+		});
 
-		ResetUsersTickData();
-		BroadcastTickDataForUsers();
-		if (is_over) {
-			RequestUpdateScore();
-			ClearGame();
-		}
+	if (it != tasks.end()) { // 고정 이벤트가 있어야 점수 및 콤보계산
+		CalculateScore(room_users[0].GetTetris().GetClearedLines());
+	}
+	int failed_user_id = BoundPackets();
+	if (failed_user_id != -1) {
+		lock.unlock();
+		DeleteUser(failed_user_id);
+		return;
+	}
+
+	ResetUsersTickData();
+	BroadcastTickDataForUsers();
+	if (is_over) {
+		RequestUpdateScore();
+		ClearGame();
 	}
 }
 
@@ -206,8 +214,9 @@ void SingleRoom::DeleteUser(const int id)
 	}
 }
 
-void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸고 들어온다
+void SingleRoom::SendCreateRoom(const SP<Session>& session) // 외부에서 세션락 걸고 들어온다
 {
+	if (!session) return;
 	if (room_password.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
@@ -215,7 +224,7 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		open_p.gen = room_gen;
 		open_p.max_user = max_user;
 		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
-		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
@@ -225,14 +234,14 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		lock_p.max_user = max_user;
 		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
 		server->StringToCharBuf(room_password, lock_p.room_password, sizeof(lock_p.room_password));
-		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
-	std::cout << "방 생성 - 방 이름: " << room_name << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
+	std::cout << "방 생성 - 방 이름: " << room_name << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
 }
 
 void SingleRoom::ReduceTimeouts(int type)
 {
-	RoomSession r_session = room_users[0];
+	RoomSession& r_session = room_users[0];
 	switch (type) {
 	case DOWN_TIMEOUT:
 		if (r_session.GetScore() <= 100) {
@@ -310,7 +319,9 @@ void SingleRoom::MakeMovePacketData(int move_type)
 	move_p.header.type = S2C_MOVE;
 	move_p.id = session->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
-	room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);
+	if (!room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size)) {
+		DeleteUser(session->GetDBInfo().id);
+	}
 }
 
 void SingleRoom::RequestUpdateScore()
@@ -320,10 +331,10 @@ void SingleRoom::RequestUpdateScore()
 	if (session_shared->GetDBInfo().max_score < room_users[0].GetScore()) {
 		int new_score = room_users[0].GetScore();
 		Database& db = server->GetDB();
-		Session* session_ptr = session_shared.get();
-		auto task_update_score = [session_ptr, new_score, &db] {
-			db.ExecuteUpdateScore(*session_ptr, new_score);
+		SessionKey key = session_shared->GetSessionKey();
+		auto task_update_score = [key, new_score, &db] {
+			db.ExecuteUpdateScore(key, new_score);
 			};
-		server->GetDB().Enqueue(task_update_score, session_ptr);
+		server->GetDB().Enqueue(task_update_score, session_shared);
 	}
 }

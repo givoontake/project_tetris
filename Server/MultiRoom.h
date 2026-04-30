@@ -21,10 +21,10 @@ public:
 	~MultiRoom();
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session& request_session) override;
+	virtual void HandlePacket(char* packet, const SP<Session>& request_session) override;
 	virtual void ProcessPlayTasks() override;
 	virtual void DeleteUser(const int id) override;
-	virtual void SendCreateRoom(Session& session) override;
+	virtual void SendCreateRoom(const SP<Session>& session) override;
 	virtual bool AddHostSession(const SP<Session>& session) override;
 
 	void StartGame(int request_user_id);
@@ -42,10 +42,10 @@ public:
 	void RequestUpdateMatchResult();
 
 private:
-	void HandleDeleteUserPacket(Session& request_session);
-	void HandleReadyPacket(Session& request_session);
-	void HandleKickPacket(char* packet, Session& request_session);
-	void HandleStartPacket(Session& request_session);
-	void HandleMovePacket(char* packet, Session& request_session);
+	void HandleDeleteUserPacket(const SP<Session>& request_session);
+	void HandleReadyPacket(const SP<Session>& request_session);
+	void HandleKickPacket(char* packet, const SP<Session>& request_session);
+	void HandleStartPacket(const SP<Session>& request_session);
+	void HandleMovePacket(char* packet, const SP<Session>& request_session);
 };
 

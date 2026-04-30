@@ -20,7 +20,7 @@ private:
 	void HandleDeleteFriendDBResult(DBOverlapped* db_over);
 	void HandleLoadRankingDBResult(DBOverlapped* db_over);
 	void HandleLoginDBResult(DBOverlapped* db_over, const SP<Session>& session);
-	void HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& session);
-	void HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Session& session);
-	void HandleLoadFriendListDBResult(DBOverlapped* db_over, Session& session);
+	void HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<Session>& session);
+	void HandleUpdateMatchResultDBResult(DBOverlapped* db_over, const SP<Session>& session);
+	void HandleLoadFriendListDBResult(DBOverlapped* db_over, const SP<Session>& session);
 };

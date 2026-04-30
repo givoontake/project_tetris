@@ -11,14 +11,15 @@ void Session::InitSession(SOCKET new_socket)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	socket = new_socket;
-	io_pending_count = 0; // recv 토큰은 정상 수신 중에는 계속 유지하고 disconnect 경로에서만 내려놓는다.
+	io_pending_count = 0;
 	db_info.clear();
 	friend_list.reserve(MAX_FRIENDS);
 	room_index = -1;
 	remain_data_size = 0;
+	key.id = -1;
 	recv_over.ex_over.key = key;
 	life_state.Store(LIFE_STATE::ACTIVE);
-	state.Store(MODE_STATE::LOGIN);
+	mode_state.Store(MODE_STATE::LOGIN);
 
 	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
@@ -27,14 +28,15 @@ void Session::InitSession(SOCKET new_socket)
 bool Session::InitDBInfo(DBResultLogin* new_info)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (state.Load() != MODE_STATE::LOGIN) return false;
+	if (!(mode_state.Load() == MODE_STATE::LOGIN && life_state == LIFE_STATE::ACTIVE)) return false;
 	db_info.id = new_info->id;
+	key.id = new_info->id;
 	db_info.login_id = new_info->login_id;
 	db_info.nickname = new_info->nickname;
 	db_info.lose_count = new_info->lose_count;
 	db_info.win_count = new_info->win_count;
 	db_info.max_score = new_info->max_score;
-	state.Store(MODE_STATE::LOBBY);
+	mode_state.Store(MODE_STATE::LOBBY);
 	return true;
 }
 
@@ -74,7 +76,7 @@ void Session::SendBoundPacket(char* packet_buf, int data_size, const HANDLE iocp
 
 void Session::RecvPacket(const HANDLE iocp_handle)
 {
-	if (life_state.Load() != LIFE_STATE::ACTIVE) return;
+	if (!TryAddPending()) return;
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over.ex_over.over, sizeof(recv_over.ex_over.over)); // io 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
 	recv_over.ex_over.key = key;
@@ -206,7 +208,7 @@ int Session::GetRoomIndex() const
 RoomSnapShot Session::GetRoomSnapShot() const
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	return { state.Load(), room_index };
+	return { mode_state.Load(), room_index };
 }
 
 int Session::GetRemainDataSize() const
@@ -231,7 +233,7 @@ void Session::StoreState(MODE_STATE new_state)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return;
-	state.Store(new_state);
+	mode_state.Store(new_state);
 }
 
 void Session::SetRoomSnapShot(MODE_STATE new_state, int new_room_index)
@@ -239,7 +241,7 @@ void Session::SetRoomSnapShot(MODE_STATE new_state, int new_room_index)
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return;
 	room_index = new_room_index;
-	state.Store(new_state);
+	mode_state.Store(new_state);
 }
 
 bool Session::TrySetRoomMode(int new_room_index)
@@ -247,9 +249,9 @@ bool Session::TrySetRoomMode(int new_room_index)
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (new_room_index < 0) return false;
 	if (life_state.Load() != LIFE_STATE::ACTIVE) return false;
-	if (state.Load() != MODE_STATE::LOBBY) return false;
+	if (mode_state.Load() != MODE_STATE::LOBBY) return false;
 	room_index = new_room_index;
-	state.Store(MODE_STATE::ROOM);
+	mode_state.Store(MODE_STATE::ROOM);
 	return true;
 }
 
@@ -262,6 +264,6 @@ bool Session::TryChangeLifeState(LIFE_STATE expected, LIFE_STATE desired)
 bool Session::TryChangeState(MODE_STATE expected, MODE_STATE desired)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	return state.Compare_exchange_strong(expected, desired);
+	return mode_state.Compare_exchange_strong(expected, desired);
 }
 

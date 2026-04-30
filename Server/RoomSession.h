@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <array>
 #include <memory>
 #include "Types.h"
 #include "Tetris.h"
@@ -47,7 +46,7 @@ public:
 	bool InitRoomSession(const SP<Session>& s, int room_index);
 	void ClearRoomSession();
 	void ClearData();
-	void AddToSendBuffer(const char* data, int data_size);
+	bool AddToSendBuffer(const char* data, int data_size);
 	//void SendTickData(HANDLE iocp_handle);
 	void ClearSendBuf();
 };

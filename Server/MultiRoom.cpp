@@ -22,40 +22,49 @@ bool MultiRoom::AddHostSession(const SP<Session>& session)
 	return true;
 }
 
-void MultiRoom::HandleDeleteUserPacket(Session& request_session)
+void MultiRoom::HandleDeleteUserPacket(const SP<Session>& request_session)
 {
-	DeleteUser(request_session.GetDBInfo().id);
+	if (!request_session) return;
+	DeleteUser(request_session->GetDBInfo().id);
 }
 
-void MultiRoom::HandleReadyPacket(Session& request_session)
+void MultiRoom::HandleReadyPacket(const SP<Session>& request_session)
 {
-	ReadyUser(request_session.GetDBInfo().id);
+	if (!request_session) return;
+	ReadyUser(request_session->GetDBInfo().id);
 }
 
-void MultiRoom::HandleKickPacket(char* packet, Session& request_session)
+void MultiRoom::HandleKickPacket(char* packet, const SP<Session>& request_session)
 {
+	if (!request_session) return;
 	C2S_KICK_PACKET* kick_p = reinterpret_cast<C2S_KICK_PACKET*>(packet);
-	KickUser(request_session.GetDBInfo().id, kick_p->kick_user_id);
+	KickUser(request_session->GetDBInfo().id, kick_p->kick_user_id);
 }
 
-void MultiRoom::HandleStartPacket(Session& request_session)
+void MultiRoom::HandleStartPacket(const SP<Session>& request_session)
 {
-	StartGame(request_session.GetDBInfo().id);
+	if (!request_session) return;
+	StartGame(request_session->GetDBInfo().id);
 }
 
-void MultiRoom::HandleMovePacket(char* packet, Session& request_session)
+void MultiRoom::HandleMovePacket(char* packet, const SP<Session>& request_session)
 {
-	C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
-	TaskInfo new_task;
-	new_task.id = request_session.GetDBInfo().id;
-	new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
-	GetTasks().AddTask(new_task);
+	if (!request_session) return;
+	std::lock_guard<std::mutex> lock(room_mutex);
+	if (room_state == ROOM_STATE::PLAY) {
+		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
+		TaskInfo new_task;
+		new_task.id = request_session->GetDBInfo().id;
+		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+		GetTasks().AddTask(new_task);
+	}
 }
 
 // 게임 시작 전에 처리되는 것들 -> 함수 내에 뮤텍스 넣고 처리
 // 게임 시작 후에 처리되는 것들 -> 틱 처리 함수에 뮤텍스 넣고, 틱 처리 관련 내부 함수는 뮤텍스 넣지 않음
-void MultiRoom::HandlePacket(char* packet, Session& request_session)
+void MultiRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 {
+	if (!request_session) return;
 	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
 
 	case C2S_DELETE_USER: {
@@ -197,8 +206,9 @@ void MultiRoom::DeleteUser(const int id)
 	}
 }
 
-void MultiRoom::SendCreateRoom(Session& session)
+void MultiRoom::SendCreateRoom(const SP<Session>& session)
 {
+	if (!session) return;
 	std::lock_guard<std::mutex> lock(room_mutex);
 	if (room_password.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
@@ -207,7 +217,7 @@ void MultiRoom::SendCreateRoom(Session& session)
 		open_p.gen = room_gen;
 		open_p.max_user = max_user;
 		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
-		session.SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
@@ -217,10 +227,10 @@ void MultiRoom::SendCreateRoom(Session& session)
 		lock_p.max_user = max_user;
 		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
 		server->StringToCharBuf(room_password, lock_p.room_password, sizeof(lock_p.room_password));
-		session.SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
 	}
 	FindNewHost();
-	std::cout << "방 생성 - 방 이름: " << room_name << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
+	std::cout << "방 생성 - 방 이름: " << room_name << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
 }
 
 void MultiRoom::ReadyUser(int id)
@@ -356,7 +366,7 @@ void MultiRoom::StartGame(int request_user_id)
 
 void MultiRoom::ProcessPlayTasks()
 {
-	std::lock_guard<std::mutex> lock(room_mutex); // 게임 중간에 Disconnect 작업이 일어나 DeleteUser가 호출될 수 있음. 틱 처리 이전에 해결하는 것이 좋아보인다.
+	std::unique_lock<std::mutex> lock(room_mutex); // 게임 중간에 Disconnect 작업이 일어나 DeleteUser가 호출될 수 있음. 틱 처리 이전에 해결하는 것이 좋아보인다.
 	if (room_state.Load() != ROOM_STATE::PLAY) return;
 	UpdateTick();
 	tasks.SwapTask();
@@ -388,7 +398,12 @@ void MultiRoom::ProcessPlayTasks()
 	bool game_end = false;
 	game_end = FindWinner();
 	if (!game_end) AddSpawnTask();
-	BoundPackets();
+	int failed_user_id = BoundPackets();
+	if (failed_user_id != -1) {
+		lock.unlock();
+		DeleteUser(failed_user_id);
+		return;
+	}
 
 	ResetUsersTickData();
 	BroadcastTickDataForUsers();
@@ -521,11 +536,11 @@ void MultiRoom::RequestUpdateMatchResult()
 			is_winner = true;
 		}
 		Database& db = server->GetDB();
-		Session* session_ptr = session_shared.get();
-		auto task_update_match_result = [session_ptr, is_winner, &db] {
-			db.ExecuteUpdateMatchResult(*session_ptr, is_winner);
+		SessionKey key = session_shared->GetSessionKey();
+		auto task_update_match_result = [key, is_winner, &db] {
+			db.ExecuteUpdateMatchResult(key, is_winner);
 			};
-		db.Enqueue(task_update_match_result, session_ptr);
+		db.Enqueue(task_update_match_result, session_shared);
 	}
 }
 

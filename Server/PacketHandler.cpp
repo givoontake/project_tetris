@@ -40,24 +40,25 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 	std::string login_id = server.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
 	std::string password = server.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
 	Database& repr_db = server.GetDB();
-	Session* session_ptr = session.get();
-	auto task_login = [&repr_db, session_ptr, login_id, password]() {
-		repr_db.ExecuteLogin(*session_ptr, login_id, password);
+	SessionKey key = session->GetSessionKey();
+	auto task_login = [&repr_db, key, login_id, password]() {
+		repr_db.ExecuteLogin(key, login_id, password);
 		};
 
-	repr_db.Enqueue(task_login, session_ptr);
+	repr_db.Enqueue(task_login, session);
 }
 
-void PacketHandler::HandleMessagePacket(char* packet, Session& session)
+void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
 	int msg_size = recv_p->header.size - sizeof(C2S_MESSAGE_PACKET);
 	if (msg_size == 0) return;
 	int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
 
-	if (session.GetModeState() != MODE_STATE::LOBBY) return;
-	std::string nickname = session.GetDBInfo().nickname;
-	int id = session.GetDBInfo().id;
+	if (session->GetModeState() != MODE_STATE::LOBBY) return;
+	std::string nickname = session->GetDBInfo().nickname;
+	int id = session->GetDBInfo().id;
 
 	char* send_p = new char[send_p_size];
 	S2C_MESSAGE_PACKET front_p;
@@ -73,15 +74,16 @@ void PacketHandler::HandleMessagePacket(char* packet, Session& session)
 	delete[] send_p;
 }
 
-void PacketHandler::HandleTestPacket(char* packet, Session& session)
+void PacketHandler::HandleTestPacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_TEST_PACKET* recv_p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
 	char* send_p = new char[recv_p->header.size];
 	int msg_size = recv_p->header.size - sizeof(C2S_TEST_PACKET);
 	S2C_TEST_PACKET front_p;
 	front_p.header.size = recv_p->header.size;
 	front_p.header.type = S2C_TEST;
-	front_p.id = session.GetDBInfo().id;
+	front_p.id = session->GetDBInfo().id;
 	front_p.last_time = recv_p->last_time;
 	memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET));
 	memcpy(send_p + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_TEST_PACKET), msg_size);
@@ -91,87 +93,95 @@ void PacketHandler::HandleTestPacket(char* packet, Session& session)
 	delete[] send_p;
 }
 
-void PacketHandler::HandleDisconnectPacket(Session& session)
+void PacketHandler::HandleDisconnectPacket(const SP<Session>& session)
 {
-	if (session.BeginDeactivate()) server.BeginDisconnect(session);
-	if (session.TryDeactivate()) server.TryDisconnect(session);
+	if (!session) return;
+	if (session->BeginDeactivate()) server.BeginDisconnect(session);
+	if (session->TryDeactivate()) server.TryDisconnect(session);
 }
 
-void PacketHandler::HandleJoinOpenRoomPacket(char* packet, Session& session)
+void PacketHandler::HandleJoinOpenRoomPacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_JOIN_OPEN_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_OPEN_ROOM_PACKET*>(packet);
-	server.TryJoinRoom(session, join_p->room_gen, "");
+	int result = server.TryJoinRoom(session, join_p->room_gen, "");
+	if (result != SUCCESS) server.SendError(session, result);
 }
 
-void PacketHandler::HandleJoinLockRoomPacket(char* packet, Session& session)
+void PacketHandler::HandleJoinLockRoomPacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_JOIN_LOCK_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_LOCK_ROOM_PACKET*>(packet);
-	server.TryJoinRoom(session, join_p->room_gen, server.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
+	int result = server.TryJoinRoom(session, join_p->room_gen, server.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
+	if (result != SUCCESS) server.SendError(session, result);
 }
 
-void PacketHandler::HandleFastMatchingPacket(char* packet, Session& session)
+void PacketHandler::HandleFastMatchingPacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_FAST_MATCHING_PACKET* matching_p = reinterpret_cast<C2S_FAST_MATCHING_PACKET*>(packet);
 	server.FindMatch(session, matching_p->max_user);
 }
 
-void PacketHandler::HandleRequestFriendPacket(char* packet, Session& session)
+void PacketHandler::HandleRequestFriendPacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_REQUEST_FRIEND_PACKET* friend_p = reinterpret_cast<C2S_REQUEST_FRIEND_PACKET*>(packet);
 
-	Session& requester_sess = session;
-	if (requester_sess.GetModeState() != MODE_STATE::LOBBY) return;
+	if (session->GetModeState() != MODE_STATE::LOBBY) return;
 
 	int recver_id = friend_p->recver_id;
 	Database& repr_db = server.GetDB();
-	Session* requester_sess_ptr = &requester_sess;
-	auto task_afr = [&repr_db, requester_sess_ptr, recver_id]() {
-		repr_db.ExecuteAddFriendRequest(*requester_sess_ptr, recver_id);
+	SessionKey key = session->GetSessionKey();
+	DBResultLogin db_info = session->GetDBInfo();
+	FriendInfo requester_info{ db_info.id, db_info.nickname };
+	auto task_afr = [&repr_db, key, requester_info, recver_id]() {
+		repr_db.ExecuteAddFriendRequest(key, requester_info, recver_id);
 		};
 
-	repr_db.Enqueue(task_afr, &requester_sess);
+	repr_db.Enqueue(task_afr, session);
 }
 
-void PacketHandler::HandleAcceptFriendPacket(char* packet, Session& session)
+void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_ACCEPT_FRIEND_PACKET* accept_p = reinterpret_cast<C2S_ACCEPT_FRIEND_PACKET*>(packet);
-	Session& accepter_session = session;
-
-	if (accepter_session.GetModeState() != MODE_STATE::LOBBY) return;
+	if (session->GetModeState() != MODE_STATE::LOBBY) return;
 
 	int requester_id = accept_p->requester_id;
 	Database& repr_db = server.GetDB();
-	Session* accepter_session_ptr = &accepter_session;
-	auto task_af = [&repr_db, accepter_session_ptr, requester_id]() {
-		repr_db.ExecuteAddFriend(*accepter_session_ptr, requester_id);
+	SessionKey key = session->GetSessionKey();
+	DBResultLogin db_info = session->GetDBInfo();
+	FriendInfo accepter_info{ db_info.id, db_info.nickname };
+	auto task_af = [&repr_db, key, accepter_info, requester_id]() {
+		repr_db.ExecuteAddFriend(key, accepter_info, requester_id);
 		};
 
-	repr_db.Enqueue(task_af, &accepter_session);
+	repr_db.Enqueue(task_af, session);
 }
 
-void PacketHandler::HandleDeleteFriendPacket(char* packet, Session& session)
+void PacketHandler::HandleDeleteFriendPacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	C2S_DELETE_FRIEND_PACKET* delete_p = reinterpret_cast<C2S_DELETE_FRIEND_PACKET*>(packet);
-	Session& requester_session = session;
 	int target_id = delete_p->target_id;
-	if (requester_session.GetModeState() != MODE_STATE::LOBBY) return;
+	if (session->GetModeState() != MODE_STATE::LOBBY) return;
 	Database& repr_db = server.GetDB();
-	Session* requester_session_ptr = &requester_session;
-	auto task_df = [&repr_db, requester_session_ptr, target_id]() {
-		repr_db.ExecuteDeleteFriend(*requester_session_ptr, target_id);
+	SessionKey key = session->GetSessionKey();
+	auto task_df = [&repr_db, key, target_id]() {
+		repr_db.ExecuteDeleteFriend(key, target_id);
 		};
 
-	repr_db.Enqueue(task_df, &requester_session);
+	repr_db.Enqueue(task_df, session);
 }
 
-void PacketHandler::HandlePacket(char* packet, Session& session)
+void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)
 {
+	if (!session) return;
 	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
 
 	case C2S_LOGIN: {
-		auto session_ptr = server.FindSessionByIndex(session.GetSessionKey().index);
-		if (!session_ptr || session_ptr.get() != &session) break;
-		HandleLoginPacket(packet, session_ptr);
+		HandleLoginPacket(packet, session);
 		break;
 	}
 
