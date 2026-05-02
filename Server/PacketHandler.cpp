@@ -26,6 +26,7 @@
 #include "define_packets.h"
 #include "packet_types.h"
 #include "IOCPServer.h"
+#include "ViewSession.h"
 
 PacketHandler::PacketHandler(IOCPServer& server) : server(server)
 {
@@ -39,6 +40,11 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 
 	std::string login_id = server.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
 	std::string password = server.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
+	if (login_id == VIEW_SESSION_LOGIN_ID && password == VIEW_SESSION_PASSWORD) {
+		server.GetViewSession().InitSession(session);
+		return;
+	}
+
 	Database& repr_db = server.GetDB();
 	SessionKey key = session->GetSessionKey();
 	auto task_login = [&repr_db, key, login_id, password]() {
@@ -46,6 +52,20 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 		};
 
 	repr_db.Enqueue(task_login, session);
+}
+
+void PacketHandler::HandleTestLoginPacket(char* packet, const SP<Session>& session)
+{
+	if (!session) return;
+	C2S_TEST_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_TEST_LOGIN_PACKET*>(packet);
+	server.LoginStressTestSession(session, recv_p->temp_id);
+}
+
+void PacketHandler::HandleStressEnterMatchPacket(const SP<Session>& session)
+{
+	if (!session) return;
+	int result = server.EnterStressRoom(session);
+	if (result != SUCCESS) server.SendError(session, result);
 }
 
 void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session)
@@ -182,6 +202,16 @@ void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)
 
 	case C2S_LOGIN: {
 		HandleLoginPacket(packet, session);
+		break;
+	}
+
+	case C2S_TEST_LOGIN: {
+		HandleTestLoginPacket(packet, session);
+		break;
+	}
+
+	case C2S_STRESS_ENTER_MATCH: {
+		HandleStressEnterMatchPacket(session);
 		break;
 	}
 

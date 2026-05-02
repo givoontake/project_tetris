@@ -14,6 +14,8 @@ public:
 
 private:
 	void HandleLoginPacket(char* packet, const SP<Session>& session);
+	void HandleTestLoginPacket(char* packet, const SP<Session>& session);
+	void HandleStressEnterMatchPacket(const SP<Session>& session);
 	void HandleMessagePacket(char* packet, const SP<Session>& session);
 	void HandleTestPacket(char* packet, const SP<Session>& session);
 	void HandleDisconnectPacket(const SP<Session>& session);

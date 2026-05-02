@@ -69,6 +69,29 @@ bool TetrisRoom::AddHostSession(const SP<Session>& session)
 	return InitHostSession(session);
 }
 
+int TetrisRoom::AddStressUserInLock(const SP<Session>& session)
+{
+	if (!session) return ERROR_CODE::INVALID_REQUEST;
+	if (room_state == ROOM_STATE::PLAY) return ERROR_CODE::ROOM_INGAME;
+	if (room_state == ROOM_STATE::WAITING_DELETE) return ERROR_CODE::ROOM_NOT_FOUND;
+	if (room_state != ROOM_STATE::WAIT) return ERROR_CODE::INVALID_REQUEST;
+
+	for (auto& r_user : room_users) {
+		if (r_user.GetSession()) continue;
+		if (!r_user.InitRoomSession(session, room_index)) return ERROR_CODE::INVALID_REQUEST;
+		++cur_user;
+		return SUCCESS;
+	}
+
+	return ERROR_CODE::ROOM_FULL;
+}
+
+int TetrisRoom::AddStressUser(const SP<Session>& session)
+{
+	std::lock_guard<std::mutex> lock(room_mutex);
+	return AddStressUserInLock(session);
+}
+
 RoomInfoSnapshot TetrisRoom::GetRoomInfoSnapshot()
 {
 	std::lock_guard<std::mutex> lock(room_mutex);

@@ -31,10 +31,13 @@
     <ClCompile Include="RoomPacketHandler.cpp" />
     <ClCompile Include="RoomSession.cpp" />
     <ClCompile Include="Session.cpp" />
+    <ClCompile Include="ServerThreadManager.cpp" />
     <ClCompile Include="SingleRoom.cpp" />
+    <ClCompile Include="stress_test_files\StressRoom.cpp" />
     <ClCompile Include="Tetris.cpp" />
     <ClCompile Include="TetrisRoom.cpp" />
     <ClCompile Include="TetrisTickData.cpp" />
+    <ClCompile Include="ViewSession.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ActiveRoomManager.h" />
@@ -51,6 +54,7 @@
     <ClInclude Include="settings.h" />
     <ClInclude Include="SingleRoom.h" />
     <ClInclude Include="single_packets.h" />
+    <ClInclude Include="stress_test_files\StressRoom.h" />
     <ClInclude Include="task_type.h" />
     <ClInclude Include="Tetromino.h" />
     <ClInclude Include="ExOverlapped.h" />
@@ -62,10 +66,14 @@
     <ClInclude Include="RoomPacketHandler.h" />
     <ClInclude Include="RoomSession.h" />
     <ClInclude Include="Session.h" />
+    <ClInclude Include="ServerThreadManager.h" />
     <ClInclude Include="Tetris.h" />
     <ClInclude Include="TetrisRoom.h" />
     <ClInclude Include="TetrisTickData.h" />
     <ClInclude Include="Types.h" />
+    <ClInclude Include="ViewSession.h" />
+    <ClInclude Include="stress_test_files\MetricsPacket.h" />
+    <ClInclude Include="stress_test_files\StressTestConfig.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

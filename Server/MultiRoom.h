@@ -26,6 +26,8 @@ public:
 	virtual void DeleteUser(const int id) override;
 	virtual void SendCreateRoom(const SP<Session>& session) override;
 	virtual bool AddHostSession(const SP<Session>& session) override;
+	virtual int AddStressUser(const SP<Session>& session) override;
+	virtual void StartStressGame() override;
 
 	void StartGame(int request_user_id);
 
@@ -47,5 +49,5 @@ private:
 	void HandleKickPacket(char* packet, const SP<Session>& request_session);
 	void HandleStartPacket(const SP<Session>& request_session);
 	void HandleMovePacket(char* packet, const SP<Session>& request_session);
+	void HandleTestMovePacket(char* packet, const SP<Session>& request_session);
 };
-

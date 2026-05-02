@@ -74,9 +74,15 @@ Database::~Database()
 {
 }
 
-void Database::init(HANDLE iocp)
+void Database::init(HANDLE iocp, bool use_test_users)
 {
     iocp_handle = iocp;
+    use_test_users_table = use_test_users;
+}
+
+const char* Database::GetUserTableName() const
+{
+    return use_test_users_table ? "test_users" : "users";
 }
 
 bool Database::Enqueue(Task db_task, const SP<Session>& session)
@@ -169,13 +175,13 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
         if (!stmt) // 캐시가 없으면 캐시를 만들고 다시 캐시를 가져오고, 그래도 없으면 실패 처리
         {
             // EXISTS: 항상 1행 1컬럼(0/1) 반환
-            const char* SQL_LOGIN =
+            std::string SQL_LOGIN =
                 "SELECT password_hash "
-                "FROM users "
+                "FROM " + std::string(GetUserTableName()) + " "
                 "WHERE login_id=? "
                 "LIMIT 1";
 
-            caches.stmt_cache[DBOperationType::LOGIN].reset(caches.conn->prepareStatement(SQL_LOGIN));
+            caches.stmt_cache[DBOperationType::LOGIN].reset(caches.conn->prepareStatement(SQL_LOGIN.c_str()));
             stmt = caches.GetStmt(DBOperationType::LOGIN);
             if (!stmt)
             {
@@ -230,14 +236,14 @@ void Database::ExecuteLogin(SessionKey key, const std::string login_id, const st
             auto* info_stmt = caches.GetStmt(DBOperationType::LOAD_SESSION_INFO); // LOAD_SESSION_INFO는 캐시에만 활용
             if (!info_stmt)
             {
-                const char* SQL_LOAD_INFO =
+                std::string SQL_LOAD_INFO =
                     "SELECT user_id, nickname, single_score, win, lose "
-                    "FROM users "
+                    "FROM " + std::string(GetUserTableName()) + " "
                     "WHERE login_id=? "
                     "LIMIT 1";
 
                 caches.stmt_cache[DBOperationType::LOAD_SESSION_INFO]
-                    .reset(caches.conn->prepareStatement(SQL_LOAD_INFO));
+                    .reset(caches.conn->prepareStatement(SQL_LOAD_INFO.c_str()));
 
                 info_stmt = caches.GetStmt(DBOperationType::LOAD_SESSION_INFO);
                 if (!info_stmt)
@@ -349,10 +355,10 @@ void Database::ExecuteUpdateScore(SessionKey key, int new_score)
         auto* stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
         if (!stmt)
         {
-            const char* SQL_UPDATE_SCORE =
-                "UPDATE users SET single_score=? WHERE user_id=?";
+            std::string SQL_UPDATE_SCORE =
+                "UPDATE " + std::string(GetUserTableName()) + " SET single_score=? WHERE user_id=?";
 
-            caches.stmt_cache[DBOperationType::UPDATE_SCORE].reset(caches.conn->prepareStatement(SQL_UPDATE_SCORE));
+            caches.stmt_cache[DBOperationType::UPDATE_SCORE].reset(caches.conn->prepareStatement(SQL_UPDATE_SCORE.c_str()));
             stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
             if (!stmt)
             {
@@ -405,14 +411,14 @@ void Database::ExecuteUpdateMatchResult(SessionKey key, bool is_winner)
         auto* stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
         if (!stmt)
         {
-            const char* SQL_UPDATE_MATCH_RESULT =
-                "UPDATE users "
+            std::string SQL_UPDATE_MATCH_RESULT =
+                "UPDATE " + std::string(GetUserTableName()) + " "
                 "SET win = win + ?, "
                 "lose = lose + ? "
                 "WHERE user_id=?";
 
             caches.stmt_cache[DBOperationType::UPDATE_MATCH_RESULT]
-                .reset(caches.conn->prepareStatement(SQL_UPDATE_MATCH_RESULT));
+                .reset(caches.conn->prepareStatement(SQL_UPDATE_MATCH_RESULT.c_str()));
 
             stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
             if (!stmt)

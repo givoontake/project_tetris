@@ -22,6 +22,16 @@ bool MultiRoom::AddHostSession(const SP<Session>& session)
 	return true;
 }
 
+int MultiRoom::AddStressUser(const SP<Session>& session)
+{
+	std::lock_guard<std::mutex> lock(room_mutex);
+	int result = AddStressUserInLock(session);
+	if (result == SUCCESS && host_id == -1) {
+		host_id = session->GetDBInfo().id;
+	}
+	return result;
+}
+
 void MultiRoom::HandleDeleteUserPacket(const SP<Session>& request_session)
 {
 	if (!request_session) return;
@@ -60,6 +70,29 @@ void MultiRoom::HandleMovePacket(char* packet, const SP<Session>& request_sessio
 	}
 }
 
+void MultiRoom::HandleTestMovePacket(char* packet, const SP<Session>& request_session)
+{
+	if (!request_session) return;
+	if (!server->IsStressTestMode()) return;
+	C2S_TEST_MOVE_PACKET* recv_p = reinterpret_cast<C2S_TEST_MOVE_PACKET*>(packet);
+	{
+		std::lock_guard<std::mutex> lock(room_mutex);
+		if (room_state == ROOM_STATE::PLAY) {
+			TaskInfo new_task;
+			new_task.id = request_session->GetDBInfo().id;
+			new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+			GetTasks().AddTask(new_task);
+		}
+	}
+
+	S2C_TEST_MOVE_PACKET send_p;
+	send_p.header.size = static_cast<std::uint16_t>(sizeof(send_p));
+	send_p.header.type = S2C_TEST_MOVE;
+	send_p.sequence = recv_p->sequence;
+	send_p.client_time = recv_p->client_time;
+	request_session->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
+}
+
 // 게임 시작 전에 처리되는 것들 -> 함수 내에 뮤텍스 넣고 처리
 // 게임 시작 후에 처리되는 것들 -> 틱 처리 함수에 뮤텍스 넣고, 틱 처리 관련 내부 함수는 뮤텍스 넣지 않음
 void MultiRoom::HandlePacket(char* packet, const SP<Session>& request_session)
@@ -89,6 +122,11 @@ void MultiRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 
 	case C2S_MOVE: {
 		HandleMovePacket(packet, request_session);
+		break;
+	}
+
+	case C2S_TEST_MOVE: {
+		HandleTestMovePacket(packet, request_session);
 		break;
 	}
 	}
@@ -408,8 +446,12 @@ void MultiRoom::ProcessPlayTasks()
 	ResetUsersTickData();
 	BroadcastTickDataForUsers();
 	if (game_end) {
-		RequestUpdateMatchResult();
+		if (!server->IsStressTestMode()) RequestUpdateMatchResult();
 		ClearGame();
+		if (server->IsStressTestMode()) {
+			lock.unlock();
+			StartStressGame();
+		}
 	}
 }
 
@@ -586,3 +628,23 @@ int MultiRoom::FindHostIndex(int host_id)
 	return -1;
 }
 
+void MultiRoom::StartStressGame()
+{
+	int request_user_id = -1;
+	{
+		std::lock_guard<std::mutex> lock(room_mutex);
+		if (room_state.Load() == ROOM_STATE::PLAY) return;
+		if (host_id == -1) return;
+		if (GetCurrentUser() != GetMaxUser()) return;
+		request_user_id = host_id;
+		for (auto& r_user : room_users) {
+			auto session = r_user.GetSession();
+			if (!session) continue;
+			if (session->GetDBInfo().id != host_id) {
+				r_user.SetRoomUserState(ROOM_USER_STATE::READY);
+			}
+		}
+	}
+
+	StartGame(request_user_id);
+}

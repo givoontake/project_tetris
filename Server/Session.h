@@ -19,11 +19,14 @@ struct RoomSnapShot {
 	int room_index;
 };
 
+struct ServerMetrics;
+
 class Session
 {
 	SOCKET socket;
 	IOOverlapped recv_over;
 	//IServer* server_interface;
+	ServerMetrics* server_metrics = nullptr;
 	SessionKey key;
 	int room_index = -1;
 	int remain_data_size = 0;
@@ -76,6 +79,7 @@ public:
 
 	//setters
 	void SetIndex(int new_index);
+	void SetServerMetrics(ServerMetrics* metrics);
 	void AddDataSize(int new_data_size);
 	void StoreLifeState(LIFE_STATE new_state);
 	void StoreState(MODE_STATE new_state);

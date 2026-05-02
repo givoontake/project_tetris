@@ -1,42 +1,49 @@
 #include <iostream>
 #include <vector>
 #include <thread>
+#include <chrono>
 #include "TestManager.h"
 
 TestManager test_manager;
 
-void RecvWorkerThread()
+void IocpWorkerThread()
 {
 	while (true) {
 		test_manager.ProcessGQCS();
 	}
 }
 
-void SendWorkerThread()
+void ViewWorkerThread()
 {
-	while (true) {
-		test_manager.ProcessSend();
-	}
+	test_manager.ProcessViewSocket();
+}
+
+void ConnectWorkerThread()
+{
+	test_manager.ProcessConnectThread();
 }
 
 int main()
 {
 	test_manager.SetTestMessege(MAX_MESSAGE_SIZE);
-	bool res = test_manager.ConnectToServer();
-	if (!res) {
-		std::cout << "서버 연결 실패" << std::endl;
-		return 0;
+
+	std::vector<std::thread> worker_threads;
+	for (int i = 0; i < STRESS_WORKER_THREAD_COUNT; ++i) {
+		worker_threads.emplace_back(IocpWorkerThread);
 	}
-	std::vector <std::thread> worker_threads;
-	int recv_worker_threads = std::thread::hardware_concurrency() / 4;
-	int send_worker_threads = std::thread::hardware_concurrency() / 4;
-	for (int i = 0; i < recv_worker_threads; ++i)
-		worker_threads.emplace_back(RecvWorkerThread);
+	worker_threads.emplace_back(ConnectWorkerThread);
+	worker_threads.emplace_back(ViewWorkerThread);
 
-	for (int i = 0; i < send_worker_threads; ++i)
-		worker_threads.emplace_back(SendWorkerThread);
+	if (!test_manager.StartConnectSessions(STRESS_SESSION_COUNT)) {
+		std::cout << "some stress clients failed to start" << std::endl;
+	}
 
-	for (auto& th : worker_threads)
+	while (true) {
+		test_manager.ProcessSend();
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	}
+
+	for (auto& th : worker_threads) {
 		th.join();
+	}
 }
-

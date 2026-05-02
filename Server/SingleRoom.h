@@ -22,6 +22,7 @@ public:
 	virtual void DeleteUser(const int id) override;
 	virtual void SendCreateRoom(const SP<Session>& session) override;
 	void StartGame();
+	virtual void StartStressGame() override;
 
 	// 싱글 전용
 	void CalculateScore(int clear_line_count);
@@ -34,6 +35,6 @@ private:
 	void HandleStartPacket();
 	void HandleDeleteUserPacket(const SP<Session>& request_session);
 	void HandleMovePacket(char* packet);
+	void HandleTestMovePacket(char* packet, const SP<Session>& request_session);
 	void HandleGiveupPacket();
 };
-

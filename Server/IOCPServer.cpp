@@ -3,6 +3,8 @@
 #include "IOCPServer.h"
 #include "SingleRoom.h"
 #include "MultiRoom.h"
+#include "stress_test_files/StressRoom.h"
+#include "stress_test_files/MetricsPacket.h"
 
 #undef min
 
@@ -164,6 +166,89 @@ void IOCPServer::SendError(const SP<Session>& session, int error_code)
 	error_p.error_code = error_code;
 
 	session->SendPacket(reinterpret_cast<char*>(&error_p), iocp_handle);
+}
+
+void IOCPServer::InitStressTestRooms()
+{
+	if (!IsStressTestMode()) return;
+
+	for (int i = 0; i < MAX_ROOM; ++i) {
+		if (rooms[i].load() != nullptr) continue;
+
+		OpenRoomInitData data;
+		data.room_index = i;
+		data.room_gen = GetNewRoomGen();
+		data.max_user = static_cast<char>(stress_room_user_count);
+		data.room_name = "stress_room_" + std::to_string(i);
+
+		SP<TetrisRoom> new_room;
+		if (stress_room_user_count == 1) new_room = std::make_shared<SingleRoom>(this, data);
+		else new_room = std::make_shared<StressRoom>(this, data);
+
+		SP<TetrisRoom> expected = nullptr;
+		if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
+			active_rooms.AddRoom(data.room_gen, new_room);
+			server_metrics.active_room_count.fetch_add(1);
+		}
+	}
+}
+
+void IOCPServer::LoginStressTestSession(const SP<Session>& session, int temp_id)
+{
+	if (!session) return;
+	if (!IsStressTestMode()) {
+		SendError(session, ERROR_CODE::INVALID_REQUEST);
+		return;
+	}
+	if (temp_id < 0 || session->GetModeState() != MODE_STATE::LOGIN) {
+		SendError(session, ERROR_CODE::INVALID_REQUEST);
+		return;
+	}
+
+	DBResultLogin login_result;
+	login_result.clear();
+	login_result.id = STRESS_TEST_USER_ID_START + temp_id;
+	login_result.login_id = "stress_" + std::to_string(temp_id);
+	login_result.nickname = login_result.login_id;
+
+	S2C_TEST_LOGIN_PACKET login_p;
+	login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
+	login_p.header.type = S2C_TEST_LOGIN;
+	login_p.id = -1;
+
+	if (active_users.AddUser(session, &login_result)) {
+		login_p.id = login_result.id;
+	}
+
+	session->SendPacket(reinterpret_cast<char*>(&login_p), iocp_handle);
+}
+
+int IOCPServer::EnterStressRoom(const SP<Session>& session)
+{
+	if (!session) return ERROR_CODE::INVALID_REQUEST;
+	if (!IsStressTestMode()) return ERROR_CODE::INVALID_REQUEST;
+	if (session->GetModeState() != MODE_STATE::LOBBY) return ERROR_CODE::INVALID_REQUEST;
+
+	auto session_ptr = FindSessionByIndex(session->GetSessionKey().index);
+	if (!session_ptr || session_ptr != session) return ERROR_CODE::INVALID_REQUEST;
+
+	for (auto& room : rooms) {
+		auto room_sp = room.load();
+		if (!room_sp) continue;
+		if (room_sp->GetMaxUser() != stress_room_user_count) continue;
+
+		int result = room_sp->AddStressUser(session_ptr);
+		if (result == SUCCESS) {
+			room_sp->StartStressGame();
+			return SUCCESS;
+		}
+
+		if (result == ERROR_CODE::INVALID_REQUEST || result == ERROR_CODE::SERVER_ERROR) {
+			return result;
+		}
+	}
+
+	return ERROR_CODE::NOT_FOUND_JOINABLE_ROOM;
 }
 
 void IOCPServer::FindMatch(const SP<Session>& session, int max_user)
@@ -433,6 +518,7 @@ void IOCPServer::ProcessGQCS()
 			int new_index = GetEmptyUserIndex();
 			if (new_index != -1) {
 				auto new_session = std::make_shared<Session>();
+				new_session->SetServerMetrics(&server_metrics);
 				new_session->SetIndex(new_index);
 				new_session->InitSession(client_socket);
 				SP<Session> expected = nullptr;
@@ -440,6 +526,8 @@ void IOCPServer::ProcessGQCS()
 					CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, SESSION_IO_COMPLETION, 0);
 					new_session->RecvPacket(iocp_handle);
 					client_socket = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+					server_metrics.current_connected_users.fetch_add(1);
+					server_metrics.total_connected_users.fetch_add(1);
 					std::cout << "Session[" << new_index << "] connect" << std::endl;
 				}
 				else {
@@ -596,7 +684,7 @@ void IOCPServer::ProcessPacket(const SP<Session>& session, int recv_bytes)
 void IOCPServer::RoutePacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
-	PrintPacketType(reinterpret_cast<PacketHeader*>(packet)->type);
+	//PrintPacketType(reinterpret_cast<PacketHeader*>(packet)->type);
 	auto room_snapshot = session->GetRoomSnapShot();
 	switch (room_snapshot.state) {
 	case MODE_STATE::NONE:
@@ -680,6 +768,7 @@ void IOCPServer::CreateOpenRoom(char* packet, const SP<Session>& session)
 						return;
 					}
 					active_rooms.AddRoom(data.room_gen, new_room);
+					server_metrics.active_room_count.fetch_add(1);
 					new_room->SendCreateRoom(session_ptr);
 					return;
 				}
@@ -738,6 +827,7 @@ void IOCPServer::CreateLockRoom(char* packet, const SP<Session>& session)
 						return;
 					}
 					active_rooms.AddRoom(data.room_gen, new_room);
+					server_metrics.active_room_count.fetch_add(1);
 					new_room->SendCreateRoom(session_ptr);
 					return;
 				}
@@ -752,6 +842,7 @@ void IOCPServer::DeleteRoom(int room_index)
 	if (!room) return;
 	active_rooms.RemoveRoom(room->GetRoomGen(), room);
 	rooms[room_index].store(nullptr);
+	server_metrics.active_room_count.fetch_sub(1);
 	std::cout << "방 삭제 - 방 이름: " << room->GetRoomName() << std::endl;
 }
 
@@ -835,7 +926,9 @@ void IOCPServer::Disconnect(const SP<Session>& session)
 	if (user_index >= 0 && user_index < MAX_USER) {
 		SP<Session> expected_session = session_ptr;
 		SP<Session> empty_session = nullptr;
-		users[user_index].compare_exchange_strong(expected_session, empty_session);
+		if (users[user_index].compare_exchange_strong(expected_session, empty_session)) {
+			server_metrics.current_connected_users.fetch_sub(1);
+		}
 	}
 }
 
@@ -852,4 +945,3 @@ std::string IOCPServer::CharBufToString(const char* buf, int buf_size)
 	std::string str(buf, copy_size);
 	return str;
 }
-

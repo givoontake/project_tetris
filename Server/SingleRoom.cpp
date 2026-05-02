@@ -36,6 +36,11 @@ void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 		break;
 	}
 
+	case C2S_TEST_MOVE: {
+		HandleTestMovePacket(packet, request_session);
+		break;
+	}
+
 	case C2S_GIVEUP: {
 		HandleGiveupPacket();
 	}
@@ -65,6 +70,29 @@ void SingleRoom::HandleMovePacket(char* packet)
 		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
 		GetTasks().AddTask(new_task);
 	}
+}
+
+void SingleRoom::HandleTestMovePacket(char* packet, const SP<Session>& request_session)
+{
+	if (!request_session) return;
+	if (!server->IsStressTestMode()) return;
+	C2S_TEST_MOVE_PACKET* recv_p = reinterpret_cast<C2S_TEST_MOVE_PACKET*>(packet);
+	{
+		std::lock_guard<std::mutex> lock(room_mutex);
+		if (room_state == ROOM_STATE::PLAY) {
+			TaskInfo new_task;
+			new_task.id = request_session->GetDBInfo().id;
+			new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+			GetTasks().AddTask(new_task);
+		}
+	}
+
+	S2C_TEST_MOVE_PACKET send_p;
+	send_p.header.size = static_cast<std::uint16_t>(sizeof(send_p));
+	send_p.header.type = S2C_TEST_MOVE;
+	send_p.sequence = recv_p->sequence;
+	send_p.client_time = recv_p->client_time;
+	request_session->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
 }
 
 void SingleRoom::HandleGiveupPacket()
@@ -137,8 +165,12 @@ void SingleRoom::ProcessPlayTasks()
 	ResetUsersTickData();
 	BroadcastTickDataForUsers();
 	if (is_over) {
-		RequestUpdateScore();
+		if (!server->IsStressTestMode()) RequestUpdateScore();
 		ClearGame();
+		if (server->IsStressTestMode()) {
+			lock.unlock();
+			StartStressGame();
+		}
 	}
 }
 
@@ -179,6 +211,11 @@ void SingleRoom::StartGame()
 			Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
 		}
 	}
+}
+
+void SingleRoom::StartStressGame()
+{
+	StartGame();
 }
 
 void SingleRoom::DeleteUser(const int id)

@@ -16,6 +16,9 @@
 #include "Atomic.h"
 #include "Database.h"
 #include "RankingManager.h"
+#include "ViewSession.h"
+#include "stress_test_files/MetricsPacket.h"
+#include "stress_test_files/StressTestConfig.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -28,8 +31,12 @@ class IOCPServer
 	IOOverlapped accept_over;
 	Database db;
 	RankingManager ranking_manager;
+	ServerMetrics server_metrics;
+	ViewSession view_session;
 	ActiveRoomManager active_rooms;
 	ActiveUserManager active_users;
+	SERVER_RUN_MODE run_mode = SERVER_MODE;
+	int stress_room_user_count = STRESS_TEST_ROOM_USER_COUNT;
 	PacketHandler packet_handler;
 	DBResultHandler db_result_handler;
 	std::atomic<int> room_gen_generator = -1;
@@ -52,14 +59,16 @@ public:
 	int GetNewRoomGen();
 	bool GetRunning() const { return is_running.load(); }
 	HANDLE GetHandle() const { return iocp_handle; }
+	bool IsStressTestMode() const { return run_mode == SERVER_RUN_MODE::STRESS_TEST; }
 
 	long long GetTickCount() const { return tick_count.load(); }
 	SP<TetrisRoom> GetRoom(int room_index) const;
 	Database& GetDB() { return db; }
 	RankingManager& GetRankingManager() { return ranking_manager; }
+	ServerMetrics& GetServerMetrics() { return server_metrics; }
+	ViewSession& GetViewSession() { return view_session; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
-
 	SP<Session> FindSessionByIndex(int user_index);
 
 	void BeginDisconnect(const SP<Session>& session);
@@ -87,4 +96,7 @@ public:
 	void SendRanking(const SP<Session>& session);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
 	void SendDeleteFriendResult(int requester_id, int target_id);
+	void InitStressTestRooms();
+	void LoginStressTestSession(const SP<Session>& session, int temp_id);
+	int EnterStressRoom(const SP<Session>& session);
 };

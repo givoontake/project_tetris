@@ -22,7 +22,7 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 // 그러면 회전된 테트로미노 관리가 수월해진다.
 EVENT_TYPE Tetris::HandleTetrominoKeyInput(EVENT_TYPE move_type) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
 {
-    PrintMoveType(move_type);
+    //PrintMoveType(move_type);
     Tetromino if_move_tetromino = current_tetromino;
 	if(!CheckInputAllow(move_type)) return EVENT_TYPE::NONE;
     switch (move_type) {

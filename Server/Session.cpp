@@ -1,6 +1,7 @@
 #include <iostream>
 #include <mutex>
 #include "Session.h"
+#include "stress_test_files/MetricsPacket.h"
 
 Session::Session()
 {
@@ -133,6 +134,12 @@ void Session::SetIndex(int new_index)
 	key.index = new_index;
 }
 
+void Session::SetServerMetrics(ServerMetrics* metrics)
+{
+	std::lock_guard<std::mutex> lock(sess_mutex);
+	server_metrics = metrics;
+}
+
 void Session::AddDataSize(int new_data_size)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
@@ -145,6 +152,7 @@ bool Session::TryAddPending()
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (life_state.Load() != LIFE_STATE::ACTIVE) return false;
 	io_pending_count++;
+	if (server_metrics) server_metrics->current_pending_count.fetch_add(1);
 	return true;	
 }
 
@@ -152,6 +160,10 @@ void Session::ReducePending()
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	--io_pending_count;
+	if (server_metrics) {
+		server_metrics->completed_pending_total.fetch_add(1);
+		server_metrics->current_pending_count.fetch_sub(1);
+	}
 }
 
 bool Session::IsDisconnectable()
@@ -266,4 +278,3 @@ bool Session::TryChangeState(MODE_STATE expected, MODE_STATE desired)
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	return mode_state.Compare_exchange_strong(expected, desired);
 }
-

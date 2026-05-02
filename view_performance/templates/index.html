@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tetris Performance View</title>
+  <link rel="stylesheet" href="/static/style.css?v=2" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <h1>Tetris<br />Performance View</h1>
+        <p class="subtitle">서버와 스트레스 프로그램의 IP를 직접 입력하면 각 지표를 독립적으로 갱신합니다.</p>
+      </div>
+      <div class="badge">Binary metrics · 1s refresh</div>
+    </section>
+
+    <section id="connectPanel" class="panel connect-panel">
+      <div class="connect-grid">
+        <div class="connect-field">
+          <label for="serverHost">Server IP</label>
+          <div class="input-action">
+            <input id="serverHost" placeholder="예: 192.168.0.10 또는 192.168.0.10:12345" />
+            <button id="connectServerBtn">서버 연결</button>
+          </div>
+        </div>
+        <div class="connect-field">
+          <label for="stressHost">Stress IP</label>
+          <div class="input-action">
+            <input id="stressHost" placeholder="예: 192.168.0.20 또는 192.168.0.20:23456" />
+            <button id="connectStressBtn">테스트 연결</button>
+          </div>
+        </div>
+      </div>
+      <div class="status-row">
+        <span id="serverChip" class="chip">server: waiting</span>
+        <span id="stressChip" class="chip">stress: waiting</span>
+        <span id="messageChip" class="chip">ready</span>
+      </div>
+    </section>
+
+    <section id="dashboard" class="dashboard open">
+      <div class="section-title">Server</div>
+      <article class="card">
+        <div class="metric-title">Current Users</div>
+        <div class="metric-value" id="serverCurrentUsers">?</div>
+        <div class="meter"><i id="serverUsersMeter"></i></div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Total Users</div>
+        <div class="metric-value" id="serverTotalUsers">?</div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Pending Left</div>
+        <div class="metric-value" id="serverPending">?</div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Active Rooms</div>
+        <div class="metric-value" id="serverRooms">?</div>
+      </article>
+      <article class="card wide">
+        <div class="metric-title">Pending Completed</div>
+        <div class="metric-value" id="serverPendingDone">?</div>
+      </article>
+      <article class="card wide">
+        <div class="metric-title">Memory</div>
+        <div class="metric-value"><span id="serverMemory">?</span><span class="metric-unit">MB</span></div>
+      </article>
+
+      <div class="section-title">Stress Client</div>
+      <article class="card">
+        <div class="metric-title">Connected</div>
+        <div class="metric-value" id="stressConnected">?</div>
+        <div class="meter"><i id="stressConnectedMeter"></i></div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Playing</div>
+        <div class="metric-value" id="stressPlaying">?</div>
+        <div class="meter"><i id="stressPlayingMeter"></i></div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Current RTT</div>
+        <div class="metric-value"><span id="stressCurrentRtt">?</span><span class="metric-unit">ms</span></div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Average RTT</div>
+        <div class="metric-value"><span id="stressAvgRtt">?</span><span class="metric-unit">ms</span></div>
+      </article>
+      <article class="card wide">
+        <div class="metric-title">Max RTT</div>
+        <div class="metric-value"><span id="stressMaxRtt">?</span><span class="metric-unit">ms</span></div>
+      </article>
+      <article class="card wide">
+        <div class="metric-title">RTT Samples</div>
+        <div class="metric-value" id="stressSamples">?</div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Login RTT</div>
+        <div class="metric-value"><span id="stressCurrentLoginRtt">?</span><span class="metric-unit">ms</span></div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Avg Login RTT</div>
+        <div class="metric-value"><span id="stressAvgLoginRtt">?</span><span class="metric-unit">ms</span></div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Max Login RTT</div>
+        <div class="metric-value"><span id="stressMaxLoginRtt">?</span><span class="metric-unit">ms</span></div>
+      </article>
+      <article class="card">
+        <div class="metric-title">Login Samples</div>
+        <div class="metric-value" id="stressLoginSamples">?</div>
+      </article>
+
+      <article class="panel log" id="logBox">server connected=false users=? pending=?
+stress connected=false clients=? playing=? rtt=?ms login=?ms</article>
+    </section>
+  </main>
+
+  <script src="/static/app.js?v=5"></script>
+</body>
+</html>

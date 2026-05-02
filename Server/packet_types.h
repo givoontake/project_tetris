@@ -82,6 +82,9 @@ constexpr std::uint8_t S2C_RANKING_INFO = 63;
 constexpr std::uint8_t S2C_INFO = 100;
 constexpr std::uint8_t S2C_TEST_LOGIN = 101;
 constexpr std::uint8_t C2S_TEST_LOGIN = 102;
+constexpr std::uint8_t C2S_STRESS_ENTER_MATCH = 103;
+constexpr std::uint8_t C2S_TEST_MOVE = 104;
+constexpr std::uint8_t S2C_TEST_MOVE = 105;
 
 inline void PrintPacketType(std::uint8_t type)
 {
@@ -152,5 +155,3 @@ inline void PrintPacketType(std::uint8_t type)
 
     std::cout << " (" << static_cast<int>(type) << ")\n";
 }
-
-

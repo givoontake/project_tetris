@@ -95,6 +95,7 @@ protected:
 	std::mutex room_mutex;
 
 	bool InitHostSession(const SP<Session>& session);
+	int AddStressUserInLock(const SP<Session>& session);
 
 public:
 	TetrisRoom(IOCPServer* server, OpenRoomInitData data);
@@ -119,6 +120,8 @@ public:
 	virtual void DeleteUser(const int id) = 0;	
 	virtual void SendCreateRoom(const SP<Session>& session) = 0;
 	virtual bool AddHostSession(const SP<Session>& session);
+	virtual int AddStressUser(const SP<Session>& session);
+	virtual void StartStressGame() = 0;
 	// 공통
 	void SetRoomIndex(const int val);
 	void SetRoomGen(const int val);

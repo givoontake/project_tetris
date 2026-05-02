@@ -58,6 +58,7 @@ private:
     std::string db_id;
     std::string db_password;
     std::string schema;
+    bool use_test_users_table = false;
 
     std::atomic<bool> running{ false };
 
@@ -81,7 +82,7 @@ public:
     bool GetRunning() const { return running.load(); }
     void SetRunning(bool val) { running.store(val); }
 
-    void init(HANDLE iocp);
+    void init(HANDLE iocp, bool use_test_users);
     void Run();
     //Database(const Database&) = delete;
     //Database& operator=(const Database&) = delete;
@@ -110,6 +111,7 @@ private:
     bool LoadDBConfigFromFile(const std::string& file_path);
 
 private:
+    const char* GetUserTableName() const;
     bool Connect();
     void Disconnect();
 };
