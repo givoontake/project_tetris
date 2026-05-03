@@ -30,6 +30,7 @@ struct C2S_TEST_MOVE_PACKET
 struct S2C_TEST_MOVE_PACKET
 {
 	PacketHeader header;
+	int id;
 	std::uint32_t sequence;
 	std::uint64_t client_time;
 };

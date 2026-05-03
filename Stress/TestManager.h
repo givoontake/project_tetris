@@ -27,17 +27,15 @@ class TestManager
 	std::mutex connect_mutex;
 	std::condition_variable connect_cv;
 	std::mutex latency_mutex;
-	std::array<long long, 100> recent_latencies{};
+	std::array<long long, STRESS_LATENCY_AVERAGE_COUNT> recent_latencies{};
 	int recent_latency_index = 0;
 	int recent_latency_count = 0;
 	long long recent_latency_total = 0;
-	std::atomic<long long> latency_total = 0;
-	std::atomic<long long> latency_sample_count = 0;
 	std::atomic<long long> current_latency = 0;
 	std::atomic<long long> recent_average_latency = 0;
 	std::atomic<long long> max_latency = 0;
 	std::atomic<long long> login_latency_total = 0;
-	std::atomic<long long> login_latency_sample_count = 0;
+	std::atomic<long long> login_latency_count = 0;
 	std::atomic<long long> current_login_latency = 0;
 	std::atomic<long long> average_login_latency = 0;
 	std::atomic<long long> max_login_latency = 0;
@@ -47,6 +45,7 @@ class TestManager
 	std::atomic<int> target_connect_count = 0;
 	std::atomic<int> started_connect_count = 0;
 	std::atomic<int> connect_signal_count = 0;
+	std::atomic<bool> connect_enabled = true;
 
 public:
 	std::atomic<int> connected_client = 0;
@@ -68,6 +67,7 @@ public:
 	void HandlePacket(char* packet, int user_index);
 	void Disconnect(int session_index);
 	void ProcessViewSocket();
+	void ProcessViewControl(SOCKET socket);
 
 	long long GetCurrentTimeMS();
 	void AdjustSessionNumber(long long now_time, S2C_TEST_PACKET* p);
@@ -87,4 +87,5 @@ private:
 	long long GetConnectDelay(long long average_latency) const;
 	void PrintMetrics(long long now_time);
 	void SendViewMetrics();
+	void SetConnectEnabled(bool enabled);
 };

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <array>
 #include <string>
@@ -17,6 +18,9 @@ struct TaskInfo
 {
 	EVENT_TYPE type;
 	int id;
+	bool is_test = false;
+	std::uint32_t sequence = 0;
+	std::uint64_t client_time = 0;
 };
 
 //struct TaskQueue

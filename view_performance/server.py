@@ -16,6 +16,7 @@ STRESS_VIEW_PORT = 23456
 C2S_LOGIN = 2
 S2V_SERVER_METRICS = 1
 S2V_STRESS_METRICS = 2
+V2S_STRESS_CONNECT_CONTROL = 3
 
 MAX_USER_ID = 48
 MAX_USER_PASSWORD = 48
@@ -25,8 +26,15 @@ TEMPLATE_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
 HEADER_STRUCT = struct.Struct("<HB")
-SERVER_METRICS_STRUCT = struct.Struct("<QQQQQQqQQ")
-STRESS_METRICS_STRUCT = struct.Struct("<QQQQQQQQQQ")
+MAX_LOGICAL_PROCESSOR_METRICS = 64
+MAX_TICK_WORKER_METRICS = 32
+SERVER_METRICS_STRUCT = struct.Struct(
+    "<QQQQQQqQQQQQ"
+    + ("Q" * MAX_LOGICAL_PROCESSOR_METRICS)
+    + ("Q" * MAX_TICK_WORKER_METRICS)
+)
+STRESS_METRICS_STRUCT = struct.Struct("<QQQQQQQQQ")
+STRESS_CONNECT_CONTROL_STRUCT = struct.Struct("<B")
 
 CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -133,9 +141,19 @@ class MetricsHub:
             "current_connected_users", "total_connected_users", "current_latency_ms",
             "average_latency_ms", "max_latency_ms", "completed_pending_total",
             "current_pending_count", "active_room_count", "server_memory_bytes",
+            "created_thread_count", "logical_processor_count", "tick_worker_count",
         ]
+        server_data = dict(zip(keys, values[:len(keys)]))
+        processor_count = min(int(server_data.get("logical_processor_count", 0)), MAX_LOGICAL_PROCESSOR_METRICS)
+        processor_start = len(keys)
+        processor_usage = list(values[processor_start:processor_start + processor_count])
+        tick_worker_count = min(int(server_data.get("tick_worker_count", 0)), MAX_TICK_WORKER_METRICS)
+        tick_worker_start = processor_start + MAX_LOGICAL_PROCESSOR_METRICS
+        tick_worker_ticks = list(values[tick_worker_start:tick_worker_start + tick_worker_count])
+        server_data["logical_processor_usage"] = processor_usage
+        server_data["tick_worker_ticks_per_second"] = tick_worker_ticks
         with self.lock:
-            self.server = dict(zip(keys, values))
+            self.server = server_data
             self.server_connected = True
             self.server_updated_at = time.monotonic()
 
@@ -143,14 +161,24 @@ class MetricsHub:
         values = STRESS_METRICS_STRUCT.unpack(payload[:STRESS_METRICS_STRUCT.size])
         keys = [
             "connected_client", "playing_client", "current_latency_ms",
-            "average_latency_ms", "max_latency_ms", "latency_sample_count",
+            "average_latency_ms", "max_latency_ms",
             "current_login_latency_ms", "average_login_latency_ms",
-            "max_login_latency_ms", "login_latency_sample_count",
+            "max_login_latency_ms", "connect_enabled",
         ]
         with self.lock:
             self.stress = dict(zip(keys, values))
             self.stress_connected = True
             self.stress_updated_at = time.monotonic()
+
+    def send_stress_connect_control(self, enabled):
+        with self.lock:
+            sock = self.stress_socket
+        if not sock:
+            raise ConnectionError("stress socket is not connected")
+
+        payload = STRESS_CONNECT_CONTROL_STRUCT.pack(1 if enabled else 0)
+        packet_size = HEADER_STRUCT.size + len(payload)
+        sock.sendall(HEADER_STRUCT.pack(packet_size, V2S_STRESS_CONNECT_CONTROL) + payload)
 
 
 HUB = MetricsHub()
@@ -312,6 +340,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/disconnect":
             HUB.close()
             self._send_json(200, {"ok": True})
+            return
+
+        if path == "/api/stress/connect-control":
+            try:
+                body = json.loads(raw.decode("utf-8"))
+                HUB.send_stress_connect_control(bool(body.get("enabled")))
+                self._send_json(200, {"ok": True})
+            except Exception as exc:
+                self._send_json(200, {"ok": False, "error": str(exc)})
             return
 
         self.send_error(404)

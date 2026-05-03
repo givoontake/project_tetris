@@ -20,11 +20,13 @@ struct S2C_ERROR_PACKET {
 struct S2C_TEST_LOGIN_PACKET {
 	PacketHeader header;
 	int id;
+	std::uint64_t client_time;
 };
 
 struct C2S_TEST_LOGIN_PACKET {
 	PacketHeader header;
 	int temp_id;
+	std::uint64_t client_time;
 };
 
 struct S2C_LOGIN_PACKET {

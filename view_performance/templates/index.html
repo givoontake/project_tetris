@@ -67,8 +67,32 @@
         <div class="metric-title">Memory</div>
         <div class="metric-value"><span id="serverMemory">?</span><span class="metric-unit">MB</span></div>
       </article>
+      <article class="card wide">
+        <div class="metric-title">Threads</div>
+        <div class="metric-value" id="serverThreads">?</div>
+      </article>
+      <article class="card wide">
+        <div class="metric-title">Logical Processors</div>
+        <div class="metric-value" id="processorCount">?</div>
+      </article>
+      <article class="card full processor-card">
+        <div class="metric-title">Logical Processor Usage</div>
+        <div id="processorBars" class="processor-grid"></div>
+      </article>
+      <article class="card full processor-card">
+        <div class="metric-title">Tick Worker Ticks / Sec</div>
+        <div id="tickWorkerBars" class="processor-grid"></div>
+      </article>
 
       <div class="section-title">Stress Client</div>
+      <article class="card wide">
+        <div class="metric-title">Connect Control</div>
+        <div class="metric-value" id="stressConnectStatus">?</div>
+        <div class="control-actions">
+          <button id="pauseConnectBtn">&#50672;&#44208; &#51473;&#51648;</button>
+          <button id="resumeConnectBtn">&#50672;&#44208; &#51116;&#44060;</button>
+        </div>
+      </article>
       <article class="card">
         <div class="metric-title">Connected</div>
         <div class="metric-value" id="stressConnected">?</div>
@@ -91,10 +115,6 @@
         <div class="metric-title">Max RTT</div>
         <div class="metric-value"><span id="stressMaxRtt">?</span><span class="metric-unit">ms</span></div>
       </article>
-      <article class="card wide">
-        <div class="metric-title">RTT Samples</div>
-        <div class="metric-value" id="stressSamples">?</div>
-      </article>
       <article class="card">
         <div class="metric-title">Login RTT</div>
         <div class="metric-value"><span id="stressCurrentLoginRtt">?</span><span class="metric-unit">ms</span></div>
@@ -107,16 +127,12 @@
         <div class="metric-title">Max Login RTT</div>
         <div class="metric-value"><span id="stressMaxLoginRtt">?</span><span class="metric-unit">ms</span></div>
       </article>
-      <article class="card">
-        <div class="metric-title">Login Samples</div>
-        <div class="metric-value" id="stressLoginSamples">?</div>
-      </article>
 
       <article class="panel log" id="logBox">server connected=false users=? pending=?
 stress connected=false clients=? playing=? rtt=?ms login=?ms</article>
     </section>
   </main>
 
-  <script src="/static/app.js?v=5"></script>
+  <script src="/static/app.js?v=10"></script>
 </body>
 </html>

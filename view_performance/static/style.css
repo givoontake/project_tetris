@@ -204,6 +204,10 @@ button:disabled {
   grid-column: span 6;
 }
 
+.card.full {
+  grid-column: span 12;
+}
+
 .card::after {
   content: "";
   position: absolute;
@@ -254,6 +258,70 @@ button:disabled {
   transition: width 0.35s ease;
 }
 
+.control-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.control-actions button {
+  padding: 12px 18px;
+  font-size: 14px;
+}
+
+.processor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.processor-item {
+  position: relative;
+  overflow: hidden;
+  min-height: 54px;
+  border: 1px solid rgba(16, 33, 63, 0.1);
+  border-radius: 14px;
+  background: rgba(16, 33, 63, 0.06);
+  padding: 10px;
+}
+
+.processor-item span,
+.processor-item strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+.processor-item span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.processor-item strong {
+  margin-top: 4px;
+  font-size: 18px;
+  letter-spacing: -0.04em;
+}
+
+.processor-item i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 5px;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+  transition: width 0.35s ease;
+}
+
+.processor-empty {
+  color: var(--muted);
+  font-size: 22px;
+  font-weight: 900;
+}
+
 .section-title {
   grid-column: span 12;
   margin: 12px 0 -4px;
@@ -286,7 +354,8 @@ button:disabled {
   }
 
   .card,
-  .card.wide {
+  .card.wide,
+  .card.full {
     grid-column: span 12;
   }
 }

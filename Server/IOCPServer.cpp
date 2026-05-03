@@ -8,6 +8,27 @@
 
 #undef min
 
+namespace
+{
+	int MakeStressUserId(const std::string& login_id, int session_index)
+	{
+		long long suffix = 0;
+		long long digit_value = 1;
+		bool has_digit = false;
+		for (auto it = login_id.rbegin(); it != login_id.rend(); ++it) {
+			if (*it < '0' || *it > '9') break;
+			has_digit = true;
+			suffix += static_cast<long long>(*it - '0') * digit_value;
+			digit_value *= 10;
+			if (suffix > MAX_USER * 10) break;
+		}
+		if (has_digit && suffix > 0 && suffix <= MAX_USER * 10) {
+			return STRESS_TEST_USER_ID_START + static_cast<int>(suffix);
+		}
+		return STRESS_TEST_USER_ID_START + session_index + 1;
+	}
+}
+
 IOCPServer::IOCPServer() : packet_handler(*this), db_result_handler(*this)
 {
 	for (int i = 0; i < MAX_USER; ++i) {
@@ -193,28 +214,47 @@ void IOCPServer::InitStressTestRooms()
 	}
 }
 
-void IOCPServer::LoginStressTestSession(const SP<Session>& session, int temp_id)
+void IOCPServer::LoginStressTestSession(const SP<Session>& session, const std::string& login_id, std::uint64_t client_time)
 {
 	if (!session) return;
 	if (!IsStressTestMode()) {
 		SendError(session, ERROR_CODE::INVALID_REQUEST);
 		return;
 	}
-	if (temp_id < 0 || session->GetModeState() != MODE_STATE::LOGIN) {
+	if (login_id.empty() || session->GetModeState() != MODE_STATE::LOGIN) {
 		SendError(session, ERROR_CODE::INVALID_REQUEST);
 		return;
 	}
 
 	DBResultLogin login_result;
 	login_result.clear();
-	login_result.id = STRESS_TEST_USER_ID_START + temp_id;
-	login_result.login_id = "stress_" + std::to_string(temp_id);
+	login_result.id = MakeStressUserId(login_id, session->GetSessionKey().index);
+	login_result.login_id = login_id;
 	login_result.nickname = login_result.login_id;
 
-	S2C_TEST_LOGIN_PACKET login_p;
+	if (client_time != 0) {
+		S2C_TEST_LOGIN_PACKET login_p;
+		login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
+		login_p.header.type = S2C_TEST_LOGIN;
+		login_p.id = -1;
+		login_p.client_time = client_time;
+
+		if (active_users.AddUser(session, &login_result)) {
+			login_p.id = login_result.id;
+		}
+
+		session->SendPacket(reinterpret_cast<char*>(&login_p), iocp_handle);
+		return;
+	}
+
+	S2C_LOGIN_PACKET login_p;
 	login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
-	login_p.header.type = S2C_TEST_LOGIN;
+	login_p.header.type = S2C_LOGIN;
 	login_p.id = -1;
+	login_p.max_score = 0;
+	login_p.win_count = 0;
+	login_p.lose_count = 0;
+	StringToCharBuf(login_result.nickname, login_p.nickname, sizeof(login_p.nickname));
 
 	if (active_users.AddUser(session, &login_result)) {
 		login_p.id = login_result.id;
@@ -557,38 +597,37 @@ void IOCPServer::ProcessGQCS()
 				if (ex_over->op_type == OP_TYPE::SEND) delete io_over;
 				break;
 			}
-			Session& sess = *sess_ptr;
 			switch (ex_over->op_type) {
 			case OP_TYPE::RECV: {
 				if (!result || transferred_bytes == 0) {
-					if (sess.BeginDeactivate()) {
+					if (sess_ptr->BeginDeactivate()) {
 						BeginDisconnect(sess_ptr); // 팬딩이 0으로 노출되면 다른 곳에서 disconnect 관련 작업이 일어날 수 있다.
 					}
-					sess.ReducePending();
-					if (sess.TryDeactivate()) TryDisconnect(sess_ptr);
+					sess_ptr->ReducePending();
+					if (sess_ptr->TryDeactivate()) TryDisconnect(sess_ptr);
 
 					break;
 				}
 				else {
 					ProcessPacket(sess_ptr, transferred_bytes); // recv 토큰은 정상 수신 중 유지하고 disconnect 경로에서만 줄인다.
-					sess.ReducePending();
-					if (sess.TryDeactivate()) TryDisconnect(sess_ptr);
-					sess.RecvPacket(iocp_handle);
+					sess_ptr->ReducePending();
+					if (sess_ptr->TryDeactivate()) TryDisconnect(sess_ptr);
+					sess_ptr->RecvPacket(iocp_handle);
 				}
 				break;
 			}
 
 			case OP_TYPE::SEND: {
 				if ((!result || transferred_bytes == 0)) {
-					if (sess.BeginDeactivate()) {
+					if (sess_ptr->BeginDeactivate()) {
 						BeginDisconnect(sess_ptr);
 					}
-					sess.ReducePending();
-					if (sess.TryDeactivate()) TryDisconnect(sess_ptr);
+					sess_ptr->ReducePending();
+					if (sess_ptr->TryDeactivate()) TryDisconnect(sess_ptr);
 				}
 				else {
-					sess.ReducePending();
-					if (sess.TryDeactivate()) TryDisconnect(sess_ptr);
+					sess_ptr->ReducePending();
+					if (sess_ptr->TryDeactivate()) TryDisconnect(sess_ptr);
 				}
 				
 				delete io_over;

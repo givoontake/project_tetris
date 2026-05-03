@@ -97,6 +97,6 @@ public:
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& recver_info);
 	void SendDeleteFriendResult(int requester_id, int target_id);
 	void InitStressTestRooms();
-	void LoginStressTestSession(const SP<Session>& session, int temp_id);
+	void LoginStressTestSession(const SP<Session>& session, const std::string& login_id, std::uint64_t client_time = 0);
 	int EnterStressRoom(const SP<Session>& session);
 };

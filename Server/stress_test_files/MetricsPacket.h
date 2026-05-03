@@ -1,7 +1,10 @@
 #pragma once
+#include <array>
 #include <atomic>
 #include <cstdint>
 
+constexpr int MAX_LOGICAL_PROCESSOR_METRICS = 64;
+constexpr int MAX_TICK_WORKER_METRICS = 32;
 constexpr int VIEW_SESSION_ID = 99999;
 constexpr const char* VIEW_SESSION_LOGIN_ID = "server";
 constexpr const char* VIEW_SESSION_PASSWORD = "1234";
@@ -19,6 +22,10 @@ struct ServerMetrics
 	std::atomic<std::int64_t> current_pending_count = 0;
 	std::atomic<std::uint64_t> active_room_count = 0;
 	std::atomic<std::uint64_t> server_memory_bytes = 0;
+	std::atomic<std::uint64_t> created_thread_count = 0;
+	std::atomic<std::uint64_t> logical_processor_count = 0;
+	std::array<std::atomic<std::uint64_t>, MAX_LOGICAL_PROCESSOR_METRICS> logical_processor_usage{};
+	std::array<std::atomic<std::uint64_t>, MAX_TICK_WORKER_METRICS> tick_worker_processed_ticks{};
 };
 
 #pragma pack(push, 1)
@@ -40,6 +47,11 @@ struct ServerMetricsSnapshot
 	std::int64_t current_pending_count;
 	std::uint64_t active_room_count;
 	std::uint64_t server_memory_bytes;
+	std::uint64_t created_thread_count;
+	std::uint64_t logical_processor_count;
+	std::uint64_t tick_worker_count;
+	std::uint64_t logical_processor_usage[MAX_LOGICAL_PROCESSOR_METRICS];
+	std::uint64_t tick_worker_ticks_per_second[MAX_TICK_WORKER_METRICS];
 };
 
 struct S2V_SERVER_METRICS_PACKET

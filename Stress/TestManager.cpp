@@ -7,6 +7,20 @@
 #include <thread>
 #include "TestManager.h"
 
+namespace
+{
+	bool RecvExact(SOCKET socket, char* buffer, int size)
+	{
+		int received = 0;
+		while (received < size) {
+			int ret = recv(socket, buffer + received, size - received, 0);
+			if (ret <= 0) return false;
+			received += ret;
+		}
+		return true;
+	}
+}
+
 TestManager::TestManager()
 {
 	for (int i = 0; i < MAX_USER; i++){
@@ -78,6 +92,33 @@ void TestManager::ProcessViewSocket()
 		if (view_socket != INVALID_SOCKET) closesocket(view_socket);
 		view_socket = accepted_socket;
 		std::cout << "stress view connected" << std::endl;
+		std::thread(&TestManager::ProcessViewControl, this, accepted_socket).detach();
+	}
+}
+
+void TestManager::ProcessViewControl(SOCKET socket)
+{
+	while (true) {
+		PacketHeader header{};
+		if (!RecvExact(socket, reinterpret_cast<char*>(&header), sizeof(header))) break;
+		if (header.size < sizeof(PacketHeader) || header.size > BUF_SIZE) break;
+
+		char payload[BUF_SIZE]{};
+		int payload_size = header.size - static_cast<int>(sizeof(PacketHeader));
+		if (payload_size > 0 && !RecvExact(socket, payload, payload_size)) break;
+
+		if (header.type == V2S_STRESS_CONNECT_CONTROL && header.size == sizeof(V2S_STRESS_CONNECT_CONTROL_PACKET)) {
+			V2S_STRESS_CONNECT_CONTROL_PACKET packet{};
+			packet.header = header;
+			memcpy(reinterpret_cast<char*>(&packet) + sizeof(PacketHeader), payload, payload_size);
+			SetConnectEnabled(packet.connect_enabled != 0);
+		}
+	}
+
+	std::lock_guard<std::mutex> lock(view_mutex);
+	if (view_socket == socket) {
+		closesocket(view_socket);
+		view_socket = INVALID_SOCKET;
 	}
 }
 
@@ -163,9 +204,9 @@ bool TestManager::ConnectToServer()
 
 long long TestManager::GetConnectDelay(long long average_latency) const
 {
-	if (average_latency <= 50) return 20;
+	if (average_latency <= 50) return 10;
 	if (average_latency >= 100) return 2000;
-	return 20 + ((average_latency - 50) * 1980) / 50;
+	return 10 + ((average_latency - 50) * 1990) / 50;
 }
 
 void TestManager::NotifyLoginSuccess()
@@ -201,7 +242,7 @@ void TestManager::ResetRecentLatency()
 	recent_latency_count = 0;
 	recent_latency_total = 0;
 	recent_average_latency.store(0);
-	delay.store(20);
+	delay.store(10);
 }
 
 void TestManager::ProcessConnectThread()
@@ -213,6 +254,8 @@ void TestManager::ProcessConnectThread()
 				return connect_signal_count.load() > 0;
 				});
 		}
+
+		if (!connect_enabled.load()) continue;
 
 		long long average_latency = recent_average_latency.load();
 		if (average_latency > 100) {
@@ -240,6 +283,7 @@ void TestManager::ProcessConnectThread()
 		}
 
 		average_latency = recent_average_latency.load();
+		if (!connect_enabled.load()) continue;
 		if (average_latency > 100) continue;
 		if (started_connect_count.load() >= target_count) continue;
 		if (connect_signal_count.load() > 0) {
@@ -332,8 +376,8 @@ void TestManager::SendTestLoginPacket(int user_index)
 	C2S_TEST_LOGIN_PACKET p{};
 	p.header.size = static_cast<std::uint16_t>(sizeof(p));
 	p.header.type = C2S_TEST_LOGIN;
-	p.temp_id = user_index + 1;
-	sessions[user_index]->login_send_time.store(GetCurrentTimeMS());
+	p.temp_id = user_index;
+	p.client_time = static_cast<std::uint64_t>(GetCurrentTimeMS());
 	sessions[user_index]->SendPacket(reinterpret_cast<char*>(&p), iocp_handle);
 }
 
@@ -468,7 +512,13 @@ void TestManager::HandlePacket(char* packet, int user_index)
 	switch (header->type) {
 	case S2C_TEST_LOGIN: {
 		S2C_TEST_LOGIN_PACKET* p = reinterpret_cast<S2C_TEST_LOGIN_PACKET*>(packet);
-		UpdateLoginLatency(user_index);
+		current_login_latency.store(GetCurrentTimeMS() - static_cast<long long>(p->client_time));
+		long long total_latency = login_latency_total.fetch_add(current_login_latency.load()) + current_login_latency.load();
+		long long login_count = login_latency_count.fetch_add(1) + 1;
+		average_login_latency.store(total_latency / login_count);
+		long long expected = max_login_latency.load();
+		while (current_login_latency.load() > expected && !max_login_latency.compare_exchange_weak(expected, current_login_latency.load())) {
+		}
 		NotifyLoginSuccess();
 		if (p->id >= 0 && session->GetState() == LOGIN) {
 			session->SetId(p->id);
@@ -504,6 +554,7 @@ void TestManager::HandlePacket(char* packet, int user_index)
 
 	case S2C_TEST_MOVE: {
 		S2C_TEST_MOVE_PACKET* p = reinterpret_cast<S2C_TEST_MOVE_PACKET*>(packet);
+		if (p->id != session->GetId()) break;
 		long long now_time = GetCurrentTimeMS();
 		UpdateLatency(now_time - static_cast<long long>(p->client_time));
 		break;
@@ -527,8 +578,6 @@ void TestManager::HandlePacket(char* packet, int user_index)
 void TestManager::UpdateLatency(long long latency)
 {
 	current_latency.store(latency);
-	latency_total.fetch_add(latency);
-	long long new_sample_count = latency_sample_count.fetch_add(1) + 1;
 	long long average_latency = 0;
 	{
 		std::lock_guard<std::mutex> lock(latency_mutex);
@@ -545,7 +594,15 @@ void TestManager::UpdateLatency(long long latency)
 	}
 	recent_average_latency.store(average_latency);
 	delay.store(GetConnectDelay(average_latency));
-	if (average_latency > 100) connect_cv.notify_one();
+	if (average_latency > 100) {
+		bool expected = true;
+		if (connect_enabled.compare_exchange_strong(expected, false)) {
+			connect_cv.notify_one();
+		}
+	}
+	else if (average_latency > 100) {
+		connect_cv.notify_one();
+	}
 
 	long long expected = max_latency.load();
 	while (latency > expected && !max_latency.compare_exchange_weak(expected, latency)) {
@@ -560,8 +617,8 @@ void TestManager::UpdateLoginLatency(int user_index)
 	long long latency = GetCurrentTimeMS() - send_time;
 	current_login_latency.store(latency);
 	long long total_latency = login_latency_total.fetch_add(latency) + latency;
-	long long sample_count = login_latency_sample_count.fetch_add(1) + 1;
-	average_login_latency.store(total_latency / sample_count);
+	long long login_count = login_latency_count.fetch_add(1) + 1;
+	average_login_latency.store(total_latency / login_count);
 
 	long long expected = max_login_latency.load();
 	while (latency > expected && !max_login_latency.compare_exchange_weak(expected, latency)) {
@@ -582,6 +639,7 @@ void TestManager::PrintMetrics(long long now_time)
 		<< " max_rtt: " << max_latency.load() << "ms"
 		<< " login_rtt: " << current_login_latency.load() << "ms"
 		<< " avg_login: " << average_login_latency.load() << "ms"
+		<< " connect: " << (connect_enabled.load() ? "on" : "off")
 		<< std::endl;
 	SendViewMetrics();
 }
@@ -595,7 +653,6 @@ void TestManager::SendViewMetrics()
 	}
 	if (socket_copy == INVALID_SOCKET) return;
 
-	long long sample_count = latency_sample_count.load();
 	long long average_latency = recent_average_latency.load();
 	S2V_STRESS_METRICS_PACKET packet{};
 	packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
@@ -605,11 +662,10 @@ void TestManager::SendViewMetrics()
 	packet.metrics.current_latency_ms = static_cast<std::uint64_t>(current_latency.load());
 	packet.metrics.average_latency_ms = static_cast<std::uint64_t>(average_latency);
 	packet.metrics.max_latency_ms = static_cast<std::uint64_t>(max_latency.load());
-	packet.metrics.latency_sample_count = static_cast<std::uint64_t>(sample_count);
 	packet.metrics.current_login_latency_ms = static_cast<std::uint64_t>(current_login_latency.load());
 	packet.metrics.average_login_latency_ms = static_cast<std::uint64_t>(average_login_latency.load());
 	packet.metrics.max_login_latency_ms = static_cast<std::uint64_t>(max_login_latency.load());
-	packet.metrics.login_latency_sample_count = static_cast<std::uint64_t>(login_latency_sample_count.load());
+	packet.metrics.connect_enabled = connect_enabled.load() ? 1 : 0;
 
 	int result = send(socket_copy, reinterpret_cast<const char*>(&packet), sizeof(packet), 0);
 	if (result == SOCKET_ERROR) {
@@ -619,4 +675,14 @@ void TestManager::SendViewMetrics()
 			view_socket = INVALID_SOCKET;
 		}
 	}
+}
+
+void TestManager::SetConnectEnabled(bool enabled)
+{
+	connect_enabled.store(enabled);
+	if (enabled) {
+		connect_signal_count.fetch_add(1);
+	}
+	connect_cv.notify_one();
+	SendViewMetrics();
 }

@@ -57,6 +57,7 @@ void StressRoom::ProcessPlayTasks()
 	if (room_state.Load() != ROOM_STATE::PLAY) return;
 	UpdateTick();
 	tasks.SwapTask();
+	int failed_user_id = -1;
 	while (!tasks.task_queue.IsEmpty()) {
 		TaskInfo task = tasks.GetTask();
 		for (auto& r_user : room_users) {
@@ -64,9 +65,26 @@ void StressRoom::ProcessPlayTasks()
 			if (!session) continue;
 			if (session->GetDBInfo().id == task.id) {
 				r_user.GetTetris().GetInputTasks().emplace_back(task.type);
+				if (task.is_test) {
+					S2C_TEST_MOVE_PACKET send_p;
+					send_p.header.size = static_cast<std::uint16_t>(sizeof(send_p));
+					send_p.header.type = S2C_TEST_MOVE;
+					send_p.id = task.id;
+					send_p.sequence = task.sequence;
+					send_p.client_time = task.client_time;
+					if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.header.size)) {
+						failed_user_id = task.id;
+					}
+				}
 				break;
 			}
 		}
+		if (failed_user_id != -1) break;
+	}
+	if (failed_user_id != -1) {
+		lock.unlock();
+		DeleteUser(failed_user_id);
+		return;
 	}
 	UpdatePrevUsersState();
 
@@ -81,7 +99,7 @@ void StressRoom::ProcessPlayTasks()
 	bool game_end = false;
 	game_end = FindWinner();
 	if (!game_end) AddSpawnTask();
-	int failed_user_id = BoundPackets();
+	failed_user_id = BoundPackets();
 	if (failed_user_id != -1) {
 		lock.unlock();
 		DeleteUser(failed_user_id);
@@ -91,7 +109,6 @@ void StressRoom::ProcessPlayTasks()
 	ResetUsersTickData();
 	BroadcastTickDataForUsers();
 	if (game_end) {
-		RequestUpdateMatchResult();
 		ClearGame();
 		lock.unlock();
 		StartStressGame();

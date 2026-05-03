@@ -83,16 +83,12 @@ void SingleRoom::HandleTestMovePacket(char* packet, const SP<Session>& request_s
 			TaskInfo new_task;
 			new_task.id = request_session->GetDBInfo().id;
 			new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+			new_task.is_test = true;
+			new_task.sequence = recv_p->sequence;
+			new_task.client_time = recv_p->client_time;
 			GetTasks().AddTask(new_task);
 		}
 	}
-
-	S2C_TEST_MOVE_PACKET send_p;
-	send_p.header.size = static_cast<std::uint16_t>(sizeof(send_p));
-	send_p.header.type = S2C_TEST_MOVE;
-	send_p.sequence = recv_p->sequence;
-	send_p.client_time = recv_p->client_time;
-	request_session->SendPacket(reinterpret_cast<char*>(&send_p), server->GetHandle());
 }
 
 void SingleRoom::HandleGiveupPacket()
@@ -121,6 +117,7 @@ void SingleRoom::ProcessPlayTasks()
 	if (room_state.Load() != ROOM_STATE::PLAY) return;
 	UpdateTick();
 	tasks.SwapTask();
+	int failed_user_id = -1;
 	while (!tasks.task_queue.IsEmpty()) {
 		TaskInfo task = tasks.GetTask();
 		for (auto& r_user : room_users) {
@@ -129,11 +126,28 @@ void SingleRoom::ProcessPlayTasks()
 			if (session->GetDBInfo().id == task.id) {
 				// 각 작업들을 각 세션에 분배
 				r_user.GetTetris().GetInputTasks().emplace_back(task.type);
+				if (task.is_test) {
+					S2C_TEST_MOVE_PACKET send_p;
+					send_p.header.size = static_cast<std::uint16_t>(sizeof(send_p));
+					send_p.header.type = S2C_TEST_MOVE;
+					send_p.id = task.id;
+					send_p.sequence = task.sequence;
+					send_p.client_time = task.client_time;
+					if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&send_p), send_p.header.size)) {
+						failed_user_id = task.id;
+					}
+				}
 
 				//r_user.GetTetris().DebugPrintBoard();
 				break;
 			}
 		}
+		if (failed_user_id != -1) break;
+	}
+	if (failed_user_id != -1) {
+		lock.unlock();
+		DeleteUser(failed_user_id);
+		return;
 	}
 
 	for (auto& r_user : room_users) {
@@ -155,7 +169,7 @@ void SingleRoom::ProcessPlayTasks()
 	if (it != tasks.end()) { // 고정 이벤트가 있어야 점수 및 콤보계산
 		CalculateScore(room_users[0].GetTetris().GetClearedLines());
 	}
-	int failed_user_id = BoundPackets();
+	failed_user_id = BoundPackets();
 	if (failed_user_id != -1) {
 		lock.unlock();
 		DeleteUser(failed_user_id);
@@ -363,6 +377,7 @@ void SingleRoom::MakeMovePacketData(int move_type)
 
 void SingleRoom::RequestUpdateScore()
 {
+	if (server->IsStressTestMode()) return;
 	auto session_shared = room_users[0].GetSession();
 	if (!session_shared) return;
 	if (session_shared->GetDBInfo().max_score < room_users[0].GetScore()) {

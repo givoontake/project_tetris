@@ -1,9 +1,38 @@
 #include "ServerThreadManager.h"
+#include <algorithm>
 #include <chrono>
 #include <thread>
+#include <vector>
 #include <Psapi.h>
 
 #pragma comment(lib, "Psapi.lib")
+
+namespace
+{
+	constexpr ULONG SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION_CLASS = 8;
+
+	struct SystemProcessorPerformanceInfo {
+		LARGE_INTEGER IdleTime;
+		LARGE_INTEGER KernelTime;
+		LARGE_INTEGER UserTime;
+		LARGE_INTEGER DpcTime;
+		LARGE_INTEGER InterruptTime;
+		ULONG InterruptCount;
+	};
+
+	using NtQuerySystemInformationFunc = LONG(WINAPI*)(ULONG, PVOID, ULONG, PULONG);
+
+	NtQuerySystemInformationFunc GetNtQuerySystemInformation()
+	{
+		static NtQuerySystemInformationFunc func = [] {
+			HMODULE module = GetModuleHandleW(L"ntdll.dll");
+			if (!module) module = LoadLibraryW(L"ntdll.dll");
+			if (!module) return NtQuerySystemInformationFunc{};
+			return reinterpret_cast<NtQuerySystemInformationFunc>(GetProcAddress(module, "NtQuerySystemInformation"));
+			}();
+		return func;
+	}
+}
 
 ServerThreadManager::ServerThreadManager(IOCPServer& server)
 	: iocp_server(server), server_metrics(server.GetServerMetrics()), view_session(server.GetViewSession())
@@ -15,9 +44,10 @@ void ServerThreadManager::WorkerThread()
 	iocp_server.ProcessGQCS();
 }
 
-void ServerThreadManager::TickWorkerThread(int num)
+void ServerThreadManager::TickWorkerThread()
 {
 	int last_tick = 0;
+	int tick_worker_index = tick_worker_index_counter.fetch_add(1);
 
 	while (iocp_server.GetRunning())
 	{
@@ -42,6 +72,9 @@ void ServerThreadManager::TickWorkerThread(int num)
 			}
 		}
 
+		if (tick_worker_index >= 0 && tick_worker_index < MAX_TICK_WORKER_METRICS) {
+			server_metrics.tick_worker_processed_ticks[tick_worker_index].fetch_add(1);
+		}
 		last_tick = current_tick;
 	}
 }
@@ -51,7 +84,6 @@ void ServerThreadManager::TimerThread()
 	using clock = std::chrono::steady_clock;
 
 	auto next_tick = clock::now();
-	auto next_view_metrics_time = clock::now() + std::chrono::seconds(1);
 
 	while (iocp_server.GetRunning())
 	{
@@ -67,13 +99,36 @@ void ServerThreadManager::TimerThread()
 
 		// 새 틱이 생겼으니 TickWorker 들을 깨운다.
 		g_tick_cv.notify_all();
+		metrics_counter.fetch_add(1);
+		metrics_cv.notify_one();
+	}
+}
+
+void ServerThreadManager::MetricsThread()
+{
+	using clock = std::chrono::steady_clock;
+
+	int last_metrics_count = metrics_counter.load();
+	UpdateProcessorMetrics();
+	auto last_metrics_time = clock::now();
+
+	while (iocp_server.GetRunning())
+	{
+		std::unique_lock<std::mutex> lock(metrics_mutex);
+		metrics_cv.wait(lock, [&] {
+			if (!iocp_server.GetRunning()) return true;
+			return metrics_counter.load() != last_metrics_count;
+			});
+
+		last_metrics_count = metrics_counter.load();
+		lock.unlock();
 
 		auto now_time = clock::now();
-		if (now_time >= next_view_metrics_time) {
-			SendViewMetrics();
-			do {
-				next_view_metrics_time += std::chrono::seconds(1);
-			} while (now_time >= next_view_metrics_time);
+		if (now_time - last_metrics_time >= std::chrono::seconds(1)) {
+			auto metrics_elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now_time - last_metrics_time).count();
+			UpdateProcessorMetrics();
+			SendViewMetrics(static_cast<std::uint64_t>(metrics_elapsed_ms));
+			last_metrics_time = now_time;
 		}
 	}
 }
@@ -83,9 +138,61 @@ void ServerThreadManager::DBThread()
 	iocp_server.GetDB().Run();
 }
 
-void ServerThreadManager::SendViewMetrics()
+void ServerThreadManager::UpdateProcessorMetrics()
+{
+	auto nt_query = GetNtQuerySystemInformation();
+	if (!nt_query) return;
+
+	DWORD processor_count = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+	if (processor_count == 0) return;
+
+	std::vector<SystemProcessorPerformanceInfo> processor_infos(processor_count);
+	ULONG return_length = 0;
+	LONG result = nt_query(
+		SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION_CLASS,
+		processor_infos.data(),
+		static_cast<ULONG>(processor_infos.size() * sizeof(SystemProcessorPerformanceInfo)),
+		&return_length);
+	if (result < 0) return;
+
+	std::size_t reported_count = return_length / sizeof(SystemProcessorPerformanceInfo);
+	if (reported_count == 0) reported_count = processor_infos.size();
+	std::size_t update_count = std::min<std::size_t>(reported_count, MAX_LOGICAL_PROCESSOR_METRICS);
+
+	server_metrics.logical_processor_count.store(static_cast<std::uint64_t>(update_count));
+	for (std::size_t i = 0; i < update_count; ++i) {
+		std::uint64_t idle = static_cast<std::uint64_t>(processor_infos[i].IdleTime.QuadPart);
+		std::uint64_t kernel = static_cast<std::uint64_t>(processor_infos[i].KernelTime.QuadPart);
+		std::uint64_t user = static_cast<std::uint64_t>(processor_infos[i].UserTime.QuadPart);
+
+		if (has_prev_processor_times) {
+			std::uint64_t idle_delta = idle - prev_processor_times[i].idle;
+			std::uint64_t kernel_delta = kernel - prev_processor_times[i].kernel;
+			std::uint64_t user_delta = user - prev_processor_times[i].user;
+			std::uint64_t total_delta = kernel_delta + user_delta;
+			std::uint64_t busy_delta = total_delta > idle_delta ? total_delta - idle_delta : 0;
+			std::uint64_t usage = total_delta == 0 ? 0 : (busy_delta * 100) / total_delta;
+			server_metrics.logical_processor_usage[i].store(std::min<std::uint64_t>(usage, 100));
+		}
+		else {
+			server_metrics.logical_processor_usage[i].store(0);
+		}
+
+		prev_processor_times[i].idle = idle;
+		prev_processor_times[i].kernel = kernel;
+		prev_processor_times[i].user = user;
+	}
+
+	for (std::size_t i = update_count; i < MAX_LOGICAL_PROCESSOR_METRICS; ++i) {
+		server_metrics.logical_processor_usage[i].store(0);
+	}
+	has_prev_processor_times = true;
+}
+
+void ServerThreadManager::SendViewMetrics(std::uint64_t metrics_elapsed_ms)
 {
 	if (!view_session.IsActive()) return;
+	if (metrics_elapsed_ms == 0) metrics_elapsed_ms = 1;
 
 	PROCESS_MEMORY_COUNTERS_EX memory_counters{};
 	memory_counters.cb = sizeof(memory_counters);
@@ -106,6 +213,21 @@ void ServerThreadManager::SendViewMetrics()
 	packet.metrics.current_pending_count = server_metrics.current_pending_count.load();
 	packet.metrics.active_room_count = server_metrics.active_room_count.load();
 	packet.metrics.server_memory_bytes = server_metrics.server_memory_bytes.load();
+	packet.metrics.created_thread_count = server_metrics.created_thread_count.load();
+	packet.metrics.logical_processor_count = server_metrics.logical_processor_count.load();
+	packet.metrics.tick_worker_count = MAX_TICK_WORKERS;
+	for (int i = 0; i < MAX_LOGICAL_PROCESSOR_METRICS; ++i) {
+		packet.metrics.logical_processor_usage[i] = server_metrics.logical_processor_usage[i].load();
+	}
+	for (int i = 0; i < MAX_TICK_WORKER_METRICS; ++i) {
+		if (i < MAX_TICK_WORKERS) {
+			std::uint64_t tick_count = server_metrics.tick_worker_processed_ticks[i].exchange(0);
+			packet.metrics.tick_worker_ticks_per_second[i] = tick_count * 1000 / metrics_elapsed_ms;
+		}
+		else {
+			packet.metrics.tick_worker_ticks_per_second[i] = 0;
+		}
+	}
 
 	view_session.SendPacket(reinterpret_cast<char*>(&packet), packet.header.size, iocp_server.GetHandle());
 }

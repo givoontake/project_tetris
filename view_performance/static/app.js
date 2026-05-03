@@ -1,4 +1,4 @@
-const maxUsers = 10000;
+const maxUsers = 30000;
 const hostStorageKeys = {
   server: "tetris.performance.server_host",
   stress: "tetris.performance.stress_host"
@@ -41,22 +41,114 @@ function updateServerMetrics(server, fresh) {
   elem("serverRooms").textContent = metricValue(server.active_room_count, fresh);
   elem("serverPendingDone").textContent = metricValue(server.completed_pending_total, fresh);
   elem("serverMemory").textContent = fresh ? mb(server.server_memory_bytes) : "?";
-  meter("serverUsersMeter", fresh ? server.current_connected_users : 0, 10000);
+  elem("serverThreads").textContent = metricValue(server.created_thread_count, fresh);
+  elem("processorCount").textContent = metricValue(server.logical_processor_count, fresh);
+  updateProcessorBars(server.logical_processor_usage || [], fresh);
+  updateTickWorkerBars(server.tick_worker_ticks_per_second || [], fresh);
+  meter("serverUsersMeter", fresh ? server.current_connected_users : 0, maxUsers);
+}
+
+function updateProcessorBars(usages, fresh) {
+  const box = elem("processorBars");
+  box.innerHTML = "";
+  if (!fresh || usages.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "processor-empty";
+    empty.textContent = "?";
+    box.appendChild(empty);
+    return;
+  }
+
+  usages.forEach((usage, index) => {
+    const item = document.createElement("div");
+    item.className = "processor-item";
+
+    const label = document.createElement("span");
+    label.textContent = `P${index}`;
+
+    const value = document.createElement("strong");
+    value.textContent = `${fmt(usage)}%`;
+
+    const meter = document.createElement("i");
+    meter.style.width = `${Math.min(100, Math.max(0, Number(usage || 0)))}%`;
+
+    item.appendChild(label);
+    item.appendChild(value);
+    item.appendChild(meter);
+    box.appendChild(item);
+  });
+}
+
+function updateTickWorkerBars(ticks, fresh) {
+  const box = elem("tickWorkerBars");
+  box.innerHTML = "";
+  if (!fresh || ticks.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "processor-empty";
+    empty.textContent = "?";
+    box.appendChild(empty);
+    return;
+  }
+
+  ticks.forEach((tick, index) => {
+    const item = document.createElement("div");
+    item.className = "processor-item";
+
+    const label = document.createElement("span");
+    label.textContent = `T${index}`;
+
+    const value = document.createElement("strong");
+    value.textContent = fmt(tick);
+
+    const meter = document.createElement("i");
+    meter.style.width = `${Math.min(100, Math.max(0, (Number(tick || 0) / 50) * 100))}%`;
+
+    item.appendChild(label);
+    item.appendChild(value);
+    item.appendChild(meter);
+    box.appendChild(item);
+  });
 }
 
 function updateStressMetrics(stress, fresh) {
+  const connectEnabled = Number(stress.connect_enabled || 0) !== 0;
+  elem("stressConnectStatus").textContent = fresh ? (connectEnabled ? "ON" : "STOP") : "?";
   elem("stressConnected").textContent = metricValue(stress.connected_client, fresh);
   elem("stressPlaying").textContent = metricValue(stress.playing_client, fresh);
   elem("stressCurrentRtt").textContent = metricValue(stress.current_latency_ms, fresh);
   elem("stressAvgRtt").textContent = metricValue(stress.average_latency_ms, fresh);
   elem("stressMaxRtt").textContent = metricValue(stress.max_latency_ms, fresh);
-  elem("stressSamples").textContent = metricValue(stress.latency_sample_count, fresh);
   elem("stressCurrentLoginRtt").textContent = metricValue(stress.current_login_latency_ms, fresh);
   elem("stressAvgLoginRtt").textContent = metricValue(stress.average_login_latency_ms, fresh);
   elem("stressMaxLoginRtt").textContent = metricValue(stress.max_login_latency_ms, fresh);
-  elem("stressLoginSamples").textContent = metricValue(stress.login_latency_sample_count, fresh);
   meter("stressConnectedMeter", fresh ? stress.connected_client : 0, maxUsers);
   meter("stressPlayingMeter", fresh ? stress.playing_client : 0, maxUsers);
+}
+
+async function controlStressConnect(enabled) {
+  const pauseBtn = elem("pauseConnectBtn");
+  const resumeBtn = elem("resumeConnectBtn");
+  pauseBtn.disabled = true;
+  resumeBtn.disabled = true;
+  setChip(elem("messageChip"), null, enabled ? "stress connect resume..." : "stress connect pause...");
+
+  try {
+    const res = await fetch("/api/stress/connect-control", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({enabled})
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      throw new Error(data.error || "connect control failed");
+    }
+    setChip(elem("messageChip"), true, enabled ? "stress connect resumed" : "stress connect paused");
+  } catch (err) {
+    setChip(elem("messageChip"), false, err.message);
+  } finally {
+    pauseBtn.disabled = false;
+    resumeBtn.disabled = false;
+  }
 }
 
 function updateLog(data) {
@@ -68,9 +160,10 @@ function updateLog(data) {
   const stressPlaying = data.stress_fresh ? stress.playing_client || 0 : "?";
   const stressRtt = data.stress_fresh ? stress.current_latency_ms || 0 : "?";
   const stressLoginRtt = data.stress_fresh ? stress.current_login_latency_ms || 0 : "?";
+  const stressConnect = data.stress_fresh ? (Number(stress.connect_enabled || 0) !== 0 ? "on" : "off") : "?";
   elem("logBox").textContent = [
     `server connected=${data.server_connected} users=${serverUsers} pending=${serverPending}`,
-    `stress connected=${data.stress_connected} clients=${stressClients} playing=${stressPlaying} rtt=${stressRtt}ms login=${stressLoginRtt}ms`
+    `stress connected=${data.stress_connected} clients=${stressClients} playing=${stressPlaying} rtt=${stressRtt}ms login=${stressLoginRtt}ms connect=${stressConnect}`
   ].join("\n");
 }
 
@@ -127,4 +220,6 @@ function connectEvents() {
 loadSavedHosts();
 elem("connectServerBtn").addEventListener("click", () => connectTarget("server"));
 elem("connectStressBtn").addEventListener("click", () => connectTarget("stress"));
+elem("pauseConnectBtn").addEventListener("click", () => controlStressConnect(false));
+elem("resumeConnectBtn").addEventListener("click", () => controlStressConnect(true));
 connectEvents();

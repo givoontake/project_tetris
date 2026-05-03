@@ -45,6 +45,11 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 		return;
 	}
 
+	if (server.IsStressTestMode()) {
+		server.LoginStressTestSession(session, login_id);
+		return;
+	}
+
 	Database& repr_db = server.GetDB();
 	SessionKey key = session->GetSessionKey();
 	auto task_login = [&repr_db, key, login_id, password]() {
@@ -58,7 +63,7 @@ void PacketHandler::HandleTestLoginPacket(char* packet, const SP<Session>& sessi
 {
 	if (!session) return;
 	C2S_TEST_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_TEST_LOGIN_PACKET*>(packet);
-	server.LoginStressTestSession(session, recv_p->temp_id);
+	server.LoginStressTestSession(session, "tester" + std::to_string(recv_p->temp_id + 1), recv_p->client_time);
 }
 
 void PacketHandler::HandleStressEnterMatchPacket(const SP<Session>& session)
@@ -146,6 +151,10 @@ void PacketHandler::HandleFastMatchingPacket(char* packet, const SP<Session>& se
 void PacketHandler::HandleRequestFriendPacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
+	if (server.IsStressTestMode()) {
+		server.SendError(session, ERROR_CODE::INVALID_REQUEST);
+		return;
+	}
 	C2S_REQUEST_FRIEND_PACKET* friend_p = reinterpret_cast<C2S_REQUEST_FRIEND_PACKET*>(packet);
 
 	if (session->GetModeState() != MODE_STATE::LOBBY) return;
@@ -165,6 +174,10 @@ void PacketHandler::HandleRequestFriendPacket(char* packet, const SP<Session>& s
 void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
+	if (server.IsStressTestMode()) {
+		server.SendError(session, ERROR_CODE::INVALID_REQUEST);
+		return;
+	}
 	C2S_ACCEPT_FRIEND_PACKET* accept_p = reinterpret_cast<C2S_ACCEPT_FRIEND_PACKET*>(packet);
 	if (session->GetModeState() != MODE_STATE::LOBBY) return;
 
@@ -183,6 +196,10 @@ void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& se
 void PacketHandler::HandleDeleteFriendPacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
+	if (server.IsStressTestMode()) {
+		server.SendError(session, ERROR_CODE::INVALID_REQUEST);
+		return;
+	}
 	C2S_DELETE_FRIEND_PACKET* delete_p = reinterpret_cast<C2S_DELETE_FRIEND_PACKET*>(packet);
 	int target_id = delete_p->target_id;
 	if (session->GetModeState() != MODE_STATE::LOBBY) return;
