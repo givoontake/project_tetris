@@ -456,6 +456,12 @@ void MultiRoom::ProcessPlayTasks()
 		DeleteUser(failed_user_id);
 		return;
 	}
+	failed_user_id = BoundAllPackets();
+	if (failed_user_id != -1) {
+		lock.unlock();
+		DeleteUser(failed_user_id);
+		return;
+	}
 
 	ResetUsersTickData();
 	BroadcastTickDataForUsers();

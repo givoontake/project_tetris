@@ -16,7 +16,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, OpenRoomInitData data)
 	room_state.Store(ROOM_STATE::WAIT);
 	room_users.reserve(max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
 	for (int i = 0; i < max_user; ++i) {
-		room_users.emplace_back();
+		room_users.emplace_back(max_user);
 	}
 
 	//SendAddRoom(session);
@@ -34,7 +34,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, LockRoomInitData data)
 	room_state.Store(ROOM_STATE::WAIT);
 	room_users.reserve(max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
 	for (int i = 0; i < max_user; ++i) {
-		room_users.emplace_back();
+		room_users.emplace_back(max_user);
 	}
 	//SendAddRoom(session);
 	cur_user = 0;
@@ -197,7 +197,7 @@ int TetrisRoom::BoundPackets()
 				fix_p.id = user_id;
 				fix_p.fixed_x = t.fixed_x; // 실시간 반영된 값을 읽는게 아니라 작업 목록을 가져와서 패킷을 구성하므로, 작업 당시의 값을 가져와야 함. addline과 동시 틱에 처리되면 클라는 공중에 떠 있는 것으로 보이는 버그 발생
 				fix_p.fixed_y = t.fixed_y;
-				if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.header.size)) return user_id;
+				if (!r_user.AddToTickBuffer(reinterpret_cast<char*>(&fix_p), fix_p.header.size)) return user_id;
 				break;
 			}
 
@@ -210,7 +210,7 @@ int TetrisRoom::BoundPackets()
 				clear_line_p.score = r_user.GetScore();
 				clear_line_p.line_index = t.line_index;
 				clear_line_p.combo = r_user.GetCombo();
-				if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.header.size)) return user_id;
+				if (!r_user.AddToTickBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.header.size)) return user_id;
 
 				break;
 			}
@@ -227,7 +227,7 @@ int TetrisRoom::BoundPackets()
 					spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
 					spawn_p.spawn_x = static_cast<char>(spawn_pos.x);
 					spawn_p.spawn_y = static_cast<char>(spawn_pos.y);
-					if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.header.size)) return user_id;
+					if (!r_user.AddToTickBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.header.size)) return user_id;
 				}
 				break;
 			}
@@ -240,7 +240,7 @@ int TetrisRoom::BoundPackets()
 				add_line_p.id = user_id;
 				auto& t = std::get<TaskAddLine>(task.task);
 				add_line_p.hole_x = static_cast<char>(t.hole_x);
-				if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.header.size)) return user_id;
+				if (!r_user.AddToTickBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.header.size)) return user_id;
 				break;
 			}
 
@@ -251,7 +251,7 @@ int TetrisRoom::BoundPackets()
 				gameover_p.header.size = static_cast<std::uint16_t>(sizeof(gameover_p));
 				gameover_p.header.type = S2C_GAMEOVER;
 				gameover_p.id = user_id;
-				if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameover_p), gameover_p.header.size)) return user_id;
+				if (!r_user.AddToTickBuffer(reinterpret_cast<char*>(&gameover_p), gameover_p.header.size)) return user_id;
 
 				break;
 			}
@@ -263,12 +263,32 @@ int TetrisRoom::BoundPackets()
 				gameend_p.header.size = static_cast<std::uint16_t>(sizeof(gameend_p));
 				gameend_p.header.type = S2C_GAMEEND;
 				gameend_p.winner_id = t.winner_id;
-				if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&gameend_p), gameend_p.header.size)) return user_id;
+				if (!r_user.AddToTickBuffer(reinterpret_cast<char*>(&gameend_p), gameend_p.header.size)) return user_id;
 				break;
 			}
 			}
 		}
 	}
+	return -1;
+}
+
+int TetrisRoom::BoundAllPackets()
+{
+	for (auto& target : room_users) {
+		auto target_session = target.GetSession();
+		if (!target_session) continue;
+		int target_user_id = target_session->GetDBInfo().id;
+
+		for (auto& source : room_users) {
+			if (&target == &source) continue; // 같은 객체인지 주소 비교
+			auto source_session = source.GetSession(); 
+			if (!source_session) continue; // 객체 내에 세션이 살아 있는지 확인
+			int data_size = source.GetTickDataSize();
+			if (data_size <= 0) continue; // 보낼 데이터가 있는지 확인
+			if (!target.AddToSendBuffer(source.GetTickBuf(), data_size)) return target_user_id;
+		}
+	}
+
 	return -1;
 }
 
@@ -281,7 +301,7 @@ bool TetrisRoom::MakeMovePacket(RoomSession& r_session, int move_type)
 	move_p.header.type = S2C_MOVE;
 	move_p.id = session->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
-	return r_session.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);
+	return r_session.AddToTickBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);
 }
 
 void TetrisRoom::AddGarbageLines()
@@ -327,30 +347,23 @@ void TetrisRoom::ResetUsersTickData()
 
 void TetrisRoom::BroadcastTickDataForUsers()
 {
-	for (int i = 0; i < room_users.size(); ++i) {
-		RoomSession& source = room_users[i];
-		auto source_session = source.GetSession();
-		if (!source_session) continue;
+	for (auto& r_user : room_users) {
+		auto session = r_user.GetSession();
+		if (!session) continue;
 		//IOKey key = source.GetSession()->GetIOKey();
-		char* send_buffer = source.GetSendBuf();
-		int data_size = source.GetSendDataSize();
-
-		for (int j = 0; j < room_users.size(); ++j) {
-			RoomSession& target = room_users[j];
-			// data_size = 0이 IOCP로 들어가면 연결이 종료되는 것에 주의해야함
-			// 게임 시작 시 틱마다 자동 전송하므로 조건이 꼭 필요
-			if (data_size > 0) {
-				auto target_session = target.GetSession();
-				if (!target_session) continue;
-				target_session->SendBoundPacket(send_buffer, data_size, server->GetHandle());
-			}
+		char* send_buffer = r_user.GetSendBuf();
+		int data_size = r_user.GetSendDataSize();
+		// data_size = 0이 IOCP로 들어가면 연결이 종료되는 것에 주의해야함
+		// 게임 시작 시 틱마다 자동 전송하므로 조건이 꼭 필요
+		if (data_size > 0) {
+			session->SendBoundPacket(send_buffer, data_size, server->GetHandle());
 		}
 	}
 
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
-		r_user.ClearSendBuf();
+		r_user.ClearBuffers();
 	}
 }
 

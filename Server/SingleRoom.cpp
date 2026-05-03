@@ -175,6 +175,12 @@ void SingleRoom::ProcessPlayTasks()
 		DeleteUser(failed_user_id);
 		return;
 	}
+	failed_user_id = BoundAllPackets();
+	if (failed_user_id != -1) {
+		lock.unlock();
+		DeleteUser(failed_user_id);
+		return;
+	}
 
 	ResetUsersTickData();
 	BroadcastTickDataForUsers();
@@ -370,7 +376,7 @@ void SingleRoom::MakeMovePacketData(int move_type)
 	move_p.header.type = S2C_MOVE;
 	move_p.id = session->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
-	if (!room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size)) {
+	if (!room_users[0].AddToTickBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size)) {
 		DeleteUser(session->GetDBInfo().id);
 	}
 }

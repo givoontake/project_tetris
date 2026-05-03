@@ -140,6 +140,7 @@ public:
 	void ClearRoom(); // 이제 재사용이 아니라 아예 없앨거라서 굳이 방이 비워진 상태를 관리할 필요는 없다. 나중에 없애면 될 듯
 	void UpdateTick();
 	int BoundPackets();
+	int BoundAllPackets();
 	//void SendAddRoom(Session* session);
 	bool MakeMovePacket(RoomSession& r_session, int move_type);
 	void AddGarbageLines();
