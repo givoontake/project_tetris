@@ -1,7 +1,7 @@
 #pragma once
 constexpr int FPS = 50;
 constexpr int FRAME_TIME = 1000 / FPS;
-constexpr int MAX_TICK_WORKERS = 10;
+constexpr int MAX_TICK_WORKERS = 12;
 
 constexpr int CLEAR_LINE_SCORE = 10;
 
