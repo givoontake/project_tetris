@@ -26,14 +26,12 @@ class LoginState(BaseState):
         self.pw_label: Optional[LabelFrame] = None
         self.btn_login: Optional[Button] = None
         self.reactable = True
-        self.fail_connect_popup = None
         self.fail_login_popup = None
         self.set_layout()
 
-    def connect(self):
-        if not self.net_worker.connect_to_server():
-            self.fail_connect_popup = PopupBox(self.screen, self.rm, "서버와의 연결이 원활하지 않습니다.", ["재시도", "종료"])
-            self.reactable = False
+    def queue_connect_state(self):
+        from tetris.states.connect_state import ConnectState
+        self.queue_state(ConnectState(self.screen, self.rm, self.net_worker, self.session, True))
 
     def set_layout(self):
         sw, sh = self.screen.get_size()
@@ -109,7 +107,8 @@ class LoginState(BaseState):
                 id = self.id_label.input_box.handle_event(ev)
                 pw = self.pw_label.input_box.handle_event(ev)
                 packet = self.net_worker.builder.build_login_pkt(id, pw)
-                self.net_worker.send_packet(packet)
+                if not self.net_worker.send_packet(packet):
+                    self.queue_connect_state()
                 return
             
             else:
@@ -120,26 +119,20 @@ class LoginState(BaseState):
                 id = self.id_label.input_box.extract_text()
                 pw = self.pw_label.input_box.extract_text()
                 packet = self.net_worker.builder.build_login_pkt(id, pw)
-                self.net_worker.send_packet(packet)
+                if not self.net_worker.send_packet(packet):
+                    self.queue_connect_state()
 
         else:
-            if self.fail_connect_popup:
-                str = self.fail_connect_popup.handle_event(ev)
-
-                if str == "재시도": 
-                    self.fail_connect_popup = None
-                    self.reactable = True
-                    self.connect()
-
-                elif str == "종료": pygame.quit(); raise SystemExit
-
-            elif self.fail_login_popup:
+            if self.fail_login_popup:
                 if self.fail_login_popup.handle_event(ev) == "확인":
                     self.fail_login_popup = None
                     self.reactable = True
 
 
     def update(self, dt_ms, events):
+        if not self.net_worker.running and self.next_state is None:
+            self.queue_connect_state()
+
         for ev in events:
             self.handle_event(ev)
 
@@ -154,8 +147,6 @@ class LoginState(BaseState):
         self.id_label.draw()
         self.pw_label.draw()
         self.btn_login.draw()
-        if self.fail_connect_popup:
-            self.fail_connect_popup.draw()
         if self.fail_login_popup:
             self.fail_login_popup.draw()
 

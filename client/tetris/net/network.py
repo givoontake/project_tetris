@@ -30,10 +30,13 @@ class NetworkWorker:
     #     return self._pm.queue
 
     # ---- 연결/해제 ----
-    def connect_to_server(self) -> bool:
+    def connect_to_server(self, host: str = SERVER_HOST, port: int = SERVER_PORT, timeout: float = 3.0) -> bool:
+        temp_sock = None
         try:
             temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            temp_sock.connect((SERVER_HOST, SERVER_PORT))
+            temp_sock.settimeout(timeout)
+            temp_sock.connect((host, port))
+            temp_sock.settimeout(None)
             self.sock = temp_sock
             self.running = True
             self.recv_thread = threading.Thread(target=self.recv_loop, daemon=True)
@@ -41,10 +44,11 @@ class NetworkWorker:
             return True
         except Exception:
             self.running = False
-            try:
-                temp_sock.close()
-            except Exception:
-                pass
+            if temp_sock:
+                try:
+                    temp_sock.close()
+                except Exception:
+                    pass
             return False
 
     # 수신 스레드가 아직 살아 있으면 join 시도 (약간의 유예)
@@ -66,6 +70,8 @@ class NetworkWorker:
                 self._pm.process_packet()
         except Exception as e:
             print(f"[recv_loop] 예외 발생: {type(e).__name__} - {e}")
+        finally:
+            self.running = False
             self.sock.close()
             
 
@@ -79,4 +85,5 @@ class NetworkWorker:
             return True
         except Exception as e:
             print(f"[send_packet] 예외 발생: {type(e).__name__} - {e}")
+            self.running = False
             return False

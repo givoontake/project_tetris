@@ -3,7 +3,7 @@ import queue
 import pygame
 
 from tetris.config.define import *
-from tetris.states.login_state import LoginState
+from tetris.states.connect_state import ConnectState
 from tetris.net.network import NetworkWorker
 from tetris.resources.resource_manager import ResourceManager
 from tetris.net.session import Session
@@ -29,8 +29,7 @@ class GameLoop:
         self.net_worker = NetworkWorker()
         self.session = Session(self.rm)
         self.session.set_my_session()
-        self.state = LoginState(self.screen, self.rm, self.net_worker, self.session)
-        self.state.connect()
+        self.state = ConnectState(self.screen, self.rm, self.net_worker, self.session)
 
         self.prev_time = time.perf_counter()
         self.frame_time = 1.0 / FPS  # 초 단위
