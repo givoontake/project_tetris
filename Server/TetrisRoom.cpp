@@ -280,7 +280,6 @@ int TetrisRoom::BoundAllPackets()
 		int target_user_id = target_session->GetDBInfo().id;
 
 		for (auto& source : room_users) {
-			if (&target == &source) continue; // 같은 객체인지 주소 비교
 			auto source_session = source.GetSession(); 
 			if (!source_session) continue; // 객체 내에 세션이 살아 있는지 확인
 			int data_size = source.GetTickDataSize();

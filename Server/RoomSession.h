@@ -12,21 +12,21 @@ class RoomSession
 	Tetris tetris;
 	char tick_buf[BUF_SIZE];
 	std::unique_ptr<char[]> send_buf;
-	int send_buf_size = 0;
-	int tick_data_size = 0;
-	int send_data_size = 0;
+	int send_buf_size;
+	int tick_data_size;
+	int send_data_size;
 	// std::string user_name; // 방 생성할 때 만들도록 일단 하고, 나중에 회원가입 - DB 연동으로 session 클래스에 포함해보자.
 	// char user_name[MAX_USER_NAME];
 	Atomic<ROOM_USER_STATE> r_user_state;
 	Atomic<ROOM_USER_STATE> prev_r_user_state; // 게임 오버시 무승부 체크용
 
-	int tetromino_index = 0;
+	int tetromino_index;
 
-	int score = 0;
-	int combo = 0;
+	int score;
+	int combo;
 
 public:
-	RoomSession(int max_user = 1);
+	RoomSession(int max_user);
 	RoomSession(const RoomSession&) = delete;
 	RoomSession& operator=(const RoomSession&) = delete;
 	RoomSession(RoomSession&& other) noexcept = default;

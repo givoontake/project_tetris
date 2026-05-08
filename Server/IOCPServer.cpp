@@ -29,7 +29,10 @@ namespace
 	}
 }
 
-IOCPServer::IOCPServer() : packet_handler(*this), db_result_handler(*this)
+IOCPServer::IOCPServer(SERVER_RUN_MODE mode)
+	: run_mode(mode),
+	packet_handler(*this),
+	db_result_handler(*this)
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		users[i].store(nullptr);
@@ -81,24 +84,24 @@ void IOCPServer::SendRoomList(const SP<Session>& session)
 {
 	if (!session) return;
 	// 더미 방 생성
-	for (int i = 0; i < 20; ++i) {
-		S2C_ROOM_INFO_PACKET p{};
-		p.header.size = sizeof(S2C_ROOM_INFO_PACKET);
-		p.header.type = S2C_ROOM_INFO;
+	//for (int i = 0; i < 20; ++i) {
+	//	S2C_ROOM_INFO_PACKET p{};
+	//	p.header.size = sizeof(S2C_ROOM_INFO_PACKET);
+	//	p.header.type = S2C_ROOM_INFO;
 
-		p.room_gen = 1000000 + i;
+	//	p.room_gen = 1000000 + i;
 
-		std::string name = "DummyRoom_" + std::to_string(i);
-		StringToCharBuf(name, p.room_name, sizeof(p.room_name));
+	//	std::string name = "DummyRoom_" + std::to_string(i);
+	//	StringToCharBuf(name, p.room_name, sizeof(p.room_name));
 
-		p.max_user = 2;
-		p.cur_user = 1; 
+	//	p.max_user = 2;
+	//	p.cur_user = 1;
 
-		p.is_private = false;
-		p.is_play = false;
+	//	p.is_private = false;
+	//	p.is_play = false;
 
-		session->SendPacket(reinterpret_cast<char*>(&p), iocp_handle);
-	}
+	//	session->SendPacket(reinterpret_cast<char*>(&p), iocp_handle);
+	//}
 	
 	char packet_buf[BUF_SIZE];
 	int packet_size = 0;

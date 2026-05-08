@@ -55,7 +55,7 @@ class Images:
 
     def load_image(self, file_path: str, width: int, height: int) -> pygame.Surface:
         # 이미지 로드 (투명도 유지)
-        path = RESOURCE_ROOT_PATH + file_path
+        path = resource_path(file_path)
         image = pygame.image.load(path).convert_alpha()
 
         # 절대 크기로 스케일링

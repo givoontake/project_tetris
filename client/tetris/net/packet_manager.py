@@ -56,7 +56,7 @@ class PacketManager:
 
             while True:
                 try:
-                    self.queue.put_nowait(data)
+                    self.queue.put(data, timeout=0.1)
                     break
                 except queue.Full:
                     continue

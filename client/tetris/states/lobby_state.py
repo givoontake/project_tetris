@@ -67,6 +67,7 @@ class LobbyState(BaseState):
         self.friend_ev_target_id = None
 
         self.join_room_gen = None
+        self.initial_lobby_requests_sent = False
     
         self.set_layout()
 
@@ -94,28 +95,34 @@ class LobbyState(BaseState):
         self.top_menus[4].set_text("설정")
         self.top_menus[5].set_text("게임종료")
 
-        self.request_room_list()
-        self.request_lobby_user_list()
-        self.request_friend_list()
-
     # def on_resize(self, w, h, screen):
     #     self.screen = screen
     #     self.set_layout()
 
+    def request_initial_lobby_data(self):
+        if self.initial_lobby_requests_sent:
+            return
+
+        self.initial_lobby_requests_sent = (
+            self.request_room_list()
+            and self.request_lobby_user_list()
+            and self.request_friend_list()
+        )
+
     def request_room_list(self):
         self.room_list.clear()
         packet = self.net_worker.builder.build_request_room_list_pkt()
-        self.net_worker.send_packet(packet)
+        return self.net_worker.send_packet(packet)
 
     def request_lobby_user_list(self):
         self.user_tabs.clear(USER_TAB_NAME)
         packet = self.net_worker.builder.build_request_lobby_user_list_pkt()
-        self.net_worker.send_packet(packet)
+        return self.net_worker.send_packet(packet)
 
     def request_friend_list(self):
         self.user_tabs.clear(FRIEND_TAB_NAME)
         packet = self.net_worker.builder.build_request_friend_list_pkt()
-        self.net_worker.send_packet(packet)
+        return self.net_worker.send_packet(packet)
 
     def handle_packet(self, data: RecvPacketStruct):
         if data:
@@ -393,6 +400,7 @@ class LobbyState(BaseState):
             return
 
     def update(self, dt_ms, events):
+        self.request_initial_lobby_data()
         self.chat_window.update(dt_ms)
                     
         for ev in events:

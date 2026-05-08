@@ -1,5 +1,6 @@
 import pygame
 from typing import Optional
+from tetris.resources.paths import resource_path
 
 MIN_SIZE = 10
 MAX_SIZE = 50
@@ -38,5 +39,5 @@ class Fonts:
             return self.fonts[_font_size]
             
     def load_font(self, font_size: int) -> pygame.font.Font:
-        font = pygame.font.Font("tetris/resources/fonts/Galmuri11.ttf", font_size)
+        font = pygame.font.Font(resource_path("fonts", "Galmuri11.ttf"), font_size)
         return font

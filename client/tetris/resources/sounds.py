@@ -3,13 +3,16 @@ from pathlib import Path
 from tetris.resources.paths import *
 
 class Sounds:
-    FILE_PATH = "tetris/config/sound_settings.txt"
+    FILE_PATH = user_config_path("sound_settings.txt")
+    DEFAULT_FILE_PATH = config_path("sound_settings.txt")
+
     def __init__(self):
         # BGM 로드
         self.bgms = {}
         for name, path in BGM_PATHS.items():
-            pygame.mixer.music.load(path)
-            self.bgms[name] = path   # music은 단일 채널이므로 path만 저장
+            file_path = resource_path(path)
+            pygame.mixer.music.load(file_path)
+            self.bgms[name] = file_path   # music은 단일 채널이므로 path만 저장
 
         # 효과음 로드
         self.sound_effects: dict[int, pygame.mixer.Sound] = {}
@@ -45,6 +48,9 @@ class Sounds:
 
     def load_sound_settings(self):
         path = Path(self.FILE_PATH)
+        if not path.exists():
+            path = Path(self.DEFAULT_FILE_PATH)
+
         if not path.exists():
             print("설정 파일이 존재하지 않아 기본값을 사용합니다.")
             return
@@ -83,6 +89,8 @@ class Sounds:
 
     def save_sound_settings(self):
         path = Path(self.FILE_PATH)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
         master = max(0, min(100, int(self.volumes["마스터"])))
         bgm = max(0, min(100, int(self.volumes["배경음"])))
         effect = max(0, min(100, self.volumes["효과음"]))
@@ -91,5 +99,5 @@ class Sounds:
         path.write_text(data, encoding="utf-8")
 
     def load_effect_sound(self, path: str)-> pygame.mixer.Sound:
-        file_path = RESOURCE_ROOT_PATH + path
+        file_path = resource_path(path)
         return pygame.mixer.Sound(file_path)

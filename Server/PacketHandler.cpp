@@ -46,7 +46,7 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 	}
 
 	if (server.IsStressTestMode()) {
-		server.LoginStressTestSession(session, login_id);
+		server.LoginStressTestSession(session, login_id, 0);
 		return;
 	}
 

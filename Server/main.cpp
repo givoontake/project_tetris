@@ -2,13 +2,33 @@
 #include <vector>
 #include <thread>
 #include <memory>
+#include <string>
 #include "IOCPServer.h"
 #include "ServerThreadManager.h"
+
+SERVER_RUN_MODE SelectServerRunMode()
+{
+    while (true) {
+        std::cout << "Select server run mode\n";
+        std::cout << "1. Normal\n";
+        std::cout << "2. Stress Test\n";
+        std::cout << "> ";
+
+        std::string selected_mode;
+        std::cin >> selected_mode;
+
+        if (selected_mode == "1") return SERVER_RUN_MODE::NORMAL;
+        if (selected_mode == "2") return SERVER_RUN_MODE::STRESS_TEST;
+
+        std::cout << "Invalid mode. Select 1 or 2.\n";
+    }
+}
 
 int main()
 {
     SetConsoleOutputCP(65001);
-    auto iocp_server = std::make_unique<IOCPServer>();
+    const SERVER_RUN_MODE run_mode = SelectServerRunMode();
+    auto iocp_server = std::make_unique<IOCPServer>(run_mode);
 
     iocp_server->StartServer();
     iocp_server->InitStressTestRooms();

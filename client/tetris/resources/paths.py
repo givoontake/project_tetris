@@ -1,7 +1,43 @@
+import os
+import sys
+from pathlib import Path
+
 from tetris.resources.define import *
 
 # ===== Resource Root =====
-RESOURCE_ROOT_PATH = "tetris/resources/"
+def _package_root_path() -> Path:
+    if getattr(sys, "frozen", False):
+        bundle_root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        packaged_root = bundle_root / "tetris"
+        if packaged_root.exists():
+            return packaged_root
+    return Path(__file__).resolve().parents[1]
+
+
+def _user_config_root_path() -> Path:
+    if sys.platform == "win32":
+        base_path = os.getenv("LOCALAPPDATA") or os.getenv("APPDATA")
+        if base_path:
+            return Path(base_path) / "ProjectTetris"
+    return Path.home() / ".project_tetris"
+
+
+PACKAGE_ROOT_PATH = _package_root_path()
+RESOURCE_ROOT_PATH = PACKAGE_ROOT_PATH / "resources"
+CONFIG_ROOT_PATH = PACKAGE_ROOT_PATH / "config"
+USER_CONFIG_ROOT_PATH = _user_config_root_path()
+
+
+def resource_path(*parts: str) -> str:
+    return str(RESOURCE_ROOT_PATH.joinpath(*parts))
+
+
+def config_path(*parts: str) -> str:
+    return str(CONFIG_ROOT_PATH.joinpath(*parts))
+
+
+def user_config_path(*parts: str) -> str:
+    return str(USER_CONFIG_ROOT_PATH.joinpath(*parts))
 
 # ===== Block Image Paths =====
 BLOCK_IMAGE_PATHS = {
@@ -61,7 +97,7 @@ UI_IMAGE_PATHS = {
 
 # ===== Sound Paths =====
 BGM_PATHS = {
-    BGM_INGAME: "tetris/resources/sounds/bgm_ingame.mp3",
+    BGM_INGAME: "sounds/bgm_ingame.mp3",
 }
 
 EFFECT_SOUND_PATHS = {

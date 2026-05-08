@@ -398,3 +398,10 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Project generated artifacts
+/client/build/
+/client/dist/
+/merge_stress_code.exe
+/merged_server_code.txt
+/merged_stress_code.txt

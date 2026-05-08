@@ -1,14 +1,18 @@
 #include "RoomSession.h"
 
 RoomSession::RoomSession(int max_user)
+	: tick_buf{},
+	send_buf(std::make_unique<char[]>(BUF_SIZE * (max_user > 0 ? max_user : 1))),
+	send_buf_size(BUF_SIZE * (max_user > 0 ? max_user : 1)),
+	tick_data_size(0),
+	send_data_size(0),
+	r_user_state(ROOM_USER_STATE::WAIT),
+	prev_r_user_state(ROOM_USER_STATE::WAIT),
+	tetromino_index(0),
+	score(0),
+	combo(0)
 {
-	if (max_user <= 0) max_user = 1;
-	send_buf_size = BUF_SIZE * max_user;
-	send_buf = std::make_unique<char[]>(send_buf_size);
-	ZeroMemory(tick_buf, sizeof(tick_buf));
 	ZeroMemory(send_buf.get(), send_buf_size);
-	r_user_state.Store(ROOM_USER_STATE::WAIT);
-	prev_r_user_state.Store(ROOM_USER_STATE::WAIT);
 }
 
 bool RoomSession::InitRoomSession(const SP<Session>& s, int room_index)
@@ -22,6 +26,7 @@ bool RoomSession::InitRoomSession(const SP<Session>& s, int room_index)
 	tetromino_index = 0;
 
 	score = 0;
+	combo = 0;
 	ClearBuffers();
 	return true;
 }
@@ -36,6 +41,7 @@ void RoomSession::ClearRoomSession()
 	tetromino_index = 0;
 
 	score = 0;
+	combo = 0;
 	ClearBuffers();
 }
 
@@ -47,6 +53,7 @@ void RoomSession::ClearData()
 	tetromino_index = 0;
 
 	score = 0;
+	combo = 0;
 	ClearBuffers();
 }
 

@@ -9,6 +9,8 @@ from tetris.resources.resource_manager import ResourceManager
 from tetris.net.session import Session
 from tetris.resources.fonts import Fonts
 
+MAX_PACKETS_PER_FRAME = 128
+
 class GameLoop:
     def __init__(self):
         pygame.init()
@@ -53,16 +55,18 @@ class GameLoop:
     
     def drain_packets(self):
         q = self.net_worker._pm.queue
+        processed = 0
 
-        while not q.empty():
+        while processed < MAX_PACKETS_PER_FRAME:
             if self.state.next_state is not None:
                 break
             try:
                 data = q.get_nowait()
             except queue.Empty:
-                data = None
+                break
 
             self.state.handle_packet(data)
+            processed += 1
 
             if data is None:
                 break
