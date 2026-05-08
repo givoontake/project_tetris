@@ -1,5 +1,6 @@
 import time
 import queue
+import ctypes
 import pygame
 
 from tetris.config.define import *
@@ -8,11 +9,26 @@ from tetris.net.network import NetworkWorker
 from tetris.resources.resource_manager import ResourceManager
 from tetris.net.session import Session
 from tetris.resources.fonts import Fonts
+from tetris.resources.paths import resource_path
 
 MAX_PACKETS_PER_FRAME = 128
 
+APP_USER_MODEL_ID = "ProjectTetris.TetrisClient"
+
+def set_windows_app_id():
+    if not hasattr(ctypes, "windll"):
+        return
+
+    shell32 = ctypes.windll.shell32
+    shell32.SetCurrentProcessExplicitAppUserModelID.argtypes = [ctypes.c_wchar_p]
+    shell32.SetCurrentProcessExplicitAppUserModelID.restype = ctypes.c_long
+    shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+
+
 class GameLoop:
     def __init__(self):
+        set_windows_app_id()
+
         pygame.init()
         pygame.mixer.init()
         pygame.mixer.music.set_volume(0.3)
@@ -20,6 +36,7 @@ class GameLoop:
         # 초기 화면 생성
         w = int(BASE_SCREEN_WIDTH * INITIAL_SCALE)
         h = int(BASE_SCREEN_HEIGHT * INITIAL_SCALE)
+        pygame.display.set_icon(pygame.image.load(resource_path("icons", "tetris_icon.png")))
         self.screen = pygame.display.set_mode((w, h))
         pygame.display.set_caption("Tetris")
         pygame.key.start_text_input()
