@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33424.131
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server.vcxproj", "{1C3F6C7F-4E7B-4260-A64D-C6BD4D97310E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TetrisServer", "TetrisServer.vcxproj", "{1C3F6C7F-4E7B-4260-A64D-C6BD4D97310E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
