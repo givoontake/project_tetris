@@ -28,6 +28,7 @@ from tetris.ui.user_taps import UserTabs, USER_TAB_NAME, FRIEND_TAB_NAME
 from tetris.states.single_play_state import SinglePlayState
 from tetris.states.multi_play_state import MultiPlayState
 from tetris.states.ranking_state import RankingState
+from tetris.states.customize_state import CustomizeState
 from tetris.states.base_state import BaseState
 from tetris.net.packet_structs import *
 from tetris.net.error_types import *
@@ -38,6 +39,7 @@ MENU_HEIGHT = 100
 QUICK_START_MENU_TEXT = "빠른시작"
 QUICK_START_SINGLE_ROOM_NAME = "빠른 싱글"
 RANKING_MENU_TEXT = "\uB7AD\uD0B9"
+CUSTOMIZE_MENU_TEXT = "\uBE14\uB85D \uC124\uC815"
 
 class LobbyState(BaseState):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager,
@@ -81,6 +83,7 @@ class LobbyState(BaseState):
             draw_x += MENU_WIDTH
         self.top_menus[4].set_text(RANKING_MENU_TEXT)
         exit_rect = self.top_menus[5].button.rect.copy()
+        customize_rect = exit_rect.copy()
         exit_rect.x = self.screen.get_width() - MENU_WIDTH
         self.top_menus[5] = Button(self.screen, exit_rect, self.rm, "게임종료", 0)
         self.top_menus[5].set_images(
@@ -94,6 +97,11 @@ class LobbyState(BaseState):
         self.top_menus[3].set_text("상점")
         self.top_menus[4].set_text("설정")
         self.top_menus[5].set_text("게임종료")
+
+        self.top_menus.append(self.top_menus[5])
+        self.top_menus[5] = Button(self.screen, customize_rect, self.rm, CUSTOMIZE_MENU_TEXT, 0)
+        self.top_menus[5].set_text(CUSTOMIZE_MENU_TEXT)
+        self.top_menus[6].set_text("\uAC8C\uC784\uC885\uB8CC")
 
     # def on_resize(self, w, h, screen):
     #     self.screen = screen
@@ -219,6 +227,10 @@ class LobbyState(BaseState):
                     return
 
                 elif event == 5:
+                    self.queue_state(CustomizeState(self.screen, self.rm, self.net_worker, self.session))
+                    return
+
+                elif event == 6:
                     popup_texts = ["게임종료", "계속하기"]
                     self.exit_popup = PopupBox(self.screen, self.rm, "종료하시겠습니까?", popup_texts)
                     self.reactable = False

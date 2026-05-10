@@ -13,6 +13,7 @@ class Session:
         self.lose = 0
         self.max_score = 0
         self.block_textures = {'I': None, 'J': None, 'L': None, 'O': None, 'S': None, 'T': None, 'Z': None, 'G': None}
+        self.block_texture_keys = DEFAULT_BLOCK_IMAGE_KEYS.copy()
         
         self.load_default_textures()
     
@@ -29,17 +30,21 @@ class Session:
         
         self.block_textures = new_textures # 텍스쳐 가져올 때 실제로 있는건지 검증하는 코드가 필요할 것 같기는 한데.. 일단 패스
 
+    def set_block_texture(self, shape_key: str, block_image_key: int):
+        if shape_key not in self.block_textures:
+            return
+        if block_image_key not in self.rm.images.block_images:
+            return
+
+        self.block_texture_keys[shape_key] = block_image_key
+        self.block_textures[shape_key] = self.rm.images.block_images[block_image_key]
+    
     def load_default_textures(self):
-       self.block_textures = {
-        'Z': self.rm.images.block_images[PRISM_RED],      
-        'L': self.rm.images.block_images[PRISM_ORANGE],  
-        'O': self.rm.images.block_images[PRISM_YELLOW],
-        'S': self.rm.images.block_images[PRISM_GREEN], 
-        'J': self.rm.images.block_images[PRISM_BLUE],   
-        'I': self.rm.images.block_images[PRISM_CYAN],  
-        'T': self.rm.images.block_images[PRISM_PURPLE],
-        'G': self.rm.images.block_images[PRISM_SILVER],
-    }
+        self.block_texture_keys = DEFAULT_BLOCK_IMAGE_KEYS.copy()
+        self.block_textures = {
+            shape_key: self.rm.images.block_images[block_image_key]
+            for shape_key, block_image_key in self.block_texture_keys.items()
+        }
 
     # def set_id(self, new_id: int):
     #     self.id = int(new_id)

@@ -5,10 +5,12 @@ from tetris.resources.paths import *
 class Images:
     HOVER_SCALE = 1.05
     PRESS_SCALE = 0.95
+    BLOCK_IMAGE_SIZE = 100
+
     def __init__(self):
         # ---- Block Images ----
         self.block_images = {
-            key: self.load_image(path, CELL_SIZE, CELL_SIZE)
+            key: self.load_image(path, self.BLOCK_IMAGE_SIZE, self.BLOCK_IMAGE_SIZE)
             for key, path in BLOCK_IMAGE_PATHS.items()
         }
 

@@ -101,7 +101,7 @@ class Blue(Base):
 class Indigo(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.images.block_images[PRISM_ROYAL_BLUE]
+        self.image = self.rm.images.block_images[PRISM_PINK]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
