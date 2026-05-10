@@ -31,14 +31,14 @@ class Session:
 
     def load_default_textures(self):
        self.block_textures = {
-        'Z': self.rm.images.block_images[DEFAULT_RED],      
-        'L': self.rm.images.block_images[DEFAULT_ORANGE],  
-        'O': self.rm.images.block_images[DEFAULT_YELLOW],
-        'S': self.rm.images.block_images[DEFAULT_GREEN], 
-        'J': self.rm.images.block_images[DEFAULT_BLUE],   
-        'I': self.rm.images.block_images[DEFAULT_INDIGO],  
-        'T': self.rm.images.block_images[DEFAULT_PURPLE],
-        'G': self.rm.images.block_images[DEFAULT_GRAY],
+        'Z': self.rm.images.block_images[PRISM_RED],      
+        'L': self.rm.images.block_images[PRISM_ORANGE],  
+        'O': self.rm.images.block_images[PRISM_YELLOW],
+        'S': self.rm.images.block_images[PRISM_GREEN], 
+        'J': self.rm.images.block_images[PRISM_BLUE],   
+        'I': self.rm.images.block_images[PRISM_CYAN],  
+        'T': self.rm.images.block_images[PRISM_PURPLE],
+        'G': self.rm.images.block_images[PRISM_SILVER],
     }
 
     # def set_id(self, new_id: int):

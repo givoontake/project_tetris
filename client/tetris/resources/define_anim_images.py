@@ -41,7 +41,7 @@ class Base:
 class Red(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.block_images[DEFAULT_RED]
+        self.image = self.rm.images.block_images[PRISM_RED]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
@@ -53,7 +53,7 @@ class Red(Base):
 class Orange(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.block_images[DEFAULT_ORANGE]
+        self.image = self.rm.images.block_images[PRISM_ORANGE]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
@@ -65,7 +65,7 @@ class Orange(Base):
 class Yellow(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.block_images[DEFAULT_YELLOW]
+        self.image = self.rm.images.block_images[PRISM_YELLOW]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
@@ -77,7 +77,7 @@ class Yellow(Base):
 class Green(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.block_images[DEFAULT_GREEN]
+        self.image = self.rm.images.block_images[PRISM_GREEN]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
@@ -89,7 +89,7 @@ class Green(Base):
 class Blue(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.block_images[DEFAULT_BLUE]
+        self.image = self.rm.images.block_images[PRISM_BLUE]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
@@ -101,7 +101,7 @@ class Blue(Base):
 class Indigo(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.block_images[DEFAULT_INDIGO]
+        self.image = self.rm.images.block_images[PRISM_ROYAL_BLUE]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
@@ -113,7 +113,7 @@ class Indigo(Base):
 class Purple(Base):
     def __init__(self, screen: pygame.Surface, rm: ResourceManager):
         super().__init__(screen, rm)
-        self.image = self.rm.block_images[DEFAULT_PURPLE]
+        self.image = self.rm.images.block_images[PRISM_PURPLE]
 
         self.large_image = pygame.transform.smoothscale(self.image, (LARGE_SIZE, LARGE_SIZE))
         self.medium_image = pygame.transform.smoothscale(self.image, (MEDIUM_SIZE, MEDIUM_SIZE))
