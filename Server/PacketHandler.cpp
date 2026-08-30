@@ -39,13 +39,8 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 
 	std::string login_id = server.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
 	std::string password = server.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
-	Database& repr_db = server.GetDB();
 	SessionKey key = session->GetSessionKey();
-	auto task_login = [&repr_db, key, login_id, password]() {
-		repr_db.ExecuteLogin(key, login_id, password);
-		};
-
-	repr_db.Enqueue(task_login, session);
+	server.EnqueueDBTask(std::make_unique<DBLoginTask>(key, login_id, password), session);
 }
 
 void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session)
@@ -131,15 +126,10 @@ void PacketHandler::HandleRequestFriendPacket(char* packet, const SP<Session>& s
 	if (session->GetModeState() != MODE_STATE::LOBBY) return;
 
 	int recver_id = friend_p->recver_id;
-	Database& repr_db = server.GetDB();
 	SessionKey key = session->GetSessionKey();
 	DBResultLogin db_info = session->GetDBInfo();
 	FriendInfo requester_info{ db_info.id, db_info.nickname };
-	auto task_afr = [&repr_db, key, requester_info, recver_id]() {
-		repr_db.ExecuteAddFriendRequest(key, requester_info, recver_id);
-		};
-
-	repr_db.Enqueue(task_afr, session);
+	server.EnqueueDBTask(std::make_unique<DBAddFriendRequestTask>(key, requester_info, recver_id), session);
 }
 
 void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& session)
@@ -149,15 +139,10 @@ void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& se
 	if (session->GetModeState() != MODE_STATE::LOBBY) return;
 
 	int requester_id = accept_p->requester_id;
-	Database& repr_db = server.GetDB();
 	SessionKey key = session->GetSessionKey();
 	DBResultLogin db_info = session->GetDBInfo();
 	FriendInfo accepter_info{ db_info.id, db_info.nickname };
-	auto task_af = [&repr_db, key, accepter_info, requester_id]() {
-		repr_db.ExecuteAddFriend(key, accepter_info, requester_id);
-		};
-
-	repr_db.Enqueue(task_af, session);
+	server.EnqueueDBTask(std::make_unique<DBAddFriendTask>(key, accepter_info, requester_id), session);
 }
 
 void PacketHandler::HandleDeleteFriendPacket(char* packet, const SP<Session>& session)
@@ -166,13 +151,8 @@ void PacketHandler::HandleDeleteFriendPacket(char* packet, const SP<Session>& se
 	C2S_DELETE_FRIEND_PACKET* delete_p = reinterpret_cast<C2S_DELETE_FRIEND_PACKET*>(packet);
 	int target_id = delete_p->target_id;
 	if (session->GetModeState() != MODE_STATE::LOBBY) return;
-	Database& repr_db = server.GetDB();
 	SessionKey key = session->GetSessionKey();
-	auto task_df = [&repr_db, key, target_id]() {
-		repr_db.ExecuteDeleteFriend(key, target_id);
-		};
-
-	repr_db.Enqueue(task_df, session);
+	server.EnqueueDBTask(std::make_unique<DBDeleteFriendTask>(key, target_id), session);
 }
 
 void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)

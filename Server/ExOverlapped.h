@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <WinSock2.h>
 #include <MSWSock.h>
 #include "define_packets.h"
@@ -13,8 +14,8 @@ struct SessionKey {
 constexpr ULONG_PTR LISTEN_IO_COMPLETION = 1;
 constexpr ULONG_PTR SESSION_IO_COMPLETION = 2;
 constexpr ULONG_PTR ROOM_IO_COMPLETION = 3;
-constexpr ULONG_PTR DB_IO_COMPLETION = 4;
-constexpr ULONG_PTR DB_INIT_SERVER_COMPLETION = 5;
+constexpr ULONG_PTR DB_SESSION_COMPLETION = 4;
+constexpr ULONG_PTR DB_SERVER_COMPLETION = 5;
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;
@@ -51,13 +52,8 @@ struct IOOverlapped {
 struct DBOverlapped
 {
 	ExOverlapped ex_over;
-	DBOperationType type{};
-	bool ok;
 	std::unique_ptr<DBResultDefault> result_data;
 
-	DBOverlapped() {
-		ok = false;
-		result_data = nullptr;
-	}
+	explicit DBOverlapped(DBOperationType type) : result_data(std::make_unique<DBResultFailure>(type)) {}
 };
 

@@ -528,20 +528,22 @@ void MultiRoom::UpdatePrevUsersState()
 
 void MultiRoom::RequestUpdateMatchResult()
 {
+	SessionKey winner_key{};
+	winner_key.id = winner_id;
+	SessionKey players[MAX_MATCH_RESULT_PLAYERS]{};
+	SP<Session> sessions[MAX_MATCH_RESULT_PLAYERS]{};
+	uint8_t player_count = 0;
+
 	for (auto& r_user : room_users) {
-		auto session_shared = r_user.GetSession();
-		if (!session_shared) continue;
-		bool is_winner = false;
-		if (winner_id == session_shared->GetDBInfo().id) {
-			is_winner = true;
-		}
-		Database& db = server->GetDB();
-		SessionKey key = session_shared->GetSessionKey();
-		auto task_update_match_result = [key, is_winner, &db] {
-			db.ExecuteUpdateMatchResult(key, is_winner);
-			};
-		db.Enqueue(task_update_match_result, session_shared);
+		auto session = r_user.GetSession();
+		if (!session) continue;
+		players[player_count] = session->GetSessionKey();
+		sessions[player_count] = session;
+		if (players[player_count].id == winner_id) winner_key = players[player_count];
+		++player_count;
 	}
+
+	server->EnqueueDBTask(std::make_unique<DBUpdateMatchResultTask>(winner_key, players, player_count), sessions);
 }
 
 void MultiRoom::FindNewHost()

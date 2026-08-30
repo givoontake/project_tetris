@@ -6,7 +6,8 @@
 
 #undef min
 
-IOCPServer::IOCPServer() : packet_handler(*this), db_result_handler(*this)
+IOCPServer::IOCPServer()
+	: packet_handler(*this), db_result_handler(*this)
 {
 	for (int i = 0; i < MAX_USER; ++i) {
 		users[i].store(nullptr);
@@ -49,8 +50,87 @@ IOCPServer::~IOCPServer()
 	active_users.Clear();
 	closesocket(listen_socket);
 	closesocket(client_socket);
-	db.SetRunning(false);
+	StopDBWorkers();
 	WSACleanup();
+}
+
+void IOCPServer::InitDBWorkers()
+{
+	login_db_worker.Init(iocp_handle);
+	for (auto& worker : game_db_workers)
+		worker.Init(iocp_handle);
+}
+
+void IOCPServer::StartDBWorkers()
+{
+	login_db_worker.Start();
+	for (auto& worker : game_db_workers)
+		worker.Start();
+}
+
+void IOCPServer::StopDBWorkers()
+{
+	login_db_worker.Stop();
+	for (auto& worker : game_db_workers)
+		worker.Stop();
+}
+
+void IOCPServer::WakeDBWorkers()
+{
+	login_db_worker.Wake();
+	for (auto& worker : game_db_workers)
+		worker.Wake();
+}
+
+void IOCPServer::RunLoginDBWorker()
+{
+	login_db_worker.Run();
+}
+
+void IOCPServer::RunGameDBWorker(std::size_t worker_index)
+{
+	if (worker_index >= game_db_workers.size()) return;
+	game_db_workers[worker_index].Run();
+}
+
+bool IOCPServer::EnqueueDBTask(std::unique_ptr<ServerDBTask> db_task)
+{
+	const std::size_t worker_index = next_game_db_worker.fetch_add(1) % game_db_workers.size();
+	return game_db_workers[worker_index].Enqueue(std::move(db_task));
+}
+
+bool IOCPServer::EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session)
+{
+	bool enqueued = false;
+	if (db_task->type == DBOperationType::LOGIN)
+	{
+		enqueued = login_db_worker.Enqueue(std::move(db_task), session);
+	}
+	else
+	{
+		std::size_t worker_index = 0;
+		if (db_task->key.id >= 0)
+			worker_index = static_cast<std::size_t>(db_task->key.id) % game_db_workers.size();
+		else
+			worker_index = next_game_db_worker.fetch_add(1) % game_db_workers.size();
+
+		enqueued = game_db_workers[worker_index].Enqueue(std::move(db_task), session);
+	}
+
+	if (!enqueued && session->TryDeactivate()) TryDisconnect(session);
+	return enqueued;
+}
+
+void IOCPServer::EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task, const SP<Session> (&sessions)[MAX_MATCH_RESULT_PLAYERS])
+{
+	for (int i = 0; i < db_task->player_count; ++i)
+	{
+		if (sessions[i]->TryAddPending()) db_task->completion_mask |= static_cast<uint8_t>(1u << i);
+		else if (sessions[i]->TryDeactivate()) TryDisconnect(sessions[i]);
+	}
+
+	const std::size_t worker_index = static_cast<std::size_t>(db_task->players[0].id) % game_db_workers.size();
+	game_db_workers[worker_index].Enqueue(std::move(db_task));
 }
 
 
@@ -518,7 +598,7 @@ void IOCPServer::ProcessGQCS()
 			delete ex_over;
 			break;
 
-		case DB_IO_COMPLETION: { // 팬딩은 모든 작업을 마치고 줄야야 함
+		case DB_SESSION_COMPLETION: { // 팬딩은 모든 작업을 마치고 줄야야 함
 			DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
 			int index = db_over->ex_over.key.index;
 			auto sess_ptr = FindSessionByIndex(index);
@@ -540,7 +620,7 @@ void IOCPServer::ProcessGQCS()
 			break;
 		}
 
-		case DB_INIT_SERVER_COMPLETION: {
+		case DB_SERVER_COMPLETION: {
 			if (!result) {
 				is_running.store(false);
 			}
@@ -757,11 +837,7 @@ void IOCPServer::DeleteRoom(int room_index)
 
 void IOCPServer::RequestLoadRanking()
 {
-	Database& repr_db = GetDB();
-	auto task = [&repr_db]() {
-		repr_db.ExecuteLoadRanking();
-		};
-	repr_db.Enqueue(task, nullptr);
+	EnqueueDBTask(std::make_unique<DBLoadRankingTask>());
 }
 
 

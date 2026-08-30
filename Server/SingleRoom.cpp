@@ -330,11 +330,7 @@ void SingleRoom::RequestUpdateScore()
 	if (!session_shared) return;
 	if (session_shared->GetDBInfo().max_score < room_users[0].GetScore()) {
 		int new_score = room_users[0].GetScore();
-		Database& db = server->GetDB();
 		SessionKey key = session_shared->GetSessionKey();
-		auto task_update_score = [key, new_score, &db] {
-			db.ExecuteUpdateScore(key, new_score);
-			};
-		server->GetDB().Enqueue(task_update_score, session_shared);
+		server->EnqueueDBTask(std::make_unique<DBUpdateScoreTask>(key, new_score), session_shared);
 	}
 }

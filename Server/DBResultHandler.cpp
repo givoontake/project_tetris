@@ -9,7 +9,7 @@ DBResultHandler::DBResultHandler(IOCPServer& server) : server(server)
 
 void DBResultHandler::HandleRequestFriendDBResult(DBOverlapped* db_over)
 {
-	if (db_over->ok) {
+	if (db_over->result_data->is_success) {
 		DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
 		auto recver_session = server.active_users.FindSessionById(res->recver_info.id);
 		if (recver_session) {
@@ -27,7 +27,7 @@ void DBResultHandler::HandleRequestFriendDBResult(DBOverlapped* db_over)
 
 void DBResultHandler::HandleAddFriendDBResult(DBOverlapped* db_over)
 {
-	if (db_over->ok) {
+	if (db_over->result_data->is_success) {
 		DBResultAddFriend* res = static_cast<DBResultAddFriend*>(db_over->result_data.get());
 		server.SendAddFriendResult(res->requester_info, res->accepter_info);
 	}
@@ -35,7 +35,7 @@ void DBResultHandler::HandleAddFriendDBResult(DBOverlapped* db_over)
 
 void DBResultHandler::HandleDeleteFriendDBResult(DBOverlapped* db_over)
 {
-	if (db_over->ok) {
+	if (db_over->result_data->is_success) {
 		DBResultDeleteFriend* res = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
 		server.SendDeleteFriendResult(res->requester_id, res->target_id);
 	}
@@ -43,7 +43,7 @@ void DBResultHandler::HandleDeleteFriendDBResult(DBOverlapped* db_over)
 
 void DBResultHandler::HandleLoadRankingDBResult(DBOverlapped* db_over)
 {
-	if (db_over->ok && db_over->result_data) {
+	if (db_over->result_data->is_success) {
 		DBResultLoadRanking* res = static_cast<DBResultLoadRanking*>(db_over->result_data.get());
 		server.GetRankingManager().InitRanking(res->rankings);
 	}
@@ -58,21 +58,19 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, const SP<Sessio
 	login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
 	login_p.header.type = S2C_LOGIN;
 	login_p.id = -1;
-	if (db_over->ok) {
-		if (db_over->result_data) {
-			DBResultLogin* login_result = static_cast<DBResultLogin*>(db_over->result_data.get());
+	if (db_over->result_data->is_success) {
+		DBResultLogin* login_result = static_cast<DBResultLogin*>(db_over->result_data.get());
 
-			if (!server.active_users.AddUser(session, login_result)) {
-				login_p.id = -2;
-			}
-			else {
-				DBResultLogin db_info = session->GetDBInfo();
-				login_p.id = db_info.id;
-				login_p.max_score = db_info.max_score;
-				login_p.win_count = db_info.win_count;
-				login_p.lose_count = db_info.lose_count;
-				server.StringToCharBuf(db_info.nickname, login_p.nickname, sizeof(login_p.nickname));
-			}
+		if (!server.active_users.AddUser(session, login_result)) {
+			login_p.id = -2;
+		}
+		else {
+			DBResultLogin db_info = session->GetDBInfo();
+			login_p.id = db_info.id;
+			login_p.max_score = db_info.max_score;
+			login_p.win_count = db_info.win_count;
+			login_p.lose_count = db_info.lose_count;
+			server.StringToCharBuf(db_info.nickname, login_p.nickname, sizeof(login_p.nickname));
 		}
 	}
 
@@ -94,19 +92,15 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, const SP<Sessio
 		std::cout << "로그인 - 플레이어: " << session->GetDBInfo().nickname << std::endl;
 		session->SendPacket(reinterpret_cast<char*>(&login_p), server.GetHandle());
 
-		Database& repr_db = server.GetDB();
 		SessionKey key = session->GetSessionKey();
-		auto task = [&repr_db, key]() {
-			repr_db.ExecuteLoadFriendList(key);
-			};
-		repr_db.Enqueue(task, session);
+		server.EnqueueDBTask(std::make_unique<DBLoadFriendListTask>(key), session);
 	}
 }
 
 void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<Session>& session)
 {
 	if (!session) return;
-	if (db_over->ok) {
+	if (db_over->result_data->is_success) {
 		DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
 		DBResultLogin db_info = session->UpdateMaxScore(res->max_score);
 		server.GetRankingManager().UpdateRanking(db_info.id, db_info.nickname, res->max_score);
@@ -121,7 +115,7 @@ void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<
 void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, const SP<Session>& session)
 {
 	if (!session) return;
-	if (db_over->ok) {
+	if (db_over->result_data->is_success) {
 		S2C_MATCH_RECORD_PACKET record_p;
 		record_p.header.size = static_cast<std::uint16_t>(sizeof(record_p));
 		record_p.header.type = S2C_MATCH_RECORD;
@@ -138,7 +132,7 @@ void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, con
 void DBResultHandler::HandleLoadFriendListDBResult(DBOverlapped* db_over, const SP<Session>& session)
 {
 	if (!session) return;
-	if (db_over->ok) {
+	if (db_over->result_data->is_success) {
 		DBResultLoadFriendList* res = static_cast<DBResultLoadFriendList*>(db_over->result_data.get());
 		session->InitFriendList(res->friend_list);
 	}
@@ -148,7 +142,7 @@ void DBResultHandler::HandleIOResult(DBOverlapped* db_over, const SP<Session>& s
 {
 	if (!session) return;
 
-	switch (db_over->type) {
+	switch (db_over->result_data->type) {
 	case DBOperationType::LOGIN:
 		HandleLoginDBResult(db_over, session);
 		break;
@@ -181,7 +175,7 @@ void DBResultHandler::HandleIOResult(DBOverlapped* db_over, const SP<Session>& s
 
 void DBResultHandler::HandleInitServerResult(DBOverlapped* db_over)
 {
-	switch (db_over->type){
+	switch (db_over->result_data->type){
 	case DBOperationType::LOAD_RANKING:
 		HandleLoadRankingDBResult(db_over);
 		break;

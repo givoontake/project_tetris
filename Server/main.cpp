@@ -67,12 +67,18 @@ void TimerThread()
 
         // 새 틱이 생겼으니 TickWorker 들을 깨운다.
         g_tick_cv.notify_all();
+        iocp_server.WakeDBWorkers();
     }
 }
 
-void DBThread()
+void LoginDBThread()
 {
-    iocp_server.GetDB().Run();
+    iocp_server.RunLoginDBWorker();
+}
+
+void GameDBThread(std::size_t worker_index)
+{
+    iocp_server.RunGameDBWorker(worker_index);
 }
 
 int main()
@@ -80,7 +86,7 @@ int main()
     SetConsoleOutputCP(65001);
 
     iocp_server.StartServer();
-    iocp_server.GetDB().init(iocp_server.GetHandle());
+    iocp_server.InitDBWorkers();
 
     std::vector<std::thread> worker_threads;
     int num_threads = std::thread::hardware_concurrency();
@@ -94,8 +100,15 @@ int main()
     std::thread timer_thread(TimerThread);
     --num_threads;
 
-    std::thread db_thread(DBThread);
-    --num_threads;
+    iocp_server.StartDBWorkers();
+    std::vector<std::thread> db_workers;
+    for (int i = 0; i < GAME_DB_WORKER_COUNT; ++i) {
+        db_workers.emplace_back(GameDBThread, static_cast<std::size_t>(i));
+    }
+    for (int i = 0; i < LOGIN_DB_WORKER_COUNT; ++i) {
+        db_workers.emplace_back(LoginDBThread);
+    }
+    num_threads -= DB_WORKER_COUNT;
     iocp_server.RequestLoadRanking();
 
     for (int i = 0; i < num_threads; ++i)
@@ -108,7 +121,9 @@ int main()
         th.join();
 
     timer_thread.join();
-    db_thread.join();
+    iocp_server.StopDBWorkers();
+    for (auto& th : db_workers)
+        th.join();
 
     return 0;
 }

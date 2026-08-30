@@ -14,10 +14,14 @@
 #include "MQueue.h"
 #include "TetrisRoom.h"
 #include "Atomic.h"
-#include "Database.h"
+#include "LoginDBWorker.h"
+#include "GameDBWorker.h"
 #include "RankingManager.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
+
+static_assert(GAME_DB_WORKER_COUNT > 0);
+static_assert(LOGIN_DB_WORKER_COUNT == 1);
 
 class IOCPServer
 {
@@ -26,7 +30,9 @@ class IOCPServer
 	WSADATA wsadata;
 	SOCKADDR_IN server_addr;
 	IOOverlapped accept_over;
-	Database db;
+	LoginDBWorker login_db_worker;
+	std::array<GameDBWorker, GAME_DB_WORKER_COUNT> game_db_workers;
+	std::atomic<std::size_t> next_game_db_worker{ 0 };
 	RankingManager ranking_manager;
 	ActiveRoomManager active_rooms;
 	ActiveUserManager active_users;
@@ -35,7 +41,6 @@ class IOCPServer
 	std::atomic<int> room_gen_generator = -1;
 	std::atomic<long long> tick_count = 0;
 	std::array<std::atomic<SP<Session>>, MAX_USER> users;
-	
 	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM> rooms;
 
 	std::atomic<bool> is_running = true;
@@ -55,7 +60,6 @@ public:
 
 	long long GetTickCount() const { return tick_count.load(); }
 	SP<TetrisRoom> GetRoom(int room_index) const;
-	Database& GetDB() { return db; }
 	RankingManager& GetRankingManager() { return ranking_manager; }
 
 	void AddTickCount() { tick_count.fetch_add(1); }
@@ -66,6 +70,15 @@ public:
 	void TryDisconnect(const SP<Session>& session);
 	void Disconnect(const SP<Session>& session);
 	void StartServer();
+	void InitDBWorkers();
+	void StartDBWorkers();
+	void StopDBWorkers();
+	void WakeDBWorkers();
+	void RunLoginDBWorker();
+	void RunGameDBWorker(std::size_t worker_index);
+	bool EnqueueDBTask(std::unique_ptr<ServerDBTask> db_task);
+	bool EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session);
+	void EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task, const SP<Session> (&sessions)[MAX_MATCH_RESULT_PLAYERS]);
 	void ProcessGQCS();
 	void ProcessPacket(const SP<Session>& session, int recv_bytes);
 	void RoutePacket(char* packet, const SP<Session>& session);

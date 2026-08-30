@@ -12,7 +12,7 @@ void Session::InitSession(SOCKET new_socket)
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	socket = new_socket;
 	io_pending_count = 0;
-	db_info.clear();
+	db_info.Clear();
 	friend_list.reserve(MAX_FRIENDS);
 	room_index = -1;
 	remain_data_size = 0;
