@@ -16,6 +16,9 @@
     <Filter Include="Packets">
       <UniqueIdentifier>{5c3ded7e-84c5-457c-b5ad-67be3685c583}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Threads">
+      <UniqueIdentifier>{7740505e-cb44-40d8-a7a5-3cf1b661ef85}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -23,6 +26,21 @@
     </ClCompile>
     <ClCompile Include="IOCPServer.cpp">
       <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\ServerThreadManager.cpp">
+      <Filter>Threads</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\ServerThread.cpp">
+      <Filter>Threads</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\IOThread.cpp">
+      <Filter>Threads</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\TickThread.cpp">
+      <Filter>Threads</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\TimerThread.cpp">
+      <Filter>Threads</Filter>
     </ClCompile>
     <ClCompile Include="Session.cpp">
       <Filter>소스 파일</Filter>
@@ -64,6 +82,21 @@
   <ItemGroup>
     <ClInclude Include="IOCPServer.h">
       <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\ServerThreadManager.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\ServerThread.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\IOThread.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\TickThread.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\TimerThread.h">
+      <Filter>Threads</Filter>
     </ClInclude>
     <ClInclude Include="define_packets.h">
       <Filter>헤더 파일</Filter>

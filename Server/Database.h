@@ -27,6 +27,7 @@
 #include "DBResult.h"
 #include "Session.h"
 #include "DBTasks.h"
+#include "Threads/ServerThread.h"
 
 struct DBConnectionInfo
 {
@@ -49,7 +50,7 @@ struct DBCaches
     }
 };
 
-class Database
+class Database : public ServerThread
 {
 protected:
     HANDLE iocp_handle = nullptr;
@@ -57,16 +58,15 @@ protected:
 
 public:
     Database();
-    virtual ~Database();
+    ~Database() override;
 
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
 
     void Init(HANDLE iocp);
-    void Start();
-    void Stop();
+    void Close() override;
     void Wake();
-    void Run();
+    void Run() override;
 
     bool Enqueue(std::unique_ptr<ServerDBTask> db_task);
     bool Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session);
@@ -82,7 +82,6 @@ protected:
 private:
     DBConnectionInfo connection_info;
 
-    std::atomic<bool> running{ false };
     std::mutex wait_mutex;
     std::condition_variable cv;
     oneapi::tbb::concurrent_queue<std::unique_ptr<DBTask>> task_queue;

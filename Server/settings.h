@@ -1,10 +1,6 @@
 #pragma once
 constexpr int FPS = 50;
 constexpr int FRAME_TIME = 1000 / FPS;
-constexpr int MAX_TICK_WORKERS = 4;
-constexpr int GAME_DB_WORKER_COUNT = 2;
-constexpr int LOGIN_DB_WORKER_COUNT = 1;
-constexpr int DB_WORKER_COUNT = GAME_DB_WORKER_COUNT + LOGIN_DB_WORKER_COUNT;
 
 constexpr int CLEAR_LINE_SCORE = 10;
 

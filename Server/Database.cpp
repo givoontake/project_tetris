@@ -57,12 +57,7 @@ void Database::Init(HANDLE iocp)
     iocp_handle = iocp;
 }
 
-void Database::Start()
-{
-    running = true;
-}
-
-void Database::Stop()
+void Database::Close()
 {
     {
         std::lock_guard<std::mutex> lock(wait_mutex);

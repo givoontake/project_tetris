@@ -17,11 +17,12 @@
 #include "LoginDBWorker.h"
 #include "GameDBWorker.h"
 #include "RankingManager.h"
+#include "Threads/ServerThreadManager.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
-static_assert(GAME_DB_WORKER_COUNT > 0);
-static_assert(LOGIN_DB_WORKER_COUNT == 1);
+static_assert(ServerThreadManager::GAME_DB_WORKER_COUNT > 0);
+static_assert(ServerThreadManager::LOGIN_DB_WORKER_COUNT == 1);
 
 class IOCPServer
 {
@@ -31,7 +32,7 @@ class IOCPServer
 	SOCKADDR_IN server_addr;
 	IOOverlapped accept_over;
 	LoginDBWorker login_db_worker;
-	std::array<GameDBWorker, GAME_DB_WORKER_COUNT> game_db_workers;
+	std::array<GameDBWorker, ServerThreadManager::GAME_DB_WORKER_COUNT> game_db_workers;
 	std::atomic<std::size_t> next_game_db_worker{ 0 };
 	RankingManager ranking_manager;
 	ActiveRoomManager active_rooms;
@@ -47,6 +48,8 @@ class IOCPServer
 
 	friend class PacketHandler;
 	friend class DBResultHandler;
+	friend class IOThread;
+	friend class ServerThreadManager;
 
 public:
 	IOCPServer();
@@ -74,12 +77,9 @@ public:
 	void StartDBWorkers();
 	void StopDBWorkers();
 	void WakeDBWorkers();
-	void RunLoginDBWorker();
-	void RunGameDBWorker(std::size_t worker_index);
 	bool EnqueueDBTask(std::unique_ptr<ServerDBTask> db_task);
 	bool EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session);
 	void EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task, const SP<Session> (&sessions)[MAX_MATCH_RESULT_PLAYERS]);
-	void ProcessGQCS();
 	void ProcessPacket(const SP<Session>& session, int recv_bytes);
 	void RoutePacket(char* packet, const SP<Session>& session);
 	void BroadCastToLobby(char* packet);
