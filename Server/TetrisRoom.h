@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <vector>
 #include <array>
 #include <string>
@@ -12,6 +13,7 @@ constexpr int ADD_TIMEOUT = 1;
 constexpr int DOWN_TIMEOUT = 2;
 
 class IOCPServer;
+class TickThread;
 
 struct TaskInfo
 {
@@ -76,11 +78,14 @@ struct RoomInfoSnapshot {
 // 룸 내부의 세션은 Disconnect 로직 및 방 내부 뮤텍스에 의해 100% 유효한 상태
 class TetrisRoom
 {
+	friend class TickThread;
+
 protected:
 	//std::array<RoomSession*, MAX_USER>& users;
 	std::vector<RoomSession> room_users; // 아토믹 변수는 복사가 안돼서..
 	IOCPServer* server;
 	Atomic<ROOM_STATE> room_state;
+	std::atomic<ROOM_PROCESS_STATE> processing_state{ ROOM_PROCESS_STATE::COMPLETE };
 	Tasks tasks;
 	std::vector<char> tetromino_spawn_list;
 	Position spawn_pos{ 3, 0 };

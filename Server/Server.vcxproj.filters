@@ -39,6 +39,9 @@
     <ClCompile Include="Threads\TickThread.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
+    <ClCompile Include="Threads\TickPhaseContext.cpp">
+      <Filter>Threads</Filter>
+    </ClCompile>
     <ClCompile Include="Threads\TimerThread.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
@@ -93,6 +96,12 @@
       <Filter>Threads</Filter>
     </ClInclude>
     <ClInclude Include="Threads\TickThread.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\TickPhaseContext.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\tick_state.h">
       <Filter>Threads</Filter>
     </ClInclude>
     <ClInclude Include="Threads\TimerThread.h">

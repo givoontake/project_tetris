@@ -36,6 +36,7 @@
     <ClCompile Include="Session.cpp" />
     <ClCompile Include="Threads\ServerThreadManager.cpp" />
     <ClCompile Include="Threads\ServerThread.cpp" />
+    <ClCompile Include="Threads\TickPhaseContext.cpp" />
     <ClCompile Include="Threads\TickThread.cpp" />
     <ClCompile Include="Threads\TimerThread.cpp" />
     <ClCompile Include="SingleRoom.cpp" />
@@ -75,6 +76,8 @@
     <ClInclude Include="Session.h" />
     <ClInclude Include="Threads\ServerThreadManager.h" />
     <ClInclude Include="Threads\ServerThread.h" />
+    <ClInclude Include="Threads\TickPhaseContext.h" />
+    <ClInclude Include="Threads\tick_state.h" />
     <ClInclude Include="Threads\TickThread.h" />
     <ClInclude Include="Threads\TimerThread.h" />
     <ClInclude Include="Tetris.h" />

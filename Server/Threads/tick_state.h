@@ -1,0 +1,5 @@
+#pragma once
+
+enum class THREAD_STATE { COMPLETE, PROCESSING };
+enum class TICK_PHASE { NONE, ROOM_PROCESS };
+enum class TICK_WAIT_POLICY { FULL_SPIN, HYBRID_SPIN, FULL_SLEEP };
