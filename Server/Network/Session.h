@@ -3,10 +3,10 @@
 #include <MSWSock.h>
 #include <vector>
 #include <array>
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include "ExOverlapped.h"
-#include "Atomic.h"
 #include "define_packets.h"
 #include "DBResult.h"
 #include "enum_class.h"
@@ -31,8 +31,8 @@ class Session
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
 	mutable std::mutex sess_mutex;
-	Atomic<LIFE_STATE> life_state = LIFE_STATE::NONE;
-	Atomic<MODE_STATE> mode_state = MODE_STATE::NONE;
+	std::atomic<LIFE_STATE> life_state = LIFE_STATE::NONE;
+	std::atomic<MODE_STATE> mode_state = MODE_STATE::NONE;
 	DBResultLogin db_info;
 
 	std::vector<FriendInfo> friend_list;
@@ -68,9 +68,9 @@ public:
 	int GetRoomIndex() const;
 	RoomSnapShot GetRoomSnapShot() const;
 	int GetRemainDataSize() const;
-	LIFE_STATE GetLifeState() const { return life_state.Load(); }
-	MODE_STATE GetState() const { return mode_state.Load(); }
-	MODE_STATE GetModeState() const { return mode_state.Load(); }
+	LIFE_STATE GetLifeState() const { return life_state.load(); }
+	MODE_STATE GetState() const { return mode_state.load(); }
+	MODE_STATE GetModeState() const { return mode_state.load(); }
 	DBResultLogin GetDBInfo() const;
 	//std::string GetPrimaryKey() const { return login_id; }
 

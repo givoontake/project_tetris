@@ -2,7 +2,7 @@
 #include <immintrin.h>
 #include "TimerThread.h"
 #include "ServerThreadManager.h"
-#include "../IOCPServer.h"
+#include "IOCPServer.h"
 
 TimerThread::TimerThread(ServerThreadManager& manager) : manager(manager)
 {

@@ -253,7 +253,7 @@ void MultiRoom::KickUser(int id, int kick_user_id)
 void MultiRoom::StartGame(int request_user_id)
 {
 	if (request_user_id != host_id) return;
-	if (room_state.Load() == ROOM_STATE::PLAY) return;
+	if (room_state.load() == ROOM_STATE::PLAY) return;
 	auto room_users = GetRoomUsers();
 
 	int ready_user_count = 0;

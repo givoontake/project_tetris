@@ -19,76 +19,71 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ActiveRoomManager.cpp" />
-    <ClCompile Include="ActiveUserManager.cpp" />
-    <ClCompile Include="Database.cpp" />
-    <ClCompile Include="GameDBWorker.cpp" />
-    <ClCompile Include="LoginDBWorker.cpp" />
-    <ClCompile Include="DBResultHandler.cpp" />
-    <ClCompile Include="FivePlayerRoom.cpp" />
-    <ClCompile Include="IOCPServer.cpp" />
+    <ClCompile Include="Managers\ActiveRoomManager.cpp" />
+    <ClCompile Include="Managers\ActiveUserManager.cpp" />
+    <ClCompile Include="Database\Database.cpp" />
+    <ClCompile Include="Database\GameDBWorker.cpp" />
+    <ClCompile Include="Database\LoginDBWorker.cpp" />
+    <ClCompile Include="Database\DBResultHandler.cpp" />
+    <ClCompile Include="Rooms\FivePlayerRoom.cpp" />
+    <ClCompile Include="Core\IOCPServer.cpp" />
     <ClCompile Include="Threads\IOThread.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="MultiRoom.cpp" />
-    <ClCompile Include="PacketHandler.cpp" />
-    <ClCompile Include="RankingManager.cpp" />
-    <ClCompile Include="RoomPacketHandler.cpp" />
-    <ClCompile Include="RoomSession.cpp" />
-    <ClCompile Include="Session.cpp" />
+    <ClCompile Include="Core\main.cpp" />
+    <ClCompile Include="Rooms\MultiRoom.cpp" />
+    <ClCompile Include="Network\PacketHandler.cpp" />
+    <ClCompile Include="Managers\RankingManager.cpp" />
+    <ClCompile Include="Rooms\RoomSession.cpp" />
+    <ClCompile Include="Network\Session.cpp" />
     <ClCompile Include="Threads\ServerThreadManager.cpp" />
     <ClCompile Include="Threads\ServerThread.cpp" />
     <ClCompile Include="Threads\TickPhaseContext.cpp" />
     <ClCompile Include="Threads\TickThread.cpp" />
     <ClCompile Include="Threads\TimerThread.cpp" />
-    <ClCompile Include="SingleRoom.cpp" />
-    <ClCompile Include="Tetris.cpp" />
-    <ClCompile Include="TetrisRoom.cpp" />
-    <ClCompile Include="TetrisTickData.cpp" />
-    <ClCompile Include="TwoPlayerRoom.cpp" />
+    <ClCompile Include="Rooms\SingleRoom.cpp" />
+    <ClCompile Include="Game\Tetris.cpp" />
+    <ClCompile Include="Rooms\TetrisRoom.cpp" />
+    <ClCompile Include="Game\TetrisTickData.cpp" />
+    <ClCompile Include="Rooms\TwoPlayerRoom.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ActiveRoomManager.h" />
-    <ClInclude Include="ActiveUserManager.h" />
-    <ClInclude Include="Atomic.h" />
-    <ClInclude Include="ConcurrentTaskQueue.h" />
-    <ClInclude Include="Database.h" />
-    <ClInclude Include="GameDBWorker.h" />
-    <ClInclude Include="LoginDBWorker.h" />
-    <ClInclude Include="DBTasks.h" />
-    <ClInclude Include="DBResultHandler.h" />
-    <ClInclude Include="DBResult.h" />
-    <ClInclude Include="define_packets.h" />
-    <ClInclude Include="enum_class.h" />
-    <ClInclude Include="error_code.h" />
-    <ClInclude Include="FivePlayerRoom.h" />
-    <ClInclude Include="info_code.h" />
-    <ClInclude Include="MultiRoom.h" />
-    <ClInclude Include="settings.h" />
-    <ClInclude Include="SingleRoom.h" />
-    <ClInclude Include="single_packets.h" />
-    <ClInclude Include="task_type.h" />
-    <ClInclude Include="Tetromino.h" />
-    <ClInclude Include="ExOverlapped.h" />
-    <ClInclude Include="IOCPServer.h" />
+    <ClInclude Include="Managers\ActiveRoomManager.h" />
+    <ClInclude Include="Managers\ActiveUserManager.h" />
+    <ClInclude Include="Common\ConcurrentTaskQueue.h" />
+    <ClInclude Include="Database\Database.h" />
+    <ClInclude Include="Database\GameDBWorker.h" />
+    <ClInclude Include="Database\LoginDBWorker.h" />
+    <ClInclude Include="Database\DBTasks.h" />
+    <ClInclude Include="Database\DBResultHandler.h" />
+    <ClInclude Include="Database\DBResult.h" />
+    <ClInclude Include="Packets\define_packets.h" />
+    <ClInclude Include="Common\enum_class.h" />
+    <ClInclude Include="Common\error_code.h" />
+    <ClInclude Include="Rooms\FivePlayerRoom.h" />
+    <ClInclude Include="Common\info_code.h" />
+    <ClInclude Include="Rooms\MultiRoom.h" />
+    <ClInclude Include="Common\settings.h" />
+    <ClInclude Include="Rooms\SingleRoom.h" />
+    <ClInclude Include="Game\task_type.h" />
+    <ClInclude Include="Game\Tetromino.h" />
+    <ClInclude Include="Network\ExOverlapped.h" />
+    <ClInclude Include="Core\IOCPServer.h" />
     <ClInclude Include="Threads\IOThread.h" />
-    <ClInclude Include="MQueue.h" />
-    <ClInclude Include="PacketHandler.h" />
-    <ClInclude Include="packet_types.h" />
-    <ClInclude Include="RankingManager.h" />
-    <ClInclude Include="RoomPacketHandler.h" />
-    <ClInclude Include="RoomSession.h" />
-    <ClInclude Include="Session.h" />
+    <ClInclude Include="Network\PacketHandler.h" />
+    <ClInclude Include="Packets\packet_types.h" />
+    <ClInclude Include="Managers\RankingManager.h" />
+    <ClInclude Include="Rooms\RoomSession.h" />
+    <ClInclude Include="Network\Session.h" />
     <ClInclude Include="Threads\ServerThreadManager.h" />
     <ClInclude Include="Threads\ServerThread.h" />
     <ClInclude Include="Threads\TickPhaseContext.h" />
     <ClInclude Include="Threads\tick_state.h" />
     <ClInclude Include="Threads\TickThread.h" />
     <ClInclude Include="Threads\TimerThread.h" />
-    <ClInclude Include="Tetris.h" />
-    <ClInclude Include="TetrisRoom.h" />
-    <ClInclude Include="TetrisTickData.h" />
-    <ClInclude Include="Types.h" />
-    <ClInclude Include="TwoPlayerRoom.h" />
+    <ClInclude Include="Game\Tetris.h" />
+    <ClInclude Include="Rooms\TetrisRoom.h" />
+    <ClInclude Include="Game\TetrisTickData.h" />
+    <ClInclude Include="Common\Types.h" />
+    <ClInclude Include="Rooms\TwoPlayerRoom.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -152,6 +147,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -165,6 +161,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -182,6 +179,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -197,6 +195,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>

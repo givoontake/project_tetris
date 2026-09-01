@@ -1,207 +1,225 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="소스 파일">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <Filter Include="Core">
+      <UniqueIdentifier>{A1A9D48A-CC95-42AC-8E9A-5A9C2F2B9A01}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="리소스 파일">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="Common">
+      <UniqueIdentifier>{B16D120A-468E-4C19-AE28-D93CF73E56E2}</UniqueIdentifier>
     </Filter>
     <Filter Include="Packets">
-      <UniqueIdentifier>{5c3ded7e-84c5-457c-b5ad-67be3685c583}</UniqueIdentifier>
+      <UniqueIdentifier>{5C3DED7E-84C5-457C-B5AD-67BE3685C583}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Network">
+      <UniqueIdentifier>{A2286861-9105-414E-A3A9-952A1494B030}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Database">
+      <UniqueIdentifier>{7B1F63C5-C20D-4D77-A1D5-D8FA16F19C02}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game">
+      <UniqueIdentifier>{91BDAE93-2AE0-438B-9317-CAB263C9FE86}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Rooms">
+      <UniqueIdentifier>{0BF88965-38D9-4557-96BC-D7195F0DA3BB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Managers">
+      <UniqueIdentifier>{896E48DF-62AF-4F92-AE0C-023AD3952356}</UniqueIdentifier>
     </Filter>
     <Filter Include="Threads">
-      <UniqueIdentifier>{7740505e-cb44-40d8-a7a5-3cf1b661ef85}</UniqueIdentifier>
+      <UniqueIdentifier>{7740505E-CB44-40D8-A7A5-3CF1B661EF85}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>소스 파일</Filter>
+    <ClCompile Include="Core\IOCPServer.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="IOCPServer.cpp">
-      <Filter>소스 파일</Filter>
+    <ClCompile Include="Core\main.cpp">
+      <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Threads\ServerThreadManager.cpp">
+    <ClCompile Include="Managers\ActiveRoomManager.cpp">
+      <Filter>Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="Managers\ActiveUserManager.cpp">
+      <Filter>Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="Managers\RankingManager.cpp">
+      <Filter>Managers</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\PacketHandler.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\Session.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
+    <ClCompile Include="Database\Database.cpp">
+      <Filter>Database</Filter>
+    </ClCompile>
+    <ClCompile Include="Database\DBResultHandler.cpp">
+      <Filter>Database</Filter>
+    </ClCompile>
+    <ClCompile Include="Database\GameDBWorker.cpp">
+      <Filter>Database</Filter>
+    </ClCompile>
+    <ClCompile Include="Database\LoginDBWorker.cpp">
+      <Filter>Database</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Tetris.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\TetrisTickData.cpp">
+      <Filter>Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Rooms\FivePlayerRoom.cpp">
+      <Filter>Rooms</Filter>
+    </ClCompile>
+    <ClCompile Include="Rooms\MultiRoom.cpp">
+      <Filter>Rooms</Filter>
+    </ClCompile>
+    <ClCompile Include="Rooms\RoomSession.cpp">
+      <Filter>Rooms</Filter>
+    </ClCompile>
+    <ClCompile Include="Rooms\SingleRoom.cpp">
+      <Filter>Rooms</Filter>
+    </ClCompile>
+    <ClCompile Include="Rooms\TetrisRoom.cpp">
+      <Filter>Rooms</Filter>
+    </ClCompile>
+    <ClCompile Include="Rooms\TwoPlayerRoom.cpp">
+      <Filter>Rooms</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\IOThread.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
     <ClCompile Include="Threads\ServerThread.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
-    <ClCompile Include="Threads\IOThread.cpp">
-      <Filter>Threads</Filter>
-    </ClCompile>
-    <ClCompile Include="Threads\TickThread.cpp">
+    <ClCompile Include="Threads\ServerThreadManager.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
     <ClCompile Include="Threads\TickPhaseContext.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
+    <ClCompile Include="Threads\TickThread.cpp">
+      <Filter>Threads</Filter>
+    </ClCompile>
     <ClCompile Include="Threads\TimerThread.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
-    <ClCompile Include="Session.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="PacketHandler.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="RoomSession.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="Tetris.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="TetrisRoom.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="RoomPacketHandler.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="TetrisTickData.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="Database.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="GameDBWorker.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="LoginDBWorker.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="SingleRoom.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="MultiRoom.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="TwoPlayerRoom.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="FivePlayerRoom.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="IOCPServer.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="Core\IOCPServer.h">
+      <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="Threads\ServerThreadManager.h">
+    <ClInclude Include="Common\ConcurrentTaskQueue.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\enum_class.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\error_code.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\info_code.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\settings.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\Types.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Packets\define_packets.h">
+      <Filter>Packets</Filter>
+    </ClInclude>
+    <ClInclude Include="Packets\packet_types.h">
+      <Filter>Packets</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\ExOverlapped.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\PacketHandler.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\Session.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\Database.h">
+      <Filter>Database</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\DBResult.h">
+      <Filter>Database</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\DBResultHandler.h">
+      <Filter>Database</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\DBTasks.h">
+      <Filter>Database</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\GameDBWorker.h">
+      <Filter>Database</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\LoginDBWorker.h">
+      <Filter>Database</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\task_type.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Tetris.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\TetrisTickData.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Tetromino.h">
+      <Filter>Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Rooms\FivePlayerRoom.h">
+      <Filter>Rooms</Filter>
+    </ClInclude>
+    <ClInclude Include="Rooms\MultiRoom.h">
+      <Filter>Rooms</Filter>
+    </ClInclude>
+    <ClInclude Include="Rooms\RoomSession.h">
+      <Filter>Rooms</Filter>
+    </ClInclude>
+    <ClInclude Include="Rooms\SingleRoom.h">
+      <Filter>Rooms</Filter>
+    </ClInclude>
+    <ClInclude Include="Rooms\TetrisRoom.h">
+      <Filter>Rooms</Filter>
+    </ClInclude>
+    <ClInclude Include="Rooms\TwoPlayerRoom.h">
+      <Filter>Rooms</Filter>
+    </ClInclude>
+    <ClInclude Include="Managers\ActiveRoomManager.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
+    <ClInclude Include="Managers\ActiveUserManager.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
+    <ClInclude Include="Managers\RankingManager.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\IOThread.h">
       <Filter>Threads</Filter>
     </ClInclude>
     <ClInclude Include="Threads\ServerThread.h">
       <Filter>Threads</Filter>
     </ClInclude>
-    <ClInclude Include="Threads\IOThread.h">
-      <Filter>Threads</Filter>
-    </ClInclude>
-    <ClInclude Include="Threads\TickThread.h">
-      <Filter>Threads</Filter>
-    </ClInclude>
-    <ClInclude Include="Threads\TickPhaseContext.h">
+    <ClInclude Include="Threads\ServerThreadManager.h">
       <Filter>Threads</Filter>
     </ClInclude>
     <ClInclude Include="Threads\tick_state.h">
       <Filter>Threads</Filter>
     </ClInclude>
-    <ClInclude Include="Threads\TimerThread.h">
+    <ClInclude Include="Threads\TickPhaseContext.h">
       <Filter>Threads</Filter>
     </ClInclude>
-    <ClInclude Include="define_packets.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="Threads\TickThread.h">
+      <Filter>Threads</Filter>
     </ClInclude>
-    <ClInclude Include="Session.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ExOverlapped.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="PacketHandler.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="MQueue.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Tetromino.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="RoomSession.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Tetris.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="TetrisRoom.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="packet_types.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="RoomPacketHandler.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Atomic.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ConcurrentTaskQueue.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="TetrisTickData.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="settings.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="task_type.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Database.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="GameDBWorker.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="LoginDBWorker.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="DBTasks.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="enum_class.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="DBResult.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="SingleRoom.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="single_packets.h">
-      <Filter>Packets</Filter>
-    </ClInclude>
-    <ClInclude Include="MultiRoom.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="TwoPlayerRoom.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="FivePlayerRoom.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="error_code.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="info_code.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="Types.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="Threads\TimerThread.h">
+      <Filter>Threads</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

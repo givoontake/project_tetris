@@ -1,7 +1,7 @@
 #include <thread>
 #include <utility>
 #include "ServerThreadManager.h"
-#include "../IOCPServer.h"
+#include "IOCPServer.h"
 #include "IOThread.h"
 #include "TickThread.h"
 #include "TickPhaseContext.h"

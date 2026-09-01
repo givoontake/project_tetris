@@ -12,7 +12,6 @@
 #include "PacketHandler.h"
 #include "DBResultHandler.h"
 #include "TetrisRoom.h"
-#include "Atomic.h"
 #include "LoginDBWorker.h"
 #include "GameDBWorker.h"
 #include "RankingManager.h"

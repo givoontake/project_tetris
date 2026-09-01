@@ -18,8 +18,8 @@ void Session::InitSession(SOCKET new_socket)
 	remain_data_size = 0;
 	key.id = -1;
 	recv_over.ex_over.key = key;
-	life_state.Store(LIFE_STATE::ACTIVE);
-	mode_state.Store(MODE_STATE::LOGIN);
+	life_state.store(LIFE_STATE::ACTIVE);
+	mode_state.store(MODE_STATE::LOGIN);
 
 	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
@@ -28,7 +28,7 @@ void Session::InitSession(SOCKET new_socket)
 bool Session::InitDBInfo(DBResultLogin* new_info)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (!(mode_state.Load() == MODE_STATE::LOGIN && life_state == LIFE_STATE::ACTIVE)) return false;
+	if (!(mode_state.load() == MODE_STATE::LOGIN && life_state.load() == LIFE_STATE::ACTIVE)) return false;
 	db_info.id = new_info->id;
 	key.id = new_info->id;
 	db_info.login_id = new_info->login_id;
@@ -36,7 +36,7 @@ bool Session::InitDBInfo(DBResultLogin* new_info)
 	db_info.lose_count = new_info->lose_count;
 	db_info.win_count = new_info->win_count;
 	db_info.max_score = new_info->max_score;
-	mode_state.Store(MODE_STATE::LOBBY);
+	mode_state.store(MODE_STATE::LOBBY);
 	return true;
 }
 
@@ -143,7 +143,7 @@ void Session::AddDataSize(int new_data_size)
 bool Session::TryAddPending()
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (life_state.Load() != LIFE_STATE::ACTIVE) return false;
+	if (life_state.load() != LIFE_STATE::ACTIVE) return false;
 	io_pending_count++;
 	return true;	
 }
@@ -157,15 +157,15 @@ void Session::ReducePending()
 bool Session::IsDisconnectable()
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) return true;
+	if (life_state.load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) return true;
 	return false;
 }
 
 bool Session::BeginDeactivate()
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (life_state.Load() == LIFE_STATE::ACTIVE) {
-		life_state.Store(LIFE_STATE::DISCONNECT_PENDING);
+	if (life_state.load() == LIFE_STATE::ACTIVE) {
+		life_state.store(LIFE_STATE::DISCONNECT_PENDING);
 		return true;
 	}
 	return false;
@@ -174,8 +174,8 @@ bool Session::BeginDeactivate()
 bool Session::TryDeactivate()
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) {
-		life_state.Store(LIFE_STATE::DISCONNECTING);
+	if (life_state.load() == LIFE_STATE::DISCONNECT_PENDING && io_pending_count == 0) {
+		life_state.store(LIFE_STATE::DISCONNECTING);
 		return true;
 	}
 	return false;
@@ -208,7 +208,7 @@ int Session::GetRoomIndex() const
 RoomSnapShot Session::GetRoomSnapShot() const
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	return { mode_state.Load(), room_index };
+	return { mode_state.load(), room_index };
 }
 
 int Session::GetRemainDataSize() const
@@ -226,44 +226,44 @@ DBResultLogin Session::GetDBInfo() const
 void Session::StoreLifeState(LIFE_STATE new_state)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	life_state.Store(new_state);
+	life_state.store(new_state);
 }
 
 void Session::StoreState(MODE_STATE new_state)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return;
-	mode_state.Store(new_state);
+	if (life_state.load() == LIFE_STATE::DISCONNECT_PENDING || life_state.load() == LIFE_STATE::DISCONNECTING) return;
+	mode_state.store(new_state);
 }
 
 void Session::SetRoomSnapShot(MODE_STATE new_state, int new_room_index)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	if (life_state.Load() == LIFE_STATE::DISCONNECT_PENDING || life_state.Load() == LIFE_STATE::DISCONNECTING) return;
+	if (life_state.load() == LIFE_STATE::DISCONNECT_PENDING || life_state.load() == LIFE_STATE::DISCONNECTING) return;
 	room_index = new_room_index;
-	mode_state.Store(new_state);
+	mode_state.store(new_state);
 }
 
 bool Session::TrySetRoomMode(int new_room_index)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
 	if (new_room_index < 0) return false;
-	if (life_state.Load() != LIFE_STATE::ACTIVE) return false;
-	if (mode_state.Load() != MODE_STATE::LOBBY) return false;
+	if (life_state.load() != LIFE_STATE::ACTIVE) return false;
+	if (mode_state.load() != MODE_STATE::LOBBY) return false;
 	room_index = new_room_index;
-	mode_state.Store(MODE_STATE::ROOM);
+	mode_state.store(MODE_STATE::ROOM);
 	return true;
 }
 
 bool Session::TryChangeLifeState(LIFE_STATE expected, LIFE_STATE desired)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	return life_state.Compare_exchange_strong(expected, desired);
+	return life_state.compare_exchange_strong(expected, desired);
 }
 
 bool Session::TryChangeState(MODE_STATE expected, MODE_STATE desired)
 {
 	std::lock_guard<std::mutex> lock(sess_mutex);
-	return mode_state.Compare_exchange_strong(expected, desired);
+	return mode_state.compare_exchange_strong(expected, desired);
 }
 

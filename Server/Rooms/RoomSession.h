@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <string>
 #include <memory>
 #include "Types.h"
@@ -14,8 +15,8 @@ class RoomSession
 	int send_data_size = 0;
 	// std::string user_name; // 방 생성할 때 만들도록 일단 하고, 나중에 회원가입 - DB 연동으로 session 클래스에 포함해보자.
 	// char user_name[MAX_USER_NAME];
-	Atomic<ROOM_USER_STATE> r_user_state;
-	Atomic<ROOM_USER_STATE> prev_r_user_state; // 게임 오버시 무승부 체크용
+	std::atomic<ROOM_USER_STATE> r_user_state;
+	std::atomic<ROOM_USER_STATE> prev_r_user_state; // 게임 오버시 무승부 체크용
 
 	int tetromino_index = 0;
 
@@ -27,8 +28,8 @@ public:
 	~RoomSession();
 
 	SP<Session> GetSession() const { return session.lock(); }
-	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.Load(); }
-	ROOM_USER_STATE GetPrevRoomUserState() const { return prev_r_user_state.Load(); }
+	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.load(); }
+	ROOM_USER_STATE GetPrevRoomUserState() const { return prev_r_user_state.load(); }
 	Tetris& GetTetris() { return tetris; }
 	char* GetSendBuf() { return send_buf; }
 	int GetSendDataSize() const { return send_data_size; }
@@ -37,8 +38,8 @@ public:
 	int GetScore() const { return score; }
 	int GetCombo() const { return combo; }
 
-	void SetRoomUserState(ROOM_USER_STATE new_state) { return r_user_state.Store(new_state); }
-	void SetPrevRoomUserState(ROOM_USER_STATE new_state) { return prev_r_user_state.Store(new_state); }
+	void SetRoomUserState(ROOM_USER_STATE new_state) { return r_user_state.store(new_state); }
+	void SetPrevRoomUserState(ROOM_USER_STATE new_state) { return prev_r_user_state.store(new_state); }
 	void AddScore(int val) { score += val; }	
 	void ResetCombo() { combo = 0; }
 	void AddCombo() { ++combo; }

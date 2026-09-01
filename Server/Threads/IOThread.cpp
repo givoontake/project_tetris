@@ -1,6 +1,6 @@
 #include <iostream>
 #include "IOThread.h"
-#include "../IOCPServer.h"
+#include "IOCPServer.h"
 
 IOThread::IOThread(IOCPServer& iocp_server)
 	: iocp_server(iocp_server)

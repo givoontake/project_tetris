@@ -13,7 +13,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, OpenRoomInitData data)
 	room_password.clear();
 	room_index = data.room_index;
 	room_gen = data.room_gen;
-	room_state.Store(ROOM_STATE::EMPTY);
+	room_state.store(ROOM_STATE::EMPTY);
 
 	//SendAddRoom(session);
 	cur_user.store(0);
@@ -27,7 +27,7 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, LockRoomInitData data)
 	room_password = std::move(data.room_password);
 	room_index = data.room_index;
 	room_gen = data.room_gen;
-	room_state.Store(ROOM_STATE::EMPTY);
+	room_state.store(ROOM_STATE::EMPTY);
 	//SendAddRoom(session);
 	cur_user.store(0);
 }
@@ -65,7 +65,7 @@ RoomInfoSnapshot TetrisRoom::GetRoomInfoSnapshot()
 	snapshot.cur_user = static_cast<int>(cur_user.load());
 	snapshot.room_name = room_name;
 	snapshot.is_private = !room_password.empty();
-	snapshot.room_state = room_state.Load();
+	snapshot.room_state = room_state.load();
 	return snapshot;
 }
 
@@ -103,7 +103,7 @@ void TetrisRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 	case C2S_MOVE: {
 		if (!IsRoomSession(request_session)) return;
 		const std::uint64_t current_play_generation = play_generation.load();
-		if (room_state.Load() != ROOM_STATE::PLAY) return;
+		if (room_state.load() != ROOM_STATE::PLAY) return;
 		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
 		TaskInfo task;
 		task.id = request_session->GetDBInfo().id;
@@ -119,10 +119,10 @@ void TetrisRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 
 bool TetrisRoom::AddRoomTask(RoomTaskInfo task)
 {
-	ROOM_STATE state = room_state.Load();
+	ROOM_STATE state = room_state.load();
 	if (state != ROOM_STATE::WAIT && state != ROOM_STATE::PLAY) return false;
 	room_tasks.Enqueue(std::move(task));
-	state = room_state.Load();
+	state = room_state.load();
 	return state == ROOM_STATE::WAIT || state == ROOM_STATE::PLAY;
 }
 
@@ -151,7 +151,7 @@ void TetrisRoom::ProcessPlayTasks()
 {
 	ProcessRoomTasks();
 	const std::size_t task_count = play_tasks.ClaimTaskCount();
-	if (room_state.Load() != ROOM_STATE::PLAY) {
+	if (room_state.load() != ROOM_STATE::PLAY) {
 		for (std::size_t i = 0; i < task_count; ++i) play_tasks.Dequeue();
 		return;
 	}
@@ -190,7 +190,7 @@ void TetrisRoom::BeginRoomDelete()
 
 void TetrisRoom::TryPostRoomDelete()
 {
-	if (room_state.Load() != ROOM_STATE::WAITING_DELETE || room_tasks.GetTaskCount() != 0) return;
+	if (room_state.load() != ROOM_STATE::WAITING_DELETE || room_tasks.GetTaskCount() != 0) return;
 	StoreRoomState(ROOM_STATE::DELETE_POST);
 	ExOverlapped* delete_over = new ExOverlapped;
 	delete_over->op_type = OP_TYPE::DELETE_ROOM;
@@ -483,10 +483,10 @@ void TetrisRoom::SetRoomGen(const int val)
 
 void TetrisRoom::StoreRoomState(ROOM_STATE new_state)
 {
-	room_state.Store(new_state);
+	room_state.store(new_state);
 }
 
 bool TetrisRoom::TryChangeRoomState(ROOM_STATE expected, ROOM_STATE desired)
 {
-	return room_state.Compare_exchange_strong(expected, desired);
+	return room_state.compare_exchange_strong(expected, desired);
 }

@@ -3,7 +3,7 @@
 #include "TickThread.h"
 #include "TickPhaseContext.h"
 #include "ServerThreadManager.h"
-#include "../IOCPServer.h"
+#include "IOCPServer.h"
 
 TickThread::TickThread(ServerThreadManager& manager) : manager(manager)
 {

@@ -63,7 +63,7 @@ class TetrisRoom
 
 protected:
 	IOCPServer* server;
-	Atomic<ROOM_STATE> room_state;
+	std::atomic<ROOM_STATE> room_state;
 	std::atomic<ROOM_PROCESS_STATE> processing_state{ ROOM_PROCESS_STATE::PROCESSING };
 	ConcurrentTaskQueue<RoomTaskInfo> room_tasks;
 	ConcurrentTaskQueue<TaskInfo> play_tasks;
@@ -94,7 +94,7 @@ public:
 	TetrisRoom(IOCPServer* server, LockRoomInitData data);
 	virtual ~TetrisRoom();
 
-	ROOM_STATE GetRoomState() const { return room_state.Load(); }
+	ROOM_STATE GetRoomState() const { return room_state.load(); }
 	int GetRoomGen() const { return room_gen; }
 	int GetRoomIndex() const { return room_index; }
 	bool GetIsPrivate() const { return !room_password.empty(); }
