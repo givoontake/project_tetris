@@ -14,7 +14,12 @@ RoomSession::~RoomSession()
 bool RoomSession::InitRoomSession(const SP<Session>& s, int room_index)
 {
 	if (!s) return false;
-	if (!s->TrySetRoomMode(room_index)) return false;
+	if (s->GetLifeState() != LIFE_STATE::ACTIVE) return false;
+	const RoomSnapShot room_snapshot = s->GetRoomSnapShot();
+	if (room_snapshot.state == MODE_STATE::LOBBY) {
+		if (!s->TrySetRoomMode(room_index)) return false;
+	}
+	else if (room_snapshot.state != MODE_STATE::ROOM || room_snapshot.room_index != room_index) return false;
 	session = s;
 	tetris.Clear();
 	r_user_state.Store(ROOM_USER_STATE::WAIT);

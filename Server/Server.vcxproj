@@ -48,6 +48,7 @@
     <ClInclude Include="ActiveRoomManager.h" />
     <ClInclude Include="ActiveUserManager.h" />
     <ClInclude Include="Atomic.h" />
+    <ClInclude Include="ConcurrentTaskQueue.h" />
     <ClInclude Include="Database.h" />
     <ClInclude Include="GameDBWorker.h" />
     <ClInclude Include="LoginDBWorker.h" />

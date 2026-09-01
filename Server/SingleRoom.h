@@ -1,7 +1,6 @@
 #pragma once
 #include <vector>
 #include <array>
-#include <mutex>
 #include "RoomSession.h"
 #include "Session.h"
 #include "define_packets.h"
@@ -18,7 +17,6 @@ public:
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, const SP<Session>& request_session) override;
-	virtual void ProcessPlayTasks() override;
 	virtual void DeleteUser(const int id) override;
 	virtual void SendCreateRoom(const SP<Session>& session) override;
 	void StartGame();
@@ -31,9 +29,8 @@ public:
 	void ReduceTimeouts(int type);
 
 private:
-	void HandleStartPacket();
-	void HandleDeleteUserPacket(const SP<Session>& request_session);
-	void HandleMovePacket(char* packet);
-	void HandleGiveupPacket();
+	virtual void ProcessSpecificRoomTask(const RoomTaskInfo& task) override;
+	virtual void ProcessGameTick() override;
+	void GiveUp(const SP<Session>& request_session);
 };
 

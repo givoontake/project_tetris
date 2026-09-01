@@ -126,33 +126,13 @@ void IOCPServer::EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task, cons
 void IOCPServer::SendRoomList(const SP<Session>& session)
 {
 	if (!session) return;
-	// 더미 방 생성
-	for (int i = 0; i < 20; ++i) {
-		S2C_ROOM_INFO_PACKET p{};
-		p.header.size = sizeof(S2C_ROOM_INFO_PACKET);
-		p.header.type = S2C_ROOM_INFO;
-
-		p.room_gen = 1000000 + i;
-
-		std::string name = "DummyRoom_" + std::to_string(i);
-		StringToCharBuf(name, p.room_name, sizeof(p.room_name));
-
-		p.max_user = 2;
-		p.cur_user = 1; 
-
-		p.is_private = false;
-		p.is_play = false;
-
-		session->SendPacket(reinterpret_cast<char*>(&p), iocp_handle);
-	}
-	
 	char packet_buf[BUF_SIZE];
 	int packet_size = 0;
 	for (auto& room_sp : active_rooms.GetActiveRoomsSnapshot()) {
 		if (!room_sp) continue;
 		S2C_ROOM_INFO_PACKET info_p;
 		RoomInfoSnapshot room_snapshot = room_sp->GetRoomInfoSnapshot();
-		if (room_snapshot.room_state == ROOM_STATE::EMPTY) continue;
+		if (room_snapshot.room_state != ROOM_STATE::WAIT && room_snapshot.room_state != ROOM_STATE::PLAY) continue;
 		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 		info_p.header.type = S2C_ROOM_INFO;
 		info_p.room_gen = room_snapshot.room_gen;
@@ -160,10 +140,7 @@ void IOCPServer::SendRoomList(const SP<Session>& session)
 		info_p.cur_user = room_snapshot.cur_user;
 		StringToCharBuf(room_snapshot.room_name, info_p.room_name, sizeof(info_p.room_name));
 		info_p.is_private = room_snapshot.is_private;
-		bool is_play;
-		if (room_snapshot.room_state == ROOM_STATE::WAIT) is_play = false;
-		else is_play = true;
-		info_p.is_play = is_play;
+		info_p.is_play = room_snapshot.room_state == ROOM_STATE::PLAY;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) { 
 			session->SendBoundPacket(reinterpret_cast<char*>(packet_buf), packet_size, iocp_handle);
@@ -180,33 +157,27 @@ void IOCPServer::SendRoomList(const SP<Session>& session)
 }
 
 // 
-int IOCPServer::TryJoinRoom(const SP<Session>& session, int room_gen, const std::string& room_password)
+int IOCPServer::TryJoinRoom(const SP<Session>& session, int room_gen, const std::string& room_password, int matching_max_user)
 {	
 	if (!session) return ERROR_CODE::INVALID_REQUEST;
-	int result = ERROR_CODE::ROOM_NOT_FOUND;
 	auto session_ptr = FindSessionByIndex(session->GetSessionKey().index);
-	if (!session_ptr || session_ptr != session) {
-		return ERROR_CODE::INVALID_REQUEST;
-	}
+	if (!session_ptr || session_ptr != session) return ERROR_CODE::INVALID_REQUEST;
 	SP<TetrisRoom> room_sp = FindRoom(room_gen);
-	if (room_sp) {
-		std::lock_guard<std::mutex> lock(room_sp->GetRoomMutex());
-		if (room_sp->GetRoomState() == ROOM_STATE::WAITING_DELETE) result = ERROR_CODE::ROOM_NOT_FOUND;
-		else {
-			if (room_sp->GetMaxUser() != 1) { // 싱글이 아닌 경우
-				auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
-				if (!multi_sp) result = ERROR_CODE::SERVER_ERROR;
-				else {
-					result = multi_sp->AddUser(session_ptr, room_password); // 멀티 룸에만 있는 함수라 위에서 다운캐스팅 한 것
-				}
-			}
-			else {
-				result = ERROR_CODE::INVALID_REQUEST;
-			}
-		}
+	if (!room_sp) return ERROR_CODE::ROOM_NOT_FOUND;
+	const RoomInfoSnapshot snapshot = room_sp->GetRoomInfoSnapshot();
+	if (snapshot.room_state == ROOM_STATE::WAITING_DELETE) return ERROR_CODE::ROOM_NOT_FOUND;
+	if (snapshot.room_state == ROOM_STATE::PLAY) return ERROR_CODE::ROOM_INGAME;
+	if (snapshot.cur_user >= snapshot.max_user) return ERROR_CODE::ROOM_FULL;
+	if (room_sp->GetMaxUser() == 1) return ERROR_CODE::INVALID_REQUEST;
+	if (room_sp->GetIsPrivate() && room_sp->GetRoomPassword() != room_password) return ERROR_CODE::ROOM_INVALID_PASSWORD;
+	auto multi_sp = std::dynamic_pointer_cast<MultiRoom>(room_sp); // TetrisRoom -> MultiRoom으로 다운캐스팅(참조 카운트 증가)
+	if (!multi_sp) return ERROR_CODE::SERVER_ERROR;
+	if (!session_ptr->TrySetRoomMode(room_sp->GetRoomIndex())) return ERROR_CODE::INVALID_REQUEST;
+	if (!multi_sp->AddUserTask(session_ptr, matching_max_user)) {
+		session_ptr->SetRoomSnapShot(MODE_STATE::LOBBY, -1);
+		return ERROR_CODE::ROOM_NOT_FOUND;
 	}
-
-	return result;
+	return SUCCESS;
 }
 
 SP<TetrisRoom> IOCPServer::FindRoom(int room_gen)
@@ -246,7 +217,9 @@ void IOCPServer::FindMatch(const SP<Session>& session, int max_user)
 			if (room_sp) {
 				if (room_sp->GetIsPrivate()) continue;
 				if (room_sp->GetMaxUser() == 2 or room_sp->GetMaxUser() == 5) { // 공개 멀티 방 중 아무 방이나 찾기
-					int result = TryJoinRoom(session, room_sp->GetRoomGen(), "");
+					const RoomInfoSnapshot snapshot = room_sp->GetRoomInfoSnapshot();
+					if (snapshot.room_state != ROOM_STATE::WAIT || snapshot.cur_user >= snapshot.max_user) continue;
+					int result = TryJoinRoom(session, room_sp->GetRoomGen(), "", max_user);
 					if (result == SUCCESS) return;
 					if (result == ERROR_CODE::INVALID_REQUEST || result == ERROR_CODE::SERVER_ERROR) {
 						SendError(session, result);
@@ -263,7 +236,9 @@ void IOCPServer::FindMatch(const SP<Session>& session, int max_user)
 			if (room_sp) {
 				if (room_sp->GetIsPrivate()) continue;
 				if (room_sp->GetMaxUser() == max_user) {
-					int result = TryJoinRoom(session, room_sp->GetRoomGen(), "");
+					const RoomInfoSnapshot snapshot = room_sp->GetRoomInfoSnapshot();
+					if (snapshot.room_state != ROOM_STATE::WAIT || snapshot.cur_user >= snapshot.max_user) continue;
+					int result = TryJoinRoom(session, room_sp->GetRoomGen(), "", max_user);
 					if (result == SUCCESS) return;
 					if (result == ERROR_CODE::INVALID_REQUEST || result == ERROR_CODE::SERVER_ERROR) {
 						SendError(session, result);
@@ -280,7 +255,9 @@ void IOCPServer::FindMatch(const SP<Session>& session, int max_user)
 			if (room_sp) {
 				if (room_sp->GetIsPrivate()) continue;
 				if (room_sp->GetMaxUser() == max_user) {
-					int result = TryJoinRoom(session, room_sp->GetRoomGen(), "");
+					const RoomInfoSnapshot snapshot = room_sp->GetRoomInfoSnapshot();
+					if (snapshot.room_state != ROOM_STATE::WAIT || snapshot.cur_user >= snapshot.max_user) continue;
+					int result = TryJoinRoom(session, room_sp->GetRoomGen(), "", max_user);
 					if (result == SUCCESS) return;
 					if (result == ERROR_CODE::INVALID_REQUEST || result == ERROR_CODE::SERVER_ERROR) {
 						SendError(session, result);
@@ -520,6 +497,10 @@ void IOCPServer::RoutePacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
 	PrintPacketType(reinterpret_cast<PacketHeader*>(packet)->type);
+	if (reinterpret_cast<PacketHeader*>(packet)->type == C2S_DISCONNECT) {
+		packet_handler.HandlePacket(packet, session);
+		return;
+	}
 	auto room_snapshot = session->GetRoomSnapShot();
 	switch (room_snapshot.state) {
 	case MODE_STATE::NONE:
@@ -604,6 +585,7 @@ void IOCPServer::CreateOpenRoom(char* packet, const SP<Session>& session)
 					}
 					active_rooms.AddRoom(data.room_gen, new_room);
 					new_room->SendCreateRoom(session_ptr);
+					new_room->CompleteRoomInitialization();
 					return;
 				}
 			}
@@ -662,6 +644,7 @@ void IOCPServer::CreateLockRoom(char* packet, const SP<Session>& session)
 					}
 					active_rooms.AddRoom(data.room_gen, new_room);
 					new_room->SendCreateRoom(session_ptr);
+					new_room->CompleteRoomInitialization();
 					return;
 				}
 			}
@@ -739,12 +722,16 @@ void IOCPServer::Disconnect(const SP<Session>& session)
 	auto session_ptr = FindSessionByIndex(user_index);
 	if (!session_ptr || session_ptr != session) return;
 
-	int user_id = session->GetDBInfo().id;
 	auto room_snapshot = session->GetRoomSnapShot();
 	if (user_index >= 0 && user_index < MAX_USER) {
 		if (room_snapshot.state == MODE_STATE::ROOM) {
 			auto room = GetRoom(room_snapshot.room_index);
-			if (room) room->DeleteUser(user_id);
+			if (room) {
+				RoomTaskInfo task;
+				task.type = ROOM_TASK_TYPE::DELETE_USER;
+				task.session = session_ptr;
+				room->AddRoomTask(std::move(task));
+			}
 		}
 	}
 

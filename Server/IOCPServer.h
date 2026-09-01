@@ -11,7 +11,6 @@
 #include "Session.h"
 #include "PacketHandler.h"
 #include "DBResultHandler.h"
-#include "MQueue.h"
 #include "TetrisRoom.h"
 #include "Atomic.h"
 #include "LoginDBWorker.h"
@@ -90,7 +89,7 @@ public:
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
 	void SendRoomList(const SP<Session>& session);
-	int TryJoinRoom(const SP<Session>& session, int room_gen, const std::string& room_password);
+	int TryJoinRoom(const SP<Session>& session, int room_gen, const std::string& room_password, int matching_max_user = -1);
 	SP<TetrisRoom> FindRoom(int room_gen);
 	int FindUser(int user_id);
 	void SendError(const SP<Session>& session, int error_code);

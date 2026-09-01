@@ -16,64 +16,26 @@ SingleRoom::SingleRoom(IOCPServer* server, LockRoomInitData data)
 void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 {
 	if (!request_session) return;
-	//std::cout << "SingleRoom::HandlePacket, Packet type: ";
-	//PrintPacketType(packet[2]);
-
 	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
-
-	case C2S_START: {
-		HandleStartPacket();
-		break;
-	}
-
-	case C2S_DELETE_USER: {
-		HandleDeleteUserPacket(request_session);
-		break;
-	}
-
-	case C2S_MOVE: {
-		HandleMovePacket(packet);
-		break;
-	}
-
 	case C2S_GIVEUP: {
-		HandleGiveupPacket();
+		RoomTaskInfo task;
+		task.type = ROOM_TASK_TYPE::GIVEUP;
+		task.session = request_session;
+		AddRoomTask(std::move(task));
+		break;
 	}
-	}
-}
-
-void SingleRoom::HandleStartPacket()
-{
-	StartGame();
-}
-
-void SingleRoom::HandleDeleteUserPacket(const SP<Session>& request_session)
-{
-	if (!request_session) return;
-	DeleteUser(request_session->GetDBInfo().id);
-}
-
-void SingleRoom::HandleMovePacket(char* packet)
-{
-	std::lock_guard<std::mutex> lock(room_mutex);
-	if (room_state == ROOM_STATE::PLAY) {
-		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
-		auto session = room_users[0].GetSession();
-		if (!session) return;
-		TaskInfo new_task;
-		new_task.id = session->GetDBInfo().id;
-		new_task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
-		GetTasks().AddTask(new_task);
+	default:
+		TetrisRoom::HandlePacket(packet, request_session);
+		break;
 	}
 }
 
-void SingleRoom::HandleGiveupPacket()
+void SingleRoom::GiveUp(const SP<Session>& request_session)
 {
-	std::lock_guard<std::mutex> lock(room_mutex);
-
+	if (!IsRoomSession(request_session)) return;
 	if (room_state == ROOM_STATE::PLAY) {
 		auto session = room_users[0].GetSession();
-		if (!session) return;
+		if (!session || session != request_session) return;
 		S2C_GAMEOVER_PACKET gameover_p;
 		gameover_p.header.size = static_cast<std::uint16_t>(sizeof(gameover_p));
 		gameover_p.header.type = S2C_GAMEOVER;
@@ -84,30 +46,22 @@ void SingleRoom::HandleGiveupPacket()
 	}
 }
 
-void SingleRoom::ProcessPlayTasks()
+void SingleRoom::ProcessSpecificRoomTask(const RoomTaskInfo& task)
 {
-	// delete가 도중에 일어나면 문제가 되는 일이 많아진다.
-	// 싱글에서 유저 제거는 방 삭제를 동반한다. 클리어 작업 후 [0]에 접근할 수도 있고, 범위기반 반복문 진입 전에는 있었는데 막상 실행할 때는 없을 수도 있음. 즉 처음에 잡은 범위 스코프 메모리를 무효화된다.
-	// 따라서 삭제는 틱 처리 도중에 일어나서는 안된다.
-	std::unique_lock<std::mutex> lock(room_mutex);
-	if (room_state.Load() != ROOM_STATE::PLAY) return;
-	UpdateTick();
-	tasks.SwapTask();
-	while (!tasks.task_queue.IsEmpty()) {
-		TaskInfo task = tasks.GetTask();
-		for (auto& r_user : room_users) {
-			auto session = r_user.GetSession();
-			if (!session) continue;
-			if (session->GetDBInfo().id == task.id) {
-				// 각 작업들을 각 세션에 분배
-				r_user.GetTetris().GetInputTasks().emplace_back(task.type);
-
-				//r_user.GetTetris().DebugPrintBoard();
-				break;
-			}
-		}
+	switch (task.type) {
+	case ROOM_TASK_TYPE::START:
+		if (IsRoomSession(task.session)) StartGame();
+		break;
+	case ROOM_TASK_TYPE::GIVEUP:
+		GiveUp(task.session);
+		break;
+	default:
+		break;
 	}
+}
 
+void SingleRoom::ProcessGameTick()
+{
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -129,8 +83,8 @@ void SingleRoom::ProcessPlayTasks()
 	}
 	int failed_user_id = BoundPackets();
 	if (failed_user_id != -1) {
-		lock.unlock();
 		DeleteUser(failed_user_id);
+		TryPostRoomDelete();
 		return;
 	}
 
@@ -145,9 +99,9 @@ void SingleRoom::ProcessPlayTasks()
 void SingleRoom::StartGame()
 {
 	{
-		std::lock_guard<std::mutex> lock(room_mutex);
 		if (room_state == ROOM_STATE::PLAY) return;
 		if (!TryChangeRoomState(ROOM_STATE::WAIT, ROOM_STATE::PLAY)) return;
+		play_generation.fetch_add(1);
 
 		// 모든 조건 통과->게임 시작
 		InitGame();
@@ -186,14 +140,11 @@ void SingleRoom::DeleteUser(const int id)
 	//std::cout << "delete user id: " << id << std::endl;
 
 	{
-		// 삭제 처리와 틱 시작 처리는 락으로 동기화, 
-		std::lock_guard<std::mutex> lock(room_mutex);
 		for (auto& r_user : room_users) {
 			auto session = r_user.GetSession();
 			if (!session) continue;
 			if (session->GetDBInfo().id == id) { // 삭제할 아이디 검색
 				//std::cout << "delete user id: " << id << std::endl;
-				//room_mutex.lock();
 				session->SetRoomSnapShot(MODE_STATE::LOBBY, -1);
 				S2C_DELETE_USER_PACKET p;
 				p.header.size = static_cast<std::uint16_t>(sizeof(p));
@@ -203,11 +154,7 @@ void SingleRoom::DeleteUser(const int id)
 				Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
 
 				ClearRoom(); // 안하면 방 삭제 포스트 이후 세션이 재사용되면 문제가 될 수 있음.
-				room_state.Store(ROOM_STATE::WAITING_DELETE);
-				ExOverlapped* delete_over = new ExOverlapped;
-				delete_over->op_type = OP_TYPE::DELETE_ROOM;
-				delete_over->room_index = room_index;
-				PostQueuedCompletionStatus(server->GetHandle(), 1, ROOM_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
+				BeginRoomDelete();
 				break;
 			}
 		}
@@ -321,6 +268,7 @@ void SingleRoom::MakeMovePacketData(int move_type)
 	move_p.move_type = static_cast<char>(move_type);
 	if (!room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size)) {
 		DeleteUser(session->GetDBInfo().id);
+		TryPostRoomDelete();
 	}
 }
 

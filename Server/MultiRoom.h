@@ -2,7 +2,6 @@
 #pragma once
 #include <vector>
 #include <array>
-#include <mutex>
 #include "RoomSession.h"
 #include "Session.h"
 #include "define_packets.h"
@@ -22,7 +21,6 @@ public:
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, const SP<Session>& request_session) override;
-	virtual void ProcessPlayTasks() override;
 	virtual void DeleteUser(const int id) override;
 	virtual void SendCreateRoom(const SP<Session>& session) override;
 	virtual bool AddHostSession(const SP<Session>& session) override;
@@ -31,7 +29,7 @@ public:
 
 	void FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
 	int FindHostIndex(int host_id); // 현재 호스트의 인덱스를 반환
-	int AddUser(const SP<Session>& new_session, const std::string& room_password);
+	bool AddUserTask(const SP<Session>& new_session, int matching_max_user);
 	void ReadyUser(int id);
 	void KickUser(int id, int kick_user_id);
 	bool FindWinner();
@@ -42,10 +40,8 @@ public:
 	void RequestUpdateMatchResult();
 
 private:
-	void HandleDeleteUserPacket(const SP<Session>& request_session);
-	void HandleReadyPacket(const SP<Session>& request_session);
-	void HandleKickPacket(char* packet, const SP<Session>& request_session);
-	void HandleStartPacket(const SP<Session>& request_session);
-	void HandleMovePacket(char* packet, const SP<Session>& request_session);
+	virtual void ProcessSpecificRoomTask(const RoomTaskInfo& task) override;
+	virtual void ProcessGameTick() override;
+	int AddUser(const SP<Session>& new_session);
 };
 
