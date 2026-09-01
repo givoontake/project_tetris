@@ -25,6 +25,7 @@
     <ClCompile Include="GameDBWorker.cpp" />
     <ClCompile Include="LoginDBWorker.cpp" />
     <ClCompile Include="DBResultHandler.cpp" />
+    <ClCompile Include="FivePlayerRoom.cpp" />
     <ClCompile Include="IOCPServer.cpp" />
     <ClCompile Include="Threads\IOThread.cpp" />
     <ClCompile Include="main.cpp" />
@@ -43,6 +44,7 @@
     <ClCompile Include="Tetris.cpp" />
     <ClCompile Include="TetrisRoom.cpp" />
     <ClCompile Include="TetrisTickData.cpp" />
+    <ClCompile Include="TwoPlayerRoom.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ActiveRoomManager.h" />
@@ -58,6 +60,7 @@
     <ClInclude Include="define_packets.h" />
     <ClInclude Include="enum_class.h" />
     <ClInclude Include="error_code.h" />
+    <ClInclude Include="FivePlayerRoom.h" />
     <ClInclude Include="info_code.h" />
     <ClInclude Include="MultiRoom.h" />
     <ClInclude Include="settings.h" />
@@ -85,6 +88,7 @@
     <ClInclude Include="TetrisRoom.h" />
     <ClInclude Include="TetrisTickData.h" />
     <ClInclude Include="Types.h" />
+    <ClInclude Include="TwoPlayerRoom.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -60,6 +60,7 @@ int MultiRoom::AddUser(const SP<Session>& new_session)
 {
 	if (!new_session) return ERROR_CODE::INVALID_REQUEST;
 	if (!IsRoomSession(new_session)) return ERROR_CODE::INVALID_REQUEST;
+	auto room_users = GetRoomUsers();
 	//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
 	int result = ERROR_CODE::ROOM_FULL;
 	int added_slot = -1;
@@ -145,6 +146,7 @@ int MultiRoom::AddUser(const SP<Session>& new_session)
 
 void MultiRoom::DeleteUser(const int id)
 {
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -193,6 +195,7 @@ void MultiRoom::SendCreateRoom(const SP<Session>& session)
 void MultiRoom::ReadyUser(int id)
 {
 	if (host_id == id) return;
+	auto room_users = GetRoomUsers();
 	bool is_ready = false;
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
@@ -222,6 +225,7 @@ void MultiRoom::KickUser(int id, int kick_user_id)
 {
 	if (id != host_id) return;
 	if (kick_user_id == host_id) return;
+	auto room_users = GetRoomUsers();
 
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
@@ -250,6 +254,7 @@ void MultiRoom::StartGame(int request_user_id)
 {
 	if (request_user_id != host_id) return;
 	if (room_state.Load() == ROOM_STATE::PLAY) return;
+	auto room_users = GetRoomUsers();
 
 	int ready_user_count = 0;
 	int result = -1;
@@ -350,6 +355,7 @@ void MultiRoom::ProcessGameTick()
 {
 	UpdatePrevUsersState();
 
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -379,6 +385,7 @@ void MultiRoom::ProcessGameTick()
 
 bool MultiRoom::FindWinner()
 {
+	auto room_users = GetRoomUsers();
 	int over_count = 0;
 	int player_count = 0;
 	for (auto& r_user : room_users) {
@@ -432,6 +439,7 @@ bool MultiRoom::FindWinner()
 void MultiRoom::CalcAttackLine()
 {	
 	// 서로 클리어한 라인을 통해 남에게 패널티를 부여할 라인을 모두 계산한 뒤, 한 번에 적용
+	auto room_users = GetRoomUsers();
 	for (int i = 0; i < room_users.size(); ++i) {
 		if (room_users[i].GetRoomUserState() == ROOM_USER_STATE::PLAY) {
 			int add_line_num = GetGarbageLinesFromAttack(room_users[i].GetTetris().GetClearedLines());
@@ -483,6 +491,7 @@ int MultiRoom::GetGarbageLinesFromAttack(int cleared_line_num)
 void MultiRoom::UpdatePrevUsersState()
 {
 	if (room_state != ROOM_STATE::PLAY) return;
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -498,6 +507,7 @@ void MultiRoom::RequestUpdateMatchResult()
 	SP<Session> sessions[MAX_MATCH_RESULT_PLAYERS]{};
 	uint8_t player_count = 0;
 
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -513,6 +523,7 @@ void MultiRoom::RequestUpdateMatchResult()
 void MultiRoom::FindNewHost()
 {
 	bool find_host = false;
+	auto room_users = GetRoomUsers();
 	
 	if (GetCurrentUser() != 0) {
 		for (auto& r_user : room_users) {
@@ -540,6 +551,7 @@ void MultiRoom::FindNewHost()
 
 int MultiRoom::FindHostIndex(int host_id)
 {
+	auto room_users = GetRoomUsers();
 	for (int i = 0; i < room_users.size(); ++i) {
 		auto session = room_users[i].GetSession();
 		if (!session) continue;

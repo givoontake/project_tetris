@@ -2,6 +2,7 @@
 #include <atomic>
 #include <vector>
 #include <array>
+#include <span>
 #include <string>
 #include <cstdint>
 #include <utility>
@@ -61,8 +62,6 @@ class TetrisRoom
 	friend class TickThread;
 
 protected:
-	//std::array<RoomSession*, MAX_USER>& users;
-	std::vector<RoomSession> room_users; // 아토믹 변수는 복사가 안돼서..
 	IOCPServer* server;
 	Atomic<ROOM_STATE> room_state;
 	std::atomic<ROOM_PROCESS_STATE> processing_state{ ROOM_PROCESS_STATE::PROCESSING };
@@ -79,6 +78,8 @@ protected:
 	char max_user;
 	std::atomic<char> cur_user{ 0 };
 
+	// 크기가 다른 자식 방의 고정 배열을 부모 공통 로직에서 동일하게 처리하기 위해 배열 범위를 반환한다.
+	virtual std::span<RoomSession> GetRoomUsers() = 0;
 	bool InitHostSession(const SP<Session>& session);
 	void ClearPlayTasks();
 	bool IsRoomSession(const SP<Session>& session) const;

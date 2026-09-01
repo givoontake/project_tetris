@@ -3,6 +3,8 @@
 #include "IOCPServer.h"
 #include "SingleRoom.h"
 #include "MultiRoom.h"
+#include "TwoPlayerRoom.h"
+#include "FivePlayerRoom.h"
 
 #undef min
 
@@ -545,15 +547,12 @@ void IOCPServer::CreateOpenRoom(char* packet, const SP<Session>& session)
 	OpenRoomInitData data;
 	constexpr size_t MIN_ROOM_NAME_LENGTH = 4;
 	//std::shared_ptr<TetrisRoom> new_room;
-	bool is_single;
 	if (open_p->max_user == 1) {
 		data.max_user = open_p->max_user;
-		is_single = true;
 	}
 		
 	else if (open_p->max_user == 2 || open_p->max_user == 5) {
 		data.max_user = open_p->max_user;
-		is_single = false;
 	}
 		
 	else return;
@@ -572,8 +571,9 @@ void IOCPServer::CreateOpenRoom(char* packet, const SP<Session>& session)
 		if (rooms[i].load() == nullptr) {
 			data.room_index = i;
 			{
-				if (is_single) new_room = std::make_shared<SingleRoom>(this, data);
-				else new_room = std::make_shared<MultiRoom>(this, data);
+				if (data.max_user == 1) new_room = std::make_shared<SingleRoom>(this, data);
+				else if (data.max_user == 2) new_room = std::make_shared<TwoPlayerRoom>(this, data);
+				else new_room = std::make_shared<FivePlayerRoom>(this, data);
 				SP<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
 					if (!new_room->AddHostSession(session_ptr)) {
@@ -603,15 +603,12 @@ void IOCPServer::CreateLockRoom(char* packet, const SP<Session>& session)
 	constexpr size_t MIN_ROOM_NAME_LENGTH = 4;
 	constexpr size_t MIN_ROOM_PASSWORD_LENGTH = 4;
 	//std::shared_ptr<TetrisRoom> new_room;
-	bool is_single;
 	if (lock_p->max_user == 1) {
 		data.max_user = lock_p->max_user;
-		is_single = true;
 	}
 
 	else if (lock_p->max_user == 2 || lock_p->max_user == 5) {
 		data.max_user = lock_p->max_user;
-		is_single = false;
 	}
 
 	else return;
@@ -631,8 +628,9 @@ void IOCPServer::CreateLockRoom(char* packet, const SP<Session>& session)
 		if (rooms[i].load() == nullptr) {
 			data.room_index = i;
 			{
-				if (is_single) new_room = std::make_shared<SingleRoom>(this, data);
-				else new_room = std::make_shared<MultiRoom>(this, data);
+				if (data.max_user == 1) new_room = std::make_shared<SingleRoom>(this, data);
+				else if (data.max_user == 2) new_room = std::make_shared<TwoPlayerRoom>(this, data);
+				else new_room = std::make_shared<FivePlayerRoom>(this, data);
 				SP<TetrisRoom> expected = nullptr;
 				if (std::atomic_compare_exchange_strong(&rooms[i], &expected, new_room)) {
 					if (!new_room->AddHostSession(session_ptr)) {

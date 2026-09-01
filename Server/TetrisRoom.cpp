@@ -14,10 +14,6 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, OpenRoomInitData data)
 	room_index = data.room_index;
 	room_gen = data.room_gen;
 	room_state.Store(ROOM_STATE::EMPTY);
-	room_users.reserve(max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
-	for (int i = 0; i < max_user; ++i) {
-		room_users.emplace_back();
-	}
 
 	//SendAddRoom(session);
 	cur_user.store(0);
@@ -32,10 +28,6 @@ TetrisRoom::TetrisRoom(IOCPServer* _server, LockRoomInitData data)
 	room_index = data.room_index;
 	room_gen = data.room_gen;
 	room_state.Store(ROOM_STATE::EMPTY);
-	room_users.reserve(max_user); // 미리 메모리를 할당하고 객체를 채우면 문제 x
-	for (int i = 0; i < max_user; ++i) {
-		room_users.emplace_back();
-	}
 	//SendAddRoom(session);
 	cur_user.store(0);
 }
@@ -52,6 +44,7 @@ int TetrisRoom::GetCurrentUser() const
 bool TetrisRoom::InitHostSession(const SP<Session>& session)
 {
 	if (!session) return false;
+	auto room_users = GetRoomUsers();
 	if (room_users.empty()) return false;
 	if (room_users[0].GetSession()) return false;
 	if (!room_users[0].InitRoomSession(session, room_index)) return false;
@@ -165,6 +158,7 @@ void TetrisRoom::ProcessPlayTasks()
 
 	UpdateTick();
 	const std::uint64_t current_play_generation = play_generation.load();
+	auto room_users = GetRoomUsers();
 	for (std::size_t i = 0; i < task_count; ++i) {
 		TaskInfo task = play_tasks.Dequeue();
 		if (task.play_generation != current_play_generation) continue;
@@ -206,6 +200,7 @@ void TetrisRoom::TryPostRoomDelete()
 
 void TetrisRoom::InitGame()
 {
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) { 
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -218,6 +213,7 @@ void TetrisRoom::ClearGame()
 	StoreRoomState(ROOM_STATE::WAIT);
 	ClearPlayTasks();
 	tetromino_spawn_list.clear();
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -239,6 +235,7 @@ void TetrisRoom::Add7BagTetrominoList()
 
 bool TetrisRoom::SpawnTetromino(int id) // 내가 이걸 왜 반환형을 bool이라고 했을까
 {
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -255,13 +252,15 @@ void TetrisRoom::ClearRoom()
 {
 	ClearPlayTasks();
 	tetromino_spawn_list.clear();
-	room_users.clear();
+	auto room_users = GetRoomUsers();
+	for (auto& r_user : room_users) r_user.ClearRoomSession();
 	cur_user.store(0);
 	StoreRoomState(ROOM_STATE::EMPTY);
 }
 
 void TetrisRoom::UpdateTick()
 {
+	auto room_users = GetRoomUsers();
 	for(auto& r_user : room_users){
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -272,6 +271,7 @@ void TetrisRoom::UpdateTick()
 // 얘는 순차적으로 쌓인 작업을 처리해 보내야할 패킷들을 버퍼에 쌓음
 int TetrisRoom::BoundPackets()
 {
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() != ROOM_USER_STATE::PLAY) continue; // 게임오버 되어도 상태 변경은 여기서 이루어지므로 진입 시에는 게임오버 상태는 아님
 		auto session = r_user.GetSession();
@@ -384,6 +384,7 @@ bool TetrisRoom::MakeMovePacket(RoomSession& r_session, int move_type)
 
 void TetrisRoom::AddGarbageLines()
 {
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() == ROOM_USER_STATE::PLAY) {
 			r_user.GetTetris().AddGarbageLines();
@@ -395,6 +396,7 @@ void TetrisRoom::AddSpawnTask()
 {
 	// spawn은 룸에서 이루어져야 한다. 스폰될 테트로미노를 일괄 관리중이기 때문이다.
 	// spawn은 fix와 항상 같이 일어나므로, 작업에서 fix 여부를 확인해 있으면 추가해준다.
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		if (r_user.GetRoomUserState() != ROOM_USER_STATE::PLAY) continue;
 		std::vector<TaskType>& tasks = r_user.GetTetris().GetSendTasks();
@@ -416,6 +418,7 @@ void TetrisRoom::AddSpawnTask()
 
 void TetrisRoom::ResetUsersTickData()
 {
+	auto room_users = GetRoomUsers();
 	for(auto& r_user : room_users){
 		auto session = r_user.GetSession();
 		if (!session) continue;
@@ -425,6 +428,7 @@ void TetrisRoom::ResetUsersTickData()
 
 void TetrisRoom::BroadcastTickDataForUsers()
 {
+	auto room_users = GetRoomUsers();
 	for (int i = 0; i < room_users.size(); ++i) {
 		RoomSession& source = room_users[i];
 		auto source_session = source.GetSession();
@@ -459,6 +463,7 @@ void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 	// 틱 루프에서 호출할 경우 이중락 걸리므로 주의
 	// 우선 외부에서 잠그는걸로 다시 변경. 범위기반 탐색과 삭제 사이의 관계 때문에 락이 필요한데, 멀티와 같은 경우 범위기반 탐색 내에 다시 범위기반 탐색을 하는 경우도 꽤 있으므로 외부에서 하는게 효율적인 것 같다.
 	std::vector<int> target_index;
+	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
 		if (!session) continue;

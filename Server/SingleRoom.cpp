@@ -6,11 +6,18 @@
 SingleRoom::SingleRoom(IOCPServer* server, OpenRoomInitData data)
 	: TetrisRoom(server, data)
 {
+	max_user = 1;
 }
 
 SingleRoom::SingleRoom(IOCPServer* server, LockRoomInitData data)
 	: TetrisRoom(server, data)
 {
+	max_user = 1;
+}
+
+std::span<RoomSession> SingleRoom::GetRoomUsers()
+{
+	return room_users;
 }
 
 void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)

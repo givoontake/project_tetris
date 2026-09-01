@@ -10,6 +10,7 @@
 
 class SingleRoom : public TetrisRoom
 {
+	std::array<RoomSession, 1> room_users;
 
 public:
 	SingleRoom(IOCPServer* server, OpenRoomInitData data);
@@ -29,6 +30,7 @@ public:
 	void ReduceTimeouts(int type);
 
 private:
+	virtual std::span<RoomSession> GetRoomUsers() override;
 	virtual void ProcessSpecificRoomTask(const RoomTaskInfo& task) override;
 	virtual void ProcessGameTick() override;
 	void GiveUp(const SP<Session>& request_session);
