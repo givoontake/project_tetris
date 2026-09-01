@@ -10,14 +10,14 @@ bool RankingManager::CompareRankingInfo(const RankingInfo& lhs, const RankingInf
 
 void RankingManager::SortAndTrim()
 {
-	std::sort(rankings.begin(), rankings.end(), CompareRankingInfo); // 오름차순 정렬
-	if (rankings.size() > MAX_RANKING_COUNT) rankings.resize(MAX_RANKING_COUNT); // 상위 10개만 남기기
+	std::sort(rankings_.begin(), rankings_.end(), CompareRankingInfo); // 오름차순 정렬
+	if (rankings_.size() > MAX_RANKING_COUNT) rankings_.resize(MAX_RANKING_COUNT); // 상위 10개만 남기기
 }
 
 void RankingManager::InitRanking(std::vector<RankingInfo>& loaded_rankings)
 {
-	std::lock_guard<std::mutex> lock(ranking_mutex);
-	rankings = std::move(loaded_rankings);
+	std::lock_guard<std::mutex> lock(ranking_mutex_);
+	rankings_ = std::move(loaded_rankings);
 	SortAndTrim();
 }
 
@@ -25,28 +25,28 @@ void RankingManager::UpdateRanking(int id, const std::string& nickname, int scor
 {
 	if (score <= 0) return;
 
-	std::lock_guard<std::mutex> lock(ranking_mutex);
+	std::lock_guard<std::mutex> lock(ranking_mutex_);
 
-	auto it = std::find_if(rankings.begin(), rankings.end(),
+	auto it = std::find_if(rankings_.begin(), rankings_.end(),
 		[id](const RankingInfo& info) {
 			return info.id == id;
 		});
 
-	if (it != rankings.end()) {
+	if (it != rankings_.end()) {
 		it->nickname = nickname;
 		if (score > it->score) it->score = score;
 		SortAndTrim();
 		return;
 	}
 
-	if (rankings.size() < MAX_RANKING_COUNT || score > rankings.back().score) {
-		rankings.push_back(RankingInfo{ id, nickname, score });
+	if (rankings_.size() < MAX_RANKING_COUNT || score > rankings_.back().score) {
+		rankings_.push_back(RankingInfo{ id, nickname, score });
 		SortAndTrim();
 	}
 }
 
 std::vector<RankingInfo> RankingManager::GetRankings() const
 {
-	std::lock_guard<std::mutex> lock(ranking_mutex);
-	return rankings;
+	std::lock_guard<std::mutex> lock(ranking_mutex_);
+	return rankings_;
 }

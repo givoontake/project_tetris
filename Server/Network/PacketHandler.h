@@ -1,12 +1,12 @@
 #pragma once
-#include "Types.h"
+#include "types.h"
 
 class IOCPServer;
 class Session;
 
 class PacketHandler
 {
-	IOCPServer& server;
+	IOCPServer& server_;
 
 public:
 	PacketHandler(IOCPServer& server);

@@ -6,27 +6,27 @@
 SingleRoom::SingleRoom(IOCPServer* server, OpenRoomInitData data)
 	: TetrisRoom(server, data)
 {
-	max_user = 1;
+	max_user_ = 1;
 }
 
 SingleRoom::SingleRoom(IOCPServer* server, LockRoomInitData data)
 	: TetrisRoom(server, data)
 {
-	max_user = 1;
+	max_user_ = 1;
 }
 
 std::span<RoomSession> SingleRoom::GetRoomUsers()
 {
-	return room_users;
+	return room_users_;
 }
 
 void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 {
 	if (!request_session) return;
-	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
+	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
 	case C2S_GIVEUP: {
 		RoomTaskInfo task;
-		task.type = ROOM_TASK_TYPE::GIVEUP;
+		task.type = RoomTaskType::GIVEUP;
 		task.session = request_session;
 		AddRoomTask(std::move(task));
 		break;
@@ -40,14 +40,14 @@ void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 void SingleRoom::GiveUp(const SP<Session>& request_session)
 {
 	if (!IsRoomSession(request_session)) return;
-	if (room_state == ROOM_STATE::PLAY) {
-		auto session = room_users[0].GetSession();
+	if (room_state_ == RoomState::PLAY) {
+		auto session = room_users_[0].GetSession();
 		if (!session || session != request_session) return;
 		S2C_GAMEOVER_PACKET gameover_p;
 		gameover_p.header.size = static_cast<std::uint16_t>(sizeof(gameover_p));
 		gameover_p.header.type = S2C_GAMEOVER;
 		gameover_p.id = session->GetDBInfo().id;
-		session->SendPacket(reinterpret_cast<char*>(&gameover_p), server->GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&gameover_p), server_->GetHandle());
 		RequestUpdateScore();
 		ClearGame();
 	}
@@ -56,10 +56,10 @@ void SingleRoom::GiveUp(const SP<Session>& request_session)
 void SingleRoom::ProcessSpecificRoomTask(const RoomTaskInfo& task)
 {
 	switch (task.type) {
-	case ROOM_TASK_TYPE::START:
+	case RoomTaskType::START:
 		if (IsRoomSession(task.session)) StartGame();
 		break;
-	case ROOM_TASK_TYPE::GIVEUP:
+	case RoomTaskType::GIVEUP:
 		GiveUp(task.session);
 		break;
 	default:
@@ -69,7 +69,7 @@ void SingleRoom::ProcessSpecificRoomTask(const RoomTaskInfo& task)
 
 void SingleRoom::ProcessGameTick()
 {
-	for (auto& r_user : room_users) {
+	for (auto& r_user : room_users_) {
 		auto session = r_user.GetSession();
 		if (!session) continue;
 		r_user.GetTetris().TickProcess();
@@ -77,16 +77,16 @@ void SingleRoom::ProcessGameTick()
 
 	AddGarbageLines();
 	bool is_over = false;
-	is_over = room_users[0].GetTetris().CheckGameover();
+	is_over = room_users_[0].GetTetris().CheckGameover();
 	if (!is_over) AddSpawnTask();
 
-	auto tasks = room_users[0].GetTetris().GetSendTasks();
+	auto tasks = room_users_[0].GetTetris().GetSendTasks();
 	auto it = std::find_if(tasks.begin(), tasks.end(), [](const TaskType& t_type) {
-		return t_type.event_type == EVENT_TYPE::FIX;
+		return t_type.event_type == EventType::FIX;
 		});
 
 	if (it != tasks.end()) { // 고정 이벤트가 있어야 점수 및 콤보계산
-		CalculateScore(room_users[0].GetTetris().GetClearedLines());
+		CalculateScore(room_users_[0].GetTetris().GetClearedLines());
 	}
 	int failed_user_id = BoundPackets();
 	if (failed_user_id != -1) {
@@ -106,38 +106,38 @@ void SingleRoom::ProcessGameTick()
 void SingleRoom::StartGame()
 {
 	{
-		if (room_state == ROOM_STATE::PLAY) return;
-		if (!TryChangeRoomState(ROOM_STATE::WAIT, ROOM_STATE::PLAY)) return;
-		play_generation.fetch_add(1);
+		if (room_state_ == RoomState::PLAY) return;
+		if (!TryChangeRoomState(RoomState::WAIT, RoomState::PLAY)) return;
+		play_generation_.fetch_add(1);
 
 		// 모든 조건 통과->게임 시작
 		InitGame();
 		Add7BagTetrominoList();
-		for (auto& r_user : room_users) {
+		for (auto& r_user : room_users_) {
 			auto session = r_user.GetSession();
 			if (!session) continue;
-			r_user.SetRoomUserState(ROOM_USER_STATE::PLAY);
-			r_user.GetTetris().InitNewTetromino(tetromino_spawn_list[r_user.GetTetrominoIndex()], spawn_pos);
+			r_user.SetRoomUserState(RoomUserState::PLAY);
+			r_user.GetTetris().InitNewTetromino(tetromino_spawn_list_[r_user.GetTetrominoIndex()], spawn_pos_);
 		}
 
 		S2C_SINGLE_START_PACKET start_p;
 		start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
 		start_p.header.type = S2C_SINGLE_START;
 		start_p.score = 0;
-		Broadcast(reinterpret_cast<char*>(&start_p), server->GetHandle());
+		Broadcast(reinterpret_cast<char*>(&start_p), server_->GetHandle());
 
-		for (auto& r_user : room_users) {
+		for (auto& r_user : room_users_) {
 			auto session = r_user.GetSession();
 			if (!session) continue;
 			S2C_SPAWN_PACKET spawn_p;
 			spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
 			spawn_p.header.type = S2C_SPAWN;
 			spawn_p.id = session->GetDBInfo().id;
-			spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-			spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
-			spawn_p.spawn_x = spawn_pos.x;
-			spawn_p.spawn_y = spawn_pos.y;
-			Broadcast(reinterpret_cast<char*>(&spawn_p), server->GetHandle());
+			spawn_p.tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex()];
+			spawn_p.next_tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex() + 1];
+			spawn_p.spawn_x = spawn_pos_.x;
+			spawn_p.spawn_y = spawn_pos_.y;
+			Broadcast(reinterpret_cast<char*>(&spawn_p), server_->GetHandle());
 		}
 	}
 }
@@ -147,18 +147,18 @@ void SingleRoom::DeleteUser(const int id)
 	//std::cout << "delete user id: " << id << std::endl;
 
 	{
-		for (auto& r_user : room_users) {
+		for (auto& r_user : room_users_) {
 			auto session = r_user.GetSession();
 			if (!session) continue;
 			if (session->GetDBInfo().id == id) { // 삭제할 아이디 검색
 				//std::cout << "delete user id: " << id << std::endl;
-				session->SetRoomSnapShot(MODE_STATE::LOBBY, -1);
+				session->SetRoomSnapShot(ModeState::LOBBY, -1);
 				S2C_DELETE_USER_PACKET p;
 				p.header.size = static_cast<std::uint16_t>(sizeof(p));
 				p.header.type = S2C_DELETE_USER;
 				p.id = id;
 
-				Broadcast(reinterpret_cast<char*>(&p), server->GetHandle());
+				Broadcast(reinterpret_cast<char*>(&p), server_->GetHandle());
 
 				ClearRoom(); // 안하면 방 삭제 포스트 이후 세션이 재사용되면 문제가 될 수 있음.
 				BeginRoomDelete();
@@ -171,31 +171,31 @@ void SingleRoom::DeleteUser(const int id)
 void SingleRoom::SendCreateRoom(const SP<Session>& session) // 외부에서 세션락 걸고 들어온다
 {
 	if (!session) return;
-	if (room_password.empty()) {
+	if (room_password_.empty()) {
 		S2C_ADD_OPEN_ROOM_PACKET open_p;
 		open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
 		open_p.header.type = S2C_ADD_OPEN_ROOM;
-		open_p.gen = room_gen;
-		open_p.max_user = max_user;
-		server->StringToCharBuf(room_name, open_p.room_name, sizeof(open_p.room_name));
-		session->SendPacket(reinterpret_cast<char*>(&open_p), server->GetHandle());
+		open_p.gen = room_gen_;
+		open_p.max_user = max_user_;
+		server_->StringToCharBuf(room_name_, open_p.room_name, sizeof(open_p.room_name));
+		session->SendPacket(reinterpret_cast<char*>(&open_p), server_->GetHandle());
 	}
 	else {
 		S2C_ADD_LOCK_ROOM_PACKET lock_p;
 		lock_p.header.size = static_cast<std::uint16_t>(sizeof(lock_p));
 		lock_p.header.type = S2C_ADD_LOCK_ROOM;
-		lock_p.gen = room_gen;
-		lock_p.max_user = max_user;
-		server->StringToCharBuf(room_name, lock_p.room_name, sizeof(lock_p.room_name));
-		server->StringToCharBuf(room_password, lock_p.room_password, sizeof(lock_p.room_password));
-		session->SendPacket(reinterpret_cast<char*>(&lock_p), server->GetHandle());
+		lock_p.gen = room_gen_;
+		lock_p.max_user = max_user_;
+		server_->StringToCharBuf(room_name_, lock_p.room_name, sizeof(lock_p.room_name));
+		server_->StringToCharBuf(room_password_, lock_p.room_password, sizeof(lock_p.room_password));
+		session->SendPacket(reinterpret_cast<char*>(&lock_p), server_->GetHandle());
 	}
-	std::cout << "방 생성 - 방 이름: " << room_name << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
+	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
 }
 
 void SingleRoom::ReduceTimeouts(int type)
 {
-	RoomSession& r_session = room_users[0];
+	RoomSession& r_session = room_users_[0];
 	switch (type) {
 	case DOWN_TIMEOUT:
 		if (r_session.GetScore() <= 100) {
@@ -239,7 +239,7 @@ void SingleRoom::CalculateScore(int clear_line_count)
 	int added_score = 0;
 	switch (clear_line_count) {
 	case 0:
-		room_users[0].ResetCombo();
+		room_users_[0].ResetCombo();
 		return;
 
 		break;
@@ -258,22 +258,22 @@ void SingleRoom::CalculateScore(int clear_line_count)
 	default:
 		break;
 	}
-	room_users[0].AddCombo();
-	int combo = room_users[0].GetCombo();
+	room_users_[0].AddCombo();
+	int combo = room_users_[0].GetCombo();
 	added_score += combo * (added_score / 10);
-	room_users[0].AddScore(added_score);
+	room_users_[0].AddScore(added_score);
 }
 
 void SingleRoom::MakeMovePacketData(int move_type)
 {
-	auto session = room_users[0].GetSession();
+	auto session = room_users_[0].GetSession();
 	if (!session) return;
 	S2C_MOVE_PACKET move_p;
 	move_p.header.size = static_cast<std::uint16_t>(sizeof(move_p));
 	move_p.header.type = S2C_MOVE;
 	move_p.id = session->GetDBInfo().id;
 	move_p.move_type = static_cast<char>(move_type);
-	if (!room_users[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size)) {
+	if (!room_users_[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size)) {
 		DeleteUser(session->GetDBInfo().id);
 		TryPostRoomDelete();
 	}
@@ -281,11 +281,11 @@ void SingleRoom::MakeMovePacketData(int move_type)
 
 void SingleRoom::RequestUpdateScore()
 {
-	auto session_shared = room_users[0].GetSession();
+	auto session_shared = room_users_[0].GetSession();
 	if (!session_shared) return;
-	if (session_shared->GetDBInfo().max_score < room_users[0].GetScore()) {
-		int new_score = room_users[0].GetScore();
+	if (session_shared->GetDBInfo().max_score < room_users_[0].GetScore()) {
+		int new_score = room_users_[0].GetScore();
 		SessionKey key = session_shared->GetSessionKey();
-		server->EnqueueDBTask(std::make_unique<DBUpdateScoreTask>(key, new_score), session_shared);
+		server_->EnqueueDBTask(std::make_unique<DBUpdateScoreTask>(key, new_score), session_shared);
 	}
 }

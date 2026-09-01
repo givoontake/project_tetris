@@ -3,15 +3,15 @@
 #include <mutex>
 #include <unordered_map>
 #include <vector>
-#include "Types.h"
+#include "types.h"
 
 class Session;
 struct DBResultLogin;
 
 class ActiveUserManager
 {
-	std::unordered_map<int, WP<Session>> active_users;
-	mutable std::mutex active_users_mutex;
+	std::unordered_map<int, WP<Session>> active_users_;
+	mutable std::mutex active_users_mutex_;
 
 public:
 	bool AddUser(const SP<Session>& session, DBResultLogin* login_result);

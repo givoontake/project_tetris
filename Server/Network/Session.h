@@ -15,27 +15,27 @@
 // 다르다면 재사용된 것이므로 작업만 취소하면 된다. 같다면 같은 세션이므로 이전의 모든 작업을 신뢰할 수 있다. 당연히 비교 및 작업 등록은 세션 뮤텍스가 필요하다.
 
 struct RoomSnapShot {
-	MODE_STATE state;
+	ModeState state;
 	int room_index;
 };
 
 class Session
 {
-	SOCKET socket;
-	IOOverlapped recv_over;
+	SOCKET socket_;
+	IOOverlapped recv_over_;
 	//IServer* server_interface;
-	SessionKey key;
-	int room_index = -1;
-	int remain_data_size = 0;
-	std::atomic<int> io_pending_count = 0;
+	SessionKey key_;
+	int room_index_ = -1;
+	int remain_data_size_ = 0;
+	std::atomic<int> io_pending_count_ = 0;
 	// 남은 데이터는 recv_over 버퍼에 들어 있으므로 추가로 만들 필요가 없음.
 
-	mutable std::mutex sess_mutex;
-	std::atomic<LIFE_STATE> life_state = LIFE_STATE::NONE;
-	std::atomic<MODE_STATE> mode_state = MODE_STATE::NONE;
-	DBResultLogin db_info;
+	mutable std::mutex sess_mutex_;
+	std::atomic<LifeState> life_state_ = LifeState::NONE;
+	std::atomic<ModeState> mode_state_ = ModeState::NONE;
+	DBResultLogin db_info_;
 
-	std::vector<FriendInfo> friend_list;
+	std::vector<FriendInfo> friend_list_;
 
 public:
 	Session();
@@ -59,29 +59,29 @@ public:
 	// 데이터 레이스를 방지하기 위해 세션은 언제든지 수정될 수 있는 데이터에 대해 참조 반환을 하지 않는다
 	//getters
 	SOCKET GetSocket() const;
-	IOOverlapped& GetExOver() { return recv_over; }
+	IOOverlapped& GetExOver() { return recv_over_; }
 	std::vector<FriendInfo> GetFriendList() const;
-	std::mutex& GetMutex() { return sess_mutex; }
+	std::mutex& GetMutex() { return sess_mutex_; }
 
 	//IOKey GetIOKey() const { return key; }
 	SessionKey GetSessionKey() const;
 	int GetRoomIndex() const;
 	RoomSnapShot GetRoomSnapShot() const;
 	int GetRemainDataSize() const;
-	LIFE_STATE GetLifeState() const { return life_state.load(); }
-	MODE_STATE GetState() const { return mode_state.load(); }
-	MODE_STATE GetModeState() const { return mode_state.load(); }
+	LifeState GetLifeState() const { return life_state_.load(); }
+	ModeState GetState() const { return mode_state_.load(); }
+	ModeState GetModeState() const { return mode_state_.load(); }
 	DBResultLogin GetDBInfo() const;
 	//std::string GetPrimaryKey() const { return login_id; }
 
 	//setters
 	void SetIndex(int new_index);
 	void AddDataSize(int new_data_size);
-	void StoreLifeState(LIFE_STATE new_state);
-	void StoreState(MODE_STATE new_state);
-	void SetRoomSnapShot(MODE_STATE new_state, int new_room_index);
+	void StoreLifeState(LifeState new_state);
+	void StoreState(ModeState new_state);
+	void SetRoomSnapShot(ModeState new_state, int new_room_index);
 	bool TrySetRoomMode(int new_room_index);
-	bool TryChangeLifeState(LIFE_STATE expected, LIFE_STATE desired);
-	bool TryChangeState(MODE_STATE expected, MODE_STATE desired);
+	bool TryChangeLifeState(LifeState expected, LifeState desired);
+	bool TryChangeState(ModeState expected, ModeState desired);
 	//void SetPrimaryKey(std::string val) { login_id = val; }
 };

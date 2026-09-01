@@ -5,13 +5,13 @@
 void LoginDBWorker::ExecuteLogin(SessionKey key, const std::string& login_id, const std::string& password)
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::LOGIN); // 기본 실패로 두고, 성공 조건에서만 true
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.key = key;
 
     try
     {
         // 1) PreparedStatement 확보 (캐시 없으면 준비)
-        auto* stmt = caches.GetStmt(DBOperationType::LOGIN);
+        auto* stmt = caches_.GetStmt(DBOperationType::LOGIN);
         if (!stmt) // 캐시가 없으면 캐시를 만들고 다시 캐시를 가져오고, 그래도 없으면 실패 처리
         {
             const char* SQL_LOGIN =
@@ -20,11 +20,11 @@ void LoginDBWorker::ExecuteLogin(SessionKey key, const std::string& login_id, co
                 "WHERE login_id=? "
                 "LIMIT 1";
 
-            caches.stmt_cache[DBOperationType::LOGIN].reset(caches.conn->prepareStatement(SQL_LOGIN));
-            stmt = caches.GetStmt(DBOperationType::LOGIN);
+            caches_.stmt_cache[DBOperationType::LOGIN].reset(caches_.conn->prepareStatement(SQL_LOGIN));
+            stmt = caches_.GetStmt(DBOperationType::LOGIN);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+                PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
                 return;
             }
         }
@@ -59,7 +59,7 @@ void LoginDBWorker::ExecuteLogin(SessionKey key, const std::string& login_id, co
         throw;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+    PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
 void LoginDBWorker::ProcessTask(DBTask& task)

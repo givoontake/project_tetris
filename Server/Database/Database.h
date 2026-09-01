@@ -21,7 +21,7 @@
 #include <jdbc/cppconn/exception.h>
 
 #include "ExOverlapped.h"
-#include "Types.h"
+#include "types.h"
 #include "enum_class.h"
 #include "define_packets.h"
 #include "DBResult.h"
@@ -53,8 +53,8 @@ struct DBCaches
 class Database : public ServerThread
 {
 protected:
-    HANDLE iocp_handle = nullptr;
-    DBCaches caches;
+    HANDLE iocp_handle_ = nullptr;
+    DBCaches caches_;
 
 public:
     Database();
@@ -80,11 +80,11 @@ protected:
     static void PrintErrorLog(const char* func_name);
 
 private:
-    DBConnectionInfo connection_info;
+    DBConnectionInfo connection_info_;
 
-    std::mutex wait_mutex;
-    std::condition_variable cv;
-    oneapi::tbb::concurrent_queue<std::unique_ptr<DBTask>> task_queue;
+    std::mutex wait_mutex_;
+    std::condition_variable cv_;
+    oneapi::tbb::concurrent_queue<std::unique_ptr<DBTask>> task_queue_;
 
     bool TryEnqueue(std::unique_ptr<DBTask>& db_task);
     bool LoadDBConfigFromFile(const std::string& file_path);

@@ -4,7 +4,7 @@
 //#include "packetType.h"
 //#include "IOCPServer.h"
 //
-////PacketHandler::PacketHandler(IOCPServer* server) : server(server)
+////PacketHandler::PacketHandler(IOCPServer* server) : server_(server)
 ////{
 ////}
 ////
@@ -27,7 +27,7 @@
 #include "packet_types.h"
 #include "IOCPServer.h"
 
-PacketHandler::PacketHandler(IOCPServer& server) : server(server)
+PacketHandler::PacketHandler(IOCPServer& server) : server_(server)
 {
 }
 
@@ -35,12 +35,12 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 {
 	C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
 	if (!session) return;
-	if (session->GetModeState() != MODE_STATE::LOGIN) return;
+	if (session->GetModeState() != ModeState::LOGIN) return;
 
-	std::string login_id = server.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
-	std::string password = server.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
+	std::string login_id = server_.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
+	std::string password = server_.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
 	SessionKey key = session->GetSessionKey();
-	server.EnqueueDBTask(std::make_unique<DBLoginTask>(key, login_id, password), session);
+	server_.EnqueueDBTask(std::make_unique<DBLoginTask>(key, login_id, password), session);
 }
 
 void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session)
@@ -51,7 +51,7 @@ void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session
 	if (msg_size == 0) return;
 	int send_p_size = sizeof(S2C_MESSAGE_PACKET) + msg_size;
 
-	if (session->GetModeState() != MODE_STATE::LOBBY) return;
+	if (session->GetModeState() != ModeState::LOBBY) return;
 	std::string nickname = session->GetDBInfo().nickname;
 	int id = session->GetDBInfo().id;
 
@@ -60,11 +60,11 @@ void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session
 	front_p.header.size = static_cast<std::uint16_t>(send_p_size);
 	front_p.header.type = S2C_MESSAGE;
 	front_p.id = id;
-	server.StringToCharBuf(nickname, front_p.user_name, sizeof(front_p.user_name));
+	server_.StringToCharBuf(nickname, front_p.user_name, sizeof(front_p.user_name));
 	memcpy(send_p, &front_p, sizeof(S2C_MESSAGE_PACKET));
 	memcpy(send_p + sizeof(S2C_MESSAGE_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_MESSAGE_PACKET), msg_size);
 
-	server.BroadCastToLobby(send_p);
+	server_.BroadCastToLobby(send_p);
 
 	delete[] send_p;
 }
@@ -83,7 +83,7 @@ void PacketHandler::HandleTestPacket(char* packet, const SP<Session>& session)
 	memcpy(send_p, &front_p, sizeof(S2C_TEST_PACKET));
 	memcpy(send_p + sizeof(S2C_TEST_PACKET), reinterpret_cast<char*>(recv_p) + sizeof(C2S_TEST_PACKET), msg_size);
 
-	server.BroadCastToLobby(send_p);
+	server_.BroadCastToLobby(send_p);
 
 	delete[] send_p;
 }
@@ -91,31 +91,31 @@ void PacketHandler::HandleTestPacket(char* packet, const SP<Session>& session)
 void PacketHandler::HandleDisconnectPacket(const SP<Session>& session)
 {
 	if (!session) return;
-	if (session->BeginDeactivate()) server.BeginDisconnect(session);
-	if (session->TryDeactivate()) server.TryDisconnect(session);
+	if (session->BeginDeactivate()) server_.BeginDisconnect(session);
+	if (session->TryDeactivate()) server_.TryDisconnect(session);
 }
 
 void PacketHandler::HandleJoinOpenRoomPacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
 	C2S_JOIN_OPEN_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_OPEN_ROOM_PACKET*>(packet);
-	int result = server.TryJoinRoom(session, join_p->room_gen, "");
-	if (result != SUCCESS) server.SendError(session, result);
+	int result = server_.TryJoinRoom(session, join_p->room_gen, "");
+	if (result != SUCCESS) server_.SendError(session, result);
 }
 
 void PacketHandler::HandleJoinLockRoomPacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
 	C2S_JOIN_LOCK_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_LOCK_ROOM_PACKET*>(packet);
-	int result = server.TryJoinRoom(session, join_p->room_gen, server.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
-	if (result != SUCCESS) server.SendError(session, result);
+	int result = server_.TryJoinRoom(session, join_p->room_gen, server_.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
+	if (result != SUCCESS) server_.SendError(session, result);
 }
 
 void PacketHandler::HandleFastMatchingPacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
 	C2S_FAST_MATCHING_PACKET* matching_p = reinterpret_cast<C2S_FAST_MATCHING_PACKET*>(packet);
-	server.FindMatch(session, matching_p->max_user);
+	server_.FindMatch(session, matching_p->max_user);
 }
 
 void PacketHandler::HandleRequestFriendPacket(char* packet, const SP<Session>& session)
@@ -123,26 +123,26 @@ void PacketHandler::HandleRequestFriendPacket(char* packet, const SP<Session>& s
 	if (!session) return;
 	C2S_REQUEST_FRIEND_PACKET* friend_p = reinterpret_cast<C2S_REQUEST_FRIEND_PACKET*>(packet);
 
-	if (session->GetModeState() != MODE_STATE::LOBBY) return;
+	if (session->GetModeState() != ModeState::LOBBY) return;
 
 	int recver_id = friend_p->recver_id;
 	SessionKey key = session->GetSessionKey();
 	DBResultLogin db_info = session->GetDBInfo();
 	FriendInfo requester_info{ db_info.id, db_info.nickname };
-	server.EnqueueDBTask(std::make_unique<DBAddFriendRequestTask>(key, requester_info, recver_id), session);
+	server_.EnqueueDBTask(std::make_unique<DBAddFriendRequestTask>(key, requester_info, recver_id), session);
 }
 
 void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
 	C2S_ACCEPT_FRIEND_PACKET* accept_p = reinterpret_cast<C2S_ACCEPT_FRIEND_PACKET*>(packet);
-	if (session->GetModeState() != MODE_STATE::LOBBY) return;
+	if (session->GetModeState() != ModeState::LOBBY) return;
 
 	int requester_id = accept_p->requester_id;
 	SessionKey key = session->GetSessionKey();
 	DBResultLogin db_info = session->GetDBInfo();
 	FriendInfo accepter_info{ db_info.id, db_info.nickname };
-	server.EnqueueDBTask(std::make_unique<DBAddFriendTask>(key, accepter_info, requester_id), session);
+	server_.EnqueueDBTask(std::make_unique<DBAddFriendTask>(key, accepter_info, requester_id), session);
 }
 
 void PacketHandler::HandleDeleteFriendPacket(char* packet, const SP<Session>& session)
@@ -150,15 +150,15 @@ void PacketHandler::HandleDeleteFriendPacket(char* packet, const SP<Session>& se
 	if (!session) return;
 	C2S_DELETE_FRIEND_PACKET* delete_p = reinterpret_cast<C2S_DELETE_FRIEND_PACKET*>(packet);
 	int target_id = delete_p->target_id;
-	if (session->GetModeState() != MODE_STATE::LOBBY) return;
+	if (session->GetModeState() != ModeState::LOBBY) return;
 	SessionKey key = session->GetSessionKey();
-	server.EnqueueDBTask(std::make_unique<DBDeleteFriendTask>(key, target_id), session);
+	server_.EnqueueDBTask(std::make_unique<DBDeleteFriendTask>(key, target_id), session);
 }
 
 void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)
 {
 	if (!session) return;
-	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
+	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
 
 	case C2S_LOGIN: {
 		HandleLoginPacket(packet, session);
@@ -181,12 +181,12 @@ void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)
 	}
 
 	case C2S_ADD_OPEN_ROOM: {
-		server.CreateOpenRoom(packet, session);
+		server_.CreateOpenRoom(packet, session);
 		break;
 	}
 
 	case C2S_ADD_LOCK_ROOM: {
-		server.CreateLockRoom(packet, session);
+		server_.CreateLockRoom(packet, session);
 		break;
 	}
 
@@ -201,22 +201,22 @@ void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)
 	}
 
 	case C2S_REQUEST_ROOM_LIST: {
-		server.SendRoomList(session);
+		server_.SendRoomList(session);
 		break;
 	}
 
 	case C2S_REQUEST_LOBBY_USER_LIST: {
-		server.SendLobbyUserList(session);
+		server_.SendLobbyUserList(session);
 		break;
 	}
 
 	case C2S_REQUEST_FRIEND_LIST: {
-		server.SendFriendList(session);
+		server_.SendFriendList(session);
 		break;
 	}
 
 	case C2S_REQUEST_RANKING: {
-		server.SendRanking(session);
+		server_.SendRanking(session);
 		break;
 	}
 

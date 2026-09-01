@@ -5,32 +5,32 @@
 void ActiveRoomManager::AddRoom(int room_gen, const SP<TetrisRoom>& room)
 {
 	if (!room) return;
-	std::lock_guard<std::mutex> lock(active_rooms_mutex);
-	active_rooms[room_gen] = room;
+	std::lock_guard<std::mutex> lock(active_rooms_mutex_);
+	active_rooms_[room_gen] = room;
 }
 
 void ActiveRoomManager::RemoveRoom(int room_gen, const SP<TetrisRoom>& room)
 {
-	std::lock_guard<std::mutex> lock(active_rooms_mutex);
-	auto it = active_rooms.find(room_gen);
-	if (it == active_rooms.end()) return;
+	std::lock_guard<std::mutex> lock(active_rooms_mutex_);
+	auto it = active_rooms_.find(room_gen);
+	if (it == active_rooms_.end()) return;
 	auto active_room = it->second.lock();
 	if (active_room && active_room != room) return;
-	active_rooms.erase(it);
+	active_rooms_.erase(it);
 }
 
 SP<TetrisRoom> ActiveRoomManager::FindRoom(int room_gen)
 {
-	std::lock_guard<std::mutex> lock(active_rooms_mutex);
-	auto it = active_rooms.find(room_gen);
-	if (it == active_rooms.end()) return nullptr;
+	std::lock_guard<std::mutex> lock(active_rooms_mutex_);
+	auto it = active_rooms_.find(room_gen);
+	if (it == active_rooms_.end()) return nullptr;
 	auto room = it->second.lock();
 	if (!room) {
-		active_rooms.erase(it);
+		active_rooms_.erase(it);
 		return nullptr;
 	}
 	if (room->GetRoomGen() != room_gen) {
-		active_rooms.erase(it);
+		active_rooms_.erase(it);
 		return nullptr;
 	}
 	return room;
@@ -38,10 +38,10 @@ SP<TetrisRoom> ActiveRoomManager::FindRoom(int room_gen)
 
 std::vector<SP<TetrisRoom>> ActiveRoomManager::GetActiveRoomsSnapshot() const
 {
-	std::lock_guard<std::mutex> lock(active_rooms_mutex);
+	std::lock_guard<std::mutex> lock(active_rooms_mutex_);
 	std::vector<SP<TetrisRoom>> snapshot;
-	snapshot.reserve(active_rooms.size());
-	for (const auto& room : active_rooms) {
+	snapshot.reserve(active_rooms_.size());
+	for (const auto& room : active_rooms_) {
 		auto room_ptr = room.second.lock();
 		if (!room_ptr) continue;
 		if (room_ptr->GetRoomGen() != room.first) continue;
@@ -55,6 +55,6 @@ std::vector<SP<TetrisRoom>> ActiveRoomManager::GetActiveRoomsSnapshot() const
 
 void ActiveRoomManager::Clear()
 {
-	std::lock_guard<std::mutex> lock(active_rooms_mutex);
-	active_rooms.clear();
+	std::lock_guard<std::mutex> lock(active_rooms_mutex_);
+	active_rooms_.clear();
 }

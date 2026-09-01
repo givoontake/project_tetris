@@ -1,6 +1,6 @@
 #pragma once
 
-enum INFO_CODE
+enum InfoCode
 {
 	KICKED = 0,
 };

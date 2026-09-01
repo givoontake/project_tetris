@@ -10,8 +10,8 @@ struct DBResultDefault {
 	DBOperationType type;
 	bool is_success;
 
-	DBResultDefault(DBOperationType result_type, bool success)
-		: type(result_type), is_success(success) {}
+	DBResultDefault(DBOperationType result_type, bool is_success)
+		: type(result_type), is_success(is_success) {}
 	virtual ~DBResultDefault() = default;
 };
 

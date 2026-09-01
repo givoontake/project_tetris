@@ -5,7 +5,7 @@ class ServerThreadManager;
 
 class TimerThread final : public ServerThread
 {
-    ServerThreadManager& manager;
+    ServerThreadManager& manager_;
 
 public:
     TimerThread(ServerThreadManager& manager);

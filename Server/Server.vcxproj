@@ -82,7 +82,7 @@
     <ClInclude Include="Game\Tetris.h" />
     <ClInclude Include="Rooms\TetrisRoom.h" />
     <ClInclude Include="Game\TetrisTickData.h" />
-    <ClInclude Include="Common\Types.h" />
+    <ClInclude Include="Common\types.h" />
     <ClInclude Include="Rooms\TwoPlayerRoom.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -9,7 +9,7 @@
 
 class SingleRoom : public TetrisRoom
 {
-	std::array<RoomSession, 1> room_users;
+	std::array<RoomSession, 1> room_users_;
 
 public:
 	SingleRoom(IOCPServer* server, OpenRoomInitData data);

@@ -4,7 +4,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
-#include "Types.h"
+#include "types.h"
 #include "ExOverlapped.h"
 #include "ActiveRoomManager.h"
 #include "ActiveUserManager.h"
@@ -24,25 +24,25 @@ static_assert(ServerThreadManager::LOGIN_DB_WORKER_COUNT == 1);
 
 class IOCPServer
 {
-	HANDLE iocp_handle;
-	SOCKET listen_socket, client_socket;
-	WSADATA wsadata;
-	SOCKADDR_IN server_addr;
-	IOOverlapped accept_over;
-	LoginDBWorker login_db_worker;
-	std::array<GameDBWorker, ServerThreadManager::GAME_DB_WORKER_COUNT> game_db_workers;
-	std::atomic<std::size_t> next_game_db_worker{ 0 };
-	RankingManager ranking_manager;
-	ActiveRoomManager active_rooms;
-	ActiveUserManager active_users;
-	PacketHandler packet_handler;
-	DBResultHandler db_result_handler;
-	std::atomic<int> room_gen_generator = -1;
-	std::atomic<long long> tick_count = 0;
-	std::array<std::atomic<SP<Session>>, MAX_USER> users;
-	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM> rooms;
+	HANDLE iocp_handle_;
+	SOCKET listen_socket_, client_socket_;
+	WSADATA wsa_data_;
+	SOCKADDR_IN server_addr_;
+	IOOverlapped accept_over_;
+	LoginDBWorker login_db_worker_;
+	std::array<GameDBWorker, ServerThreadManager::GAME_DB_WORKER_COUNT> game_db_workers_;
+	std::atomic<std::size_t> next_game_db_worker_{ 0 };
+	RankingManager ranking_manager_;
+	ActiveRoomManager active_rooms_;
+	ActiveUserManager active_users_;
+	PacketHandler packet_handler_;
+	DBResultHandler db_result_handler_;
+	std::atomic<int> room_gen_generator_ = -1;
+	std::atomic<long long> tick_count_ = 0;
+	std::array<std::atomic<SP<Session>>, MAX_USER> users_;
+	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM> rooms_;
 
-	std::atomic<bool> is_running = true;
+	std::atomic<bool> is_running_ = true;
 
 	friend class PacketHandler;
 	friend class DBResultHandler;
@@ -56,14 +56,14 @@ public:
 	int GetEmptyUserIndex();
 	int GetEmptyRoomIndex();
 	int GetNewRoomGen();
-	bool GetRunning() const { return is_running.load(); }
-	HANDLE GetHandle() const { return iocp_handle; }
+	bool GetRunning() const { return is_running_.load(); }
+	HANDLE GetHandle() const { return iocp_handle_; }
 
-	long long GetTickCount() const { return tick_count.load(); }
+	long long GetTickCount() const { return tick_count_.load(); }
 	SP<TetrisRoom> GetRoom(int room_index) const;
-	RankingManager& GetRankingManager() { return ranking_manager; }
+	RankingManager& GetRankingManager() { return ranking_manager_; }
 
-	void AddTickCount() { tick_count.fetch_add(1); }
+	void AddTickCount() { tick_count_.fetch_add(1); }
 
 	SP<Session> FindSessionByIndex(int user_index);
 

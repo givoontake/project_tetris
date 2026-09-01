@@ -10,8 +10,8 @@ class RankingManager
 {
 	static constexpr int MAX_RANKING_COUNT = 10;
 
-	std::vector<RankingInfo> rankings;
-	mutable std::mutex ranking_mutex;
+	std::vector<RankingInfo> rankings_;
+	mutable std::mutex ranking_mutex_;
 
 	static bool CompareRankingInfo(const RankingInfo& lhs, const RankingInfo& rhs);
 	void SortAndTrim();

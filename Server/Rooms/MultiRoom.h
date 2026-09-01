@@ -11,8 +11,8 @@
 
 class MultiRoom : public TetrisRoom
 {
-	int host_id = -1;
-	int winner_id = -1;
+	int host_id_ = -1;
+	int winner_id_ = -1;
 public:
 	MultiRoom(IOCPServer* server, OpenRoomInitData data);
 	MultiRoom(IOCPServer* server, LockRoomInitData data);

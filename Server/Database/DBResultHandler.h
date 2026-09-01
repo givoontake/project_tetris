@@ -1,5 +1,5 @@
 #pragma once
-#include "Types.h"
+#include "types.h"
 
 class IOCPServer;
 class Session;
@@ -7,7 +7,7 @@ struct DBOverlapped;
 
 class DBResultHandler
 {
-	IOCPServer& server;
+	IOCPServer& server_;
 
 public:
 	DBResultHandler(IOCPServer& server);

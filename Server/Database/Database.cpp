@@ -54,34 +54,34 @@ Database::~Database()
 
 void Database::Init(HANDLE iocp)
 {
-    iocp_handle = iocp;
+    iocp_handle_ = iocp;
 }
 
 void Database::Close()
 {
     {
-        std::lock_guard<std::mutex> lock(wait_mutex);
-        running = false;
+        std::lock_guard<std::mutex> lock(wait_mutex_);
+        is_running_ = false;
     }
-    cv.notify_one();
+    cv_.notify_one();
 }
 
 void Database::Wake()
 {
-    cv.notify_one();
+    cv_.notify_one();
 }
 
 bool Database::TryEnqueue(std::unique_ptr<DBTask>& db_task)
 {
     try {
-        std::lock_guard<std::mutex> lock(wait_mutex);
-        if (!running.load()) return false;
-        task_queue.push(std::move(db_task));
+        std::lock_guard<std::mutex> lock(wait_mutex_);
+        if (!is_running_.load()) return false;
+        task_queue_.push(std::move(db_task));
     }
     catch (...) {
         return false;
     }
-    cv.notify_one();
+    cv_.notify_one();
     return true;
 }
 
@@ -135,7 +135,7 @@ bool Database::LoadDBConfigFromFile(const std::string& file_path)
         Trim(val);
 
         if (key == "host")
-            connection_info.host = val;
+            connection_info_.host = val;
         else if (key == "port")
         {
             try
@@ -144,20 +144,20 @@ bool Database::LoadDBConfigFromFile(const std::string& file_path)
                 // 포트 범위 예외 처리
                 if (p < 0) p = 0;
                 if (p > 65535) p = 65535;
-                connection_info.port = static_cast<uint16_t>(p);
+                connection_info_.port = static_cast<uint16_t>(p);
             }
             catch (...)
             {
-                connection_info.port = 0;
+                connection_info_.port = 0;
                 PrintErrorLog(__func__);
             }
         }
         else if (key == "user")
-            connection_info.id = val;
+            connection_info_.id = val;
         else if (key == "password")
-            connection_info.password = val;
+            connection_info_.password = val;
         else if (key == "schema")
-            connection_info.schema = val;
+            connection_info_.schema = val;
     }
 
     return true;
@@ -172,19 +172,19 @@ void Database::PostDBFailure(const DBTask& task)
         {
             if ((multi_session_task.completion_mask & (1u << i)) == 0) continue;
             auto* db_over = new DBOverlapped{ task.type };
-            db_over->ex_over.op_type = OP_TYPE::DB;
+            db_over->ex_over.op_type = OPType::DB;
             db_over->ex_over.key = multi_session_task.players[i];
-            PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+            PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
         }
         return;
     }
 
     auto* db_over = new DBOverlapped{ task.type };
 
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
     if (task.target == DBTaskTarget::SESSION) db_over->ex_over.key = static_cast<const SessionDBTask&>(task).key;
     const ULONG_PTR completion_key = task.target == DBTaskTarget::SERVER ? DB_SERVER_COMPLETION : DB_SESSION_COMPLETION;
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), completion_key, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+    PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), completion_key, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 // ---- DB 스레드 루프 ----
@@ -194,11 +194,11 @@ void Database::Run()
     {
         std::cerr << "[DB] Failed to connect to database." << std::endl;
         {
-            std::lock_guard<std::mutex> lock(wait_mutex);
-            running.store(false);
+            std::lock_guard<std::mutex> lock(wait_mutex_);
+            is_running_.store(false);
         }
         std::unique_ptr<DBTask> failed_task;
-        while (task_queue.try_pop(failed_task))
+        while (task_queue_.try_pop(failed_task))
         {
             PostDBFailure(*failed_task);
         }
@@ -208,15 +208,15 @@ void Database::Run()
     while (true)
     {
         std::unique_ptr<DBTask> queued_task;
-        if (!task_queue.try_pop(queued_task))
+        if (!task_queue_.try_pop(queued_task))
         {
-            std::unique_lock<std::mutex> lock(wait_mutex);
+            std::unique_lock<std::mutex> lock(wait_mutex_);
             // 잠자고 있는 상태에서는 깨우는 신호가 오면 다시 조건을 검사한다.
-            cv.wait(lock, [this]() { return !task_queue.empty() || !running.load(); }); // 조건이 참이 되어야 깨어나므로 running = false이면 깨어나도록 해야함
+            cv_.wait(lock, [this]() { return !task_queue_.empty() || !is_running_.load(); }); // 조건이 참이 되어야 깨어나므로 is_running_ = false이면 깨어나도록 해야함
 
-            if (!running.load() && task_queue.empty()) break;
+            if (!is_running_.load() && task_queue_.empty()) break;
 
-            if (!task_queue.try_pop(queued_task)) continue;
+            if (!task_queue_.try_pop(queued_task)) continue;
         }
 
         // 2) 작업 실행 (DB 실행은 락 없이)
@@ -226,7 +226,7 @@ void Database::Run()
         catch (const sql::SQLException&) {
             while (!TryEnqueue(queued_task))
             {
-                if (!running.load())
+                if (!is_running_.load())
                 {
                     PostDBFailure(*queued_task);
                     break;
@@ -255,12 +255,12 @@ bool Database::Connect()
         sql::mysql::MySQL_Driver* driver = sql::mysql::get_mysql_driver_instance();
 
         // Connector/C++ legacy는 보통 tcp://host:port
-        const std::string url = "tcp://" + connection_info.host + ":" + std::to_string(connection_info.port);
+        const std::string url = "tcp://" + connection_info_.host + ":" + std::to_string(connection_info_.port);
 
-        caches.conn.reset(driver->connect(url, connection_info.id, connection_info.password));
-        caches.conn->setSchema(connection_info.schema);
+        caches_.conn.reset(driver->connect(url, connection_info_.id, connection_info_.password));
+        caches_.conn->setSchema(connection_info_.schema);
 
-        PrintDBConnectionInfo(caches.conn.get());
+        PrintDBConnectionInfo(caches_.conn.get());
 
         return true;
     }
@@ -273,13 +273,13 @@ bool Database::Connect()
 
 void Database::Disconnect()
 {
-    caches.stmt_cache.clear();
+    caches_.stmt_cache.clear();
 
-    if (caches.conn)
+    if (caches_.conn)
     {
-        try { caches.conn->close(); }
+        try { caches_.conn->close(); }
         catch (...) {}
-        caches.conn.reset();
+        caches_.conn.reset();
     }
 }
 

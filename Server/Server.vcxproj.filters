@@ -125,7 +125,7 @@
     <ClInclude Include="Common\settings.h">
       <Filter>Common</Filter>
     </ClInclude>
-    <ClInclude Include="Common\Types.h">
+    <ClInclude Include="Common\types.h">
       <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="Packets\define_packets.h">

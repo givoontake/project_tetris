@@ -4,7 +4,7 @@
 class ServerThread
 {
 protected:
-    std::atomic<bool> running{ false };
+    std::atomic<bool> is_running_{ false };
 
 public:
     virtual ~ServerThread();

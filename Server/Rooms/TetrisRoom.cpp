@@ -4,32 +4,32 @@
 #include "IOCPServer.h"
 #include "packet_types.h"
 
-TetrisRoom::TetrisRoom(IOCPServer* _server, OpenRoomInitData data)
+TetrisRoom::TetrisRoom(IOCPServer* server, OpenRoomInitData data)
 {
 	// 생성과 소멸은 스레드 세이프하지는 않지만, 어차피 make_shared하고 CAS해서 룸 리스트에 할당하기 전에는 접근되지 않는다.
-	server = _server;
-	max_user = data.max_user;
-	room_name = std::move(data.room_name);
-	room_password.clear();
-	room_index = data.room_index;
-	room_gen = data.room_gen;
-	room_state.store(ROOM_STATE::EMPTY);
+	server_ = server;
+	max_user_ = data.max_user;
+	room_name_ = std::move(data.room_name);
+	room_password_.clear();
+	room_index_ = data.room_index;
+	room_gen_ = data.room_gen;
+	room_state_.store(RoomState::EMPTY);
 
 	//SendAddRoom(session);
-	cur_user.store(0);
+	cur_user_.store(0);
 }
 
-TetrisRoom::TetrisRoom(IOCPServer* _server, LockRoomInitData data)
+TetrisRoom::TetrisRoom(IOCPServer* server, LockRoomInitData data)
 {
-	server = _server;
-	max_user = data.max_user;
-	room_name = std::move(data.room_name);
-	room_password = std::move(data.room_password);
-	room_index = data.room_index;
-	room_gen = data.room_gen;
-	room_state.store(ROOM_STATE::EMPTY);
+	server_ = server;
+	max_user_ = data.max_user;
+	room_name_ = std::move(data.room_name);
+	room_password_ = std::move(data.room_password);
+	room_index_ = data.room_index;
+	room_gen_ = data.room_gen;
+	room_state_.store(RoomState::EMPTY);
 	//SendAddRoom(session);
-	cur_user.store(0);
+	cur_user_.store(0);
 }
 
 TetrisRoom::~TetrisRoom()
@@ -38,7 +38,7 @@ TetrisRoom::~TetrisRoom()
 
 int TetrisRoom::GetCurrentUser() const
 {
-	return static_cast<int>(cur_user.load());
+	return static_cast<int>(cur_user_.load());
 }
 
 bool TetrisRoom::InitHostSession(const SP<Session>& session)
@@ -47,8 +47,8 @@ bool TetrisRoom::InitHostSession(const SP<Session>& session)
 	auto room_users = GetRoomUsers();
 	if (room_users.empty()) return false;
 	if (room_users[0].GetSession()) return false;
-	if (!room_users[0].InitRoomSession(session, room_index)) return false;
-	cur_user.store(1);
+	if (!room_users[0].InitRoomSession(session, room_index_)) return false;
+	cur_user_.store(1);
 	return true;
 }
 
@@ -60,54 +60,54 @@ bool TetrisRoom::AddHostSession(const SP<Session>& session)
 RoomInfoSnapshot TetrisRoom::GetRoomInfoSnapshot()
 {
 	RoomInfoSnapshot snapshot;
-	snapshot.room_gen = room_gen;
-	snapshot.max_user = static_cast<int>(max_user);
-	snapshot.cur_user = static_cast<int>(cur_user.load());
-	snapshot.room_name = room_name;
-	snapshot.is_private = !room_password.empty();
-	snapshot.room_state = room_state.load();
+	snapshot.room_gen = room_gen_;
+	snapshot.max_user = static_cast<int>(max_user_);
+	snapshot.cur_user = static_cast<int>(cur_user_.load());
+	snapshot.room_name = room_name_;
+	snapshot.is_private = !room_password_.empty();
+	snapshot.room_state = room_state_.load();
 	return snapshot;
 }
 
 void TetrisRoom::ClearPlayTasks()
 {
-	const std::size_t task_count = play_tasks.ClaimTaskCount();
-	for (std::size_t i = 0; i < task_count; ++i) play_tasks.Dequeue();
+	const std::size_t task_count = play_tasks_.ClaimTaskCount();
+	for (std::size_t i = 0; i < task_count; ++i) play_tasks_.Dequeue();
 }
 
 bool TetrisRoom::IsRoomSession(const SP<Session>& session) const
 {
 	if (!session) return false;
 	const RoomSnapShot snapshot = session->GetRoomSnapShot();
-	return snapshot.state == MODE_STATE::ROOM && snapshot.room_index == room_index;
+	return snapshot.state == ModeState::ROOM && snapshot.room_index == room_index_;
 }
 
 void TetrisRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 {
 	if (!request_session) return;
-	switch (reinterpret_cast<PacketHeader*>(packet)->type) {
+	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
 	case C2S_DELETE_USER: {
 		RoomTaskInfo task;
-		task.type = ROOM_TASK_TYPE::DELETE_USER;
+		task.type = RoomTaskType::DELETE_USER;
 		task.session = request_session;
 		AddRoomTask(std::move(task));
 		break;
 	}
 	case C2S_START: {
 		RoomTaskInfo task;
-		task.type = ROOM_TASK_TYPE::START;
+		task.type = RoomTaskType::START;
 		task.session = request_session;
 		AddRoomTask(std::move(task));
 		break;
 	}
 	case C2S_MOVE: {
 		if (!IsRoomSession(request_session)) return;
-		const std::uint64_t current_play_generation = play_generation.load();
-		if (room_state.load() != ROOM_STATE::PLAY) return;
+		const std::uint64_t current_play_generation = play_generation_.load();
+		if (room_state_.load() != RoomState::PLAY) return;
 		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
 		TaskInfo task;
 		task.id = request_session->GetDBInfo().id;
-		task.type = static_cast<EVENT_TYPE>(recv_p->move_type);
+		task.type = static_cast<EventType>(recv_p->move_type);
 		task.play_generation = current_play_generation;
 		AddPlayTask(std::move(task));
 		break;
@@ -119,26 +119,26 @@ void TetrisRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 
 bool TetrisRoom::AddRoomTask(RoomTaskInfo task)
 {
-	ROOM_STATE state = room_state.load();
-	if (state != ROOM_STATE::WAIT && state != ROOM_STATE::PLAY) return false;
-	room_tasks.Enqueue(std::move(task));
-	state = room_state.load();
-	return state == ROOM_STATE::WAIT || state == ROOM_STATE::PLAY;
+	RoomState state = room_state_.load();
+	if (state != RoomState::WAIT && state != RoomState::PLAY) return false;
+	room_tasks_.Enqueue(std::move(task));
+	state = room_state_.load();
+	return state == RoomState::WAIT || state == RoomState::PLAY;
 }
 
 void TetrisRoom::AddPlayTask(TaskInfo task)
 {
-	play_tasks.Enqueue(std::move(task));
+	play_tasks_.Enqueue(std::move(task));
 }
 
 void TetrisRoom::ProcessRoomTasks()
 {
-	const std::size_t task_count = room_tasks.ClaimTaskCount();
+	const std::size_t task_count = room_tasks_.ClaimTaskCount();
 	for (std::size_t i = 0; i < task_count; ++i) {
-		RoomTaskInfo task = room_tasks.Dequeue();
+		RoomTaskInfo task = room_tasks_.Dequeue();
 		if (!task.session) continue;
 
-		if (task.type == ROOM_TASK_TYPE::DELETE_USER) {
+		if (task.type == RoomTaskType::DELETE_USER) {
 			if (IsRoomSession(task.session)) DeleteUser(task.session->GetDBInfo().id);
 			continue;
 		}
@@ -150,17 +150,17 @@ void TetrisRoom::ProcessRoomTasks()
 void TetrisRoom::ProcessPlayTasks()
 {
 	ProcessRoomTasks();
-	const std::size_t task_count = play_tasks.ClaimTaskCount();
-	if (room_state.load() != ROOM_STATE::PLAY) {
-		for (std::size_t i = 0; i < task_count; ++i) play_tasks.Dequeue();
+	const std::size_t task_count = play_tasks_.ClaimTaskCount();
+	if (room_state_.load() != RoomState::PLAY) {
+		for (std::size_t i = 0; i < task_count; ++i) play_tasks_.Dequeue();
 		return;
 	}
 
 	UpdateTick();
-	const std::uint64_t current_play_generation = play_generation.load();
+	const std::uint64_t current_play_generation = play_generation_.load();
 	auto room_users = GetRoomUsers();
 	for (std::size_t i = 0; i < task_count; ++i) {
-		TaskInfo task = play_tasks.Dequeue();
+		TaskInfo task = play_tasks_.Dequeue();
 		if (task.play_generation != current_play_generation) continue;
 		for (auto& r_user : room_users) {
 			auto session = r_user.GetSession();
@@ -179,23 +179,23 @@ void TetrisRoom::ProcessPlayTasks()
 
 void TetrisRoom::CompleteRoomInitialization()
 {
-	StoreRoomState(ROOM_STATE::WAIT);
-	processing_state.store(ROOM_PROCESS_STATE::COMPLETE);
+	StoreRoomState(RoomState::WAIT);
+	processing_state_.store(RoomProcessState::COMPLETE);
 }
 
 void TetrisRoom::BeginRoomDelete()
 {
-	StoreRoomState(ROOM_STATE::WAITING_DELETE);
+	StoreRoomState(RoomState::WAITING_DELETE);
 }
 
 void TetrisRoom::TryPostRoomDelete()
 {
-	if (room_state.load() != ROOM_STATE::WAITING_DELETE || room_tasks.GetTaskCount() != 0) return;
-	StoreRoomState(ROOM_STATE::DELETE_POST);
+	if (room_state_.load() != RoomState::WAITING_DELETE || room_tasks_.GetTaskCount() != 0) return;
+	StoreRoomState(RoomState::DELETE_POST);
 	ExOverlapped* delete_over = new ExOverlapped;
-	delete_over->op_type = OP_TYPE::DELETE_ROOM;
-	delete_over->room_index = room_index;
-	PostQueuedCompletionStatus(server->GetHandle(), 1, ROOM_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
+	delete_over->op_type = OPType::DELETE_ROOM;
+	delete_over->room_index = room_index_;
+	PostQueuedCompletionStatus(server_->GetHandle(), 1, ROOM_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(delete_over));
 }
 
 void TetrisRoom::InitGame()
@@ -210,9 +210,9 @@ void TetrisRoom::InitGame()
 
 void TetrisRoom::ClearGame()
 {
-	StoreRoomState(ROOM_STATE::WAIT);
+	StoreRoomState(RoomState::WAIT);
 	ClearPlayTasks();
-	tetromino_spawn_list.clear();
+	tetromino_spawn_list_.clear();
 	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
 		auto session = r_user.GetSession();
@@ -229,8 +229,8 @@ void TetrisRoom::Add7BagTetrominoList()
 	std::vector<int> v = { 0, 1, 2, 3, 4, 5, 6 }; // I, J, L, O, S, T, Z
 
 	std::shuffle(v.begin(), v.end(), gen);
-	tetromino_spawn_list.reserve(tetromino_spawn_list.size() + v.size());
-	tetromino_spawn_list.insert(tetromino_spawn_list.end(), v.begin(), v.end());
+	tetromino_spawn_list_.reserve(tetromino_spawn_list_.size() + v.size());
+	tetromino_spawn_list_.insert(tetromino_spawn_list_.end(), v.begin(), v.end());
 }
 
 bool TetrisRoom::SpawnTetromino(int id) // 내가 이걸 왜 반환형을 bool이라고 했을까
@@ -240,7 +240,7 @@ bool TetrisRoom::SpawnTetromino(int id) // 내가 이걸 왜 반환형을 bool�
 		auto session = r_user.GetSession();
 		if (!session) continue;
 		if (session->GetDBInfo().id == id){
-			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list[r_user.GetTetrominoIndex()]), spawn_pos);
+			r_user.GetTetris().InitNewTetromino((tetromino_spawn_list_[r_user.GetTetrominoIndex()]), spawn_pos_);
 			return true;
 		}
 	}
@@ -251,11 +251,11 @@ bool TetrisRoom::SpawnTetromino(int id) // 내가 이걸 왜 반환형을 bool�
 void TetrisRoom::ClearRoom()
 {
 	ClearPlayTasks();
-	tetromino_spawn_list.clear();
+	tetromino_spawn_list_.clear();
 	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) r_user.ClearRoomSession();
-	cur_user.store(0);
-	StoreRoomState(ROOM_STATE::EMPTY);
+	cur_user_.store(0);
+	StoreRoomState(RoomState::EMPTY);
 }
 
 void TetrisRoom::UpdateTick()
@@ -273,21 +273,21 @@ int TetrisRoom::BoundPackets()
 {
 	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() != ROOM_USER_STATE::PLAY) continue; // 게임오버 되어도 상태 변경은 여기서 이루어지므로 진입 시에는 게임오버 상태는 아님
+		if (r_user.GetRoomUserState() != RoomUserState::PLAY) continue; // 게임오버 되어도 상태 변경은 여기서 이루어지므로 진입 시에는 게임오버 상태는 아님
 		auto session = r_user.GetSession();
 		if (!session) continue;
 		int user_id = session->GetDBInfo().id;
 
 		for (auto& task : r_user.GetTetris().GetSendTasks()) {
 			switch (task.event_type) {
-			case EVENT_TYPE::MOVE: {
+			case EventType::MOVE: {
 				// 각 무브별 틱 초기화 추가가 애매하므로, 무브 틱 값 초기화는 Tetris::HandleTetrominoKeyInput에서 처리
 				auto& t = std::get<TaskMove>(task.task);
 				if (!MakeMovePacket(r_user, static_cast<int>(t.move_type))) return user_id;
 				break;
 			}
 
-			case EVENT_TYPE::FIX: {
+			case EventType::FIX: {
 				auto& t = std::get<TaskFix>(task.task);
 				S2C_FIX_PACKET fix_p;
 				fix_p.header.size = static_cast<std::uint16_t>(sizeof(fix_p));
@@ -299,7 +299,7 @@ int TetrisRoom::BoundPackets()
 				break;
 			}
 
-			case EVENT_TYPE::CLEARLINE: {
+			case EventType::CLEARLINE: {
 				auto& t = std::get<TaskClearLine>(task.task);
 				S2C_CLEARLINE_PACKET clear_line_p;
 				clear_line_p.header.size = static_cast<std::uint16_t>(sizeof(clear_line_p));
@@ -312,8 +312,8 @@ int TetrisRoom::BoundPackets()
 
 				break;
 			}
-			case EVENT_TYPE::SPAWN: {
-				if (r_user.GetTetrominoIndex() == (tetromino_spawn_list.size() - 2)) Add7BagTetrominoList();
+			case EventType::SPAWN: {
+				if (r_user.GetTetrominoIndex() == (tetromino_spawn_list_.size() - 2)) Add7BagTetrominoList();
 				r_user.AddTetrominoIndex();
 
 				if (SpawnTetromino(user_id)) {
@@ -321,16 +321,16 @@ int TetrisRoom::BoundPackets()
 					spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
 					spawn_p.header.type = S2C_SPAWN;
 					spawn_p.id = user_id;
-					spawn_p.tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex()];
-					spawn_p.next_tetromino_type = tetromino_spawn_list[r_user.GetTetrominoIndex() + 1];
-					spawn_p.spawn_x = static_cast<char>(spawn_pos.x);
-					spawn_p.spawn_y = static_cast<char>(spawn_pos.y);
+					spawn_p.tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex()];
+					spawn_p.next_tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex() + 1];
+					spawn_p.spawn_x = static_cast<char>(spawn_pos_.x);
+					spawn_p.spawn_y = static_cast<char>(spawn_pos_.y);
 					if (!r_user.AddToSendBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.header.size)) return user_id;
 				}
 				break;
 			}
 
-			case EVENT_TYPE::ADDLINE: {
+			case EventType::ADDLINE: {
 				r_user.GetTetris().GetTickData().SetGarbageLineTick(0);
 				S2C_ADDLINE_PACKET add_line_p;
 				add_line_p.header.size = static_cast<std::uint16_t>(sizeof(add_line_p));
@@ -342,9 +342,9 @@ int TetrisRoom::BoundPackets()
 				break;
 			}
 
-			case EVENT_TYPE::GAMEOVER: {
+			case EventType::GAMEOVER: {
 				// 일단 종료 패킷을 보냄
-				r_user.SetRoomUserState(ROOM_USER_STATE::GAMEOVER);
+				r_user.SetRoomUserState(RoomUserState::GAMEOVER);
 				S2C_GAMEOVER_PACKET gameover_p;
 				gameover_p.header.size = static_cast<std::uint16_t>(sizeof(gameover_p));
 				gameover_p.header.type = S2C_GAMEOVER;
@@ -354,7 +354,7 @@ int TetrisRoom::BoundPackets()
 				break;
 			}
 
-			case EVENT_TYPE::GAMEEND: { // 이건 사실상 멀티만 쓰므로.. 근데 이거 하나때문에 또 분리하기 좀 그렇긴 하다 분리하는게 좋긴 할 것 같지만..
+			case EventType::GAMEEND: { // 이건 사실상 멀티만 쓰므로.. 근데 이거 하나때문에 또 분리하기 좀 그렇긴 하다 분리하는게 좋긴 할 것 같지만..
 				auto& t = std::get<TaskGameEnd>(task.task);
 
 				S2C_GAMEEND_PACKET gameend_p;
@@ -386,7 +386,7 @@ void TetrisRoom::AddGarbageLines()
 {
 	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() == ROOM_USER_STATE::PLAY) {
+		if (r_user.GetRoomUserState() == RoomUserState::PLAY) {
 			r_user.GetTetris().AddGarbageLines();
 		}
 	}
@@ -398,19 +398,19 @@ void TetrisRoom::AddSpawnTask()
 	// spawn은 fix와 항상 같이 일어나므로, 작업에서 fix 여부를 확인해 있으면 추가해준다.
 	auto room_users = GetRoomUsers();
 	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() != ROOM_USER_STATE::PLAY) continue;
+		if (r_user.GetRoomUserState() != RoomUserState::PLAY) continue;
 		std::vector<TaskType>& tasks = r_user.GetTetris().GetSendTasks();
-		bool fix_exists = false;
+		bool does_fix_exist = false;
 		for (auto& task : tasks) {
-			if (task.event_type == EVENT_TYPE::FIX) {
-				fix_exists = true;
+			if (task.event_type == EventType::FIX) {
+				does_fix_exist = true;
 				break;
 			}
 		}
 
-		if (fix_exists) {
+		if (does_fix_exist) {
 			TaskType t_type;
-			t_type.event_type = EVENT_TYPE::SPAWN;
+			t_type.event_type = EventType::SPAWN;
 			r_user.GetTetris().GetSendTasks().emplace_back(t_type);
 		}
 	}
@@ -444,7 +444,7 @@ void TetrisRoom::BroadcastTickDataForUsers()
 			if (data_size > 0) {
 				auto target_session = target.GetSession();
 				if (!target_session) continue;
-				target_session->SendBoundPacket(send_buffer, data_size, server->GetHandle());
+				target_session->SendBoundPacket(send_buffer, data_size, server_->GetHandle());
 			}
 		}
 	}
@@ -473,20 +473,20 @@ void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 
 void TetrisRoom::SetRoomIndex(const int val)
 {
-	room_index = val;
+	room_index_ = val;
 }
 
 void TetrisRoom::SetRoomGen(const int val)
 {
-	room_gen = val;
+	room_gen_ = val;
 }
 
-void TetrisRoom::StoreRoomState(ROOM_STATE new_state)
+void TetrisRoom::StoreRoomState(RoomState new_state)
 {
-	room_state.store(new_state);
+	room_state_.store(new_state);
 }
 
-bool TetrisRoom::TryChangeRoomState(ROOM_STATE expected, ROOM_STATE desired)
+bool TetrisRoom::TryChangeRoomState(RoomState expected, RoomState desired)
 {
-	return room_state.compare_exchange_strong(expected, desired);
+	return room_state_.compare_exchange_strong(expected, desired);
 }

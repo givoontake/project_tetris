@@ -11,10 +11,10 @@ class TickThread final : public ServerThread
 {
     friend class ServerThreadManager;
 
-    ServerThreadManager& manager;
-    std::atomic<THREAD_STATE> state{ THREAD_STATE::COMPLETE };
-    std::atomic<TICK_PHASE> phase{ TICK_PHASE::NONE };
-    std::shared_ptr<TickPhaseContext> phase_context;
+    ServerThreadManager& manager_;
+    std::atomic<ThreadState> state_{ ThreadState::COMPLETE };
+    std::atomic<TickPhase> phase_{ TickPhase::NONE };
+    std::shared_ptr<TickPhaseContext> phase_context_;
 
     void WaitTickPhase();
 

@@ -19,7 +19,7 @@ constexpr ULONG_PTR DB_SERVER_COMPLETION = 5;
 
 struct ExOverlapped {
 	WSAOVERLAPPED over;
-	OP_TYPE op_type;
+	OPType op_type;
 	SessionKey key;
 	int room_index = -1;
 
@@ -39,11 +39,11 @@ struct IOOverlapped {
 		wsabuf.buf = packet_buf;
 	}
 
-	void SetOperationType(OP_TYPE type) {
+	void SetOperationType(OPType type) {
 		ex_over.op_type = type;
 	}
 
-	//void SetExOverlapped(OP_TYPE type, char* packet) {
+	//void SetExOverlapped(OPType type, char* packet) {
 	//	memcpy(socket_buf, packet, packet[0]);
 	//	op_type = type;
 	//}

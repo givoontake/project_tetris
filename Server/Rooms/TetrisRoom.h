@@ -19,14 +19,14 @@ class TickThread;
 
 struct TaskInfo
 {
-	EVENT_TYPE type;
+	EventType type;
 	int id;
 	std::uint64_t play_generation;
 };
 
 struct RoomTaskInfo
 {
-	ROOM_TASK_TYPE type = ROOM_TASK_TYPE::NONE;
+	RoomTaskType type = RoomTaskType::NONE;
 	SP<Session> session;
 	int target_id = -1;
 	int matching_max_user = -1;
@@ -48,7 +48,7 @@ struct LockRoomInitData {
 };
 
 struct RoomInfoSnapshot {
-	ROOM_STATE room_state = ROOM_STATE::EMPTY;
+	RoomState room_state = RoomState::EMPTY;
 	int room_gen = -1;
 	int max_user = 0;
 	int cur_user = 0;
@@ -62,21 +62,21 @@ class TetrisRoom
 	friend class TickThread;
 
 protected:
-	IOCPServer* server;
-	std::atomic<ROOM_STATE> room_state;
-	std::atomic<ROOM_PROCESS_STATE> processing_state{ ROOM_PROCESS_STATE::PROCESSING };
-	ConcurrentTaskQueue<RoomTaskInfo> room_tasks;
-	ConcurrentTaskQueue<TaskInfo> play_tasks;
-	std::atomic<std::uint64_t> play_generation{ 0 };
-	std::vector<char> tetromino_spawn_list;
-	Position spawn_pos{ 3, 0 };
+	IOCPServer* server_;
+	std::atomic<RoomState> room_state_;
+	std::atomic<RoomProcessState> processing_state_{ RoomProcessState::PROCESSING };
+	ConcurrentTaskQueue<RoomTaskInfo> room_tasks_;
+	ConcurrentTaskQueue<TaskInfo> play_tasks_;
+	std::atomic<std::uint64_t> play_generation_{ 0 };
+	std::vector<char> tetromino_spawn_list_;
+	Position spawn_pos_{ 3, 0 };
 
-	int room_index;
-	int room_gen;
-	std::string room_name;
-	std::string room_password;
-	char max_user;
-	std::atomic<char> cur_user{ 0 };
+	int room_index_;
+	int room_gen_;
+	std::string room_name_;
+	std::string room_password_;
+	char max_user_;
+	std::atomic<char> cur_user_{ 0 };
 
 	// 크기가 다른 자식 방의 고정 배열을 부모 공통 로직에서 동일하게 처리하기 위해 배열 범위를 반환한다.
 	virtual std::span<RoomSession> GetRoomUsers() = 0;
@@ -94,15 +94,15 @@ public:
 	TetrisRoom(IOCPServer* server, LockRoomInitData data);
 	virtual ~TetrisRoom();
 
-	ROOM_STATE GetRoomState() const { return room_state.load(); }
-	int GetRoomGen() const { return room_gen; }
-	int GetRoomIndex() const { return room_index; }
-	bool GetIsPrivate() const { return !room_password.empty(); }
-	int GetMaxUser() const { return static_cast<int>(max_user); }
+	RoomState GetRoomState() const { return room_state_.load(); }
+	int GetRoomGen() const { return room_gen_; }
+	int GetRoomIndex() const { return room_index_; }
+	bool GetIsPrivate() const { return !room_password_.empty(); }
+	int GetMaxUser() const { return static_cast<int>(max_user_); }
 	int GetCurrentUser() const;
 	RoomInfoSnapshot GetRoomInfoSnapshot();
-	const std::string& GetRoomName() const { return room_name; }
-	const std::string& GetRoomPassword() const { return room_password; }
+	const std::string& GetRoomName() const { return room_name_; }
+	const std::string& GetRoomPassword() const { return room_password_; }
 
 	// 공통
 	virtual void HandlePacket(char* packet, const SP<Session>& request_session);
@@ -115,8 +115,8 @@ public:
 	void CompleteRoomInitialization();
 	void SetRoomIndex(const int val);
 	void SetRoomGen(const int val);
-	void StoreRoomState(const ROOM_STATE new_state);
-	bool TryChangeRoomState(ROOM_STATE expected, ROOM_STATE desired);
+	void StoreRoomState(const RoomState new_state);
+	bool TryChangeRoomState(RoomState expected, RoomState desired);
 	void InitGame();
 	
 	void ClearGame();

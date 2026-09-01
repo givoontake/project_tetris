@@ -4,5 +4,5 @@ ServerThread::~ServerThread() = default;
 
 void ServerThread::Start()
 {
-    running = true;
+    is_running_ = true;
 }

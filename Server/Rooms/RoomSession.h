@@ -2,47 +2,47 @@
 #include <atomic>
 #include <string>
 #include <memory>
-#include "Types.h"
+#include "types.h"
 #include "Tetris.h"
 #include "define_packets.h"
 #include "Session.h"
 
 class RoomSession
 {
-	WP<Session> session; 
-	Tetris tetris;
-	char send_buf[BUF_SIZE];
-	int send_data_size = 0;
+	WP<Session> session_;
+	Tetris tetris_;
+	char send_buf_[BUF_SIZE];
+	int send_data_size_ = 0;
 	// std::string user_name; // 방 생성할 때 만들도록 일단 하고, 나중에 회원가입 - DB 연동으로 session 클래스에 포함해보자.
 	// char user_name[MAX_USER_NAME];
-	std::atomic<ROOM_USER_STATE> r_user_state;
-	std::atomic<ROOM_USER_STATE> prev_r_user_state; // 게임 오버시 무승부 체크용
+	std::atomic<RoomUserState> r_user_state_;
+	std::atomic<RoomUserState> prev_r_user_state_; // 게임 오버시 무승부 체크용
 
-	int tetromino_index = 0;
+	int tetromino_index_ = 0;
 
-	int score = 0;
-	int combo = 0;
+	int score_ = 0;
+	int combo_ = 0;
 
 public:
 	RoomSession();
 	~RoomSession();
 
-	SP<Session> GetSession() const { return session.lock(); }
-	ROOM_USER_STATE GetRoomUserState() const { return r_user_state.load(); }
-	ROOM_USER_STATE GetPrevRoomUserState() const { return prev_r_user_state.load(); }
-	Tetris& GetTetris() { return tetris; }
-	char* GetSendBuf() { return send_buf; }
-	int GetSendDataSize() const { return send_data_size; }
-	int GetTetrominoIndex() const { return tetromino_index; }
-	void AddTetrominoIndex() { ++tetromino_index; }
-	int GetScore() const { return score; }
-	int GetCombo() const { return combo; }
+	SP<Session> GetSession() const { return session_.lock(); }
+	RoomUserState GetRoomUserState() const { return r_user_state_.load(); }
+	RoomUserState GetPrevRoomUserState() const { return prev_r_user_state_.load(); }
+	Tetris& GetTetris() { return tetris_; }
+	char* GetSendBuf() { return send_buf_; }
+	int GetSendDataSize() const { return send_data_size_; }
+	int GetTetrominoIndex() const { return tetromino_index_; }
+	void AddTetrominoIndex() { ++tetromino_index_; }
+	int GetScore() const { return score_; }
+	int GetCombo() const { return combo_; }
 
-	void SetRoomUserState(ROOM_USER_STATE new_state) { return r_user_state.store(new_state); }
-	void SetPrevRoomUserState(ROOM_USER_STATE new_state) { return prev_r_user_state.store(new_state); }
-	void AddScore(int val) { score += val; }	
-	void ResetCombo() { combo = 0; }
-	void AddCombo() { ++combo; }
+	void SetRoomUserState(RoomUserState new_state) { return r_user_state_.store(new_state); }
+	void SetPrevRoomUserState(RoomUserState new_state) { return prev_r_user_state_.store(new_state); }
+	void AddScore(int val) { score_ += val; }
+	void ResetCombo() { combo_ = 0; }
+	void AddCombo() { ++combo_; }
 
 	bool InitRoomSession(const SP<Session>& s, int room_index);
 	void ClearRoomSession();

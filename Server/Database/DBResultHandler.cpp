@@ -3,7 +3,7 @@
 #include "IOCPServer.h"
 #include <iostream>
 
-DBResultHandler::DBResultHandler(IOCPServer& server) : server(server)
+DBResultHandler::DBResultHandler(IOCPServer& server) : server_(server)
 {
 }
 
@@ -11,7 +11,7 @@ void DBResultHandler::HandleRequestFriendDBResult(DBOverlapped* db_over)
 {
 	if (db_over->result_data->is_success) {
 		DBResultAddFriendRequest* res = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-		auto recver_session = server.active_users.FindSessionById(res->recver_info.id);
+		auto recver_session = server_.active_users_.FindSessionById(res->recver_info.id);
 		if (recver_session) {
 			if (recver_session->GetDBInfo().id != res->recver_info.id) return;
 
@@ -19,8 +19,8 @@ void DBResultHandler::HandleRequestFriendDBResult(DBOverlapped* db_over)
 			request_p.header.size = static_cast<std::uint16_t>(sizeof(request_p));
 			request_p.header.type = S2C_REQUEST_FRIEND;
 			request_p.requester_id = res->requester_info.id;
-			server.StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
-			recver_session->SendPacket(reinterpret_cast<char*>(&request_p), server.GetHandle());
+			server_.StringToCharBuf(res->requester_info.nickname, request_p.requester_nickname, MAX_USER_NAME);
+			recver_session->SendPacket(reinterpret_cast<char*>(&request_p), server_.GetHandle());
 		}
 	}
 }
@@ -29,7 +29,7 @@ void DBResultHandler::HandleAddFriendDBResult(DBOverlapped* db_over)
 {
 	if (db_over->result_data->is_success) {
 		DBResultAddFriend* res = static_cast<DBResultAddFriend*>(db_over->result_data.get());
-		server.SendAddFriendResult(res->requester_info, res->accepter_info);
+		server_.SendAddFriendResult(res->requester_info, res->accepter_info);
 	}
 }
 
@@ -37,7 +37,7 @@ void DBResultHandler::HandleDeleteFriendDBResult(DBOverlapped* db_over)
 {
 	if (db_over->result_data->is_success) {
 		DBResultDeleteFriend* res = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
-		server.SendDeleteFriendResult(res->requester_id, res->target_id);
+		server_.SendDeleteFriendResult(res->requester_id, res->target_id);
 	}
 }
 
@@ -45,7 +45,7 @@ void DBResultHandler::HandleLoadRankingDBResult(DBOverlapped* db_over)
 {
 	if (db_over->result_data->is_success) {
 		DBResultLoadRanking* res = static_cast<DBResultLoadRanking*>(db_over->result_data.get());
-		server.GetRankingManager().InitRanking(res->rankings);
+		server_.GetRankingManager().InitRanking(res->rankings);
 	}
 }
 
@@ -61,7 +61,7 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, const SP<Sessio
 	if (db_over->result_data->is_success) {
 		DBResultLogin* login_result = static_cast<DBResultLogin*>(db_over->result_data.get());
 
-		if (!server.active_users.AddUser(session, login_result)) {
+		if (!server_.active_users_.AddUser(session, login_result)) {
 			login_p.id = -2;
 		}
 		else {
@@ -70,30 +70,30 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, const SP<Sessio
 			login_p.max_score = db_info.max_score;
 			login_p.win_count = db_info.win_count;
 			login_p.lose_count = db_info.lose_count;
-			server.StringToCharBuf(db_info.nickname, login_p.nickname, sizeof(login_p.nickname));
+			server_.StringToCharBuf(db_info.nickname, login_p.nickname, sizeof(login_p.nickname));
 		}
 	}
 
 	if (login_p.id == -1) {
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
-		error_p.error_code = ERROR_CODE::LOGIN_FAILED;
-		session->SendPacket(reinterpret_cast<char*>(&error_p), server.GetHandle());
+		error_p.error_code = ErrorCode::LOGIN_FAILED;
+		session->SendPacket(reinterpret_cast<char*>(&error_p), server_.GetHandle());
 	}
 
 	else if (login_p.id == -2) {
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
-		error_p.error_code = ERROR_CODE::DUPLICATE_LOGIN_ID;
-		session->SendPacket(reinterpret_cast<char*>(&error_p), server.GetHandle());
+		error_p.error_code = ErrorCode::DUPLICATE_LOGIN_ID;
+		session->SendPacket(reinterpret_cast<char*>(&error_p), server_.GetHandle());
 	}
 
 	else {
 		std::cout << "로그인 - 플레이어: " << session->GetDBInfo().nickname << std::endl;
-		session->SendPacket(reinterpret_cast<char*>(&login_p), server.GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&login_p), server_.GetHandle());
 
 		SessionKey key = session->GetSessionKey();
-		server.EnqueueDBTask(std::make_unique<DBLoadFriendListTask>(key), session);
+		server_.EnqueueDBTask(std::make_unique<DBLoadFriendListTask>(key), session);
 	}
 }
 
@@ -103,12 +103,12 @@ void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<
 	if (db_over->result_data->is_success) {
 		DBResultUpdateScore* res = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
 		DBResultLogin db_info = session->UpdateMaxScore(res->max_score);
-		server.GetRankingManager().UpdateRanking(db_info.id, db_info.nickname, res->max_score);
+		server_.GetRankingManager().UpdateRanking(db_info.id, db_info.nickname, res->max_score);
 		S2C_UPDATE_SCORE_PACKET us_p;
 		us_p.header.size = static_cast<std::uint16_t>(sizeof(us_p));
 		us_p.header.type = S2C_UPDATE_SCORE;
 		us_p.max_score = res->max_score;
-		session->SendPacket(reinterpret_cast<char*>(&us_p), server.GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&us_p), server_.GetHandle());
 	}
 }
 
@@ -125,7 +125,7 @@ void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, con
 		record_p.win_count = db_info.win_count;
 		record_p.lose_count = db_info.lose_count;
 
-		session->SendPacket(reinterpret_cast<char*>(&record_p), server.GetHandle());
+		session->SendPacket(reinterpret_cast<char*>(&record_p), server_.GetHandle());
 	}
 }
 

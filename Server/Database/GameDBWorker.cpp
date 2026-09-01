@@ -4,21 +4,21 @@
 
 namespace
 {
-    void PostMatchResultCompletions(HANDLE iocp_handle, const DBUpdateMatchResultTask& task, bool ok, ULONG_PTR completion_key)
+    void PostMatchResultCompletions(HANDLE iocp_handle, const DBUpdateMatchResultTask& task, bool is_ok, ULONG_PTR completion_key)
     {
         for (int i = 0; i < task.player_count; ++i)
         {
             if ((task.completion_mask & (1u << i)) == 0) continue;
             auto* db_over = new DBOverlapped{ DBOperationType::UPDATE_MATCH_RESULT };
-            db_over->ex_over.op_type = OP_TYPE::DB;
+            db_over->ex_over.op_type = OPType::DB;
             db_over->ex_over.key = task.players[i];
-            if (ok)
+            if (is_ok)
             {
                 db_over->result_data = std::make_unique<DBResultUpdateMatchResult>();
                 auto* result = static_cast<DBResultUpdateMatchResult*>(db_over->result_data.get());
                 result->is_winner = task.players[i].id == task.winner.id;
             }
-            PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), completion_key, reinterpret_cast<WSAOVERLAPPED*>(db_over));
+            PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OPType::DB), completion_key, reinterpret_cast<WSAOVERLAPPED*>(db_over));
         }
     }
 }
@@ -26,11 +26,11 @@ namespace
 void GameDBWorker::ExecuteLoadRanking()
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::LOAD_RANKING);
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
 
     try
     {
-        auto* stmt = caches.GetStmt(DBOperationType::LOAD_RANKING);
+        auto* stmt = caches_.GetStmt(DBOperationType::LOAD_RANKING);
         if (!stmt)
         {
             const char* SQL_LOAD_RANKING =
@@ -40,12 +40,12 @@ void GameDBWorker::ExecuteLoadRanking()
                 "ORDER BY single_score DESC, user_id ASC "
                 "LIMIT 10";
 
-            caches.stmt_cache[DBOperationType::LOAD_RANKING].reset(caches.conn->prepareStatement(SQL_LOAD_RANKING));
+            caches_.stmt_cache[DBOperationType::LOAD_RANKING].reset(caches_.conn->prepareStatement(SQL_LOAD_RANKING));
 
-            stmt = caches.GetStmt(DBOperationType::LOAD_RANKING);
+            stmt = caches_.GetStmt(DBOperationType::LOAD_RANKING);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SERVER_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+                PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SERVER_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
                 return;
             }
         }
@@ -70,29 +70,29 @@ void GameDBWorker::ExecuteLoadRanking()
         throw;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SERVER_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+    PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SERVER_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
 void GameDBWorker::ExecuteUpdateScore(SessionKey key, int new_score)
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::UPDATE_SCORE);
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.key = key;
     int user_id = key.id;
 
     try
     {
-        auto* stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
+        auto* stmt = caches_.GetStmt(DBOperationType::UPDATE_SCORE);
         if (!stmt)
         {
             const char* SQL_UPDATE_SCORE =
                 "UPDATE users SET single_score=? WHERE user_id=?";
 
-            caches.stmt_cache[DBOperationType::UPDATE_SCORE].reset(caches.conn->prepareStatement(SQL_UPDATE_SCORE));
-            stmt = caches.GetStmt(DBOperationType::UPDATE_SCORE);
+            caches_.stmt_cache[DBOperationType::UPDATE_SCORE].reset(caches_.conn->prepareStatement(SQL_UPDATE_SCORE));
+            stmt = caches_.GetStmt(DBOperationType::UPDATE_SCORE);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release())); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
+                PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release())); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
                 return;
             }
         }
@@ -122,15 +122,15 @@ void GameDBWorker::ExecuteUpdateScore(SessionKey key, int new_score)
         throw;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+    PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
 void GameDBWorker::ExecuteUpdateMatchResult(const DBUpdateMatchResultTask& task)
 {
-    bool success = false;
+    bool is_success = false;
     try
     {
-        auto* stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
+        auto* stmt = caches_.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
         if (!stmt)
         {
             const char* SQL_UPDATE_MATCH_RESULT =
@@ -138,11 +138,11 @@ void GameDBWorker::ExecuteUpdateMatchResult(const DBUpdateMatchResultTask& task)
                 "SET win = win + CASE WHEN user_id=? THEN 1 ELSE 0 END, "
                 "lose = lose + CASE WHEN user_id=? THEN 0 ELSE 1 END "
                 "WHERE user_id IN (?, ?, ?, ?, ?)";
-            caches.stmt_cache[DBOperationType::UPDATE_MATCH_RESULT].reset(caches.conn->prepareStatement(SQL_UPDATE_MATCH_RESULT));
-            stmt = caches.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
+            caches_.stmt_cache[DBOperationType::UPDATE_MATCH_RESULT].reset(caches_.conn->prepareStatement(SQL_UPDATE_MATCH_RESULT));
+            stmt = caches_.GetStmt(DBOperationType::UPDATE_MATCH_RESULT);
             if (!stmt)
             {
-                PostMatchResultCompletions(iocp_handle, task, false, DB_SESSION_COMPLETION);
+                PostMatchResultCompletions(iocp_handle_, task, false, DB_SESSION_COMPLETION);
                 return;
             }
         }
@@ -150,7 +150,7 @@ void GameDBWorker::ExecuteUpdateMatchResult(const DBUpdateMatchResultTask& task)
         stmt->setInt(1, task.winner.id);
         stmt->setInt(2, task.winner.id);
         for (int i = 0; i < MAX_MATCH_RESULT_PLAYERS; ++i) stmt->setInt(i + 3, task.players[i].id);
-        success = stmt->executeUpdate() == task.player_count;
+        is_success = stmt->executeUpdate() == task.player_count;
     }
     catch (const sql::SQLException& e)
     {
@@ -158,28 +158,28 @@ void GameDBWorker::ExecuteUpdateMatchResult(const DBUpdateMatchResultTask& task)
         throw;
     }
 
-    PostMatchResultCompletions(iocp_handle, task, success, DB_SESSION_COMPLETION);
+    PostMatchResultCompletions(iocp_handle_, task, is_success, DB_SESSION_COMPLETION);
 }
 
 void GameDBWorker::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, int requester_id)
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::ADD_FRIEND);
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.key = key;
     //db_over->ex_over.request_gen; // 사실 여기서는 의미가 없음. 적용된 두 클라에게 모두 보내야해서 두 클라의 키값이 모두 필요
 
     try
     {
-        caches.conn->setAutoCommit(false);
-        auto* af_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND);
+        caches_.conn->setAutoCommit(false);
+        auto* af_stmt = caches_.GetStmt(DBOperationType::ADD_FRIEND);
         if (!af_stmt)
         {
             const char* SQL_ADD_FRIEND = // 쿼리 안에서 몇 개를 요청하던 1번의 요청 결과는 원자적
             "INSERT IGNORE INTO friends (my_id, friend_id) "
             "VALUES (?, ?), (?, ?)";
 
-            caches.stmt_cache[DBOperationType::ADD_FRIEND].reset(caches.conn->prepareStatement(SQL_ADD_FRIEND));
-            af_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND);
+            caches_.stmt_cache[DBOperationType::ADD_FRIEND].reset(caches_.conn->prepareStatement(SQL_ADD_FRIEND));
+            af_stmt = caches_.GetStmt(DBOperationType::ADD_FRIEND);
             if (!af_stmt) goto POST_RESULT;
         }
 
@@ -196,10 +196,10 @@ void GameDBWorker::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, in
                 "DELETE FROM friend_requests "
                 "WHERE from_user_id = ? AND to_user_id = ?";
 
-            auto* dfr_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND_REQUEST);
+            auto* dfr_stmt = caches_.GetStmt(DBOperationType::DELETE_FRIEND_REQUEST);
             if (!dfr_stmt) {
-                caches.stmt_cache[DBOperationType::DELETE_FRIEND_REQUEST].reset(caches.conn->prepareStatement(SQL_DELETE_FRIEND_REQUEST));
-                dfr_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND_REQUEST);
+                caches_.stmt_cache[DBOperationType::DELETE_FRIEND_REQUEST].reset(caches_.conn->prepareStatement(SQL_DELETE_FRIEND_REQUEST));
+                dfr_stmt = caches_.GetStmt(DBOperationType::DELETE_FRIEND_REQUEST);
 				if (!dfr_stmt) goto POST_RESULT;
             }
             
@@ -211,11 +211,11 @@ void GameDBWorker::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, in
                 const char* SQL_GET_FRIEND_INFO =
                     "SELECT nickname FROM users WHERE user_id=?";
 
-                auto* gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+                auto* gri_stmt = caches_.GetStmt(DBOperationType::GET_FRIEND_INFO);
                 if (!gri_stmt) {
-                    caches.stmt_cache[DBOperationType::GET_FRIEND_INFO].reset(caches.conn->prepareStatement(SQL_GET_FRIEND_INFO));
+                    caches_.stmt_cache[DBOperationType::GET_FRIEND_INFO].reset(caches_.conn->prepareStatement(SQL_GET_FRIEND_INFO));
 
-                    gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+                    gri_stmt = caches_.GetStmt(DBOperationType::GET_FRIEND_INFO);
                     if (!gri_stmt) goto POST_RESULT;
                 }
 
@@ -228,7 +228,7 @@ void GameDBWorker::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, in
                     p->requester_info.nickname = rs->getString(1);
                     p->requester_info.id = requester_id;
                     p->accepter_info = accepter_info;
-                    caches.conn->commit();
+                    caches_.conn->commit();
                     db_over->result_data = std::move(result_data);
                 }
             }
@@ -238,41 +238,41 @@ void GameDBWorker::ExecuteAddFriend(SessionKey key, FriendInfo accepter_info, in
     catch (const sql::SQLException& e)
     {
         PrintErrorLog(__func__, e);
-        caches.conn->rollback();
-        caches.conn->setAutoCommit(true);
+        caches_.conn->rollback();
+        caches_.conn->setAutoCommit(true);
         throw;
     }
 
 POST_RESULT:
-	if (!db_over->result_data->is_success) caches.conn->rollback();
+	if (!db_over->result_data->is_success) caches_.conn->rollback();
 
-    caches.conn->setAutoCommit(true);
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+    caches_.conn->setAutoCommit(true);
+    PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
 void GameDBWorker::ExecuteDeleteFriend(SessionKey key, int target_id)
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::DELETE_FRIEND);
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.key = key;
     //db_over->ex_over.request_gen = key.gen;
     int requester_id = key.id;
 
     try
     {
-        auto* df_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND);
+        auto* df_stmt = caches_.GetStmt(DBOperationType::DELETE_FRIEND);
         if (!df_stmt)
         {
             const char* SQL_DELETE_FRIEND = // 쿼리 안에서 몇 개를 요청하던 1번의 요청 결과는 원자적
                 "DELETE FROM friends "
                 "WHERE(my_id, friend_id) IN((? , ?), (? , ?))";
 
-            caches.stmt_cache[DBOperationType::DELETE_FRIEND].reset(caches.conn->prepareStatement(SQL_DELETE_FRIEND));
+            caches_.stmt_cache[DBOperationType::DELETE_FRIEND].reset(caches_.conn->prepareStatement(SQL_DELETE_FRIEND));
 
-            df_stmt = caches.GetStmt(DBOperationType::DELETE_FRIEND);
+            df_stmt = caches_.GetStmt(DBOperationType::DELETE_FRIEND);
             if (!df_stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+                PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
                 return;
             }
         }
@@ -298,19 +298,19 @@ void GameDBWorker::ExecuteDeleteFriend(SessionKey key, int target_id)
         throw;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+    PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
 void GameDBWorker::ExecuteLoadFriendList(SessionKey key)
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::LOAD_FRIEND_LIST);
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.key = key;
     int user_id = key.id;
 
     try
     {
-        auto* stmt = caches.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
+        auto* stmt = caches_.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
         if (!stmt)
         {
             // SELECT: 컬럼들 선택(열)
@@ -322,12 +322,12 @@ void GameDBWorker::ExecuteLoadFriendList(SessionKey key)
                 "ON friends.friend_id = users.user_id "
 			    "WHERE my_id = ?";
 
-            caches.stmt_cache[DBOperationType::LOAD_FRIEND_LIST].reset(caches.conn->prepareStatement(SQL_GET_FRIEND_LIST));
+            caches_.stmt_cache[DBOperationType::LOAD_FRIEND_LIST].reset(caches_.conn->prepareStatement(SQL_GET_FRIEND_LIST));
 
-            stmt = caches.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
+            stmt = caches_.GetStmt(DBOperationType::LOAD_FRIEND_LIST);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+                PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
                 return;
             }
         }
@@ -354,26 +354,26 @@ void GameDBWorker::ExecuteLoadFriendList(SessionKey key)
         throw;
     }
 
-    PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+    PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
 void GameDBWorker::ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_info, int recver_id)
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::ADD_FRIEND_REQUEST);
-    db_over->ex_over.op_type = OP_TYPE::DB;
+    db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.key = key;
 
     try
     {
-        caches.conn->setAutoCommit(false);
-        auto* afr_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND_REQUEST);
+        caches_.conn->setAutoCommit(false);
+        auto* afr_stmt = caches_.GetStmt(DBOperationType::ADD_FRIEND_REQUEST);
         if (!afr_stmt)
         {
             const char* SQL_ADD_FRIEND_REQUEST =
                 "INSERT INTO friend_requests (from_user_id, to_user_id) "
                 "VALUES (?, ?)";
-            caches.stmt_cache[DBOperationType::ADD_FRIEND_REQUEST].reset(caches.conn->prepareStatement(SQL_ADD_FRIEND_REQUEST));
-            afr_stmt = caches.GetStmt(DBOperationType::ADD_FRIEND_REQUEST);
+            caches_.stmt_cache[DBOperationType::ADD_FRIEND_REQUEST].reset(caches_.conn->prepareStatement(SQL_ADD_FRIEND_REQUEST));
+            afr_stmt = caches_.GetStmt(DBOperationType::ADD_FRIEND_REQUEST);
 			if (!afr_stmt) goto POST_RESULT;
         }
         afr_stmt->setInt(1, requester_info.id);
@@ -385,11 +385,11 @@ void GameDBWorker::ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_
             const char* SQL_GET_FRIEND_INFO =
 				"SELECT nickname FROM users WHERE user_id=?";
 
-            auto* gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+            auto* gri_stmt = caches_.GetStmt(DBOperationType::GET_FRIEND_INFO);
             if (!gri_stmt) {
-                caches.stmt_cache[DBOperationType::GET_FRIEND_INFO].reset(caches.conn->prepareStatement(SQL_GET_FRIEND_INFO));
+                caches_.stmt_cache[DBOperationType::GET_FRIEND_INFO].reset(caches_.conn->prepareStatement(SQL_GET_FRIEND_INFO));
 
-                gri_stmt = caches.GetStmt(DBOperationType::GET_FRIEND_INFO);
+                gri_stmt = caches_.GetStmt(DBOperationType::GET_FRIEND_INFO);
 				if (!gri_stmt) goto POST_RESULT;
             }
 
@@ -411,15 +411,15 @@ void GameDBWorker::ExecuteAddFriendRequest(SessionKey key, FriendInfo requester_
     catch (const sql::SQLException& e)
     {
         PrintErrorLog(__func__, e);
-        caches.conn->rollback();
-        caches.conn->setAutoCommit(true);
+        caches_.conn->rollback();
+        caches_.conn->setAutoCommit(true);
         throw;
     }
 POST_RESULT:
-    if (!db_over->result_data->is_success) caches.conn->rollback();
-	caches.conn->setAutoCommit(true);
+    if (!db_over->result_data->is_success) caches_.conn->rollback();
+	caches_.conn->setAutoCommit(true);
 
-	PostQueuedCompletionStatus(iocp_handle, static_cast<int>(OP_TYPE::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
+	PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
 void GameDBWorker::ProcessTask(DBTask& task)

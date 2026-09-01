@@ -4,7 +4,7 @@
 
 class FivePlayerRoom : public MultiRoom
 {
-	std::array<RoomSession, 5> room_users;
+	std::array<RoomSession, 5> room_users_;
 
 public:
 	FivePlayerRoom(IOCPServer* server, OpenRoomInitData data);
