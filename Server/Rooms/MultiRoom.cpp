@@ -87,7 +87,7 @@ int MultiRoom::AddPlayer(const SP<Session>& new_session)
 			public_p.room_gen = room_gen_;
 			public_p.max_player_count = max_player_count_;
 			server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-			new_session->SendPacket(reinterpret_cast<char*>(&public_p), server_->GetIOCPHandle());
+			new_session->SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
 		}
 		else {
 			S2C_ADD_PRIVATE_ROOM_PACKET private_p;
@@ -97,7 +97,7 @@ int MultiRoom::AddPlayer(const SP<Session>& new_session)
 			private_p.max_player_count = max_player_count_;
 			server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 			server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-			new_session->SendPacket(reinterpret_cast<char*>(&private_p), server_->GetIOCPHandle());
+			new_session->SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 		}
 
 		// 본인의 입장을 본인 제외 나머지에게(방 생성 시 본인은 방에 추가된다)
@@ -111,7 +111,7 @@ int MultiRoom::AddPlayer(const SP<Session>& new_session)
 			add_p.header.type = S2C_ADD_PLAYER;
 			add_p.player_id = new_session->GetDBInfo().player_id;
 			server_->StringToCharBuf(new_session->GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
-			session->SendPacket(reinterpret_cast<char*>(&add_p), server_->GetIOCPHandle());
+			session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, server_->GetIOCPHandle());
 		}
 
 		// 본인 제외 나머지 플레이어를 본인에게
@@ -125,7 +125,7 @@ int MultiRoom::AddPlayer(const SP<Session>& new_session)
 			add_p.header.type = S2C_ADD_PLAYER;
 			add_p.player_id = session->GetDBInfo().player_id;
 			server_->StringToCharBuf(session->GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
-			new_session->SendPacket(reinterpret_cast<char*>(&add_p), server_->GetIOCPHandle());
+			new_session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, server_->GetIOCPHandle());
 		}
 
 		// 새로 입장한 세션에게 방장이 누구인지
@@ -133,7 +133,7 @@ int MultiRoom::AddPlayer(const SP<Session>& new_session)
 		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
 		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id_;
-		new_session->SendPacket(reinterpret_cast<char*>(&host_p), server_->GetIOCPHandle());
+		new_session->SendPacket(reinterpret_cast<char*>(&host_p), host_p.header.size, server_->GetIOCPHandle());
 		return result;
 	}
 
@@ -176,7 +176,7 @@ void MultiRoom::SendCreateRoom(const SP<Session>& session)
 		public_p.room_gen = room_gen_;
 		public_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-		session->SendPacket(reinterpret_cast<char*>(&public_p), server_->GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
 	}
 	else {
 		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
@@ -186,7 +186,7 @@ void MultiRoom::SendCreateRoom(const SP<Session>& session)
 		private_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-		session->SendPacket(reinterpret_cast<char*>(&private_p), server_->GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 	}
 	FindNewHost();
 	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
@@ -242,7 +242,7 @@ void MultiRoom::KickPlayer(int requester_id, int kick_player_id)
 			info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 			info_p.header.type = S2C_INFO;
 			info_p.info_code = InfoCode::KICKED;
-			session->SendPacket(reinterpret_cast<char*>(&info_p), server_->GetIOCPHandle());
+			session->SendPacket(reinterpret_cast<char*>(&info_p), info_p.header.size, server_->GetIOCPHandle());
 
 			room_player.ClearPlayer();
 			--current_player_count_;
@@ -285,7 +285,7 @@ void MultiRoom::StartGame(int requester_id)
 		int host_index = FindHostIndex(host_id_);
 		if (host_index >= 0) {
 			auto host_session = room_players[host_index].GetSession();
-			if (host_session) host_session->SendPacket(reinterpret_cast<char*>(&error_p), server_->GetIOCPHandle());
+			if (host_session) host_session->SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, server_->GetIOCPHandle());
 		}
 		return;
 	}

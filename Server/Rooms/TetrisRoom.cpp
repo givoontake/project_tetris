@@ -443,7 +443,7 @@ void TetrisRoom::BroadcastPackets()
 			if (data_size > 0) {
 				auto target_session = target.GetSession();
 				if (!target_session) continue;
-				target_session->SendBoundPacket(send_buffer, data_size, server_->GetIOCPHandle());
+				target_session->SendPacket(send_buffer, data_size, server_->GetIOCPHandle());
 			}
 		}
 	}
@@ -462,11 +462,12 @@ void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 	// 틱 루프에서 호출할 경우 이중락 걸리므로 주의
 	// 우선 외부에서 잠그는걸로 다시 변경. 범위기반 탐색과 삭제 사이의 관계 때문에 락이 필요한데, 멀티와 같은 경우 범위기반 탐색 내에 다시 범위기반 탐색을 하는 경우도 꽤 있으므로 외부에서 하는게 효율적인 것 같다.
 	std::vector<int> target_index;
+	const int packet_size = static_cast<int>(reinterpret_cast<const PACKET_HEADER*>(packet)->size);
 	auto room_players = GetRoomPlayers();
 	for (auto& room_player : room_players) {
 		auto session = room_player.GetSession();
 		if (!session) continue;
-		session->SendPacket(packet, iocp_handle);
+		session->SendPacket(packet, packet_size, iocp_handle);
 	}
 }
 

@@ -20,7 +20,7 @@ void DBResultHandler::HandleAddFriendRequestDBResult(DBOverlapped* db_over)
 			request_p.header.type = S2C_ADD_FRIEND_REQUEST;
 			request_p.requester_id = result->requester_info.player_id;
 			server_.StringToCharBuf(result->requester_info.nickname, request_p.requester_nickname, MAX_PLAYER_NAME_SIZE);
-			receiver_session->SendPacket(reinterpret_cast<char*>(&request_p), server_.GetIOCPHandle());
+			receiver_session->SendPacket(reinterpret_cast<char*>(&request_p), request_p.header.size, server_.GetIOCPHandle());
 		}
 	}
 }
@@ -78,19 +78,19 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, const SP<Sessio
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ErrorCode::LOGIN_FAILED;
-		session->SendPacket(reinterpret_cast<char*>(&error_p), server_.GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, server_.GetIOCPHandle());
 	}
 
 	else if (login_p.player_id == -2) {
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ErrorCode::DUPLICATE_LOGIN_ID;
-		session->SendPacket(reinterpret_cast<char*>(&error_p), server_.GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, server_.GetIOCPHandle());
 	}
 
 	else {
 		std::cout << "로그인 - 플레이어: " << session->GetDBInfo().nickname << std::endl;
-		session->SendPacket(reinterpret_cast<char*>(&login_p), server_.GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&login_p), login_p.header.size, server_.GetIOCPHandle());
 
 		SessionKey session_key = session->GetSessionKey();
 		server_.EnqueueDBTask(std::make_unique<DBLoadFriendListTask>(session_key), session);
@@ -108,7 +108,7 @@ void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<
 		us_p.header.size = static_cast<std::uint16_t>(sizeof(us_p));
 		us_p.header.type = S2C_UPDATE_SCORE;
 		us_p.max_score = result->max_score;
-		session->SendPacket(reinterpret_cast<char*>(&us_p), server_.GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&us_p), us_p.header.size, server_.GetIOCPHandle());
 	}
 }
 
@@ -125,7 +125,7 @@ void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, con
 		record_p.win_count = db_info.win_count;
 		record_p.lose_count = db_info.lose_count;
 
-		session->SendPacket(reinterpret_cast<char*>(&record_p), server_.GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&record_p), record_p.header.size, server_.GetIOCPHandle());
 	}
 }
 

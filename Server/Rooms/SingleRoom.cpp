@@ -47,7 +47,7 @@ void SingleRoom::GiveUp(const SP<Session>& request_session)
 		game_over_p.header.size = static_cast<std::uint16_t>(sizeof(game_over_p));
 		game_over_p.header.type = S2C_GAME_OVER;
 		game_over_p.player_id = session->GetDBInfo().player_id;
-		session->SendPacket(reinterpret_cast<char*>(&game_over_p), server_->GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&game_over_p), game_over_p.header.size, server_->GetIOCPHandle());
 		RequestUpdateScore();
 		ClearGame();
 	}
@@ -178,7 +178,7 @@ void SingleRoom::SendCreateRoom(const SP<Session>& session) // 외부에서 세�
 		public_p.room_gen = room_gen_;
 		public_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-		session->SendPacket(reinterpret_cast<char*>(&public_p), server_->GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
 	}
 	else {
 		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
@@ -188,7 +188,7 @@ void SingleRoom::SendCreateRoom(const SP<Session>& session) // 외부에서 세�
 		private_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-		session->SendPacket(reinterpret_cast<char*>(&private_p), server_->GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 	}
 	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
 }

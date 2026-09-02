@@ -42,8 +42,7 @@ public:
 
 	void InitSession(SOCKET new_socket);
 	bool ApplyLoginResult(DBResultLogin* login_result);
-	void SendPacket(char* packet, const HANDLE iocp_handle);
-	void SendBoundPacket(char* packet_buffer, int data_size, const HANDLE iocp_handle);
+	bool SendPacket(const char* packet, int packet_size, const HANDLE iocp_handle);
 	void RecvPacket(const HANDLE iocp_handle);
 	void AddFriend(FriendInfo& new_friend);
 	void RemoveFriend(const int target_id);

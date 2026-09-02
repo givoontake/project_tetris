@@ -68,7 +68,7 @@ bool Player::AddToSendBuffer(const char* data, int data_size)
 //void Player::SendTickData(HANDLE iocp_handle)
 //{
 //	if (send_data_size_ >= 3) {
-//		session_->SendBoundPacket(send_buffer_, send_data_size_, iocp_handle);
+//		session_->SendPacket(send_buffer_, send_data_size_, iocp_handle);
 //	}
 //}
 

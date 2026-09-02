@@ -145,7 +145,7 @@ void IOCPServer::SendRoomList(const SP<Session>& session)
 		info_p.is_play = room_snapshot.room_state == RoomState::PLAY;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) { 
-			session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+			session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 			packet_size = 0;
 		}
 
@@ -153,7 +153,7 @@ void IOCPServer::SendRoomList(const SP<Session>& session)
 		packet_size += sizeof(info_p);
 		//if (session->GetSessionKey().gen != request_gen) return;
 	}
-	session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+	session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 }
 
 // 
@@ -193,7 +193,7 @@ void IOCPServer::SendError(const SP<Session>& session, int error_code)
 	error_p.header.type = S2C_ERROR;
 	error_p.error_code = error_code;
 
-	session->SendPacket(reinterpret_cast<char*>(&error_p), iocp_handle_);
+	session->SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, iocp_handle_);
 }
 
 void IOCPServer::FindMatch(const SP<Session>& session, int max_player_count)
@@ -291,14 +291,14 @@ void IOCPServer::SendLobbyPlayerList(const SP<Session>& session)
 		}
 		
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
-			session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+			session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 			packet_size = 0;
 		}
 
 		memcpy(packet_buffer + packet_size, &info_p, sizeof(info_p));
 		packet_size += sizeof(info_p);
 	}
-	session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+	session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 }
 
 void IOCPServer::SendFriendList(const SP<Session>& session)
@@ -328,14 +328,14 @@ void IOCPServer::SendFriendList(const SP<Session>& session)
 		}
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
-			session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+			session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 			packet_size = 0;
 		}
 
 		memcpy(packet_buffer + packet_size, &info_p, sizeof(info_p));
 		packet_size += sizeof(info_p);
 	}
-	session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+	session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 }
 
 void IOCPServer::SendRankings(const SP<Session>& session)
@@ -358,7 +358,7 @@ void IOCPServer::SendRankings(const SP<Session>& session)
 		info_p.score = ranking.score;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
-			session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+			session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 			packet_size = 0;
 		}
 
@@ -366,7 +366,7 @@ void IOCPServer::SendRankings(const SP<Session>& session)
 		packet_size += sizeof(info_p);
 	}
 
-	session->SendBoundPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
+	session->SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, iocp_handle_);
 }
 
 void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acceptor_info)
@@ -385,7 +385,7 @@ void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acc
 	if (is_requester_connected) {
 		add_p.friend_id = acceptor_info.player_id;
 		StringToCharBuf(acceptor_info.nickname, add_p.friend_nickname, MAX_PLAYER_NAME_SIZE);
-		requester_session->SendPacket(reinterpret_cast<char*>(&add_p), iocp_handle_);
+		requester_session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, iocp_handle_);
 	}
 	
 	bool is_acceptor_connected = false;
@@ -398,7 +398,7 @@ void IOCPServer::SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acc
 	if (is_acceptor_connected) {
 		add_p.friend_id = requester_info.player_id;
 		StringToCharBuf(requester_info.nickname, add_p.friend_nickname, MAX_PLAYER_NAME_SIZE);
-		acceptor_session->SendPacket(reinterpret_cast<char*>(&add_p), iocp_handle_);
+		acceptor_session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, iocp_handle_);
 	}
 }
 
@@ -419,7 +419,7 @@ void IOCPServer::SendDeleteFriendResult(int requester_id, int target_id)
 
 	if (is_requester_connected) {
 		delete_p.target_id = target_id;
-		requester_session->SendPacket(reinterpret_cast<char*>(&delete_p), iocp_handle_);
+		requester_session->SendPacket(reinterpret_cast<char*>(&delete_p), delete_p.header.size, iocp_handle_);
 	}
 	
 	bool is_target_connected = false;
@@ -431,7 +431,7 @@ void IOCPServer::SendDeleteFriendResult(int requester_id, int target_id)
 
 	if (is_target_connected) {
 		delete_p.target_id = requester_id;
-		target_session->SendPacket(reinterpret_cast<char*>(&delete_p), iocp_handle_);
+		target_session->SendPacket(reinterpret_cast<char*>(&delete_p), delete_p.header.size, iocp_handle_);
 	}
 }
 
@@ -516,16 +516,17 @@ void IOCPServer::RoutePacket(char* packet, const SP<Session>& session)
 
 void IOCPServer::BroadcastToLobby(char* packet)
 {
+	const int packet_size = static_cast<int>(reinterpret_cast<const PACKET_HEADER*>(packet)->size);
 	for (auto& player : active_players_.GetActiveSessions()) {
 		if (player && player->GetModeState() == ModeState::LOBBY) {
-			player->SendPacket(packet, iocp_handle_);
+			player->SendPacket(packet, packet_size, iocp_handle_);
 		}
 	}
 }
 
 //void IOCPServer::SendToSelf(char* packet, int self_index)
 //{
-//	sessions_[self_index]->SendPacket(packet, iocp_handle_);
+//	sessions_[self_index]->SendPacket(packet, reinterpret_cast<PACKET_HEADER*>(packet)->size, iocp_handle_);
 //}
 
 void IOCPServer::CreatePublicRoom(char* packet, const SP<Session>& session)
