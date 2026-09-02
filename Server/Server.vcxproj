@@ -20,10 +20,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Managers\ActiveRoomManager.cpp" />
-    <ClCompile Include="Managers\ActiveUserManager.cpp" />
-    <ClCompile Include="Database\Database.cpp" />
-    <ClCompile Include="Database\GameDBWorker.cpp" />
-    <ClCompile Include="Database\LoginDBWorker.cpp" />
+    <ClCompile Include="Managers\ActivePlayerManager.cpp" />
+    <ClCompile Include="Database\DBThread.cpp" />
+    <ClCompile Include="Database\GameDBThread.cpp" />
+    <ClCompile Include="Database\LoginDBThread.cpp" />
     <ClCompile Include="Database\DBResultHandler.cpp" />
     <ClCompile Include="Rooms\FivePlayerRoom.cpp" />
     <ClCompile Include="Core\IOCPServer.cpp" />
@@ -32,7 +32,7 @@
     <ClCompile Include="Rooms\MultiRoom.cpp" />
     <ClCompile Include="Network\PacketHandler.cpp" />
     <ClCompile Include="Managers\RankingManager.cpp" />
-    <ClCompile Include="Rooms\RoomSession.cpp" />
+    <ClCompile Include="Rooms\Player.cpp" />
     <ClCompile Include="Network\Session.cpp" />
     <ClCompile Include="Threads\ServerThreadManager.cpp" />
     <ClCompile Include="Threads\ServerThread.cpp" />
@@ -42,16 +42,16 @@
     <ClCompile Include="Rooms\SingleRoom.cpp" />
     <ClCompile Include="Game\Tetris.cpp" />
     <ClCompile Include="Rooms\TetrisRoom.cpp" />
-    <ClCompile Include="Game\TetrisTickData.cpp" />
+    <ClCompile Include="Game\TetrisTickCounters.cpp" />
     <ClCompile Include="Rooms\TwoPlayerRoom.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Managers\ActiveRoomManager.h" />
-    <ClInclude Include="Managers\ActiveUserManager.h" />
+    <ClInclude Include="Managers\ActivePlayerManager.h" />
     <ClInclude Include="Common\ConcurrentTaskQueue.h" />
-    <ClInclude Include="Database\Database.h" />
-    <ClInclude Include="Database\GameDBWorker.h" />
-    <ClInclude Include="Database\LoginDBWorker.h" />
+    <ClInclude Include="Database\DBThread.h" />
+    <ClInclude Include="Database\GameDBThread.h" />
+    <ClInclude Include="Database\LoginDBThread.h" />
     <ClInclude Include="Database\DBTasks.h" />
     <ClInclude Include="Database\DBResultHandler.h" />
     <ClInclude Include="Database\DBResult.h" />
@@ -71,7 +71,7 @@
     <ClInclude Include="Network\PacketHandler.h" />
     <ClInclude Include="Packets\packet_types.h" />
     <ClInclude Include="Managers\RankingManager.h" />
-    <ClInclude Include="Rooms\RoomSession.h" />
+    <ClInclude Include="Rooms\Player.h" />
     <ClInclude Include="Network\Session.h" />
     <ClInclude Include="Threads\ServerThreadManager.h" />
     <ClInclude Include="Threads\ServerThread.h" />
@@ -81,7 +81,7 @@
     <ClInclude Include="Threads\TimerThread.h" />
     <ClInclude Include="Game\Tetris.h" />
     <ClInclude Include="Rooms\TetrisRoom.h" />
-    <ClInclude Include="Game\TetrisTickData.h" />
+    <ClInclude Include="Game\TetrisTickCounters.h" />
     <ClInclude Include="Common\types.h" />
     <ClInclude Include="Rooms\TwoPlayerRoom.h" />
   </ItemGroup>

@@ -3,30 +3,30 @@
 #include "SingleRoom.h"
 #include "packet_types.h"
 
-SingleRoom::SingleRoom(IOCPServer* server, OpenRoomInitData data)
+SingleRoom::SingleRoom(IOCPServer* server, PublicRoomInitData data)
 	: TetrisRoom(server, data)
 {
-	max_user_ = 1;
+	max_player_count_ = 1;
 }
 
-SingleRoom::SingleRoom(IOCPServer* server, LockRoomInitData data)
+SingleRoom::SingleRoom(IOCPServer* server, PrivateRoomInitData data)
 	: TetrisRoom(server, data)
 {
-	max_user_ = 1;
+	max_player_count_ = 1;
 }
 
-std::span<RoomSession> SingleRoom::GetRoomUsers()
+std::span<Player> SingleRoom::GetRoomPlayers()
 {
-	return room_users_;
+	return room_players_;
 }
 
 void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 {
 	if (!request_session) return;
 	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
-	case C2S_GIVEUP: {
-		RoomTaskInfo task;
-		task.type = RoomTaskType::GIVEUP;
+	case C2S_GIVE_UP: {
+		RoomTask task;
+		task.task_type = RoomTaskType::GIVE_UP;
 		task.session = request_session;
 		AddRoomTask(std::move(task));
 		break;
@@ -39,27 +39,27 @@ void SingleRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 
 void SingleRoom::GiveUp(const SP<Session>& request_session)
 {
-	if (!IsRoomSession(request_session)) return;
+	if (!IsPlayerInRoom(request_session)) return;
 	if (room_state_ == RoomState::PLAY) {
-		auto session = room_users_[0].GetSession();
+		auto session = room_players_[0].GetSession();
 		if (!session || session != request_session) return;
-		S2C_GAMEOVER_PACKET gameover_p;
-		gameover_p.header.size = static_cast<std::uint16_t>(sizeof(gameover_p));
-		gameover_p.header.type = S2C_GAMEOVER;
-		gameover_p.id = session->GetDBInfo().id;
-		session->SendPacket(reinterpret_cast<char*>(&gameover_p), server_->GetHandle());
+		S2C_GAME_OVER_PACKET game_over_p;
+		game_over_p.header.size = static_cast<std::uint16_t>(sizeof(game_over_p));
+		game_over_p.header.type = S2C_GAME_OVER;
+		game_over_p.player_id = session->GetDBInfo().player_id;
+		session->SendPacket(reinterpret_cast<char*>(&game_over_p), server_->GetIOCPHandle());
 		RequestUpdateScore();
 		ClearGame();
 	}
 }
 
-void SingleRoom::ProcessSpecificRoomTask(const RoomTaskInfo& task)
+void SingleRoom::ProcessSpecificRoomTask(const RoomTask& task)
 {
-	switch (task.type) {
+	switch (task.task_type) {
 	case RoomTaskType::START:
-		if (IsRoomSession(task.session)) StartGame();
+		if (IsPlayerInRoom(task.session)) StartGame();
 		break;
-	case RoomTaskType::GIVEUP:
+	case RoomTaskType::GIVE_UP:
 		GiveUp(task.session);
 		break;
 	default:
@@ -69,35 +69,35 @@ void SingleRoom::ProcessSpecificRoomTask(const RoomTaskInfo& task)
 
 void SingleRoom::ProcessGameTick()
 {
-	for (auto& r_user : room_users_) {
-		auto session = r_user.GetSession();
+	for (auto& room_player : room_players_) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		r_user.GetTetris().TickProcess();
+		room_player.GetTetris().ProcessTick();
 	}
 
 	AddGarbageLines();
-	bool is_over = false;
-	is_over = room_users_[0].GetTetris().CheckGameover();
-	if (!is_over) AddSpawnTask();
+	bool is_game_over = false;
+	is_game_over = room_players_[0].GetTetris().CheckGameOver();
+	if (!is_game_over) AddSpawnTasks();
 
-	auto tasks = room_users_[0].GetTetris().GetSendTasks();
-	auto it = std::find_if(tasks.begin(), tasks.end(), [](const TaskType& t_type) {
-		return t_type.event_type == EventType::FIX;
+	auto tasks = room_players_[0].GetTetris().GetSendTasks();
+	auto it = std::find_if(tasks.begin(), tasks.end(), [](const TaskType& task) {
+		return task.event_type == EventType::FIX;
 		});
 
 	if (it != tasks.end()) { // 고정 이벤트가 있어야 점수 및 콤보계산
-		CalculateScore(room_users_[0].GetTetris().GetClearedLines());
+		CalculateScore(room_players_[0].GetTetris().GetClearedLineCount());
 	}
-	int failed_user_id = BoundPackets();
-	if (failed_user_id != -1) {
-		DeleteUser(failed_user_id);
+	int failed_player_id = AppendTickPackets();
+	if (failed_player_id != -1) {
+		RemovePlayer(failed_player_id);
 		TryPostRoomDelete();
 		return;
 	}
 
-	ResetUsersTickData();
-	BroadcastTickDataForUsers();
-	if (is_over) {
+	ResetPlayerTickState();
+	BroadcastPackets();
+	if (is_game_over) {
 		RequestUpdateScore();
 		ClearGame();
 	}
@@ -112,53 +112,53 @@ void SingleRoom::StartGame()
 
 		// 모든 조건 통과->게임 시작
 		InitGame();
-		Add7BagTetrominoList();
-		for (auto& r_user : room_users_) {
-			auto session = r_user.GetSession();
+		AppendTetromino7Bag();
+		for (auto& room_player : room_players_) {
+			auto session = room_player.GetSession();
 			if (!session) continue;
-			r_user.SetRoomUserState(RoomUserState::PLAY);
-			r_user.GetTetris().InitNewTetromino(tetromino_spawn_list_[r_user.GetTetrominoIndex()], spawn_pos_);
+			room_player.SetRoomPlayerState(RoomPlayerState::PLAY);
+			room_player.GetTetris().InitNewTetromino(tetromino_spawn_list_[room_player.GetTetrominoIndex()], spawn_pos_);
 		}
 
 		S2C_SINGLE_START_PACKET start_p;
 		start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
 		start_p.header.type = S2C_SINGLE_START;
 		start_p.score = 0;
-		Broadcast(reinterpret_cast<char*>(&start_p), server_->GetHandle());
+		Broadcast(reinterpret_cast<char*>(&start_p), server_->GetIOCPHandle());
 
-		for (auto& r_user : room_users_) {
-			auto session = r_user.GetSession();
+		for (auto& room_player : room_players_) {
+			auto session = room_player.GetSession();
 			if (!session) continue;
 			S2C_SPAWN_PACKET spawn_p;
 			spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
 			spawn_p.header.type = S2C_SPAWN;
-			spawn_p.id = session->GetDBInfo().id;
-			spawn_p.tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex()];
-			spawn_p.next_tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex() + 1];
+			spawn_p.player_id = session->GetDBInfo().player_id;
+			spawn_p.tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex()];
+			spawn_p.next_tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex() + 1];
 			spawn_p.spawn_x = spawn_pos_.x;
 			spawn_p.spawn_y = spawn_pos_.y;
-			Broadcast(reinterpret_cast<char*>(&spawn_p), server_->GetHandle());
+			Broadcast(reinterpret_cast<char*>(&spawn_p), server_->GetIOCPHandle());
 		}
 	}
 }
 
-void SingleRoom::DeleteUser(const int id)
+void SingleRoom::RemovePlayer(const int player_id)
 {
-	//std::cout << "delete user id: " << id << std::endl;
+	//std::cout << "delete player id: " << player_id << std::endl;
 
 	{
-		for (auto& r_user : room_users_) {
-			auto session = r_user.GetSession();
+		for (auto& room_player : room_players_) {
+			auto session = room_player.GetSession();
 			if (!session) continue;
-			if (session->GetDBInfo().id == id) { // 삭제할 아이디 검색
-				//std::cout << "delete user id: " << id << std::endl;
-				session->SetRoomSnapShot(ModeState::LOBBY, -1);
-				S2C_DELETE_USER_PACKET p;
+			if (session->GetDBInfo().player_id == player_id) { // 삭제할 아이디 검색
+				//std::cout << "delete player id: " << player_id << std::endl;
+				session->SetRoomSnapshot(ModeState::LOBBY, -1);
+				S2C_REMOVE_PLAYER_PACKET p;
 				p.header.size = static_cast<std::uint16_t>(sizeof(p));
-				p.header.type = S2C_DELETE_USER;
-				p.id = id;
+				p.header.type = S2C_REMOVE_PLAYER;
+				p.player_id = player_id;
 
-				Broadcast(reinterpret_cast<char*>(&p), server_->GetHandle());
+				Broadcast(reinterpret_cast<char*>(&p), server_->GetIOCPHandle());
 
 				ClearRoom(); // 안하면 방 삭제 포스트 이후 세션이 재사용되면 문제가 될 수 있음.
 				BeginRoomDelete();
@@ -172,66 +172,25 @@ void SingleRoom::SendCreateRoom(const SP<Session>& session) // 외부에서 세�
 {
 	if (!session) return;
 	if (room_password_.empty()) {
-		S2C_ADD_OPEN_ROOM_PACKET open_p;
-		open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
-		open_p.header.type = S2C_ADD_OPEN_ROOM;
-		open_p.gen = room_gen_;
-		open_p.max_user = max_user_;
-		server_->StringToCharBuf(room_name_, open_p.room_name, sizeof(open_p.room_name));
-		session->SendPacket(reinterpret_cast<char*>(&open_p), server_->GetHandle());
+		S2C_ADD_PUBLIC_ROOM_PACKET public_p;
+		public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
+		public_p.header.type = S2C_ADD_PUBLIC_ROOM;
+		public_p.room_gen = room_gen_;
+		public_p.max_player_count = max_player_count_;
+		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
+		session->SendPacket(reinterpret_cast<char*>(&public_p), server_->GetIOCPHandle());
 	}
 	else {
-		S2C_ADD_LOCK_ROOM_PACKET lock_p;
-		lock_p.header.size = static_cast<std::uint16_t>(sizeof(lock_p));
-		lock_p.header.type = S2C_ADD_LOCK_ROOM;
-		lock_p.gen = room_gen_;
-		lock_p.max_user = max_user_;
-		server_->StringToCharBuf(room_name_, lock_p.room_name, sizeof(lock_p.room_name));
-		server_->StringToCharBuf(room_password_, lock_p.room_password, sizeof(lock_p.room_password));
-		session->SendPacket(reinterpret_cast<char*>(&lock_p), server_->GetHandle());
+		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
+		private_p.header.size = static_cast<std::uint16_t>(sizeof(private_p));
+		private_p.header.type = S2C_ADD_PRIVATE_ROOM;
+		private_p.room_gen = room_gen_;
+		private_p.max_player_count = max_player_count_;
+		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
+		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
+		session->SendPacket(reinterpret_cast<char*>(&private_p), server_->GetIOCPHandle());
 	}
 	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
-}
-
-void SingleRoom::ReduceTimeouts(int type)
-{
-	RoomSession& r_session = room_users_[0];
-	switch (type) {
-	case DOWN_TIMEOUT:
-		if (r_session.GetScore() <= 100) {
-			r_session.GetTetris().GetTickData().SetDownTimeout(25);
-		}
-
-		else if (100 < r_session.GetScore() && r_session.GetScore() <= 300) {
-			r_session.GetTetris().GetTickData().SetDownTimeout(24);
-		}
-
-		else if (300 < r_session.GetScore() && r_session.GetScore() <= 600) {
-			r_session.GetTetris().GetTickData().SetDownTimeout(23);
-		}
-
-		else if (600 < r_session.GetScore() && r_session.GetScore() <= 1000) {
-			r_session.GetTetris().GetTickData().SetDownTimeout(22);
-		}
-
-		else if (1000 < r_session.GetScore() && r_session.GetScore() <= 1500) {
-			r_session.GetTetris().GetTickData().SetDownTimeout(21);
-		}
-
-		else if (1500 < r_session.GetScore()) {
-			r_session.GetTetris().GetTickData().SetDownTimeout(20);
-		}
-
-		break;
-
-	case ADD_TIMEOUT:
-		if (r_session.GetTetris().GetTickData().GetGarbageLineTimeout() > 500)
-			r_session.GetTetris().GetTickData().SetGarbageLineTimeout(r_session.GetTetris().GetTickData().GetGarbageLineTimeout() - 5);
-		break;
-
-	default:
-		break;
-	}
 }
 
 void SingleRoom::CalculateScore(int clear_line_count)
@@ -239,7 +198,7 @@ void SingleRoom::CalculateScore(int clear_line_count)
 	int added_score = 0;
 	switch (clear_line_count) {
 	case 0:
-		room_users_[0].ResetCombo();
+		room_players_[0].ResetCombo();
 		return;
 
 		break;
@@ -258,34 +217,19 @@ void SingleRoom::CalculateScore(int clear_line_count)
 	default:
 		break;
 	}
-	room_users_[0].AddCombo();
-	int combo = room_users_[0].GetCombo();
+	room_players_[0].AddCombo();
+	int combo = room_players_[0].GetCombo();
 	added_score += combo * (added_score / 10);
-	room_users_[0].AddScore(added_score);
-}
-
-void SingleRoom::MakeMovePacketData(int move_type)
-{
-	auto session = room_users_[0].GetSession();
-	if (!session) return;
-	S2C_MOVE_PACKET move_p;
-	move_p.header.size = static_cast<std::uint16_t>(sizeof(move_p));
-	move_p.header.type = S2C_MOVE;
-	move_p.id = session->GetDBInfo().id;
-	move_p.move_type = static_cast<char>(move_type);
-	if (!room_users_[0].AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size)) {
-		DeleteUser(session->GetDBInfo().id);
-		TryPostRoomDelete();
-	}
+	room_players_[0].AddScore(added_score);
 }
 
 void SingleRoom::RequestUpdateScore()
 {
-	auto session_shared = room_users_[0].GetSession();
+	auto session_shared = room_players_[0].GetSession();
 	if (!session_shared) return;
-	if (session_shared->GetDBInfo().max_score < room_users_[0].GetScore()) {
-		int new_score = room_users_[0].GetScore();
-		SessionKey key = session_shared->GetSessionKey();
-		server_->EnqueueDBTask(std::make_unique<DBUpdateScoreTask>(key, new_score), session_shared);
+	if (session_shared->GetDBInfo().max_score < room_players_[0].GetScore()) {
+		int new_score = room_players_[0].GetScore();
+		SessionKey session_key = session_shared->GetSessionKey();
+		server_->EnqueueDBTask(std::make_unique<DBUpdateScoreTask>(session_key, new_score), session_shared);
 	}
 }

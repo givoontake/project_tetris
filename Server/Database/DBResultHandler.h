@@ -11,14 +11,14 @@ class DBResultHandler
 
 public:
 	DBResultHandler(IOCPServer& server);
-	void HandleIOResult(DBOverlapped* db_over, const SP<Session>& session);
-	void HandleInitServerResult(DBOverlapped* db_over);
+	void HandleSessionDBResult(DBOverlapped* db_over, const SP<Session>& session);
+	void HandleServerDBResult(DBOverlapped* db_over);
 
 private:
-	void HandleRequestFriendDBResult(DBOverlapped* db_over);
+	void HandleAddFriendRequestDBResult(DBOverlapped* db_over);
 	void HandleAddFriendDBResult(DBOverlapped* db_over);
 	void HandleDeleteFriendDBResult(DBOverlapped* db_over);
-	void HandleLoadRankingDBResult(DBOverlapped* db_over);
+	void HandleLoadRankingsDBResult(DBOverlapped* db_over);
 	void HandleLoginDBResult(DBOverlapped* db_over, const SP<Session>& session);
 	void HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<Session>& session);
 	void HandleUpdateMatchResultDBResult(DBOverlapped* db_over, const SP<Session>& session);

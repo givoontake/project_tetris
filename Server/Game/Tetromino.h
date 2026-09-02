@@ -1,5 +1,4 @@
 #pragma once
-#include <iostream>
 #include <vector>
 #include <array>
 #include <unordered_map>
@@ -21,28 +20,6 @@ struct Tetromino {
     char shape_index;            // 0 … (각 타입별 회전 상태 개수 − 1)
 	Position moved_pos;
     std::array<Position, 4> default_pos;
-
-    void PrintInfo() const
-    {
-        std::cout << "==== Current Tetromino Info ====\n";
-        std::cout << "Type: " << (int)type << "\n";
-        std::cout << "Shape Index: " << (int)shape_index << "\n";
-        std::cout << "Moved Pos: (" << (int)moved_pos.x << ", "
-            << (int)moved_pos.y << ")\n";
-
-        std::cout << "Blocks (Real Positions):\n";
-        for (int i = 0; i < 4; ++i) {
-            int real_x = default_pos[i].x + moved_pos.x;
-            int real_y = default_pos[i].y + moved_pos.y;
-
-            std::cout << "  [" << i << "] default("
-                << (int)default_pos[i].x << ", " << (int)default_pos[i].y
-                << ") -> real(" << real_x << ", " << real_y << ")\n";
-        }
-
-        std::cout << "=========================\n";
-    }
-
 };
 
 const std::unordered_map<char, std::vector<Tetromino>> TETROMINOS = {

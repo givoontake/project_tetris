@@ -14,7 +14,7 @@ class ActiveRoomManager
 public:
 	void AddRoom(int room_gen, const SP<TetrisRoom>& room);
 	void RemoveRoom(int room_gen, const SP<TetrisRoom>& room);
-	SP<TetrisRoom> FindRoom(int room_gen);
+	SP<TetrisRoom> FindRoomByGen(int room_gen);
 	std::vector<SP<TetrisRoom>> GetActiveRoomsSnapshot() const;
 	void Clear();
 };

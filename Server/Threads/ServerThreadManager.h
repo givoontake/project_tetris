@@ -16,12 +16,12 @@ class TickPhaseContext;
 class ServerThreadManager
 {
 public:
-    static constexpr int MAX_TICK_WORKERS = 12;
-    static constexpr int MIN_AVAILABLE_TICK_WORKERS = MAX_TICK_WORKERS / 2;
+    static constexpr int MAX_TICK_THREADS = 12;
+    static constexpr int MIN_AVAILABLE_TICK_THREADS = MAX_TICK_THREADS / 2;
     // static constexpr int TICK_SPIN_WAIT_MARGIN_MS = 5;
-    static constexpr int GAME_DB_WORKER_COUNT = 2;
-    static constexpr int LOGIN_DB_WORKER_COUNT = 1;
-    static constexpr int DB_WORKER_COUNT = GAME_DB_WORKER_COUNT + LOGIN_DB_WORKER_COUNT;
+    static constexpr int GAME_DB_THREAD_COUNT = 2;
+    static constexpr int LOGIN_DB_THREAD_COUNT = 1;
+    static constexpr int DB_THREAD_COUNT = GAME_DB_THREAD_COUNT + LOGIN_DB_THREAD_COUNT;
 
 private:
     enum ThreadGroup { IO_THREADS, TICK_THREADS, TIMER_THREADS, DB_THREADS, THREAD_GROUP_COUNT };
@@ -43,9 +43,9 @@ private:
     friend class TickThread;
     friend class TimerThread;
 
-    int GetCompleteTickWorkerCount() const;
-    std::vector<TickThread*> SelectTickWorkers();
-    void CompleteTickPhase(TickThread& tick_thread, const std::shared_ptr<TickPhaseContext>& phase_context);
+    int GetAvailableTickThreadCount() const;
+    std::vector<TickThread*> SelectTickThreads();
+    void CompleteTickThreadPhase(TickThread& tick_thread, const std::shared_ptr<TickPhaseContext>& phase_context);
 
 public:
     ServerThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy = TickWaitPolicy::FULL_SPIN);

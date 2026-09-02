@@ -13,7 +13,7 @@ void TimerThread::Run()
     // 시스템 날짜나 시간이 변경되어도 틱 간격 계산에 영향을 받지 않는 시계를 사용한다.
     using Clock = std::chrono::steady_clock;
 
-    const auto frame_time = std::chrono::milliseconds(FRAME_TIME);
+    const auto frame_time = std::chrono::milliseconds(TICK_INTERVAL_MS);
     // 매니저가 미리 정한 첫 틱 시각을 가져온다.
     // auto next_tick = Clock::time_point(Clock::duration(manager_.next_tick_time_count_.load()));
     // 현재는 시각을 공유하지 않고, 타이머 실행 시점부터 한 주기 뒤를 첫 틱으로 예약한다.
@@ -26,11 +26,11 @@ void TimerThread::Run()
         return;
     }
 
-    while (is_running_.load() && manager_.iocp_server_.GetRunning())
+    while (is_running_.load() && manager_.iocp_server_.IsRunning())
     {
         // 다음 틱 시각 계산 후 그때까지 잠자기 cpu 내의 하드웨어 타이머를 통해 타이머 인터럽트가 발생하면 깨어나므로, 대기 중 CPU를 소모하지 않는다.
         bool is_timer_wait_succeeded = true;
-        while (is_running_.load() && manager_.iocp_server_.GetRunning()) {
+        while (is_running_.load() && manager_.iocp_server_.IsRunning()) {
             const auto current_time = Clock::now();
             // 이미 예약 시각이 지났다면 더 잠들지 않고 작업 스레드 확보 단계로 넘어간다.
             if (current_time >= next_tick) break;
@@ -51,15 +51,15 @@ void TimerThread::Run()
             manager_.CloseThreads();
             break;
         }
-        if (!is_running_.load() || !manager_.iocp_server_.GetRunning()) break;
+        if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) break;
 
         // 틱 시각이 되어도 사용 가능한 작업 스레드가 최소 개수 이상 있어야 새 틱을 시작한다.
         // 여기서는 잠들지 않고 완료 여부를 반복 확인한다.
-        while (is_running_.load() && manager_.iocp_server_.GetRunning()) {
-            if (manager_.GetCompleteTickWorkerCount() >= ServerThreadManager::MIN_AVAILABLE_TICK_WORKERS) break;
+        while (is_running_.load() && manager_.iocp_server_.IsRunning()) {
+            if (manager_.GetAvailableTickThreadCount() >= ServerThreadManager::MIN_AVAILABLE_TICK_THREADS) break;
             _mm_pause();
         }
-        if (!is_running_.load() || !manager_.iocp_server_.GetRunning()) break;
+        if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) break;
 
         const auto tick_start_time = Clock::now();
         // 실제로 깨어난 시각이 아닌 이전 예약 시각에 한 주기를 더하여 기본 틱 간격을 유지한다.
@@ -70,15 +70,15 @@ void TimerThread::Run()
         // 혼합 대기에서 틱 직전에 미리 깨어나기 위한 정보이며, 일반 수면 대기와 반복 검사에는 필요 없다.
         // manager_.next_tick_time_count_.store(next_tick.time_since_epoch().count());
 
-        // 새 틱이 생겼으니 TickWorker 들을 깨운다.
+        // 새 틱이 생겼으니 TickThread 들을 깨운다.
         // 사용 가능한 스레드를 확보하고 같은 틱의 처리 정보를 전달한다. 이전 틱의 전체 완료는 기다리지 않는다.
         manager_.StartTickPhase(); // 새 틱 발생
         // 데이터베이스는 작업 등록 시 즉시 깨우며, 여기서는 큐에 남은 작업을 다시 확인하도록 보조 알림을 보낸다.
-        manager_.iocp_server_.WakeDBWorkers();
+        manager_.iocp_server_.WakeDBThreads();
     }
 
     CloseHandle(high_resolution_timer);
-    if (is_running_.load() && !manager_.iocp_server_.GetRunning()) manager_.CloseThreads();
+    if (is_running_.load() && !manager_.iocp_server_.IsRunning()) manager_.CloseThreads();
 }
 
 void TimerThread::Close()

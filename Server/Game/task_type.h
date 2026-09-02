@@ -2,7 +2,7 @@
 #include <variant>
 #include "enum_class.h"
 
-constexpr int INPUT_TYPE_NUM = 5; // RIGHT, LEFT, DOWN, ROTATE, DROP
+constexpr int INPUT_TYPE_COUNT = 5; // RIGHT, LEFT, DOWN, ROTATE, DROP
 
 struct TaskMove {
 	EventType move_type;
@@ -21,7 +21,7 @@ struct TaskFix{
 	int fixed_y;
 };;
 
-struct TaskGameover {
+struct TaskGameOver {
 	
 };
 
@@ -39,7 +39,7 @@ struct TaskGameEnd {
 
 // 이벤트 타입 말고 따로 필요한 내용이 없다면 굳이 구조체로 안만든다
 
-using TaskVar = std::variant<TaskMove, TaskClearLine, TaskAddLine, TaskFix, TaskGameover, TaskUp, TaskGameEnd, TaskSpawn>;
+using TaskVar = std::variant<TaskMove, TaskClearLine, TaskAddLine, TaskFix, TaskGameOver, TaskUp, TaskGameEnd, TaskSpawn>;
 
 struct TaskType {
 	EventType event_type;

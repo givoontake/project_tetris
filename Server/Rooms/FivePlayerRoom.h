@@ -4,12 +4,12 @@
 
 class FivePlayerRoom : public MultiRoom
 {
-	std::array<RoomSession, 5> room_users_;
+	std::array<Player, 5> room_players_;
 
 public:
-	FivePlayerRoom(IOCPServer* server, OpenRoomInitData data);
-	FivePlayerRoom(IOCPServer* server, LockRoomInitData data);
+	FivePlayerRoom(IOCPServer* server, PublicRoomInitData data);
+	FivePlayerRoom(IOCPServer* server, PrivateRoomInitData data);
 
 private:
-	virtual std::span<RoomSession> GetRoomUsers() override;
+	virtual std::span<Player> GetRoomPlayers() override;
 };

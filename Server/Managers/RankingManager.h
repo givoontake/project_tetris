@@ -18,7 +18,7 @@ class RankingManager
 
 public:
 	void InitRanking(std::vector<RankingInfo>& initial_rankings);
-	void UpdateRanking(int id, const std::string& nickname, int score);
+	void UpdateRanking(int player_id, const std::string& nickname, int score);
 	std::vector<RankingInfo> GetRankings() const;
 };
 

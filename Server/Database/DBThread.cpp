@@ -1,4 +1,4 @@
-// Database.cpp
+// DBThread.cpp
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -9,7 +9,7 @@
 #include <jdbc/cppconn/connection.h>
 #include <jdbc/cppconn/driver.h>
 #include <jdbc/cppconn/metadata.h>
-#include "Database.h"
+#include "DBThread.h"
 #include "DBResult.h"
 
 #undef min
@@ -41,23 +41,23 @@ static inline void PrintDBConnectionInfo(sql::Connection* conn)
     std::cout << "===============================\n";
 }
 
-// -------------------- Database --------------------
+// -------------------- DBThread --------------------
 
-Database::Database()
+DBThread::DBThread()
 {
     LoadDBConfigFromFile("db_config.txt");
 }
 
-Database::~Database()
+DBThread::~DBThread()
 {
 }
 
-void Database::Init(HANDLE iocp)
+void DBThread::Init(HANDLE iocp_handle)
 {
-    iocp_handle_ = iocp;
+    iocp_handle_ = iocp_handle;
 }
 
-void Database::Close()
+void DBThread::Close()
 {
     {
         std::lock_guard<std::mutex> lock(wait_mutex_);
@@ -66,12 +66,12 @@ void Database::Close()
     cv_.notify_one();
 }
 
-void Database::Wake()
+void DBThread::Wake()
 {
     cv_.notify_one();
 }
 
-bool Database::TryEnqueue(std::unique_ptr<DBTask>& db_task)
+bool DBThread::TryEnqueue(std::unique_ptr<DBTask>& db_task)
 {
     try {
         std::lock_guard<std::mutex> lock(wait_mutex_);
@@ -85,14 +85,14 @@ bool Database::TryEnqueue(std::unique_ptr<DBTask>& db_task)
     return true;
 }
 
-bool Database::Enqueue(std::unique_ptr<ServerDBTask> db_task)
+bool DBThread::Enqueue(std::unique_ptr<ServerDBTask> db_task)
 {
     std::unique_ptr<DBTask> task = std::move(db_task);
     while (!TryEnqueue(task)) std::this_thread::yield();
     return true;
 }
 
-bool Database::Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session)
+bool DBThread::Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session)
 {
     if (!session->TryAddPending()) return false;
 
@@ -101,13 +101,13 @@ bool Database::Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>
     return true;
 }
 
-void Database::Enqueue(std::unique_ptr<MultiSessionDBTask> db_task)
+void DBThread::Enqueue(std::unique_ptr<MultiSessionDBTask> db_task)
 {
     std::unique_ptr<DBTask> task = std::move(db_task);
     while (!TryEnqueue(task)) std::this_thread::yield();
 }
 
-bool Database::LoadDBConfigFromFile(const std::string& file_path)
+bool DBThread::LoadDBConfigFromFile(const std::string& file_path)
 {
     std::ifstream file(file_path);
     if (!file.is_open())
@@ -163,32 +163,32 @@ bool Database::LoadDBConfigFromFile(const std::string& file_path)
     return true;
 }
 
-void Database::PostDBFailure(const DBTask& task)
+void DBThread::PostDBFailure(const DBTask& task)
 {
-    if (task.target == DBTaskTarget::MULTI_SESSION)
+    if (task.task_target == DBTaskTarget::MULTI_SESSION)
     {
         const auto& multi_session_task = static_cast<const MultiSessionDBTask&>(task);
         for (int i = 0; i < multi_session_task.player_count; ++i)
         {
             if ((multi_session_task.completion_mask & (1u << i)) == 0) continue;
-            auto* db_over = new DBOverlapped{ task.type };
+            auto* db_over = new DBOverlapped{ task.operation_type };
             db_over->ex_over.op_type = OPType::DB;
-            db_over->ex_over.key = multi_session_task.players[i];
+            db_over->ex_over.session_key = multi_session_task.player_keys[i];
             PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over));
         }
         return;
     }
 
-    auto* db_over = new DBOverlapped{ task.type };
+    auto* db_over = new DBOverlapped{ task.operation_type };
 
     db_over->ex_over.op_type = OPType::DB;
-    if (task.target == DBTaskTarget::SESSION) db_over->ex_over.key = static_cast<const SessionDBTask&>(task).key;
-    const ULONG_PTR completion_key = task.target == DBTaskTarget::SERVER ? DB_SERVER_COMPLETION : DB_SESSION_COMPLETION;
+    if (task.task_target == DBTaskTarget::SESSION) db_over->ex_over.session_key = static_cast<const SessionDBTask&>(task).session_key;
+    const ULONG_PTR completion_key = task.task_target == DBTaskTarget::SERVER ? DB_SERVER_COMPLETION : DB_SESSION_COMPLETION;
     PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), completion_key, reinterpret_cast<WSAOVERLAPPED*>(db_over));
 }
 
 // ---- DB 스레드 루프 ----
-void Database::Run()
+void DBThread::Run()
 {
     if (!Connect())
     {
@@ -248,7 +248,7 @@ void Database::Run()
     Disconnect();
 }
 
-bool Database::Connect()
+bool DBThread::Connect()
 {
     try
     {
@@ -257,10 +257,10 @@ bool Database::Connect()
         // Connector/C++ legacy는 보통 tcp://host:port
         const std::string url = "tcp://" + connection_info_.host + ":" + std::to_string(connection_info_.port);
 
-        caches_.conn.reset(driver->connect(url, connection_info_.id, connection_info_.password));
-        caches_.conn->setSchema(connection_info_.schema);
+		connection_context_.connection.reset(driver->connect(url, connection_info_.id, connection_info_.password));
+		connection_context_.connection->setSchema(connection_info_.schema);
 
-        PrintDBConnectionInfo(caches_.conn.get());
+		PrintDBConnectionInfo(connection_context_.connection.get());
 
         return true;
     }
@@ -271,26 +271,26 @@ bool Database::Connect()
     }
 }
 
-void Database::Disconnect()
+void DBThread::Disconnect()
 {
-    caches_.stmt_cache.clear();
+	connection_context_.statement_cache.clear();
 
-    if (caches_.conn)
+	if (connection_context_.connection)
     {
-        try { caches_.conn->close(); }
+		try { connection_context_.connection->close(); }
         catch (...) {}
-        caches_.conn.reset();
+		connection_context_.connection.reset();
     }
 }
 
-void Database::PrintErrorLog(const char* func_name, const std::exception& e)
+void DBThread::PrintErrorLog(const char* func_name, const std::exception& e)
 {
     std::cerr << "[ERROR] in " << func_name << "\n"
         << "  type: " << typeid(e).name() << "\n"
         << "  what(): " << e.what() << std::endl;
 }
 
-void Database::PrintErrorLog(const char* func_name, const sql::SQLException& e)
+void DBThread::PrintErrorLog(const char* func_name, const sql::SQLException& e)
 {
     std::cerr << "[DB][SQLException] in " << func_name << "\n"
         << "  what(): " << e.what() << "\n"
@@ -298,7 +298,7 @@ void Database::PrintErrorLog(const char* func_name, const sql::SQLException& e)
         << "  SQLState: " << e.getSQLState() << std::endl;
 }
 
-void Database::PrintErrorLog(const char* func_name)
+void DBThread::PrintErrorLog(const char* func_name)
 {
     std::cerr << "[ERROR] in " << func_name
         << "  (unknown exception)" << std::endl;

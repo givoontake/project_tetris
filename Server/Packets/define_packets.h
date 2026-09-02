@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <cstdint>
 #include <cstring>
 #include "settings.h"
@@ -19,7 +19,7 @@ struct S2C_ERROR_PACKET {
 
 struct S2C_TEST_LOGIN_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 };
 
 struct C2S_TEST_LOGIN_PACKET {
@@ -29,23 +29,23 @@ struct C2S_TEST_LOGIN_PACKET {
 
 struct S2C_LOGIN_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	int max_score;
 	int win_count;
 	int lose_count;
-	char nickname[MAX_USER_NAME];
+	char nickname[MAX_PLAYER_NAME_SIZE];
 };
 
 struct C2S_LOGIN_PACKET {
 	PACKET_HEADER header;
-	char login_id[MAX_USER_ID];
-	char login_password[MAX_USER_PASSWORD];
+	char login_id[MAX_PLAYER_ID_SIZE];
+	char login_password[MAX_PLAYER_PASSWORD_SIZE];
 };
 
 struct S2C_MESSAGE_PACKET {
 	PACKET_HEADER header;
-	int id;
-	char user_name[MAX_USER_NAME];
+	int player_id;
+	char nickname[MAX_PLAYER_NAME_SIZE];
 };
 
 struct C2S_MESSAGE_PACKET {
@@ -54,7 +54,7 @@ struct C2S_MESSAGE_PACKET {
 
 struct S2C_TEST_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	long long last_time;
 };
 
@@ -69,62 +69,62 @@ struct C2S_DISCONNECT_PACKET {
 
 struct S2C_DISCONNECT_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 };
 
-struct C2S_ADD_OPEN_ROOM_PACKET {
+struct C2S_ADD_PUBLIC_ROOM_PACKET {
 	PACKET_HEADER header;
-	char max_user;
-	char room_name[MAX_ROOM_NAME];
+	char max_player_count;
+	char room_name[MAX_ROOM_NAME_SIZE];
 };
 
-struct S2C_ADD_OPEN_ROOM_PACKET {
+struct S2C_ADD_PUBLIC_ROOM_PACKET {
 	PACKET_HEADER header;
-	int gen;
-	char max_user;
-	char room_name[MAX_ROOM_NAME];
+	int room_gen;
+	char max_player_count;
+	char room_name[MAX_ROOM_NAME_SIZE];
 };
 
-struct C2S_ADD_LOCK_ROOM_PACKET {
+struct C2S_ADD_PRIVATE_ROOM_PACKET {
 	PACKET_HEADER header;
-	char max_user;
-	char room_name[MAX_ROOM_NAME];
-	char room_password[MAX_ROOM_PASSWORD];
+	char max_player_count;
+	char room_name[MAX_ROOM_NAME_SIZE];
+	char room_password[MAX_ROOM_PASSWORD_SIZE];
 };
 
-struct S2C_ADD_LOCK_ROOM_PACKET {
+struct S2C_ADD_PRIVATE_ROOM_PACKET {
 	PACKET_HEADER header;
-	int gen;
-	char max_user;
-	char room_name[MAX_ROOM_NAME];
-	char room_password[MAX_ROOM_PASSWORD];
+	int room_gen;
+	char max_player_count;
+	char room_name[MAX_ROOM_NAME_SIZE];
+	char room_password[MAX_ROOM_PASSWORD_SIZE];
 };
 
-struct C2S_JOIN_OPEN_ROOM_PACKET {
+struct C2S_JOIN_PUBLIC_ROOM_PACKET {
 	PACKET_HEADER header;
 	int room_gen;
 };
 
-struct C2S_JOIN_LOCK_ROOM_PACKET {
+struct C2S_JOIN_PRIVATE_ROOM_PACKET {
 	PACKET_HEADER header;
 	int room_gen;
-	char room_password[MAX_ROOM_PASSWORD];
+	char room_password[MAX_ROOM_PASSWORD_SIZE];
 };
 
-struct S2C_ADD_USER_PACKET {
+struct S2C_ADD_PLAYER_PACKET {
 	PACKET_HEADER header;
-	int id;
-	char name[MAX_USER_NAME];
+	int player_id;
+	char nickname[MAX_PLAYER_NAME_SIZE];
 };
 
-struct C2S_DELETE_USER_PACKET {
+struct C2S_REMOVE_PLAYER_PACKET {
 	PACKET_HEADER header;
 	//int id;
 };
 
-struct S2C_DELETE_USER_PACKET {
+struct S2C_REMOVE_PLAYER_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 };
 
 struct C2S_READY_PACKET {
@@ -135,7 +135,7 @@ struct C2S_READY_PACKET {
 
 struct S2C_READY_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	bool is_ready;
 };
 
@@ -154,12 +154,12 @@ struct S2C_MULTI_START_PACKET {
 
 struct C2S_KICK_PACKET {
 	PACKET_HEADER header;
-	int kick_user_id;
+	int kick_player_id;
 };
 
 struct S2C_KICK_PACKET {
 	PACKET_HEADER header;
-	int kick_user_id;
+	int kick_player_id;
 };
 
 struct C2S_MOVE_PACKET {
@@ -169,13 +169,13 @@ struct C2S_MOVE_PACKET {
 
 struct S2C_MOVE_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	char move_type;
 };
 
 struct S2C_SPAWN_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	char tetromino_type;
 	char next_tetromino_type;
 	char spawn_x, spawn_y;
@@ -183,31 +183,31 @@ struct S2C_SPAWN_PACKET {
 
 struct S2C_FIX_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	char fixed_x, fixed_y;
 };
 
-struct S2C_CLEARLINE_PACKET {
+struct S2C_CLEAR_LINE_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	char line_index;
 	char combo;
 	int score;
 	// ?대━?대맆 以꾩쓽 ?몃뜳???섏뿉 ?곕씪 ?ㅼ뿉 媛蹂?쇰줈 遺숈뿬 蹂대궦??
 };
 
-struct S2C_ADDLINE_PACKET {
+struct S2C_ADD_LINE_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 	char hole_x;
 };;
 
-struct S2C_GAMEOVER_PACKET {
+struct S2C_GAME_OVER_PACKET {
 	PACKET_HEADER header;
-	int id;
+	int player_id;
 };
 
-struct S2C_GAMEEND_PACKET {
+struct S2C_GAME_END_PACKET {
 	PACKET_HEADER header;
 	int winner_id;
 };
@@ -228,7 +228,7 @@ struct S2C_UPDATE_HOST_PACKET {
 	int new_host_id;
 };
 
-struct C2S_GIVEUP_PACKET {
+struct C2S_GIVE_UP_PACKET {
 	PACKET_HEADER header;
 };
 
@@ -239,9 +239,9 @@ struct C2S_REQUEST_ROOM_LIST_PACKET {
 struct S2C_ROOM_INFO_PACKET {
 	PACKET_HEADER header;
 	int room_gen;
-	char room_name[MAX_ROOM_NAME];
-	char max_user;
-	char cur_user;
+	char room_name[MAX_ROOM_NAME_SIZE];
+	char max_player_count;
+	char current_player_count;
 	bool is_private;
 	bool is_play;
 };
@@ -253,12 +253,12 @@ struct S2C_INFO_PACKET {
 
 struct C2S_FAST_MATCHING_PACKET {
 	PACKET_HEADER header;
-	char max_user;
+	char max_player_count;
 };
 
-struct C2S_REQUEST_FRIEND_PACKET {
+struct C2S_ADD_FRIEND_REQUEST_PACKET {
 	PACKET_HEADER header;
-	int recver_id; // ?꾧뎄?먭쾶 蹂대궡?붿?
+	int receiver_id; // ?꾧뎄?먭쾶 蹂대궡?붿?
 };
 
 struct C2S_DELETE_FRIEND_PACKET {
@@ -271,10 +271,10 @@ struct C2S_ACCEPT_FRIEND_PACKET {
 	int requester_id;
 };
 
-struct S2C_REQUEST_FRIEND_PACKET {
+struct S2C_ADD_FRIEND_REQUEST_PACKET {
 	PACKET_HEADER header;
 	int requester_id; // ?꾧뎄?먭쾶 ?붾뒗吏
-	char requester_nickname[MAX_USER_NAME];
+	char requester_nickname[MAX_PLAYER_NAME_SIZE];
 };
 
 struct S2C_DELETE_FRIEND_PACKET {
@@ -285,17 +285,17 @@ struct S2C_DELETE_FRIEND_PACKET {
 struct S2C_ADD_FRIEND_PACKET {
 	PACKET_HEADER header;
 	int friend_id;
-	char friend_nickname[MAX_USER_NAME];
+	char friend_nickname[MAX_PLAYER_NAME_SIZE];
 };
 
-struct C2S_REQUEST_LOBBY_USER_LIST_PACKET {
+struct C2S_REQUEST_LOBBY_PLAYER_LIST_PACKET {
 	PACKET_HEADER header;
 };
 
-struct S2C_LOBBY_USER_INFO_PACKET {
+struct S2C_LOBBY_PLAYER_INFO_PACKET {
 	PACKET_HEADER header;
-	int user_id;
-	char nickname[MAX_USER_NAME];
+	int player_id;
+	char nickname[MAX_PLAYER_NAME_SIZE];
 };
 
 struct C2S_REQUEST_FRIEND_LIST_PACKET {
@@ -304,18 +304,18 @@ struct C2S_REQUEST_FRIEND_LIST_PACKET {
 
 struct S2C_FRIEND_INFO_PACKET {
 	PACKET_HEADER header;
-	int user_id;
-	char nickname[MAX_USER_NAME];
+	int player_id;
+	char nickname[MAX_PLAYER_NAME_SIZE];
 	bool is_lobby; // ?몃? ?곹깭瑜?蹂댁뿬二쇰젮硫??섏쨷??char濡?諛붽씀湲?
 };
 
-struct C2S_REQUEST_RANKING_PACKET {
+struct C2S_REQUEST_RANKINGS_PACKET {
 	PACKET_HEADER header;
 };
 
 struct S2C_RANKING_INFO_PACKET {
 	PACKET_HEADER header;
-	char nickname[MAX_USER_NAME];
+	char nickname[MAX_PLAYER_NAME_SIZE];
 	int score;
 };
 

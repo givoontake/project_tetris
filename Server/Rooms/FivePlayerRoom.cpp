@@ -1,18 +1,18 @@
 #include "FivePlayerRoom.h"
 
-FivePlayerRoom::FivePlayerRoom(IOCPServer* server, OpenRoomInitData data)
+FivePlayerRoom::FivePlayerRoom(IOCPServer* server, PublicRoomInitData data)
 	: MultiRoom(server, data)
 {
-	max_user_ = 5;
+	max_player_count_ = 5;
 }
 
-FivePlayerRoom::FivePlayerRoom(IOCPServer* server, LockRoomInitData data)
+FivePlayerRoom::FivePlayerRoom(IOCPServer* server, PrivateRoomInitData data)
 	: MultiRoom(server, data)
 {
-	max_user_ = 5;
+	max_player_count_ = 5;
 }
 
-std::span<RoomSession> FivePlayerRoom::GetRoomUsers()
+std::span<Player> FivePlayerRoom::GetRoomPlayers()
 {
-	return room_users_;
+	return room_players_;
 }

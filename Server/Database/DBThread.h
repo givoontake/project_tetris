@@ -1,4 +1,4 @@
-// Database.h
+// DBThread.h
 #pragma once
 #include <WinSock2.h>
 #include <MSWSock.h>
@@ -38,32 +38,32 @@ struct DBConnectionInfo
     std::string schema{ "tetris" };
 };
 
-struct DBCaches
+struct DBConnectionContext
 {
-    std::unique_ptr<sql::Connection> conn;
-    std::unordered_map<DBOperationType, std::unique_ptr<sql::PreparedStatement>> stmt_cache;
+	std::unique_ptr<sql::Connection> connection;
+	std::unordered_map<DBOperationType, std::unique_ptr<sql::PreparedStatement>> statement_cache;
 
-    sql::PreparedStatement* GetStmt(DBOperationType id)
-    {
-        auto it = stmt_cache.find(id);
-        return (it == stmt_cache.end()) ? nullptr : it->second.get();
-    }
+	sql::PreparedStatement* GetStatement(DBOperationType operation_type)
+	{
+		auto it = statement_cache.find(operation_type);
+		return (it == statement_cache.end()) ? nullptr : it->second.get();
+	}
 };
 
-class Database : public ServerThread
+class DBThread : public ServerThread
 {
 protected:
     HANDLE iocp_handle_ = nullptr;
-    DBCaches caches_;
+    DBConnectionContext connection_context_;
 
 public:
-    Database();
-    ~Database() override;
+    DBThread();
+    ~DBThread() override;
 
-    Database(const Database&) = delete;
-    Database& operator=(const Database&) = delete;
+    DBThread(const DBThread&) = delete;
+    DBThread& operator=(const DBThread&) = delete;
 
-    void Init(HANDLE iocp);
+    void Init(HANDLE iocp_handle);
     void Close() override;
     void Wake();
     void Run() override;

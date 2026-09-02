@@ -39,8 +39,6 @@ public:
 	void SetDownTimeoutTick(int val) { down_timeout_tick_counter_ = val; }
 	void SetGarbageLineTick(int val) { garbage_line_tick_counter_ = val; }
 
-	void SetDownTimeout(int val) { down_timeout_ = val; }
-	void SetGarbageLineTimeout(int val) { garbage_line_timeout_ = val; }
 
 	void InitTickData();
 	void UpdateTickData();

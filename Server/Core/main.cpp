@@ -8,7 +8,7 @@ int main()
 
     auto iocp_server = std::make_unique<IOCPServer>();
     iocp_server->StartServer();
-    iocp_server->InitDBWorkers();
+    iocp_server->InitDBThreads();
 
     ServerThreadManager server_thread_manager(*iocp_server);
     server_thread_manager.StartThreads();

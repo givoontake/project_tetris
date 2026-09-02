@@ -1,27 +1,27 @@
 #include <botan/bcrypt.h>
-#include "LoginDBWorker.h"
+#include "LoginDBThread.h"
 #include "DBResult.h"
 
-void LoginDBWorker::ExecuteLogin(SessionKey key, const std::string& login_id, const std::string& password)
+void LoginDBThread::ExecuteLogin(SessionKey session_key, const std::string& login_id, const std::string& password)
 {
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::LOGIN); // 기본 실패로 두고, 성공 조건에서만 true
     db_over->ex_over.op_type = OPType::DB;
-    db_over->ex_over.key = key;
+    db_over->ex_over.session_key = session_key;
 
     try
     {
         // 1) PreparedStatement 확보 (캐시 없으면 준비)
-        auto* stmt = caches_.GetStmt(DBOperationType::LOGIN);
+		auto* stmt = connection_context_.GetStatement(DBOperationType::LOGIN);
         if (!stmt) // 캐시가 없으면 캐시를 만들고 다시 캐시를 가져오고, 그래도 없으면 실패 처리
         {
             const char* SQL_LOGIN =
-                "SELECT user_id, nickname, password_hash, single_score, win, lose "
-                "FROM users "
+                "SELECT player_id, nickname, password_hash, single_score, win, lose "
+                "FROM players "
                 "WHERE login_id=? "
                 "LIMIT 1";
 
-            caches_.stmt_cache[DBOperationType::LOGIN].reset(caches_.conn->prepareStatement(SQL_LOGIN));
-            stmt = caches_.GetStmt(DBOperationType::LOGIN);
+			connection_context_.statement_cache[DBOperationType::LOGIN].reset(connection_context_.connection->prepareStatement(SQL_LOGIN));
+			stmt = connection_context_.GetStatement(DBOperationType::LOGIN);
             if (!stmt)
             {
                 PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
@@ -43,7 +43,7 @@ void LoginDBWorker::ExecuteLogin(SessionKey key, const std::string& login_id, co
             {
                 auto result_data = std::make_unique<DBResultLogin>(); // 동적할당 및 객체 수명관리 시작
                 DBResultLogin* result = result_data.get(); // 값 조작용 raw 포인터
-                result->id = rs->getInt(1);
+				result->player_id = rs->getInt(1);
                 result->login_id = login_id;
                 result->nickname = rs->getString(2);
                 result->max_score = rs->getInt(4);
@@ -62,8 +62,8 @@ void LoginDBWorker::ExecuteLogin(SessionKey key, const std::string& login_id, co
     PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
 }
 
-void LoginDBWorker::ProcessTask(DBTask& task)
+void LoginDBThread::ProcessTask(DBTask& task)
 {
     auto& login_task = static_cast<DBLoginTask&>(task);
-    ExecuteLogin(login_task.key, login_task.login_id, login_task.password);
+    ExecuteLogin(login_task.session_key, login_task.login_id, login_task.password);
 }

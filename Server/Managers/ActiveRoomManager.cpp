@@ -19,7 +19,7 @@ void ActiveRoomManager::RemoveRoom(int room_gen, const SP<TetrisRoom>& room)
 	active_rooms_.erase(it);
 }
 
-SP<TetrisRoom> ActiveRoomManager::FindRoom(int room_gen)
+SP<TetrisRoom> ActiveRoomManager::FindRoomByGen(int room_gen)
 {
 	std::lock_guard<std::mutex> lock(active_rooms_mutex_);
 	auto it = active_rooms_.find(room_gen);

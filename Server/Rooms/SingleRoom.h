@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <array>
-#include "RoomSession.h"
+#include "Player.h"
 #include "Session.h"
 #include "define_packets.h"
 #include "IOCPServer.h"
@@ -9,15 +9,15 @@
 
 class SingleRoom : public TetrisRoom
 {
-	std::array<RoomSession, 1> room_users_;
+	std::array<Player, 1> room_players_;
 
 public:
-	SingleRoom(IOCPServer* server, OpenRoomInitData data);
-	SingleRoom(IOCPServer* server, LockRoomInitData data);
+	SingleRoom(IOCPServer* server, PublicRoomInitData data);
+	SingleRoom(IOCPServer* server, PrivateRoomInitData data);
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, const SP<Session>& request_session) override;
-	virtual void DeleteUser(const int id) override;
+	virtual void RemovePlayer(const int player_id) override;
 	virtual void SendCreateRoom(const SP<Session>& session) override;
 	void StartGame();
 
@@ -25,12 +25,9 @@ public:
 	void CalculateScore(int clear_line_count);
 	void RequestUpdateScore();
 
-	void MakeMovePacketData(int move_type);
-	void ReduceTimeouts(int type);
-
 private:
-	virtual std::span<RoomSession> GetRoomUsers() override;
-	virtual void ProcessSpecificRoomTask(const RoomTaskInfo& task) override;
+	virtual std::span<Player> GetRoomPlayers() override;
+	virtual void ProcessSpecificRoomTask(const RoomTask& task) override;
 	virtual void ProcessGameTick() override;
 	void GiveUp(const SP<Session>& request_session);
 };

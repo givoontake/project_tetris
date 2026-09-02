@@ -20,11 +20,11 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 
 // 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
 // 그러면 회전된 테트로미노 관리가 수월해진다.
-EventType Tetris::HandleTetrominoKeyInput(EventType move_type) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
+EventType Tetris::ProcessMoveInput(EventType move_type) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
 {
     PrintMoveType(move_type);
     Tetromino if_move_tetromino = current_tetromino_;
-	if(!CheckInputAllow(move_type)) return EventType::NONE;
+	if(!IsInputAllowed(move_type)) return EventType::NONE;
     switch (move_type) {
     case EventType::RIGHT:
         ++if_move_tetromino.moved_pos.x;
@@ -92,16 +92,16 @@ EventType Tetris::HandleTetrominoKeyInput(EventType move_type) //bool 반환은 
 	return EventType::NONE;
 }
 
-bool Tetris::IsValidPosition(const Tetromino& t)
+bool Tetris::IsValidPosition(const Tetromino& tetromino)
 {
-    Position real_pos[4]; 
+    Position board_positions[4];
 
     for (int i = 0; i < 4; ++i) {
-        real_pos[i].x = t.default_pos[i].x + t.moved_pos.x;
-        real_pos[i].y = t.default_pos[i].y + t.moved_pos.y;
+        board_positions[i].x = tetromino.default_pos[i].x + tetromino.moved_pos.x;
+        board_positions[i].y = tetromino.default_pos[i].y + tetromino.moved_pos.y;
     }
 
-    for (auto& pos : real_pos) {
+    for (auto& pos : board_positions) {
         if (pos.x < 0 || pos.x > BOARD_WIDTH - 1) return false;
         if (pos.y < 0 || pos.y > TOTAL_HEIGHT - 1) return false;
         if (board_[pos.y][pos.x] == true) return false;
@@ -111,14 +111,14 @@ bool Tetris::IsValidPosition(const Tetromino& t)
 
 void Tetris::FixTetromino()
 {
-    Position real_pos[4];
+    Position board_positions[4];
 
     for (int i = 0; i < 4; ++i) {
-        real_pos[i].x = current_tetromino_.default_pos[i].x + current_tetromino_.moved_pos.x;
-        real_pos[i].y = current_tetromino_.default_pos[i].y + current_tetromino_.moved_pos.y;
+        board_positions[i].x = current_tetromino_.default_pos[i].x + current_tetromino_.moved_pos.x;
+        board_positions[i].y = current_tetromino_.default_pos[i].y + current_tetromino_.moved_pos.y;
     }
 
-    for (auto& pos : real_pos) {
+    for (auto& pos : board_positions) {
         board_[pos.y][pos.x] = true;
     }
 }
@@ -135,11 +135,11 @@ void Tetris::ClearLine()
             // (숨겨진 0~RESERVE_HEIGHT-1 줄도 같이 아래로 내려오지만,
             //  줄 삭제 시의 "중력"은 전체 스택을 대상으로 적용)
             std::rotate(board_.begin(), board_.begin() + y, board_.begin() + y + 1);
-            TaskType t_type;
-			t_type.event_type = EventType::CLEARLINE;
-			t_type.task = TaskClearLine{ y };
-			send_tasks_.emplace_back(t_type);
-			++cleared_lines_;
+            TaskType task;
+			task.event_type = EventType::CLEAR_LINE;
+			task.task = TaskClearLine{ y };
+			send_tasks_.emplace_back(task);
+			++cleared_line_count_;
 			//std::cout << "Cleared line index y = " << y << "\n";
         }
     }
@@ -148,18 +148,18 @@ void Tetris::ClearLine()
 void Tetris::AddGarbageLines() // 팬딩에 add되어야 할 라인 로직 계산 후 채워줌
 {
     // 줄 추가작업
-    for (size_t i = 0; i < pending_garbage_lines_; i++){
+    for (size_t i = 0; i < pending_garbage_line_count_; i++){
         std::rotate(board_.begin(), board_.begin() + 1, board_.end());
         std::fill(board_[TOTAL_HEIGHT - 1].begin(), board_[TOTAL_HEIGHT - 1].end(), true);
-        int hole_x = GetRandomHoleX();
+        int hole_x = GenerateRandomGarbageHole();
         board_[TOTAL_HEIGHT - 1][hole_x] = false;
 
 		TaskType add_line;
-		add_line.event_type = EventType::ADDLINE;
+		add_line.event_type = EventType::ADD_LINE;
         add_line.task = TaskAddLine{ .hole_x = hole_x };
         send_tasks_.emplace_back(add_line);
 
-        if (CheckGameover()) return;
+        if (CheckGameOver()) return;
 
         // 테트로미노와 겹치면 안겹치게 테트로미노 위로 올리기
         if (!IsValidPosition(current_tetromino_)) {
@@ -172,7 +172,7 @@ void Tetris::AddGarbageLines() // 팬딩에 add되어야 할 라인 로직 계�
     }
 }
 
-int Tetris::GetRandomHoleX()
+int Tetris::GenerateRandomGarbageHole()
 {
     // OS/하드웨어 엔트로피에서 시드 생성
     static int prev_x = 0;
@@ -206,64 +206,30 @@ void Tetris::Clear()
 	tick_counters_.InitTickData();
 }
 
-bool Tetris::CheckGameover()
+bool Tetris::CheckGameOver()
 {
-	bool is_gameover = false;
+	bool is_game_over = false;
     for (int x = 0; x < BOARD_WIDTH; ++x) {
         for (int y = 0; y < HIDDEN_HEIGHT; ++y) {
             if (board_[y][x] == true) {
-				is_gameover = true;
+				is_game_over = true;
 				break;
             }
         }
-        if (is_gameover) break;
+        if (is_game_over) break;
     }
 
-    if (is_gameover) {
-        TaskType t_type;
-        t_type.event_type = EventType::GAMEOVER;
-        t_type.task = TaskGameover{};
-		send_tasks_.emplace_back(t_type);
+    if (is_game_over) {
+        TaskType task;
+        task.event_type = EventType::GAME_OVER;
+        task.task = TaskGameOver{};
+		send_tasks_.emplace_back(task);
     }
 
-    return is_gameover;
+    return is_game_over;
 }
 
-void Tetris::DebugPrintBoard()
-{
-    // 현재 테트로미노의 실제 보드 상 위치 계산
-    std::array<Position, 4> real_tetromino_pos;
-    for (int i = 0; i < 4; ++i) {
-        real_tetromino_pos[i].x = current_tetromino_.default_pos[i].x + current_tetromino_.moved_pos.x;
-        real_tetromino_pos[i].y = current_tetromino_.default_pos[i].y + current_tetromino_.moved_pos.y;
-    }
-
-    std::cout << "====== Tetris Board (y: 0 ~ " << (TOTAL_HEIGHT - 1) << ") ======\n";
-
-    for (int y = 0; y < TOTAL_HEIGHT; ++y) {
-        std::cout << "|";
-        for (int x = 0; x < BOARD_WIDTH; ++x) {
-
-            bool is_current = false;
-            for (const auto& p : real_tetromino_pos) {
-                if (p.x == x && p.y == y) {
-                    is_current = true;
-                    break;
-                }
-            }
-
-            if (is_current)
-                std::cout << "▣";          // 현재 떨어지는 테트로미노: 빗금 네모
-            else
-                std::cout << (board_[y][x] ? "■" : "□");  // 고정된 블록 / 빈 칸
-        }
-        std::cout << "|\n";
-    }
-
-    std::cout << "====================================\n";
-}
-
-bool Tetris::CheckInputAllow(EventType move_type)
+bool Tetris::IsInputAllowed(EventType move_type)
 {
     switch (move_type)
     {
@@ -292,14 +258,14 @@ bool Tetris::CheckInputAllow(EventType move_type)
     }
 }
 
-void Tetris::TickProcess()
+void Tetris::ProcessTick()
 {
     //// 첫 번째로 줄 추가 처리
     //if (tick_data.GetGarbageLineTick() >= tick_data.GetGarbageLineTimeout()) {
     //    tick_data.SetGarbageLineTick(0);
     //    AddGarbageLines(1, send_pending_tasks);
-    //    for (auto& t : send_pending_tasks) {
-    //        if (t.event_type == EventType::GAMEOVER) {
+    //    for (auto& task : send_pending_tasks) {
+    //        if (task.event_type == EventType::GAME_OVER) {
     //            return send_pending_tasks;
     //        }
     //    }
@@ -308,7 +274,7 @@ void Tetris::TickProcess()
     // 첫 번째로 줄 추가 처리
     if (tick_counters_.GetGarbageLineTick() >= tick_counters_.GetGarbageLineTimeout()) {
         tick_counters_.SetGarbageLineTick(0);
-        ++pending_garbage_lines_;
+        ++pending_garbage_line_count_;
     }
 
     // 두 번째로 쌓인 입력 처리
@@ -320,19 +286,19 @@ void Tetris::TickProcess()
 
     // 중복되는 이벤트 합치기
     for (auto& type : input_tasks_) {
-        int t = static_cast<int>(type);
-        if (t < 0 || t >= INPUT_TYPE_NUM) {
-            std::cout << "Tetris::TickProcess() - Invalid input task type: " << t << "\n";
+        int input_type_index = static_cast<int>(type);
+        if (input_type_index < 0 || input_type_index >= INPUT_TYPE_COUNT) {
+            std::cout << "Tetris::ProcessTick() - Invalid input task type: " << input_type_index << "\n";
             continue;
         }
-        pending_moves_[static_cast<int>(t)] = true;
+        pending_moves_[static_cast<int>(input_type_index)] = true;
     }
 
     // 합쳐진 이벤트들 처리
     for (int i = static_cast<int>(EventType::DROP); i >= static_cast<int>(EventType::RIGHT); --i) {
         if (pending_moves_[i] == true) {
-            EventType t = static_cast<EventType>(i);
-			EventType result = HandleTetrominoKeyInput(t);
+            EventType move_type = static_cast<EventType>(i);
+			EventType result = ProcessMoveInput(move_type);
             if (result == EventType::NONE) {
                 continue;
             }
@@ -344,7 +310,7 @@ void Tetris::TickProcess()
 
                 ClearLine();
                 // 게임오버는 룸에서 상태를 변경시키는 이벤트인데, 여기서 수행하면 상태를 변경할 수가 없다..
-				CheckGameover();
+				CheckGameOver();
             }
         }
     }
@@ -355,7 +321,7 @@ void Tetris::ResetTickData()
 	pending_moves_.fill(false);
     input_tasks_.clear();
 	send_tasks_.clear();
-    pending_garbage_lines_ = 0;
-    cleared_lines_ = 0;
+    pending_garbage_line_count_ = 0;
+    cleared_line_count_ = 0;
 }
 

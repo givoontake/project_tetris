@@ -1,11 +1,11 @@
 #include "MultiRoom.h"
 
-MultiRoom::MultiRoom(IOCPServer* server, OpenRoomInitData data)
+MultiRoom::MultiRoom(IOCPServer* server, PublicRoomInitData data)
 	: TetrisRoom(server, data)
 {
 }
 
-MultiRoom::MultiRoom(IOCPServer* server, LockRoomInitData data)
+MultiRoom::MultiRoom(IOCPServer* server, PrivateRoomInitData data)
 	: TetrisRoom(server, data)
 {
 }
@@ -17,7 +17,7 @@ MultiRoom::~MultiRoom()
 bool MultiRoom::AddHostSession(const SP<Session>& session)
 {
 	if (!InitHostSession(session)) return false;
-	host_id_ = session->GetDBInfo().id;
+	host_id_ = session->GetDBInfo().player_id;
 	return true;
 }
 
@@ -26,18 +26,18 @@ void MultiRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 	if (!request_session) return;
 	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
 	case C2S_READY: {
-		RoomTaskInfo task;
-		task.type = RoomTaskType::READY;
+		RoomTask task;
+		task.task_type = RoomTaskType::READY;
 		task.session = request_session;
 		AddRoomTask(std::move(task));
 		break;
 	}
 	case C2S_KICK: {
 		C2S_KICK_PACKET* kick_p = reinterpret_cast<C2S_KICK_PACKET*>(packet);
-		RoomTaskInfo task;
-		task.type = RoomTaskType::KICK;
+		RoomTask task;
+		task.task_type = RoomTaskType::KICK;
 		task.session = request_session;
-		task.target_id = kick_p->kick_user_id;
+		task.target_player_id = kick_p->kick_player_id;
 		AddRoomTask(std::move(task));
 		break;
 	}
@@ -47,31 +47,31 @@ void MultiRoom::HandlePacket(char* packet, const SP<Session>& request_session)
 	}
 }
 
-bool MultiRoom::AddUserTask(const SP<Session>& new_session, int matching_max_user)
+bool MultiRoom::AddPlayerTask(const SP<Session>& new_session, int matching_max_player_count)
 {
-	RoomTaskInfo task;
-	task.type = RoomTaskType::JOIN;
+	RoomTask task;
+	task.task_type = RoomTaskType::JOIN;
 	task.session = new_session;
-	task.matching_max_user = matching_max_user;
+	task.matching_max_player_count = matching_max_player_count;
 	return AddRoomTask(std::move(task));
 }
 
-int MultiRoom::AddUser(const SP<Session>& new_session)
+int MultiRoom::AddPlayer(const SP<Session>& new_session)
 {
 	if (!new_session) return ErrorCode::INVALID_REQUEST;
-	if (!IsRoomSession(new_session)) return ErrorCode::INVALID_REQUEST;
-	auto room_users = GetRoomUsers();
-	//C2S_ADD_USER_PACKET* recv_p = reinterpret_cast<C2S_ADD_USER_PACKET*>(packet);
+	if (!IsPlayerInRoom(new_session)) return ErrorCode::INVALID_REQUEST;
+	auto room_players = GetRoomPlayers();
+	//C2S_ADD_PLAYER_PACKET* recv_p = reinterpret_cast<C2S_ADD_PLAYER_PACKET*>(packet);
 	int result = ErrorCode::ROOM_FULL;
 	int added_slot = -1;
 	if (room_state_ == RoomState::WAIT) {
-		for (int i = 0; i < room_users.size(); ++i) {
-			auto& r_user = room_users[i];
-			if (r_user.GetSession()) continue;
+		for (int i = 0; i < room_players.size(); ++i) {
+			auto& room_player = room_players[i];
+			if (room_player.GetSession()) continue;
 
 			else {
-				if (!r_user.InitRoomSession(new_session, room_index_)) return ErrorCode::INVALID_REQUEST;
-				++cur_user_;
+				if (!room_player.InitPlayer(new_session, room_index_)) return ErrorCode::INVALID_REQUEST;
+				++current_player_count_;
 				result = SUCCESS;
 				added_slot = i;
 				break;
@@ -81,51 +81,51 @@ int MultiRoom::AddUser(const SP<Session>& new_session)
 
 	if (result == SUCCESS) {
 		if (room_password_.empty()) {
-			S2C_ADD_OPEN_ROOM_PACKET open_p;
-			open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
-			open_p.header.type = S2C_ADD_OPEN_ROOM;
-			open_p.gen = room_gen_;
-			open_p.max_user = max_user_;
-			server_->StringToCharBuf(room_name_, open_p.room_name, sizeof(open_p.room_name));
-			new_session->SendPacket(reinterpret_cast<char*>(&open_p), server_->GetHandle());
+			S2C_ADD_PUBLIC_ROOM_PACKET public_p;
+			public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
+			public_p.header.type = S2C_ADD_PUBLIC_ROOM;
+			public_p.room_gen = room_gen_;
+			public_p.max_player_count = max_player_count_;
+			server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
+			new_session->SendPacket(reinterpret_cast<char*>(&public_p), server_->GetIOCPHandle());
 		}
 		else {
-			S2C_ADD_LOCK_ROOM_PACKET lock_p;
-			lock_p.header.size = static_cast<std::uint16_t>(sizeof(lock_p));
-			lock_p.header.type = S2C_ADD_LOCK_ROOM;
-			lock_p.gen = room_gen_;
-			lock_p.max_user = max_user_;
-			server_->StringToCharBuf(room_name_, lock_p.room_name, sizeof(lock_p.room_name));
-			server_->StringToCharBuf(room_password_, lock_p.room_password, sizeof(lock_p.room_password));
-			new_session->SendPacket(reinterpret_cast<char*>(&lock_p), server_->GetHandle());
+			S2C_ADD_PRIVATE_ROOM_PACKET private_p;
+			private_p.header.size = static_cast<std::uint16_t>(sizeof(private_p));
+			private_p.header.type = S2C_ADD_PRIVATE_ROOM;
+			private_p.room_gen = room_gen_;
+			private_p.max_player_count = max_player_count_;
+			server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
+			server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
+			new_session->SendPacket(reinterpret_cast<char*>(&private_p), server_->GetIOCPHandle());
 		}
 
 		// 본인의 입장을 본인 제외 나머지에게(방 생성 시 본인은 방에 추가된다)
-		for (int i = 0; i < room_users.size(); ++i) {
+		for (int i = 0; i < room_players.size(); ++i) {
 			if (i == added_slot) continue;
-			auto& r_user = room_users[i];
-			auto session = r_user.GetSession();
+			auto& room_player = room_players[i];
+			auto session = room_player.GetSession();
 			if (!session) continue;
-			S2C_ADD_USER_PACKET add_p;
+			S2C_ADD_PLAYER_PACKET add_p;
 			add_p.header.size = static_cast<std::uint16_t>(sizeof(add_p));
-			add_p.header.type = S2C_ADD_USER;
-			add_p.id = new_session->GetDBInfo().id;
-			server_->StringToCharBuf(new_session->GetDBInfo().nickname, add_p.name, sizeof(add_p.name));
-			session->SendPacket(reinterpret_cast<char*>(&add_p), server_->GetHandle());
+			add_p.header.type = S2C_ADD_PLAYER;
+			add_p.player_id = new_session->GetDBInfo().player_id;
+			server_->StringToCharBuf(new_session->GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
+			session->SendPacket(reinterpret_cast<char*>(&add_p), server_->GetIOCPHandle());
 		}
 
-		// 본인 제외 나머지 유저를 본인에게
-		for (int i = 0; i < room_users.size(); ++i)	{
+		// 본인 제외 나머지 플레이어를 본인에게
+		for (int i = 0; i < room_players.size(); ++i)	{
 			if (i == added_slot) continue;
-			auto& r_user = room_users[i];
-			auto session = r_user.GetSession();
+			auto& room_player = room_players[i];
+			auto session = room_player.GetSession();
 			if (!session) continue;
-			S2C_ADD_USER_PACKET add_p;
+			S2C_ADD_PLAYER_PACKET add_p;
 			add_p.header.size = static_cast<std::uint16_t>(sizeof(add_p));
-			add_p.header.type = S2C_ADD_USER;
-			add_p.id = session->GetDBInfo().id;
-			server_->StringToCharBuf(session->GetDBInfo().nickname, add_p.name, sizeof(add_p.name));
-			new_session->SendPacket(reinterpret_cast<char*>(&add_p), server_->GetHandle());
+			add_p.header.type = S2C_ADD_PLAYER;
+			add_p.player_id = session->GetDBInfo().player_id;
+			server_->StringToCharBuf(session->GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
+			new_session->SendPacket(reinterpret_cast<char*>(&add_p), server_->GetIOCPHandle());
 		}
 
 		// 새로 입장한 세션에게 방장이 누구인지
@@ -133,34 +133,34 @@ int MultiRoom::AddUser(const SP<Session>& new_session)
 		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
 		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id_;
-		new_session->SendPacket(reinterpret_cast<char*>(&host_p), server_->GetHandle());
+		new_session->SendPacket(reinterpret_cast<char*>(&host_p), server_->GetIOCPHandle());
 		return result;
 	}
 
-	else if (room_state_ == RoomState::PLAY) result = ErrorCode::ROOM_INGAME;
+	else if (room_state_ == RoomState::PLAY) result = ErrorCode::ROOM_IN_GAME;
 
 	else if (room_state_ == RoomState::WAITING_DELETE) result = ErrorCode::ROOM_NOT_FOUND;
 
 	return result;
 }
 
-void MultiRoom::DeleteUser(const int id)
+void MultiRoom::RemovePlayer(const int player_id)
 {
-	auto room_users = GetRoomUsers();
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	auto room_players = GetRoomPlayers();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		if (session->GetDBInfo().id == id) { // 삭제할 아이디 검색
-			if (cur_user_.load() == 1) BeginRoomDelete();
-			S2C_DELETE_USER_PACKET p;
+		if (session->GetDBInfo().player_id == player_id) { // 삭제할 아이디 검색
+			if (current_player_count_.load() == 1) BeginRoomDelete();
+			S2C_REMOVE_PLAYER_PACKET p;
 			p.header.size = static_cast<std::uint16_t>(sizeof(p));
-			p.header.type = S2C_DELETE_USER;
-			p.id = id;
+			p.header.type = S2C_REMOVE_PLAYER;
+			p.player_id = player_id;
 
-			Broadcast(reinterpret_cast<char*>(&p), server_->GetHandle());
-			r_user.ClearRoomSession();
-			--cur_user_;
-			if (id == host_id_) FindNewHost(); // 여기서 찾기 및 못찾을 경우 삭제까지 같이 함
+			Broadcast(reinterpret_cast<char*>(&p), server_->GetIOCPHandle());
+			room_player.ClearPlayer();
+			--current_player_count_;
+			if (player_id == host_id_) FindNewHost(); // 여기서 찾기 및 못찾을 경우 삭제까지 같이 함
 			break;
 		}
 	}
@@ -170,105 +170,105 @@ void MultiRoom::SendCreateRoom(const SP<Session>& session)
 {
 	if (!session) return;
 	if (room_password_.empty()) {
-		S2C_ADD_OPEN_ROOM_PACKET open_p;
-		open_p.header.size = static_cast<std::uint16_t>(sizeof(open_p));
-		open_p.header.type = S2C_ADD_OPEN_ROOM;
-		open_p.gen = room_gen_;
-		open_p.max_user = max_user_;
-		server_->StringToCharBuf(room_name_, open_p.room_name, sizeof(open_p.room_name));
-		session->SendPacket(reinterpret_cast<char*>(&open_p), server_->GetHandle());
+		S2C_ADD_PUBLIC_ROOM_PACKET public_p;
+		public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
+		public_p.header.type = S2C_ADD_PUBLIC_ROOM;
+		public_p.room_gen = room_gen_;
+		public_p.max_player_count = max_player_count_;
+		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
+		session->SendPacket(reinterpret_cast<char*>(&public_p), server_->GetIOCPHandle());
 	}
 	else {
-		S2C_ADD_LOCK_ROOM_PACKET lock_p;
-		lock_p.header.size = static_cast<std::uint16_t>(sizeof(lock_p));
-		lock_p.header.type = S2C_ADD_LOCK_ROOM;
-		lock_p.gen = room_gen_;
-		lock_p.max_user = max_user_;
-		server_->StringToCharBuf(room_name_, lock_p.room_name, sizeof(lock_p.room_name));
-		server_->StringToCharBuf(room_password_, lock_p.room_password, sizeof(lock_p.room_password));
-		session->SendPacket(reinterpret_cast<char*>(&lock_p), server_->GetHandle());
+		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
+		private_p.header.size = static_cast<std::uint16_t>(sizeof(private_p));
+		private_p.header.type = S2C_ADD_PRIVATE_ROOM;
+		private_p.room_gen = room_gen_;
+		private_p.max_player_count = max_player_count_;
+		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
+		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
+		session->SendPacket(reinterpret_cast<char*>(&private_p), server_->GetIOCPHandle());
 	}
 	FindNewHost();
 	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
 }
 
-void MultiRoom::ReadyUser(int id)
+void MultiRoom::TogglePlayerReady(int player_id)
 {
-	if (host_id_ == id) return;
-	auto room_users = GetRoomUsers();
+	if (host_id_ == player_id) return;
+	auto room_players = GetRoomPlayers();
 	bool is_ready = false;
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		if (session->GetDBInfo().id == id) { // 레디 상태 
-			if (r_user.GetRoomUserState() == RoomUserState::READY) {
-				r_user.SetRoomUserState(RoomUserState::WAIT);
+		if (session->GetDBInfo().player_id == player_id) { // 레디 상태
+			if (room_player.GetRoomPlayerState() == RoomPlayerState::READY) {
+				room_player.SetRoomPlayerState(RoomPlayerState::WAIT);
 				is_ready = false;
 			}
-			else if (r_user.GetRoomUserState() == RoomUserState::WAIT) {
-				r_user.SetRoomUserState(RoomUserState::READY);
+			else if (room_player.GetRoomPlayerState() == RoomPlayerState::WAIT) {
+				room_player.SetRoomPlayerState(RoomPlayerState::READY);
 				is_ready = true;
 			}
 			S2C_READY_PACKET p;
 			p.header.size = static_cast<std::uint16_t>(sizeof(p));
 			p.header.type = S2C_READY;
-			p.id = id;
+			p.player_id = player_id;
 			p.is_ready = is_ready;
 
-			Broadcast(reinterpret_cast<char*>(&p), server_->GetHandle());
+			Broadcast(reinterpret_cast<char*>(&p), server_->GetIOCPHandle());
 			break;
 		}
 	}
 }
 
-void MultiRoom::KickUser(int id, int kick_user_id)
+void MultiRoom::KickPlayer(int requester_id, int kick_player_id)
 {
-	if (id != host_id_) return;
-	if (kick_user_id == host_id_) return;
-	auto room_users = GetRoomUsers();
+	if (requester_id != host_id_) return;
+	if (kick_player_id == host_id_) return;
+	auto room_players = GetRoomPlayers();
 
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		if (session->GetDBInfo().id == kick_user_id) { // 삭제할 아이디 검색
+		if (session->GetDBInfo().player_id == kick_player_id) { // 삭제할 아이디 검색
 
-			S2C_DELETE_USER_PACKET p;
+			S2C_REMOVE_PLAYER_PACKET p;
 			p.header.size = static_cast<std::uint16_t>(sizeof(p));
-			p.header.type = S2C_DELETE_USER;
-			p.id = kick_user_id;
-			Broadcast(reinterpret_cast<char*>(&p), server_->GetHandle());
+			p.header.type = S2C_REMOVE_PLAYER;
+			p.player_id = kick_player_id;
+			Broadcast(reinterpret_cast<char*>(&p), server_->GetIOCPHandle());
 
 			S2C_INFO_PACKET info_p;
 			info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 			info_p.header.type = S2C_INFO;
 			info_p.info_code = InfoCode::KICKED;
-			session->SendPacket(reinterpret_cast<char*>(&info_p), server_->GetHandle());
+			session->SendPacket(reinterpret_cast<char*>(&info_p), server_->GetIOCPHandle());
 
-			r_user.ClearRoomSession();
-			--cur_user_;
+			room_player.ClearPlayer();
+			--current_player_count_;
 		}
 	}
 }
 
-void MultiRoom::StartGame(int request_user_id)
+void MultiRoom::StartGame(int requester_id)
 {
-	if (request_user_id != host_id_) return;
+	if (requester_id != host_id_) return;
 	if (room_state_.load() == RoomState::PLAY) return;
-	auto room_users = GetRoomUsers();
+	auto room_players = GetRoomPlayers();
 
-	int ready_user_count = 0;
+	int ready_player_count = 0;
 	int result = -1;
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue; // 사용 중이지 않은 인덱스는 건너뜀
-		if (session->GetDBInfo().id == host_id_) ++ready_user_count;
+		if (session->GetDBInfo().player_id == host_id_) ++ready_player_count;
 
-		else if (r_user.GetRoomUserState() == RoomUserState::READY) ++ready_user_count;
+		else if (room_player.GetRoomPlayerState() == RoomPlayerState::READY) ++ready_player_count;
 	}
 
-	int current_user = GetCurrentUser();
-	if (ready_user_count == current_user) {
-		if (current_user == 1) {
+	int current_player_count = GetCurrentPlayerCount();
+	if (ready_player_count == current_player_count) {
+		if (current_player_count == 1) {
 			result = ErrorCode::ROOM_NOT_ENOUGH_PLAYERS;
 		}
 		else {
@@ -284,8 +284,8 @@ void MultiRoom::StartGame(int request_user_id)
 		error_p.error_code = result;
 		int host_index = FindHostIndex(host_id_);
 		if (host_index >= 0) {
-			auto host_session = room_users[host_index].GetSession();
-			if (host_session) host_session->SendPacket(reinterpret_cast<char*>(&error_p), server_->GetHandle());
+			auto host_session = room_players[host_index].GetSession();
+			if (host_session) host_session->SendPacket(reinterpret_cast<char*>(&error_p), server_->GetIOCPHandle());
 		}
 		return;
 	}
@@ -296,55 +296,55 @@ void MultiRoom::StartGame(int request_user_id)
 	S2C_MULTI_START_PACKET start_p;
 	start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
 	start_p.header.type = S2C_MULTI_START;
-	Broadcast(reinterpret_cast<char*>(&start_p), server_->GetHandle());
+	Broadcast(reinterpret_cast<char*>(&start_p), server_->GetIOCPHandle());
 	// 모든 조건 통과->게임 시작
-	Add7BagTetrominoList();
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	AppendTetromino7Bag();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		r_user.SetRoomUserState(RoomUserState::PLAY);
-		r_user.GetTetris().InitNewTetromino(tetromino_spawn_list_[r_user.GetTetrominoIndex()], spawn_pos_);
+		room_player.SetRoomPlayerState(RoomPlayerState::PLAY);
+		room_player.GetTetris().InitNewTetromino(tetromino_spawn_list_[room_player.GetTetrominoIndex()], spawn_pos_);
 	}
 
 	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
 	InitGame();
 
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
 		S2C_SPAWN_PACKET spawn_p;
 		spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
 		spawn_p.header.type = S2C_SPAWN;
-		spawn_p.id = session->GetDBInfo().id;
-		spawn_p.tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex()];
-		spawn_p.next_tetromino_type = tetromino_spawn_list_[r_user.GetTetrominoIndex() + 1];
+		spawn_p.player_id = session->GetDBInfo().player_id;
+		spawn_p.tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex()];
+		spawn_p.next_tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex() + 1];
 		spawn_p.spawn_x = spawn_pos_.x;
 		spawn_p.spawn_y = spawn_pos_.y;
-		Broadcast(reinterpret_cast<char*>(&spawn_p), server_->GetHandle());
+		Broadcast(reinterpret_cast<char*>(&spawn_p), server_->GetIOCPHandle());
 	}
 }
 
-void MultiRoom::ProcessSpecificRoomTask(const RoomTaskInfo& task)
+void MultiRoom::ProcessSpecificRoomTask(const RoomTask& task)
 {
-	switch (task.type) {
+	switch (task.task_type) {
 	case RoomTaskType::JOIN: {
-		const int result = AddUser(task.session);
+		const int result = AddPlayer(task.session);
 		if (result == SUCCESS) break;
-		if (!IsRoomSession(task.session)) break;
-		task.session->SetRoomSnapShot(ModeState::LOBBY, -1);
+		if (!IsPlayerInRoom(task.session)) break;
+		task.session->SetRoomSnapshot(ModeState::LOBBY, -1);
 		if (task.session->GetLifeState() != LifeState::ACTIVE) break;
-		if (task.matching_max_user >= 0) server_->FindMatch(task.session, task.matching_max_user);
+		if (task.matching_max_player_count >= 0) server_->FindMatch(task.session, task.matching_max_player_count);
 		else server_->SendError(task.session, result);
 		break;
 	}
 	case RoomTaskType::READY:
-		if (IsRoomSession(task.session)) ReadyUser(task.session->GetDBInfo().id);
+		if (IsPlayerInRoom(task.session)) TogglePlayerReady(task.session->GetDBInfo().player_id);
 		break;
 	case RoomTaskType::KICK:
-		if (IsRoomSession(task.session)) KickUser(task.session->GetDBInfo().id, task.target_id);
+		if (IsPlayerInRoom(task.session)) KickPlayer(task.session->GetDBInfo().player_id, task.target_player_id);
 		break;
 	case RoomTaskType::START:
-		if (IsRoomSession(task.session)) StartGame(task.session->GetDBInfo().id);
+		if (IsPlayerInRoom(task.session)) StartGame(task.session->GetDBInfo().player_id);
 		break;
 	default:
 		break;
@@ -353,68 +353,68 @@ void MultiRoom::ProcessSpecificRoomTask(const RoomTaskInfo& task)
 
 void MultiRoom::ProcessGameTick()
 {
-	UpdatePrevUsersState();
+	UpdatePrevPlayerStates();
 
-	auto room_users = GetRoomUsers();
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	auto room_players = GetRoomPlayers();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		r_user.GetTetris().TickProcess();
+		room_player.GetTetris().ProcessTick();
 	}
 
-	CalcAttackLine();
+	DistributeGarbageLines();
 	AddGarbageLines();
 	// 승자 나왔으면 종료 아니면 계속 진행해야되니 스폰 체크
 	bool is_game_end = false;
-	is_game_end = FindWinner();
-	if (!is_game_end) AddSpawnTask();
-	int failed_user_id = BoundPackets();
-	if (failed_user_id != -1) {
-		DeleteUser(failed_user_id);
+	is_game_end = ResolveWinner();
+	if (!is_game_end) AddSpawnTasks();
+	int failed_player_id = AppendTickPackets();
+	if (failed_player_id != -1) {
+		RemovePlayer(failed_player_id);
 		TryPostRoomDelete();
 		return;
 	}
 
-	ResetUsersTickData();
-	BroadcastTickDataForUsers();
+	ResetPlayerTickState();
+	BroadcastPackets();
 	if (is_game_end) {
 		RequestUpdateMatchResult();
 		ClearGame();
 	}
 }
 
-bool MultiRoom::FindWinner()
+bool MultiRoom::ResolveWinner()
 {
-	auto room_users = GetRoomUsers();
+	auto room_players = GetRoomPlayers();
 	int over_count = 0;
 	int player_count = 0;
-	for (auto& r_user : room_users) {
-		if (r_user.GetRoomUserState() != RoomUserState::PLAY) continue;
-		auto session = r_user.GetSession();
+	for (auto& room_player : room_players) {
+		if (room_player.GetRoomPlayerState() != RoomPlayerState::PLAY) continue;
+		auto session = room_player.GetSession();
 		if (!session) continue;
 		++player_count;
-		//if (r_user.GetRoomUserState() == RoomUserState::GAMEOVER) ++over_count;
+		//if (room_player.GetRoomPlayerState() == RoomPlayerState::GAME_OVER) ++over_count;
 	}
 
 	// int winner_id = -1;
 	int new_winner_id = -1;
 	if (player_count == 1) {
-		for (auto& r_user : room_users) {
-			if (r_user.GetRoomUserState() == RoomUserState::PLAY) {
-				auto session = r_user.GetSession();
+		for (auto& room_player : room_players) {
+			if (room_player.GetRoomPlayerState() == RoomPlayerState::PLAY) {
+				auto session = room_player.GetSession();
 				if (!session) continue;
-				new_winner_id = session->GetDBInfo().id;
+				new_winner_id = session->GetDBInfo().player_id;
 				break;
 			}
 		}
 	}
 
 	else if (player_count == 0) { // 동시에 게임오버된 상태 -> 결국 승자는 정해줘야함.
-		for (auto& r_user : room_users) {
-			if ((r_user.GetRoomUserState() == RoomUserState::GAMEOVER) || (r_user.GetPrevRoomUserState() == RoomUserState::PLAY)) {
-				auto session = r_user.GetSession();
+		for (auto& room_player : room_players) {
+			if ((room_player.GetRoomPlayerState() == RoomPlayerState::GAME_OVER) || (room_player.GetPrevRoomPlayerState() == RoomPlayerState::PLAY)) {
+				auto session = room_player.GetSession();
 				if (!session) continue;
-				new_winner_id = session->GetDBInfo().id; // 컨테이너 앞쪽에 있는 사람이 승자
+				new_winner_id = session->GetDBInfo().player_id; // 컨테이너 앞쪽에 있는 사람이 승자
 				break;
 			}
 		}
@@ -424,29 +424,29 @@ bool MultiRoom::FindWinner()
 	if (new_winner_id == -1) return false;
 	winner_id_ = new_winner_id;
 
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		TaskType t_type;
-		t_type.event_type = EventType::GAMEEND;
-		t_type.task = TaskGameEnd{ winner_id_ };
-		r_user.GetTetris().GetSendTasks().emplace_back(t_type);
+		TaskType task;
+		task.event_type = EventType::GAME_END;
+		task.task = TaskGameEnd{ winner_id_ };
+		room_player.GetTetris().GetSendTasks().emplace_back(task);
 	}
 
 	return true;
 }
 
-void MultiRoom::CalcAttackLine()
+void MultiRoom::DistributeGarbageLines()
 {	
 	// 서로 클리어한 라인을 통해 남에게 패널티를 부여할 라인을 모두 계산한 뒤, 한 번에 적용
-	auto room_users = GetRoomUsers();
-	for (int i = 0; i < room_users.size(); ++i) {
-		if (room_users[i].GetRoomUserState() == RoomUserState::PLAY) {
-			int add_line_num = GetGarbageLinesFromAttack(room_users[i].GetTetris().GetClearedLines());
-			if (add_line_num > 0) {
-				for (int j = 0; j < room_users.size(); ++j) {
-					if ((room_users[j].GetRoomUserState() == RoomUserState::PLAY) && (i != j)){
-						(room_users[j].GetTetris().AddPendingGarbageLines(add_line_num));
+	auto room_players = GetRoomPlayers();
+	for (int i = 0; i < room_players.size(); ++i) {
+		if (room_players[i].GetRoomPlayerState() == RoomPlayerState::PLAY) {
+			int garbage_line_count = CalculateGarbageLineCount(room_players[i].GetTetris().GetClearedLineCount());
+			if (garbage_line_count > 0) {
+				for (int j = 0; j < room_players.size(); ++j) {
+					if ((room_players[j].GetRoomPlayerState() == RoomPlayerState::PLAY) && (i != j)){
+						(room_players[j].GetTetris().AddPendingGarbageLines(garbage_line_count));
 					}
 				}
 			}
@@ -454,18 +454,18 @@ void MultiRoom::CalcAttackLine()
 	}
 
 	// 로직은 맞지만 함수 이름상 여기서 이 동작을 추가하는건 안어울리는 것 같기도, 이름과 동작은 명확히 일치해야 할 듯
-	//for (auto& r_user : room_users) {
-	//	if (r_user.GetRoomUserState() == RoomUserState::PLAY) {
-	//		r_user.GetTetris().AddGarbageLines();
+	//for (auto& room_player : room_players) {
+	//	if (room_player.GetRoomPlayerState() == RoomPlayerState::PLAY) {
+	//		room_player.GetTetris().AddGarbageLines();
 	//	}
 	//}
 }
 
-int MultiRoom::GetGarbageLinesFromAttack(int cleared_line_num)
+int MultiRoom::CalculateGarbageLineCount(int cleared_line_count)
 {
 	int garbage_lines = 0;
 	// 지워진 라인에 따라 증가되는 라인 수가 다름
-	switch (cleared_line_num) {
+	switch (cleared_line_count) {
 	case 1:
 		garbage_lines = 0;
 		break;
@@ -488,49 +488,49 @@ int MultiRoom::GetGarbageLinesFromAttack(int cleared_line_num)
 	return garbage_lines;
 }
 
-void MultiRoom::UpdatePrevUsersState()
+void MultiRoom::UpdatePrevPlayerStates()
 {
 	if (room_state_ != RoomState::PLAY) return;
-	auto room_users = GetRoomUsers();
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	auto room_players = GetRoomPlayers();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		r_user.SetPrevRoomUserState(r_user.GetRoomUserState());
+		room_player.SetPrevRoomPlayerState(room_player.GetRoomPlayerState());
 	}
 }
 
 void MultiRoom::RequestUpdateMatchResult()
 {
 	SessionKey winner_key{};
-	winner_key.id = winner_id_;
-	SessionKey players[MAX_MATCH_RESULT_PLAYERS]{};
+	winner_key.player_id = winner_id_;
+	SessionKey player_keys[MAX_MATCH_RESULT_PLAYERS]{};
 	SP<Session> sessions[MAX_MATCH_RESULT_PLAYERS]{};
 	uint8_t player_count = 0;
 
-	auto room_users = GetRoomUsers();
-	for (auto& r_user : room_users) {
-		auto session = r_user.GetSession();
+	auto room_players = GetRoomPlayers();
+	for (auto& room_player : room_players) {
+		auto session = room_player.GetSession();
 		if (!session) continue;
-		players[player_count] = session->GetSessionKey();
+		player_keys[player_count] = session->GetSessionKey();
 		sessions[player_count] = session;
-		if (players[player_count].id == winner_id_) winner_key = players[player_count];
+		if (player_keys[player_count].player_id == winner_id_) winner_key = player_keys[player_count];
 		++player_count;
 	}
 
-	server_->EnqueueDBTask(std::make_unique<DBUpdateMatchResultTask>(winner_key, players, player_count), sessions);
+	server_->EnqueueDBTask(std::make_unique<DBUpdateMatchResultTask>(winner_key, player_keys, player_count), sessions);
 }
 
 void MultiRoom::FindNewHost()
 {
 	bool has_found_host = false;
-	auto room_users = GetRoomUsers();
+	auto room_players = GetRoomPlayers();
 	
-	if (GetCurrentUser() != 0) {
-		for (auto& r_user : room_users) {
-			auto session = r_user.GetSession();
+	if (GetCurrentPlayerCount() != 0) {
+		for (auto& room_player : room_players) {
+			auto session = room_player.GetSession();
 			if (!session) continue;
-			host_id_ = session->GetDBInfo().id;
-			if (room_state_ == RoomState::WAIT) r_user.SetRoomUserState(RoomUserState::WAIT); // 게임 중이 아닐 때, 호스트가 나갔을 때 레디 상태인 사람이 호스트가 되면, 레디 상태를 풀어줘야함
+			host_id_ = session->GetDBInfo().player_id;
+			if (room_state_ == RoomState::WAIT) room_player.SetRoomPlayerState(RoomPlayerState::WAIT); // 게임 중이 아닐 때, 호스트가 나갔을 때 레디 상태인 사람이 호스트가 되면, 레디 상태를 풀어줘야함
 			has_found_host = true;
 			break;
 		}
@@ -541,7 +541,7 @@ void MultiRoom::FindNewHost()
 		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
 		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id_;
-		Broadcast(reinterpret_cast<char*>(&host_p), server_->GetHandle());
+		Broadcast(reinterpret_cast<char*>(&host_p), server_->GetIOCPHandle());
 	}
 
 	else {
@@ -551,11 +551,11 @@ void MultiRoom::FindNewHost()
 
 int MultiRoom::FindHostIndex(int host_id)
 {
-	auto room_users = GetRoomUsers();
-	for (int i = 0; i < room_users.size(); ++i) {
-		auto session = room_users[i].GetSession();
+	auto room_players = GetRoomPlayers();
+	for (int i = 0; i < room_players.size(); ++i) {
+		auto session = room_players[i].GetSession();
 		if (!session) continue;
-		if (session->GetDBInfo().id == host_id) return i;
+		if (session->GetDBInfo().player_id == host_id) return i;
 	}
 	return -1;
 }

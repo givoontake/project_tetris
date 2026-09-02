@@ -11,27 +11,27 @@ TickThread::TickThread(ServerThreadManager& manager) : manager_(manager)
 
 void TickThread::Run()
 {
-    while (is_running_.load() && manager_.iocp_server_.GetRunning())
+    while (is_running_.load() && manager_.iocp_server_.IsRunning())
     {
         WaitTickPhase();
-        if (!is_running_.load() || !manager_.iocp_server_.GetRunning()) break;
+        if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) break;
 
         auto current_phase_context = phase_context_; // 틱이 밀려 있어도 새로운 처리를 전달받은 시점에 한 번에 처리
 
         while (true) {
-            int i = current_phase_context->room_index_counter_.fetch_add(1);
-            if (i >= MAX_ROOM) break;
+            int i = current_phase_context->next_room_index_.fetch_add(1);
+            if (i >= MAX_ROOM_COUNT) break;
 
-            auto room = manager_.iocp_server_.GetRoom(i);
+            auto room = manager_.iocp_server_.GetRoomByIndex(i);
             if (room) {
                 RoomProcessState expected_state = RoomProcessState::COMPLETE;
                 if (!room->processing_state_.compare_exchange_strong(expected_state, RoomProcessState::PROCESSING)) continue;
-				room->ProcessPlayTasks();
+				room->ProcessRoomTick();
 				room->processing_state_.store(RoomProcessState::COMPLETE);
             }
         }
 
-        manager_.CompleteTickPhase(*this, current_phase_context);
+        manager_.CompleteTickThreadPhase(*this, current_phase_context);
     }
 }
 
@@ -46,7 +46,7 @@ void TickThread::WaitTickPhase()
         if (Clock::now() < spin_wait_start_time) {
             std::unique_lock<std::mutex> lock(manager_.tick_mutex_);
             manager_.tick_cv_.wait_until(lock, spin_wait_start_time, [&] {
-                return !is_running_.load() || !manager_.iocp_server_.GetRunning() || phase_.load() != TickPhase::NONE;
+                return !is_running_.load() || !manager_.iocp_server_.IsRunning() || phase_.load() != TickPhase::NONE;
             });
         }
     }
@@ -57,12 +57,12 @@ void TickThread::WaitTickPhase()
         std::unique_lock<std::mutex> lock(manager_.tick_mutex_);
         // 람다 함수가 참을 반환해야 다음 코드가 진행된다. notify 관련 함수가 호출되면 조건 검사를 다시 수행한다.
         manager_.tick_cv_.wait(lock, [&] { // 전달한 lock으로 람다 내부 범위를 lock, 조건 검사하고 바로 unlock한다.
-            if (!is_running_.load() || !manager_.iocp_server_.GetRunning()) return true; // 종료 신호가 오면 바로 빠져나오기
+            if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) return true; // 종료 신호가 오면 바로 빠져나오기
             return phase_.load() != TickPhase::NONE;
             });
     }
 
-    while (is_running_.load() && manager_.iocp_server_.GetRunning() && phase_.load() == TickPhase::NONE)
+    while (is_running_.load() && manager_.iocp_server_.IsRunning() && phase_.load() == TickPhase::NONE)
         _mm_pause();
 }
 

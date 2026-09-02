@@ -39,7 +39,7 @@
     <ClCompile Include="Managers\ActiveRoomManager.cpp">
       <Filter>Managers</Filter>
     </ClCompile>
-    <ClCompile Include="Managers\ActiveUserManager.cpp">
+    <ClCompile Include="Managers\ActivePlayerManager.cpp">
       <Filter>Managers</Filter>
     </ClCompile>
     <ClCompile Include="Managers\RankingManager.cpp">
@@ -51,22 +51,22 @@
     <ClCompile Include="Network\Session.cpp">
       <Filter>Network</Filter>
     </ClCompile>
-    <ClCompile Include="Database\Database.cpp">
+    <ClCompile Include="Database\DBThread.cpp">
       <Filter>Database</Filter>
     </ClCompile>
     <ClCompile Include="Database\DBResultHandler.cpp">
       <Filter>Database</Filter>
     </ClCompile>
-    <ClCompile Include="Database\GameDBWorker.cpp">
+    <ClCompile Include="Database\GameDBThread.cpp">
       <Filter>Database</Filter>
     </ClCompile>
-    <ClCompile Include="Database\LoginDBWorker.cpp">
+    <ClCompile Include="Database\LoginDBThread.cpp">
       <Filter>Database</Filter>
     </ClCompile>
     <ClCompile Include="Game\Tetris.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Game\TetrisTickData.cpp">
+    <ClCompile Include="Game\TetrisTickCounters.cpp">
       <Filter>Game</Filter>
     </ClCompile>
     <ClCompile Include="Rooms\FivePlayerRoom.cpp">
@@ -75,7 +75,7 @@
     <ClCompile Include="Rooms\MultiRoom.cpp">
       <Filter>Rooms</Filter>
     </ClCompile>
-    <ClCompile Include="Rooms\RoomSession.cpp">
+    <ClCompile Include="Rooms\Player.cpp">
       <Filter>Rooms</Filter>
     </ClCompile>
     <ClCompile Include="Rooms\SingleRoom.cpp">
@@ -143,7 +143,7 @@
     <ClInclude Include="Network\Session.h">
       <Filter>Network</Filter>
     </ClInclude>
-    <ClInclude Include="Database\Database.h">
+    <ClInclude Include="Database\DBThread.h">
       <Filter>Database</Filter>
     </ClInclude>
     <ClInclude Include="Database\DBResult.h">
@@ -155,10 +155,10 @@
     <ClInclude Include="Database\DBTasks.h">
       <Filter>Database</Filter>
     </ClInclude>
-    <ClInclude Include="Database\GameDBWorker.h">
+    <ClInclude Include="Database\GameDBThread.h">
       <Filter>Database</Filter>
     </ClInclude>
-    <ClInclude Include="Database\LoginDBWorker.h">
+    <ClInclude Include="Database\LoginDBThread.h">
       <Filter>Database</Filter>
     </ClInclude>
     <ClInclude Include="Game\task_type.h">
@@ -167,7 +167,7 @@
     <ClInclude Include="Game\Tetris.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="Game\TetrisTickData.h">
+    <ClInclude Include="Game\TetrisTickCounters.h">
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\Tetromino.h">
@@ -179,7 +179,7 @@
     <ClInclude Include="Rooms\MultiRoom.h">
       <Filter>Rooms</Filter>
     </ClInclude>
-    <ClInclude Include="Rooms\RoomSession.h">
+    <ClInclude Include="Rooms\Player.h">
       <Filter>Rooms</Filter>
     </ClInclude>
     <ClInclude Include="Rooms\SingleRoom.h">
@@ -194,7 +194,7 @@
     <ClInclude Include="Managers\ActiveRoomManager.h">
       <Filter>Managers</Filter>
     </ClInclude>
-    <ClInclude Include="Managers\ActiveUserManager.h">
+    <ClInclude Include="Managers\ActivePlayerManager.h">
       <Filter>Managers</Filter>
     </ClInclude>
     <ClInclude Include="Managers\RankingManager.h">

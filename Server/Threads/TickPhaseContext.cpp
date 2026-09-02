@@ -1,5 +1,5 @@
 #include "TickPhaseContext.h"
 
-TickPhaseContext::TickPhaseContext(int worker_count) : WORKER_COUNT(worker_count)
+TickPhaseContext::TickPhaseContext(int thread_count) : THREAD_COUNT(thread_count)
 {
 }

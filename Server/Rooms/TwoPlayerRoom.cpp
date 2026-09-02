@@ -1,18 +1,18 @@
 #include "TwoPlayerRoom.h"
 
-TwoPlayerRoom::TwoPlayerRoom(IOCPServer* server, OpenRoomInitData data)
+TwoPlayerRoom::TwoPlayerRoom(IOCPServer* server, PublicRoomInitData data)
 	: MultiRoom(server, data)
 {
-	max_user_ = 2;
+	max_player_count_ = 2;
 }
 
-TwoPlayerRoom::TwoPlayerRoom(IOCPServer* server, LockRoomInitData data)
+TwoPlayerRoom::TwoPlayerRoom(IOCPServer* server, PrivateRoomInitData data)
 	: MultiRoom(server, data)
 {
-	max_user_ = 2;
+	max_player_count_ = 2;
 }
 
-std::span<RoomSession> TwoPlayerRoom::GetRoomUsers()
+std::span<Player> TwoPlayerRoom::GetRoomPlayers()
 {
-	return room_users_;
+	return room_players_;
 }
