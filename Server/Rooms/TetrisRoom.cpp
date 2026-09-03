@@ -428,23 +428,34 @@ void TetrisRoom::ResetPlayerTickState()
 void TetrisRoom::BroadcastPackets()
 {
 	auto room_players = GetRoomPlayers();
+	char send_buffer[BUF_SIZE];
+	int send_data_size = 0;
+
 	for (int i = 0; i < room_players.size(); ++i) {
 		Player& source = room_players[i];
 		auto source_session = source.GetSession();
 		if (!source_session) continue;
-		//IOKey key = source.GetSession()->GetIOKey();
-		char* send_buffer = source.GetSendBuffer();
-		int data_size = source.GetSendDataSize();
+		const int source_data_size = source.GetSendDataSize();
+		if (source_data_size <= 0) continue;
 
-		for (int j = 0; j < room_players.size(); ++j) {
-			Player& target = room_players[j];
-			// data_size = 0이 IOCP로 들어가면 연결이 종료되는 것에 주의해야함
-			// 게임 시작 시 틱마다 자동 전송하므로 조건이 꼭 필요
-			if (data_size > 0) {
+		if (send_data_size + source_data_size > BUF_SIZE) {
+			for (auto& target : room_players) {
 				auto target_session = target.GetSession();
 				if (!target_session) continue;
-				target_session->SendPacket(send_buffer, data_size, server_->GetIOCPHandle());
+				target_session->SendPacket(send_buffer, send_data_size, server_->GetIOCPHandle());
 			}
+			send_data_size = 0;
+		}
+
+		memcpy(send_buffer + send_data_size, source.GetSendBuffer(), source_data_size);
+		send_data_size += source_data_size;
+	}
+
+	if (send_data_size > 0) {
+		for (auto& target : room_players) {
+			auto target_session = target.GetSession();
+			if (!target_session) continue;
+			target_session->SendPacket(send_buffer, send_data_size, server_->GetIOCPHandle());
 		}
 	}
 

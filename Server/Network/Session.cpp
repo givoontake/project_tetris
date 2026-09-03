@@ -43,15 +43,19 @@ bool Session::ApplyLoginResult(DBResultLogin* login_result)
 bool Session::SendPacket(const char* packet, int packet_size, const HANDLE iocp_handle)
 {
 	if (!packet || packet_size <= 0 || packet_size > BUF_SIZE) return false;
-	if (!TryAddPending()) return false;
-	IOOverlapped* send_over = new IOOverlapped;
-	send_over->SetOperationType(OPType::SEND);
-	memcpy(send_over->packet_buffer, packet, packet_size);
-	send_over->wsabuf.len = packet_size;
-	send_over->ex_over.session_key = session_key_;
-	int result = WSASend(socket_, &send_over->wsabuf, 1, 0, 0, &send_over->ex_over.over, 0);
+	const int buffer_index = send_buffer_pool_.FindAvailableBuffer();
+	const bool is_pooled = buffer_index >= 0;
+	SendBuffer* send_buffer = is_pooled ? &send_buffer_pool_.send_buffers[buffer_index] : new SendBuffer;
+	if (!send_buffer->Append(packet, packet_size) || !TryAddPending()) {
+		if (is_pooled) send_buffer->Clear();
+		else delete send_buffer;
+		return false;
+	}
+
+	send_buffer->ex_over.session_key = session_key_;
+	int result = WSASend(socket_, &send_buffer->wsabuf, 1, 0, 0, &send_buffer->ex_over.over, 0);
 	if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, &send_buffer->ex_over.over);
 		std::cerr << db_info_.nickname << "Session::SendPacket() WSASend error\n";
 		return false;
 	}

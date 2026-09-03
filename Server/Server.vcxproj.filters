@@ -48,6 +48,9 @@
     <ClCompile Include="Network\PacketHandler.cpp">
       <Filter>Network</Filter>
     </ClCompile>
+    <ClCompile Include="Network\SendBuffer.cpp">
+      <Filter>Network</Filter>
+    </ClCompile>
     <ClCompile Include="Network\Session.cpp">
       <Filter>Network</Filter>
     </ClCompile>
@@ -138,6 +141,9 @@
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="Network\PacketHandler.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\SendBuffer.h">
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="Network\Session.h">

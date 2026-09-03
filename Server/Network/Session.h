@@ -2,11 +2,10 @@
 #include <WinSock2.h>
 #include <MSWSock.h>
 #include <vector>
-#include <array>
 #include <atomic>
 #include <memory>
 #include <mutex>
-#include "ExOverlapped.h"
+#include "SendBuffer.h"
 #include "define_packets.h"
 #include "DBResult.h"
 #include "enum_class.h"
@@ -23,6 +22,7 @@ class Session
 {
 	SOCKET socket_;
 	IOOverlapped recv_over_;
+	SendBufferPool send_buffer_pool_;
 	//IServer* server_interface;
 	SessionKey session_key_;
 	int room_index_ = -1;

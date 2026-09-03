@@ -57,10 +57,13 @@ void IOThread::Run()
 		}
 
 		case SESSION_IO_COMPLETION: {
+			const bool is_send = ex_over->op_type == OPType::SEND || ex_over->op_type == OPType::POOLED_SEND;
 			IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
+			SendBuffer* send_over = is_send ? static_cast<SendBuffer*>(io_over) : nullptr;
 			auto session_ptr = iocp_server_.FindSessionByIndex(ex_over->session_key.session_index);
 			if (!session_ptr) {
-				if (ex_over->op_type == OPType::SEND) delete io_over;
+				if (ex_over->op_type == OPType::POOLED_SEND) send_over->Clear();
+				else if (ex_over->op_type == OPType::SEND) delete send_over;
 				break;
 			}
 			Session& session = *session_ptr;
@@ -84,7 +87,8 @@ void IOThread::Run()
 				break;
 			}
 
-			case OPType::SEND: {
+			case OPType::SEND:
+			case OPType::POOLED_SEND: {
 				if ((!result || transferred_bytes == 0)) {
 					if (session.BeginDeactivate()) {
 						iocp_server_.BeginDisconnect(session_ptr);
@@ -97,7 +101,8 @@ void IOThread::Run()
 					if (session.TryDeactivate()) iocp_server_.TryDisconnect(session_ptr);
 				}
 				
-				delete io_over;
+				if (ex_over->op_type == OPType::POOLED_SEND) send_over->Clear();
+				else delete send_over;
 				break;
 			}
 

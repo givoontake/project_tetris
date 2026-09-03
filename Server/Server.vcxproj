@@ -31,6 +31,7 @@
     <ClCompile Include="Core\main.cpp" />
     <ClCompile Include="Rooms\MultiRoom.cpp" />
     <ClCompile Include="Network\PacketHandler.cpp" />
+    <ClCompile Include="Network\SendBuffer.cpp" />
     <ClCompile Include="Managers\RankingManager.cpp" />
     <ClCompile Include="Rooms\Player.cpp" />
     <ClCompile Include="Network\Session.cpp" />
@@ -69,6 +70,7 @@
     <ClInclude Include="Core\IOCPServer.h" />
     <ClInclude Include="Threads\IOThread.h" />
     <ClInclude Include="Network\PacketHandler.h" />
+    <ClInclude Include="Network\SendBuffer.h" />
     <ClInclude Include="Packets\packet_types.h" />
     <ClInclude Include="Managers\RankingManager.h" />
     <ClInclude Include="Rooms\Player.h" />
