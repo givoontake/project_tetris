@@ -26,7 +26,7 @@ void TickThread::Run()
             if (room) {
                 RoomProcessState expected_state = RoomProcessState::COMPLETE;
                 if (!room->processing_state_.compare_exchange_strong(expected_state, RoomProcessState::PROCESSING)) continue;
-				room->ProcessRoomTick();
+				room->ProcessRoomTick(current_phase_context->TICK_TIME);
 				room->processing_state_.store(RoomProcessState::COMPLETE);
             }
         }

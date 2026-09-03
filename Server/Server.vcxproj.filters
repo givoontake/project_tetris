@@ -69,7 +69,7 @@
     <ClCompile Include="Game\Tetris.cpp">
       <Filter>Game</Filter>
     </ClCompile>
-    <ClCompile Include="Game\TetrisTickCounters.cpp">
+    <ClCompile Include="Game\TetrisTimers.cpp">
       <Filter>Game</Filter>
     </ClCompile>
     <ClCompile Include="Rooms\FivePlayerRoom.cpp">
@@ -173,7 +173,7 @@
     <ClInclude Include="Game\Tetris.h">
       <Filter>Game</Filter>
     </ClInclude>
-    <ClInclude Include="Game\TetrisTickCounters.h">
+    <ClInclude Include="Game\TetrisTimers.h">
       <Filter>Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\Tetromino.h">

@@ -72,7 +72,7 @@ void TimerThread::Run()
 
         // 새 틱이 생겼으니 TickThread 들을 깨운다.
         // 사용 가능한 스레드를 확보하고 같은 틱의 처리 정보를 전달한다. 이전 틱의 전체 완료는 기다리지 않는다.
-        manager_.StartTickPhase(); // 새 틱 발생
+        manager_.StartTickPhase(tick_start_time); // 새 틱 발생
         // 데이터베이스는 작업 등록 시 즉시 깨우며, 여기서는 큐에 남은 작업을 다시 확인하도록 보조 알림을 보낸다.
         manager_.iocp_server_.WakeDBThreads();
     }

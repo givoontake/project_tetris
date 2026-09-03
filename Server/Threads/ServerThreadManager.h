@@ -51,7 +51,7 @@ public:
     ServerThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy = TickWaitPolicy::FULL_SPIN);
 
     void StartThreads();
-    bool StartTickPhase();
+    bool StartTickPhase(std::chrono::steady_clock::time_point tick_time);
     void CloseThreads();
     void JoinThreads();
 };

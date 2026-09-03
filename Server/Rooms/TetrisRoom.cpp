@@ -147,7 +147,7 @@ void TetrisRoom::ProcessRoomTasks()
 	TryPostRoomDelete();
 }
 
-void TetrisRoom::ProcessRoomTick()
+void TetrisRoom::ProcessRoomTick(std::chrono::steady_clock::time_point tick_time)
 {
 	ProcessRoomTasks();
 	const std::size_t task_count = play_tasks_.ClaimTaskCount();
@@ -156,7 +156,6 @@ void TetrisRoom::ProcessRoomTick()
 		return;
 	}
 
-	IncrementPlayerTickCounters();
 	const std::uint64_t current_play_generation = play_generation_.load();
 	auto room_players = GetRoomPlayers();
 	for (std::size_t i = 0; i < task_count; ++i) {
@@ -173,7 +172,7 @@ void TetrisRoom::ProcessRoomTick()
 			}
 		}
 	}
-	ProcessGameTick();
+	ProcessGameTick(tick_time);
 }
 
 void TetrisRoom::CompleteRoomInitialization()
@@ -257,16 +256,6 @@ void TetrisRoom::ClearRoom()
 	StoreRoomState(RoomState::EMPTY);
 }
 
-void TetrisRoom::IncrementPlayerTickCounters()
-{
-	auto room_players = GetRoomPlayers();
-	for(auto& room_player : room_players){
-		auto session = room_player.GetSession();
-		if (!session) continue;
-		room_player.GetTetris().GetTickCounters().UpdateTickData();
-	}
-}
-
 // 얘는 순차적으로 쌓인 작업을 처리해 보내야할 패킷들을 버퍼에 쌓음
 int TetrisRoom::AppendTickPackets()
 {
@@ -280,7 +269,7 @@ int TetrisRoom::AppendTickPackets()
 		for (auto& task : room_player.GetTetris().GetSendTasks()) {
 			switch (task.event_type) {
 			case EventType::MOVE: {
-				// 각 무브별 틱 초기화 추가가 애매하므로, 무브 틱 값 초기화는 Tetris::ProcessMoveInput에서 처리
+				// 각 이동의 다음 입력 허용 시각은 Tetris::ProcessMoveInput에서 갱신한다.
 				auto& move_task = std::get<TaskMove>(task.task);
 				if (!AppendMovePacket(room_player, static_cast<int>(move_task.move_type))) return player_id;
 				break;
@@ -330,7 +319,6 @@ int TetrisRoom::AppendTickPackets()
 			}
 
 			case EventType::ADD_LINE: {
-				room_player.GetTetris().GetTickCounters().SetGarbageLineTick(0);
 				S2C_ADD_LINE_PACKET add_line_p;
 				add_line_p.header.size = static_cast<std::uint16_t>(sizeof(add_line_p));
 				add_line_p.header.type = S2C_ADD_LINE;

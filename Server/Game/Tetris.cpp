@@ -20,18 +20,18 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 
 // 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
 // 그러면 회전된 테트로미노 관리가 수월해진다.
-EventType Tetris::ProcessMoveInput(EventType move_type) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
+EventType Tetris::ProcessMoveInput(EventType move_type, std::chrono::steady_clock::time_point tick_time) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
 {
     PrintMoveType(move_type);
     Tetromino if_move_tetromino = current_tetromino_;
-	if(!IsInputAllowed(move_type)) return EventType::NONE;
+	if(!timers_.IsInputAllowed(move_type, tick_time)) return EventType::NONE;
     switch (move_type) {
     case EventType::RIGHT:
         ++if_move_tetromino.moved_pos.x;
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::RIGHT} });
-			tick_counters_.SetRightTick(0);
+			timers_.RecordInput(EventType::RIGHT, tick_time);
             return EventType::RIGHT;
         }
         return EventType::NONE;
@@ -41,7 +41,7 @@ EventType Tetris::ProcessMoveInput(EventType move_type) //bool 반환은 충돌 
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::LEFT} });
-			tick_counters_.SetLeftTick(0);
+			timers_.RecordInput(EventType::LEFT, tick_time);
             return EventType::LEFT;
         }
         return EventType::NONE;
@@ -51,8 +51,8 @@ EventType Tetris::ProcessMoveInput(EventType move_type) //bool 반환은 충돌 
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::DOWN} });
-			tick_counters_.SetDownTick(0);
-			tick_counters_.SetDownTimeoutTick(0);
+			timers_.RecordInput(EventType::DOWN, tick_time);
+			timers_.RestartAutoDown(tick_time);
             return EventType::DOWN;
         }
         else {
@@ -69,7 +69,7 @@ EventType Tetris::ProcessMoveInput(EventType move_type) //bool 반환은 충돌 
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::ROTATE} });
-			tick_counters_.SetRotateTick(0);
+			timers_.RecordInput(EventType::ROTATE, tick_time);
             return EventType::ROTATE;
         }
         return EventType::NONE;
@@ -83,7 +83,7 @@ EventType Tetris::ProcessMoveInput(EventType move_type) //bool 반환은 충돌 
             }
             else {
                 send_tasks_.emplace_back(TaskType{ EventType::FIX, TaskFix{current_tetromino_.moved_pos.x, current_tetromino_.moved_pos.y} });
-				tick_counters_.SetDropTick(0);
+				timers_.RecordInput(EventType::DROP, tick_time);
                 return EventType::FIX;
             }
         }
@@ -203,7 +203,7 @@ void Tetris::Clear()
     } // 가로 = WIDTH = x / 세로 = HEIGHT = y
 
 	pending_moves_.fill(false);
-	tick_counters_.InitTickData();
+	timers_.Reset();
 }
 
 bool Tetris::CheckGameOver()
@@ -229,58 +229,18 @@ bool Tetris::CheckGameOver()
     return is_game_over;
 }
 
-bool Tetris::IsInputAllowed(EventType move_type)
+void Tetris::ProcessTick(std::chrono::steady_clock::time_point tick_time)
 {
-    switch (move_type)
-    {
-    case EventType::LEFT:
-        if (tick_counters_.GetLeftTick() >= MOVE_TIMEOUT_TICK) return true;
-        return false;
-
-    case EventType::RIGHT:
-        if (tick_counters_.GetRightTick() >= MOVE_TIMEOUT_TICK) return true;
-        return false;
-
-    case EventType::DOWN:
-        if (tick_counters_.GetDownTick() >= MOVE_TIMEOUT_TICK) return true;
-        return false;
-
-    case EventType::ROTATE:
-        if (tick_counters_.GetRotateTick() >= ROTATE_TIMEOUT_TICK) return true;
-        return false;
-
-    case EventType::DROP:
-        if (tick_counters_.GetDropTick() >= DROP_TIMEOUT_TICK) return true;
-        return false;
-
-    default:
-        return false;
-    }
-}
-
-void Tetris::ProcessTick()
-{
-    //// 첫 번째로 줄 추가 처리
-    //if (tick_data.GetGarbageLineTick() >= tick_data.GetGarbageLineTimeout()) {
-    //    tick_data.SetGarbageLineTick(0);
-    //    AddGarbageLines(1, send_pending_tasks);
-    //    for (auto& task : send_pending_tasks) {
-    //        if (task.event_type == EventType::GAME_OVER) {
-    //            return send_pending_tasks;
-    //        }
-    //    }
-    //}
-
     // 첫 번째로 줄 추가 처리
-    if (tick_counters_.GetGarbageLineTick() >= tick_counters_.GetGarbageLineTimeout()) {
-        tick_counters_.SetGarbageLineTick(0);
+    if (timers_.IsGarbageLineDue(tick_time)) {
+        timers_.RestartGarbageLine(tick_time);
         ++pending_garbage_line_count_;
     }
 
     // 두 번째로 쌓인 입력 처리
     // 먼저 다운 타임아웃 이벤트 처리
-    if (tick_counters_.GetDownTimeoutTick() >= tick_counters_.GetDownTimeout()) {
-		tick_counters_.SetDownTimeoutTick(0);
+    if (timers_.IsAutoDownDue(tick_time)) {
+		timers_.RestartAutoDown(tick_time);
         input_tasks_.emplace_back(EventType::DOWN);
     }
 
@@ -298,15 +258,15 @@ void Tetris::ProcessTick()
     for (int i = static_cast<int>(EventType::DROP); i >= static_cast<int>(EventType::RIGHT); --i) {
         if (pending_moves_[i] == true) {
             EventType move_type = static_cast<EventType>(i);
-			EventType result = ProcessMoveInput(move_type);
+			EventType result = ProcessMoveInput(move_type, tick_time);
             if (result == EventType::NONE) {
                 continue;
             }
             else if (result == EventType::FIX){ // 바로 여기서 처리해도 될 것 같은데
                 FixTetromino();
-                tick_counters_.SetDownTick(0);
-                tick_counters_.SetDownTimeoutTick(0);
-                tick_counters_.SetDropTick(0);
+                timers_.RecordInput(EventType::DOWN, tick_time);
+                timers_.RestartAutoDown(tick_time);
+                timers_.RecordInput(EventType::DROP, tick_time);
 
                 ClearLine();
                 // 게임오버는 룸에서 상태를 변경시키는 이벤트인데, 여기서 수행하면 상태를 변경할 수가 없다..

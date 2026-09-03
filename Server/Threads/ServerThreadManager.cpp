@@ -73,7 +73,7 @@ std::vector<TickThread*> ServerThreadManager::SelectTickThreads()
     return selected_tick_threads;
 }
 
-bool ServerThreadManager::StartTickPhase()
+bool ServerThreadManager::StartTickPhase(std::chrono::steady_clock::time_point tick_time)
 {
     if (!iocp_server_.IsRunning()) return false;
     const std::vector<TickThread*> selected_tick_threads = SelectTickThreads();
@@ -84,7 +84,7 @@ bool ServerThreadManager::StartTickPhase()
     }
 
 	// 일부 틱 스레드 작업이 완료되지 않아도 다음 틱으로 넘어갈 수 있으므로 틱 처리 시작에 항상 새 TickPhaseContext를 생성한다.
-    const auto phase_context = std::make_shared<TickPhaseContext>(static_cast<int>(selected_tick_threads.size()));
+    const auto phase_context = std::make_shared<TickPhaseContext>(static_cast<int>(selected_tick_threads.size()), tick_time);
     {
         std::lock_guard<std::mutex> lock(tick_mutex_);
         for (TickThread* tick_thread : selected_tick_threads) {

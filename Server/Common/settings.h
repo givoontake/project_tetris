@@ -19,10 +19,10 @@ constexpr int MAX_PLAYER_ID_SIZE = 48;
 constexpr int MAX_PLAYER_PASSWORD_SIZE = 48;
 constexpr int MAX_PLAYER_NAME_SIZE = 48;
 
-constexpr int MOVE_TIMEOUT_TICK = static_cast<int>(TICK_RATE * 0.05); // 좌우, 아래 이동 3가지
-constexpr int ROTATE_TIMEOUT_TICK = static_cast<int>(TICK_RATE * 0.1);
-constexpr int DOWN_TIMEOUT_TICK = static_cast<int>(TICK_RATE * 0.5); // 자동 아래 이동 시간
-constexpr int DROP_TIMEOUT_TICK = static_cast<int>(TICK_RATE * 0.1);
-constexpr int GARBAGE_LINE_TIMEOUT_TICK = static_cast<int>(TICK_RATE * 10);
+constexpr int MOVE_TIMEOUT_MS = 50; // 좌우, 아래 이동 3가지
+constexpr int ROTATE_TIMEOUT_MS = 100;
+constexpr int DOWN_TIMEOUT_MS = 500; // 자동 아래 이동 시간
+constexpr int DROP_TIMEOUT_MS = 100;
+constexpr int GARBAGE_LINE_TIMEOUT_MS = 10000;
 
 constexpr int MAX_FRIEND_COUNT = 100;

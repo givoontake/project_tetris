@@ -43,7 +43,7 @@
     <ClCompile Include="Rooms\SingleRoom.cpp" />
     <ClCompile Include="Game\Tetris.cpp" />
     <ClCompile Include="Rooms\TetrisRoom.cpp" />
-    <ClCompile Include="Game\TetrisTickCounters.cpp" />
+    <ClCompile Include="Game\TetrisTimers.cpp" />
     <ClCompile Include="Rooms\TwoPlayerRoom.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -83,7 +83,7 @@
     <ClInclude Include="Threads\TimerThread.h" />
     <ClInclude Include="Game\Tetris.h" />
     <ClInclude Include="Rooms\TetrisRoom.h" />
-    <ClInclude Include="Game\TetrisTickCounters.h" />
+    <ClInclude Include="Game\TetrisTimers.h" />
     <ClInclude Include="Common\types.h" />
     <ClInclude Include="Rooms\TwoPlayerRoom.h" />
   </ItemGroup>

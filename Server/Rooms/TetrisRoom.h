@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 #include <atomic>
 #include <vector>
 #include <array>
@@ -84,7 +85,7 @@ protected:
 	void TryPostRoomDelete();
 	void ProcessRoomTasks();
 	virtual void ProcessSpecificRoomTask(const RoomTask& task) = 0;
-	virtual void ProcessGameTick() = 0;
+	virtual void ProcessGameTick(std::chrono::steady_clock::time_point tick_time) = 0;
 
 public:
 	TetrisRoom(IOCPServer* server, PublicRoomInitData data);
@@ -102,7 +103,7 @@ public:
 
 	// 공통
 	virtual void HandlePacket(char* packet, const SP<Session>& request_session);
-	void ProcessRoomTick();
+	void ProcessRoomTick(std::chrono::steady_clock::time_point tick_time);
 	virtual void RemovePlayer(const int player_id) = 0;
 	virtual void SendCreateRoom(const SP<Session>& session) = 0;
 	virtual bool AddHostSession(const SP<Session>& session);
@@ -118,7 +119,6 @@ public:
 	void AppendTetromino7Bag();
 	bool SpawnTetromino(int player_id);
 	void ClearRoom(); // 이제 재사용이 아니라 아예 없앨거라서 굳이 방이 비워진 상태를 관리할 필요는 없다. 나중에 없애면 될 듯
-	void IncrementPlayerTickCounters();
 	int AppendTickPackets();
 	//void SendAddRoom(Session* session);
 	bool AppendMovePacket(Player& player, int move_type);

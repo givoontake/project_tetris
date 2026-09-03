@@ -67,12 +67,12 @@ void SingleRoom::ProcessSpecificRoomTask(const RoomTask& task)
 	}
 }
 
-void SingleRoom::ProcessGameTick()
+void SingleRoom::ProcessGameTick(std::chrono::steady_clock::time_point tick_time)
 {
 	for (auto& room_player : room_players_) {
 		auto session = room_player.GetSession();
 		if (!session) continue;
-		room_player.GetTetris().ProcessTick();
+		room_player.GetTetris().ProcessTick(tick_time);
 	}
 
 	AddGarbageLines();
