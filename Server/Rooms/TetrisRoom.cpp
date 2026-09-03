@@ -147,7 +147,7 @@ void TetrisRoom::ProcessRoomTasks()
 	TryPostRoomDelete();
 }
 
-void TetrisRoom::ProcessRoomTick(std::chrono::steady_clock::time_point tick_time)
+void TetrisRoom::ProcessRoomTick(long long tick_time_ms)
 {
 	ProcessRoomTasks();
 	const std::size_t task_count = play_tasks_.ClaimTaskCount();
@@ -172,7 +172,7 @@ void TetrisRoom::ProcessRoomTick(std::chrono::steady_clock::time_point tick_time
 			}
 		}
 	}
-	ProcessGameTick(tick_time);
+	ProcessGameTick(tick_time_ms);
 }
 
 void TetrisRoom::CompleteRoomInitialization()

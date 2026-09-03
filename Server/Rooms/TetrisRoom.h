@@ -85,7 +85,7 @@ protected:
 	void TryPostRoomDelete();
 	void ProcessRoomTasks();
 	virtual void ProcessSpecificRoomTask(const RoomTask& task) = 0;
-	virtual void ProcessGameTick(std::chrono::steady_clock::time_point tick_time) = 0;
+	virtual void ProcessGameTick(long long tick_time_ms) = 0;
 
 public:
 	TetrisRoom(IOCPServer* server, PublicRoomInitData data);
@@ -103,7 +103,7 @@ public:
 
 	// 공통
 	virtual void HandlePacket(char* packet, const SP<Session>& request_session);
-	void ProcessRoomTick(std::chrono::steady_clock::time_point tick_time);
+	void ProcessRoomTick(long long tick_time_ms);
 	virtual void RemovePlayer(const int player_id) = 0;
 	virtual void SendCreateRoom(const SP<Session>& session) = 0;
 	virtual bool AddHostSession(const SP<Session>& session);

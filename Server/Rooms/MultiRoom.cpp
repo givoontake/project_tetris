@@ -351,7 +351,7 @@ void MultiRoom::ProcessSpecificRoomTask(const RoomTask& task)
 	}
 }
 
-void MultiRoom::ProcessGameTick(std::chrono::steady_clock::time_point tick_time)
+void MultiRoom::ProcessGameTick(long long tick_time_ms)
 {
 	UpdatePrevPlayerStates();
 
@@ -359,7 +359,7 @@ void MultiRoom::ProcessGameTick(std::chrono::steady_clock::time_point tick_time)
 	for (auto& room_player : room_players) {
 		auto session = room_player.GetSession();
 		if (!session) continue;
-		room_player.GetTetris().ProcessTick(tick_time);
+		room_player.GetTetris().ProcessTick(tick_time_ms);
 	}
 
 	DistributeGarbageLines();

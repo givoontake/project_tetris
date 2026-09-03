@@ -4,14 +4,14 @@
 #include "ServerThread.h"
 #include "tick_state.h"
 
-class ServerThreadManager;
-class TickPhaseContext;
+class TickThreadManager;
+struct TickPhaseContext;
 
 class TickThread final : public ServerThread
 {
-    friend class ServerThreadManager;
+    friend class TickThreadManager;
 
-    ServerThreadManager& manager_;
+    TickThreadManager& manager_;
     std::atomic<TickThreadState> state_{ TickThreadState::AVAILABLE };
     std::atomic<TickPhase> phase_{ TickPhase::NONE };
     std::shared_ptr<TickPhaseContext> phase_context_;
@@ -19,7 +19,7 @@ class TickThread final : public ServerThread
     void WaitTickPhase();
 
 public:
-    TickThread(ServerThreadManager& manager);
+    TickThread(TickThreadManager& manager);
     void Run() override;
     void Close() override;
 };

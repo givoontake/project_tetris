@@ -22,7 +22,7 @@ void TimerThread::Run()
     constexpr DWORD HIGH_RESOLUTION_WAITABLE_TIMER_FLAG = 0x00000002;
     HANDLE high_resolution_timer = CreateWaitableTimerExW(nullptr, nullptr, HIGH_RESOLUTION_WAITABLE_TIMER_FLAG, TIMER_MODIFY_STATE | SYNCHRONIZE);
     if (!high_resolution_timer) {
-        manager_.CloseThreads();
+        manager_.RequestClose();
         return;
     }
 
@@ -48,7 +48,7 @@ void TimerThread::Run()
         }
         if (!is_timer_wait_succeeded) {
             // 단순한 기상 지연이 아니라 타이머 설정 또는 대기 함수가 실패한 경우에만 종료한다.
-            manager_.CloseThreads();
+            manager_.RequestClose();
             break;
         }
         if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) break;
@@ -56,12 +56,13 @@ void TimerThread::Run()
         // 틱 시각이 되어도 사용 가능한 작업 스레드가 최소 개수 이상 있어야 새 틱을 시작한다.
         // 여기서는 잠들지 않고 완료 여부를 반복 확인한다.
         while (is_running_.load() && manager_.iocp_server_.IsRunning()) {
-            if (manager_.GetAvailableTickThreadCount() >= ServerThreadManager::MIN_AVAILABLE_TICK_THREADS) break;
+            if (manager_.tick_thread_manager_.GetAvailableThreadCount() >= TickThreadManager::MIN_AVAILABLE_THREAD_COUNT) break;
             _mm_pause();
         }
         if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) break;
 
         const auto tick_start_time = Clock::now();
+        const long long tick_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(tick_start_time.time_since_epoch()).count();
         // 실제로 깨어난 시각이 아닌 이전 예약 시각에 한 주기를 더하여 기본 틱 간격을 유지한다.
         next_tick += frame_time;
         // 다음 예약 시각까지 이미 지났다면 현재 시각으로 보정한다. 다음 반복은 시간 대기 없이 진행할 수 있다.
@@ -72,13 +73,12 @@ void TimerThread::Run()
 
         // 새 틱이 생겼으니 TickThread 들을 깨운다.
         // 사용 가능한 스레드를 확보하고 같은 틱의 처리 정보를 전달한다. 이전 틱의 전체 완료는 기다리지 않는다.
-        manager_.StartTickPhase(tick_start_time); // 새 틱 발생
+        manager_.tick_thread_manager_.StartTickPhase(tick_time_ms); // 새 틱 발생
         // 데이터베이스는 작업 등록 시 즉시 깨우며, 여기서는 큐에 남은 작업을 다시 확인하도록 보조 알림을 보낸다.
-        manager_.iocp_server_.WakeDBThreads();
+        manager_.db_thread_manager_.Wake();
     }
 
     CloseHandle(high_resolution_timer);
-    if (is_running_.load() && !manager_.iocp_server_.IsRunning()) manager_.CloseThreads();
 }
 
 void TimerThread::Close()

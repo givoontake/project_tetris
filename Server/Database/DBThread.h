@@ -27,7 +27,7 @@
 #include "DBResult.h"
 #include "Session.h"
 #include "DBTasks.h"
-#include "Threads/ServerThread.h"
+#include "Threads/Threads/ServerThread.h"
 
 struct DBConnectionInfo
 {
@@ -54,6 +54,7 @@ class DBThread : public ServerThread
 {
 protected:
     HANDLE iocp_handle_ = nullptr;
+    sql::mysql::MySQL_Driver* driver_ = nullptr;
     DBConnectionContext connection_context_;
 
 public:
@@ -63,7 +64,7 @@ public:
     DBThread(const DBThread&) = delete;
     DBThread& operator=(const DBThread&) = delete;
 
-    void Init(HANDLE iocp_handle);
+    void Init(HANDLE iocp_handle, sql::mysql::MySQL_Driver* driver);
     void Close() override;
     void Wake();
     void Run() override;

@@ -52,9 +52,10 @@ DBThread::~DBThread()
 {
 }
 
-void DBThread::Init(HANDLE iocp_handle)
+void DBThread::Init(HANDLE iocp_handle, sql::mysql::MySQL_Driver* driver)
 {
     iocp_handle_ = iocp_handle;
+    driver_ = driver;
 }
 
 void DBThread::Close()
@@ -88,8 +89,11 @@ bool DBThread::TryEnqueue(std::unique_ptr<DBTask>& db_task)
 bool DBThread::Enqueue(std::unique_ptr<ServerDBTask> db_task)
 {
     std::unique_ptr<DBTask> task = std::move(db_task);
-    while (!TryEnqueue(task)) std::this_thread::yield();
-    return true;
+    while (is_running_.load()) {
+        if (TryEnqueue(task)) return true;
+        std::this_thread::yield();
+    }
+    return false;
 }
 
 bool DBThread::Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session)
@@ -97,14 +101,21 @@ bool DBThread::Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>
     if (!session->TryAddPending()) return false;
 
     std::unique_ptr<DBTask> task = std::move(db_task);
-    while (!TryEnqueue(task)) std::this_thread::yield();
-    return true;
+    while (is_running_.load()) {
+        if (TryEnqueue(task)) return true;
+        std::this_thread::yield();
+    }
+    session->ReducePending();
+    return false;
 }
 
 void DBThread::Enqueue(std::unique_ptr<MultiSessionDBTask> db_task)
 {
     std::unique_ptr<DBTask> task = std::move(db_task);
-    while (!TryEnqueue(task)) std::this_thread::yield();
+    while (is_running_.load()) {
+        if (TryEnqueue(task)) return;
+        std::this_thread::yield();
+    }
 }
 
 bool DBThread::LoadDBConfigFromFile(const std::string& file_path)
@@ -205,7 +216,7 @@ void DBThread::Run()
         return;
     }
 
-    while (true)
+    while (is_running_.load())
     {
         std::unique_ptr<DBTask> queued_task;
         if (!task_queue_.try_pop(queued_task))
@@ -214,7 +225,7 @@ void DBThread::Run()
             // 잠자고 있는 상태에서는 깨우는 신호가 오면 다시 조건을 검사한다.
             cv_.wait(lock, [this]() { return !task_queue_.empty() || !is_running_.load(); }); // 조건이 참이 되어야 깨어나므로 is_running_ = false이면 깨어나도록 해야함
 
-            if (!is_running_.load() && task_queue_.empty()) break;
+            if (!is_running_.load()) break;
 
             if (!task_queue_.try_pop(queued_task)) continue;
         }
@@ -224,15 +235,7 @@ void DBThread::Run()
             ProcessTask(*queued_task);
         }
         catch (const sql::SQLException&) {
-            while (!TryEnqueue(queued_task))
-            {
-                if (!is_running_.load())
-                {
-                    PostDBFailure(*queued_task);
-                    break;
-                }
-                std::this_thread::yield();
-            }
+            while (is_running_.load() && !TryEnqueue(queued_task)) std::this_thread::yield();
         }
         catch (const std::exception& e) {
             PrintErrorLog(__func__, e);
@@ -244,6 +247,9 @@ void DBThread::Run()
         }
     }
 
+    std::unique_ptr<DBTask> discarded_task;
+    while (task_queue_.try_pop(discarded_task)) {}
+
     // 3) 정리
     Disconnect();
 }
@@ -252,12 +258,10 @@ bool DBThread::Connect()
 {
     try
     {
-        sql::mysql::MySQL_Driver* driver = sql::mysql::get_mysql_driver_instance();
-
         // Connector/C++ legacy는 보통 tcp://host:port
         const std::string url = "tcp://" + connection_info_.host + ":" + std::to_string(connection_info_.port);
 
-		connection_context_.connection.reset(driver->connect(url, connection_info_.id, connection_info_.password));
+		connection_context_.connection.reset(driver_->connect(url, connection_info_.id, connection_info_.password));
 		connection_context_.connection->setSchema(connection_info_.schema);
 
 		PrintDBConnectionInfo(connection_context_.connection.get());

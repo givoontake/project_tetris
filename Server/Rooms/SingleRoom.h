@@ -28,7 +28,7 @@ public:
 private:
 	virtual std::span<Player> GetRoomPlayers() override;
 	virtual void ProcessSpecificRoomTask(const RoomTask& task) override;
-	virtual void ProcessGameTick(std::chrono::steady_clock::time_point tick_time) override;
+	virtual void ProcessGameTick(long long tick_time_ms) override;
 	void GiveUp(const SP<Session>& request_session);
 };
 

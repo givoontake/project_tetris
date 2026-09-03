@@ -11,16 +11,14 @@
 #include "Session.h"
 #include "PacketHandler.h"
 #include "DBResultHandler.h"
+#include "DBTasks.h"
 #include "TetrisRoom.h"
-#include "LoginDBThread.h"
-#include "GameDBThread.h"
 #include "RankingManager.h"
-#include "Threads/ServerThreadManager.h"
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
-static_assert(ServerThreadManager::GAME_DB_THREAD_COUNT > 0);
-static_assert(ServerThreadManager::LOGIN_DB_THREAD_COUNT == 1);
+class DBThreadManager;
+class ServerThreadManager;
 
 class IOCPServer
 {
@@ -29,9 +27,7 @@ class IOCPServer
 	WSADATA wsa_data_;
 	SOCKADDR_IN server_addr_;
 	IOOverlapped accept_over_;
-	LoginDBThread login_db_thread_;
-	std::array<GameDBThread, ServerThreadManager::GAME_DB_THREAD_COUNT> game_db_threads_;
-	std::atomic<std::size_t> next_game_db_thread_{ 0 };
+	DBThreadManager* db_thread_manager_ = nullptr;
 	RankingManager ranking_manager_;
 	ActiveRoomManager active_rooms_;
 	ActivePlayerManager active_players_;
@@ -66,10 +62,6 @@ public:
 	void TryDisconnect(const SP<Session>& session);
 	void Disconnect(const SP<Session>& session);
 	void StartServer();
-	void InitDBThreads();
-	void StartDBThreads();
-	void StopDBThreads();
-	void WakeDBThreads();
 	bool EnqueueDBTask(std::unique_ptr<ServerDBTask> db_task);
 	bool EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session);
 	void EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task, const SP<Session> (&sessions)[MAX_MATCH_RESULT_PLAYERS]);

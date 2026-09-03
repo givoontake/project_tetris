@@ -2,10 +2,10 @@
 #include <immintrin.h>
 #include "TickThread.h"
 #include "TickPhaseContext.h"
-#include "ServerThreadManager.h"
+#include "TickThreadManager.h"
 #include "IOCPServer.h"
 
-TickThread::TickThread(ServerThreadManager& manager) : manager_(manager)
+TickThread::TickThread(TickThreadManager& manager) : manager_(manager)
 {
 }
 
@@ -19,19 +19,21 @@ void TickThread::Run()
         auto current_phase_context = phase_context_; // 틱이 밀려 있어도 새로운 처리를 전달받은 시점에 한 번에 처리
 
         while (true) {
-            int i = current_phase_context->next_room_index_.fetch_add(1);
+            int i = current_phase_context->next_room_index.fetch_add(1);
             if (i >= MAX_ROOM_COUNT) break;
 
             auto room = manager_.iocp_server_.GetRoomByIndex(i);
             if (room) {
                 RoomProcessState expected_state = RoomProcessState::COMPLETE;
                 if (!room->processing_state_.compare_exchange_strong(expected_state, RoomProcessState::PROCESSING)) continue;
-				room->ProcessRoomTick(current_phase_context->TICK_TIME);
+				room->ProcessRoomTick(current_phase_context->tick_time_ms);
 				room->processing_state_.store(RoomProcessState::COMPLETE);
             }
         }
 
-        manager_.CompleteTickThreadPhase(*this, current_phase_context);
+        phase_context_.reset();
+        phase_.store(TickPhase::NONE);
+        state_.store(TickThreadState::AVAILABLE);
     }
 }
 
@@ -42,7 +44,7 @@ void TickThread::WaitTickPhase()
     using Clock = std::chrono::steady_clock;
     const auto next_tick_time = Clock::time_point(Clock::duration(manager_.next_tick_time_count_.load()));
     if (manager_.tick_wait_policy_ == TickWaitPolicy::HYBRID_SPIN) {
-        const auto spin_wait_start_time = next_tick_time - std::chrono::milliseconds(ServerThreadManager::TICK_SPIN_WAIT_MARGIN_MS);
+        const auto spin_wait_start_time = next_tick_time - std::chrono::milliseconds(TickThreadManager::TICK_SPIN_WAIT_MARGIN_MS);
         if (Clock::now() < spin_wait_start_time) {
             std::unique_lock<std::mutex> lock(manager_.tick_mutex_);
             manager_.tick_cv_.wait_until(lock, spin_wait_start_time, [&] {

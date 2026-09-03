@@ -40,7 +40,7 @@ public:
 
 private:
 	virtual void ProcessSpecificRoomTask(const RoomTask& task) override;
-	virtual void ProcessGameTick(std::chrono::steady_clock::time_point tick_time) override;
+	virtual void ProcessGameTick(long long tick_time_ms) override;
 	int AddPlayer(const SP<Session>& new_session);
 };
 

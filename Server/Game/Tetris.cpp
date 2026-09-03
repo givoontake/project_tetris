@@ -20,18 +20,18 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 
 // 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
 // 그러면 회전된 테트로미노 관리가 수월해진다.
-EventType Tetris::ProcessMoveInput(EventType move_type, std::chrono::steady_clock::time_point tick_time) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
+EventType Tetris::ProcessMoveInput(EventType move_type, long long tick_time_ms) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
 {
     PrintMoveType(move_type);
     Tetromino if_move_tetromino = current_tetromino_;
-	if(!timers_.IsInputAllowed(move_type, tick_time)) return EventType::NONE;
+	if(!timers_.IsInputAllowed(move_type, tick_time_ms)) return EventType::NONE;
     switch (move_type) {
     case EventType::RIGHT:
         ++if_move_tetromino.moved_pos.x;
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::RIGHT} });
-			timers_.RecordInput(EventType::RIGHT, tick_time);
+			timers_.RecordInput(EventType::RIGHT, tick_time_ms);
             return EventType::RIGHT;
         }
         return EventType::NONE;
@@ -41,7 +41,7 @@ EventType Tetris::ProcessMoveInput(EventType move_type, std::chrono::steady_cloc
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::LEFT} });
-			timers_.RecordInput(EventType::LEFT, tick_time);
+			timers_.RecordInput(EventType::LEFT, tick_time_ms);
             return EventType::LEFT;
         }
         return EventType::NONE;
@@ -51,8 +51,8 @@ EventType Tetris::ProcessMoveInput(EventType move_type, std::chrono::steady_cloc
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::DOWN} });
-			timers_.RecordInput(EventType::DOWN, tick_time);
-			timers_.RestartAutoDown(tick_time);
+			timers_.RecordInput(EventType::DOWN, tick_time_ms);
+			timers_.RestartAutoDown(tick_time_ms);
             return EventType::DOWN;
         }
         else {
@@ -69,7 +69,7 @@ EventType Tetris::ProcessMoveInput(EventType move_type, std::chrono::steady_cloc
         if (IsValidPosition(if_move_tetromino)) {
             current_tetromino_ = if_move_tetromino;
             send_tasks_.emplace_back(TaskType{ EventType::MOVE, TaskMove{EventType::ROTATE} });
-			timers_.RecordInput(EventType::ROTATE, tick_time);
+			timers_.RecordInput(EventType::ROTATE, tick_time_ms);
             return EventType::ROTATE;
         }
         return EventType::NONE;
@@ -83,7 +83,7 @@ EventType Tetris::ProcessMoveInput(EventType move_type, std::chrono::steady_cloc
             }
             else {
                 send_tasks_.emplace_back(TaskType{ EventType::FIX, TaskFix{current_tetromino_.moved_pos.x, current_tetromino_.moved_pos.y} });
-				timers_.RecordInput(EventType::DROP, tick_time);
+				timers_.RecordInput(EventType::DROP, tick_time_ms);
                 return EventType::FIX;
             }
         }
@@ -229,18 +229,18 @@ bool Tetris::CheckGameOver()
     return is_game_over;
 }
 
-void Tetris::ProcessTick(std::chrono::steady_clock::time_point tick_time)
+void Tetris::ProcessTick(long long tick_time_ms)
 {
     // 첫 번째로 줄 추가 처리
-    if (timers_.IsGarbageLineDue(tick_time)) {
-        timers_.RestartGarbageLine(tick_time);
+    if (timers_.IsGarbageLineDue(tick_time_ms)) {
+        timers_.RestartGarbageLine(tick_time_ms);
         ++pending_garbage_line_count_;
     }
 
     // 두 번째로 쌓인 입력 처리
     // 먼저 다운 타임아웃 이벤트 처리
-    if (timers_.IsAutoDownDue(tick_time)) {
-		timers_.RestartAutoDown(tick_time);
+    if (timers_.IsAutoDownDue(tick_time_ms)) {
+		timers_.RestartAutoDown(tick_time_ms);
         input_tasks_.emplace_back(EventType::DOWN);
     }
 
@@ -258,15 +258,15 @@ void Tetris::ProcessTick(std::chrono::steady_clock::time_point tick_time)
     for (int i = static_cast<int>(EventType::DROP); i >= static_cast<int>(EventType::RIGHT); --i) {
         if (pending_moves_[i] == true) {
             EventType move_type = static_cast<EventType>(i);
-			EventType result = ProcessMoveInput(move_type, tick_time);
+			EventType result = ProcessMoveInput(move_type, tick_time_ms);
             if (result == EventType::NONE) {
                 continue;
             }
             else if (result == EventType::FIX){ // 바로 여기서 처리해도 될 것 같은데
                 FixTetromino();
-                timers_.RecordInput(EventType::DOWN, tick_time);
-                timers_.RestartAutoDown(tick_time);
-                timers_.RecordInput(EventType::DROP, tick_time);
+                timers_.RecordInput(EventType::DOWN, tick_time_ms);
+                timers_.RestartAutoDown(tick_time_ms);
+                timers_.RecordInput(EventType::DROP, tick_time_ms);
 
                 ClearLine();
                 // 게임오버는 룸에서 상태를 변경시키는 이벤트인데, 여기서 수행하면 상태를 변경할 수가 없다..

@@ -8,73 +8,73 @@ TetrisTimers::TetrisTimers()
 
 void TetrisTimers::Reset()
 {
-	const auto current_time = Clock::now();
-	left_input_available_time_ = current_time;
-	right_input_available_time_ = current_time;
-	down_input_available_time_ = current_time;
-	rotate_input_available_time_ = current_time;
-	drop_input_available_time_ = current_time;
-	next_auto_down_time_ = current_time + std::chrono::milliseconds(DOWN_TIMEOUT_MS);
-	next_garbage_line_time_ = current_time + std::chrono::milliseconds(GARBAGE_LINE_TIMEOUT_MS);
+	const long long current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	left_input_available_time_ms_ = current_time_ms;
+	right_input_available_time_ms_ = current_time_ms;
+	down_input_available_time_ms_ = current_time_ms;
+	rotate_input_available_time_ms_ = current_time_ms;
+	drop_input_available_time_ms_ = current_time_ms;
+	next_auto_down_time_ms_ = current_time_ms + DOWN_TIMEOUT_MS;
+	next_garbage_line_time_ms_ = current_time_ms + GARBAGE_LINE_TIMEOUT_MS;
 }
 
-bool TetrisTimers::IsInputAllowed(EventType move_type, Clock::time_point tick_time) const
+bool TetrisTimers::IsInputAllowed(EventType move_type, long long tick_time_ms) const
 {
 	switch (move_type) {
 	case EventType::LEFT:
-		return tick_time >= left_input_available_time_;
+		return tick_time_ms >= left_input_available_time_ms_;
 	case EventType::RIGHT:
-		return tick_time >= right_input_available_time_;
+		return tick_time_ms >= right_input_available_time_ms_;
 	case EventType::DOWN:
-		return tick_time >= down_input_available_time_;
+		return tick_time_ms >= down_input_available_time_ms_;
 	case EventType::ROTATE:
-		return tick_time >= rotate_input_available_time_;
+		return tick_time_ms >= rotate_input_available_time_ms_;
 	case EventType::DROP:
-		return tick_time >= drop_input_available_time_;
+		return tick_time_ms >= drop_input_available_time_ms_;
 	default:
 		return false;
 	}
 }
 
-void TetrisTimers::RecordInput(EventType move_type, Clock::time_point tick_time)
+void TetrisTimers::RecordInput(EventType move_type, long long tick_time_ms)
 {
 	switch (move_type) {
 	case EventType::LEFT:
-		left_input_available_time_ = tick_time + std::chrono::milliseconds(MOVE_TIMEOUT_MS);
+		left_input_available_time_ms_ = tick_time_ms + MOVE_TIMEOUT_MS;
 		break;
 	case EventType::RIGHT:
-		right_input_available_time_ = tick_time + std::chrono::milliseconds(MOVE_TIMEOUT_MS);
+		right_input_available_time_ms_ = tick_time_ms + MOVE_TIMEOUT_MS;
 		break;
 	case EventType::DOWN:
-		down_input_available_time_ = tick_time + std::chrono::milliseconds(MOVE_TIMEOUT_MS);
+		down_input_available_time_ms_ = tick_time_ms + MOVE_TIMEOUT_MS;
 		break;
 	case EventType::ROTATE:
-		rotate_input_available_time_ = tick_time + std::chrono::milliseconds(ROTATE_TIMEOUT_MS);
+		rotate_input_available_time_ms_ = tick_time_ms + ROTATE_TIMEOUT_MS;
 		break;
 	case EventType::DROP:
-		drop_input_available_time_ = tick_time + std::chrono::milliseconds(DROP_TIMEOUT_MS);
+		drop_input_available_time_ms_ = tick_time_ms + DROP_TIMEOUT_MS;
 		break;
 	default:
 		break;
 	}
 }
 
-bool TetrisTimers::IsAutoDownDue(Clock::time_point tick_time) const
+bool TetrisTimers::IsAutoDownDue(long long tick_time_ms) const
 {
-	return tick_time >= next_auto_down_time_;
+	return tick_time_ms >= next_auto_down_time_ms_;
 }
 
-void TetrisTimers::RestartAutoDown(Clock::time_point tick_time)
+void TetrisTimers::RestartAutoDown(long long tick_time_ms)
 {
-	next_auto_down_time_ = tick_time + std::chrono::milliseconds(DOWN_TIMEOUT_MS);
+	next_auto_down_time_ms_ = tick_time_ms + DOWN_TIMEOUT_MS;
 }
 
-bool TetrisTimers::IsGarbageLineDue(Clock::time_point tick_time) const
+bool TetrisTimers::IsGarbageLineDue(long long tick_time_ms) const
 {
-	return tick_time >= next_garbage_line_time_;
+	return tick_time_ms >= next_garbage_line_time_ms_;
 }
 
-void TetrisTimers::RestartGarbageLine(Clock::time_point tick_time)
+void TetrisTimers::RestartGarbageLine(long long tick_time_ms)
 {
-	next_garbage_line_time_ = tick_time + std::chrono::milliseconds(GARBAGE_LINE_TIMEOUT_MS);
+	next_garbage_line_time_ms_ = tick_time_ms + GARBAGE_LINE_TIMEOUT_MS;
 }
