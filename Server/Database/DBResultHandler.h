@@ -1,6 +1,4 @@
 #pragma once
-#include "types.h"
-
 class IOCPServer;
 class Session;
 struct DBOverlapped;
@@ -11,7 +9,7 @@ class DBResultHandler
 
 public:
 	DBResultHandler(IOCPServer& server);
-	void HandleSessionDBResult(DBOverlapped* db_over, const SP<Session>& session);
+	void HandleSessionDBResult(DBOverlapped* db_over, Session* session);
 	void HandleServerDBResult(DBOverlapped* db_over);
 
 private:
@@ -19,8 +17,8 @@ private:
 	void HandleAddFriendDBResult(DBOverlapped* db_over);
 	void HandleDeleteFriendDBResult(DBOverlapped* db_over);
 	void HandleLoadRankingsDBResult(DBOverlapped* db_over);
-	void HandleLoginDBResult(DBOverlapped* db_over, const SP<Session>& session);
-	void HandleUpdateScoreDBResult(DBOverlapped* db_over, const SP<Session>& session);
-	void HandleUpdateMatchResultDBResult(DBOverlapped* db_over, const SP<Session>& session);
-	void HandleLoadFriendListDBResult(DBOverlapped* db_over, const SP<Session>& session);
+	void HandleLoginDBResult(DBOverlapped* db_over, Session* session);
+	void HandleUpdateScoreDBResult(DBOverlapped* db_over, Session* session);
+	void HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Session* session);
+	void HandleLoadFriendListDBResult(DBOverlapped* db_over, Session* session);
 };

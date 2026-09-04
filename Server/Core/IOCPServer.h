@@ -18,7 +18,12 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 class DBThreadManager;
+class LobbyThreadManager;
+class GameThreadManager;
 class ServerThreadManager;
+struct LobbyTask;
+struct RoomLifecycleTask;
+struct SessionTask;
 
 class IOCPServer
 {
@@ -28,13 +33,15 @@ class IOCPServer
 	SOCKADDR_IN server_addr_;
 	IOOverlapped accept_over_;
 	DBThreadManager* db_thread_manager_ = nullptr;
+	LobbyThreadManager* lobby_thread_manager_ = nullptr;
+	GameThreadManager* game_thread_manager_ = nullptr;
 	RankingManager ranking_manager_;
 	ActiveRoomManager active_rooms_;
 	ActivePlayerManager active_players_;
 	PacketHandler packet_handler_;
 	DBResultHandler db_result_handler_;
 	std::atomic<int> room_gen_generator_ = -1;
-	std::array<std::atomic<SP<Session>>, MAX_PLAYER_COUNT> sessions_;
+	std::array<Session, MAX_PLAYER_COUNT> sessions_;
 	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM_COUNT> rooms_;
 
 	std::atomic<bool> is_running_ = true;
@@ -48,40 +55,50 @@ public:
 	IOCPServer();
 	~IOCPServer();
 
-	int FindAvailableSessionIndex();
+	Session* AcquireSession(SOCKET new_socket);
 	int GenerateRoomGen();
+	std::uint64_t GenerateSessionID();
 	bool IsRunning() const { return is_running_.load(); }
 	HANDLE GetIOCPHandle() const { return iocp_handle_; }
 
 	SP<TetrisRoom> GetRoomByIndex(int room_index) const;
 	RankingManager& GetRankingManager() { return ranking_manager_; }
 
-	SP<Session> FindSessionByIndex(int session_index);
+	Session* FindSessionByIndex(int session_index);
+	Session* FindSession(SessionKey session_key);
 
-	void BeginDisconnect(const SP<Session>& session);
-	void TryDisconnect(const SP<Session>& session);
-	void Disconnect(const SP<Session>& session);
+	void RequestDisconnect(SessionKey session_key);
+	void CompleteSessionIO(SessionKey session_key);
+	void CompleteRoomDisconnect(SessionKey session_key);
+	bool FinalizeDisconnect(SessionKey session_key);
 	void StartServer();
 	bool EnqueueDBTask(std::unique_ptr<ServerDBTask> db_task);
-	bool EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session);
-	void EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task, const SP<Session> (&sessions)[MAX_MATCH_RESULT_PLAYERS]);
-	void ProcessRecvBuffer(const SP<Session>& session, int recv_bytes);
-	void RoutePacket(char* packet, const SP<Session>& session);
+	bool EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task);
+	void EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task);
+	bool ProcessRecvBuffer(Session* session, int recv_bytes);
+	void RoutePacket(char* packet, Session* session);
+	SessionTaskProcessResult ProcessSessionTask(Session* session, std::unique_ptr<SessionTask> task);
+	void ProcessLobbyTask(std::unique_ptr<LobbyTask> task);
+	void ProcessRoomLifecycleTask(std::unique_ptr<RoomLifecycleTask> task);
+	bool EnqueueSessionTask(SessionKey session_key, std::unique_ptr<SessionTask> task);
+	void EnqueueLobbyTask(std::unique_ptr<LobbyTask> task);
+	void EnqueueRoomLifecycleTask(std::unique_ptr<RoomLifecycleTask> task);
+	bool BeginRoomTransition(SessionKey session_key);
 	void BroadcastToLobby(char* packet);
-	void CreatePublicRoom(char* packet, const SP<Session>& session);
-	void CreatePrivateRoom(char* packet, const SP<Session>& session);
+	int CreatePublicRoom(char* packet, Session* session, SessionKey session_key);
+	int CreatePrivateRoom(char* packet, Session* session, SessionKey session_key);
 	void DeleteRoom(int room_index);
 	void RequestLoadRankings();
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
-	void SendRoomList(const SP<Session>& session);
-	int TryJoinRoom(const SP<Session>& session, int room_gen, const std::string& room_password, int matching_max_player_count = -1);
+	void SendRoomList(Session* session);
+	int TryJoinRoom(Session* session, int room_gen, const std::string& room_password, int matching_max_player_count = -1);
 	SP<TetrisRoom> FindRoomByGen(int room_gen);
-	void SendError(const SP<Session>& session, int error_code);
-	void FindMatch(const SP<Session>& session, int max_player_count);
-	void SendLobbyPlayerList(const SP<Session>& session);
-	void SendFriendList(const SP<Session>& session);
-	void SendRankings(const SP<Session>& session);
+	void SendError(Session* session, int error_code);
+	void FindMatch(Session* session, int max_player_count);
+	void SendLobbyPlayerList(Session* session);
+	void SendFriendList(Session* session);
+	void SendRankings(Session* session);
 	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acceptor_info);
 	void SendDeleteFriendResult(int requester_id, int target_id);
 };

@@ -1,15 +1,17 @@
 #pragma once
 #include <atomic>
 #include <string>
-#include <memory>
-#include "types.h"
 #include "Tetris.h"
+#include "types.h"
 #include "define_packets.h"
-#include "Session.h"
+#include "ExOverlapped.h"
+
+class Session;
 
 class Player
 {
-	WP<Session> session_;
+	SessionKey session_key_; // 세션 정리 후에도 방 슬롯을 식별하고, 재사용된 세션 인덱스의 오삭제를 막는다.
+	std::atomic<ActiveEntryState> active_state_{ ActiveEntryState::EMPTY };
 	Tetris tetris_;
 	char send_buffer_[BUF_SIZE];
 	int send_data_size_ = 0;
@@ -27,7 +29,11 @@ public:
 	Player();
 	~Player();
 
-	SP<Session> GetSession() const { return session_.lock(); }
+	SessionKey GetSessionKey() const { return session_key_; }
+	bool HasSession() const { return active_state_.load() != ActiveEntryState::EMPTY; }
+	bool IsActive() const { return active_state_.load() == ActiveEntryState::ACTIVE; }
+	ActiveEntryState GetActiveState() const { return active_state_.load(); }
+	bool MatchesSessionKey(SessionKey session_key) const;
 	RoomPlayerState GetRoomPlayerState() const { return room_player_state_.load(); }
 	RoomPlayerState GetPrevRoomPlayerState() const { return prev_room_player_state_.load(); }
 	Tetris& GetTetris() { return tetris_; }
@@ -44,7 +50,9 @@ public:
 	void ResetCombo() { combo_ = 0; }
 	void AddCombo() { ++combo_; }
 
-	bool InitPlayer(const SP<Session>& session, int room_index);
+	bool InitPlayer(Session* session, SessionKey session_key, int room_index);
+	bool Activate(SessionKey session_key);
+	bool TrySetPending(SessionKey session_key);
 	void ClearPlayer();
 	void ResetGameData();
 	bool AddToSendBuffer(const char* data, int data_size);

@@ -35,7 +35,6 @@ void SendBuffer::Reset()
 {
 	ZeroMemory(&ex_over.over, sizeof(ex_over.over));
 	ex_over.session_key = {};
-	ex_over.room_index = -1;
 	buffer_offset = 0;
 	wsabuf.len = 0;
 	wsabuf.buf = packet_buffer;

@@ -70,7 +70,7 @@ public:
     void Run() override;
 
     bool Enqueue(std::unique_ptr<ServerDBTask> db_task);
-    bool Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session);
+    bool Enqueue(std::unique_ptr<SessionDBTask> db_task);
     void Enqueue(std::unique_ptr<MultiSessionDBTask> db_task);
 
 protected:

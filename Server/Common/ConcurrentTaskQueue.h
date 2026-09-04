@@ -23,6 +23,12 @@ public:
 		return task_count_.exchange(0);
 	}
 
+	void RestoreClaimedTaskCount(std::size_t task_count)
+	{
+		if (task_count == 0) return;
+		task_count_.fetch_add(task_count);
+	}
+
 	std::size_t GetTaskCount() const
 	{
 		return task_count_.load();

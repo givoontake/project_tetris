@@ -19,18 +19,18 @@ public:
 	~MultiRoom();
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, const SP<Session>& request_session) override;
-	virtual void RemovePlayer(const int player_id) override;
-	virtual void SendCreateRoom(const SP<Session>& session) override;
-	virtual bool AddHostSession(const SP<Session>& session) override;
+	virtual void HandlePacket(char* packet, Session* request_session) override;
+	virtual void RemovePlayer(SessionKey session_key) override;
+	virtual void SendCreateRoom(Session* session) override;
+	virtual bool AddHostSession(Session* session, SessionKey session_key) override;
+	int AddPlayer(Session* new_session, SessionKey session_key, const std::string& room_password);
 
 	void StartGame(int requester_id);
 
 	void FindNewHost(); // 방장이 나갔을 때 새로운 방장 찾기
 	int FindHostIndex(int host_id); // 현재 호스트의 인덱스를 반환
-	bool AddPlayerTask(const SP<Session>& new_session, int matching_max_player_count);
 	void TogglePlayerReady(int player_id);
-	void KickPlayer(int requester_id, int kick_player_id);
+	bool KickPlayer(int requester_id, int kick_player_id);
 	bool ResolveWinner();
 	void DistributeGarbageLines();
 	int CalculateGarbageLineCount(int cleared_line_count);
@@ -39,8 +39,9 @@ public:
 	void RequestUpdateMatchResult();
 
 private:
-	virtual void ProcessSpecificRoomTask(const RoomTask& task) override;
+	virtual void CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_type) override;
+	virtual void HandlePlayerReactivated() override;
+	virtual bool ProcessSpecificRoomTask(const RoomTask& task) override;
 	virtual void ProcessGameTick(long long tick_time_ms) override;
-	int AddPlayer(const SP<Session>& new_session);
 };
 

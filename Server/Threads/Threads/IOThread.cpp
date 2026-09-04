@@ -1,6 +1,7 @@
 #include <iostream>
 #include "IOThread.h"
 #include "IOCPServer.h"
+#include "session_tasks.h"
 
 IOThread::IOThread(IOCPServer& iocp_server)
 	: iocp_server_(iocp_server)
@@ -26,10 +27,6 @@ void IOThread::Run()
 			ProcessSessionCompletion(result, transferred_bytes, ex_over);
 			break;
 
-		case ROOM_IO_COMPLETION:
-			ProcessRoomCompletion(ex_over);
-			break;
-
 		case DB_SESSION_COMPLETION:
 			ProcessSessionDBCompletion(result, ex_over);
 			break;
@@ -52,27 +49,16 @@ void IOThread::ProcessAcceptCompletion(BOOL result, ExOverlapped* ex_over)
 		return;
 	}
 
-	int new_index = iocp_server_.FindAvailableSessionIndex();
-	if (new_index != -1) {
-		auto new_session = std::make_shared<Session>();
-		new_session->SetSessionIndex(new_index);
-		new_session->InitSession(iocp_server_.accept_socket_);
-		SP<Session> expected = nullptr;
-		if (iocp_server_.sessions_[new_index].compare_exchange_strong(expected, new_session)) {
-			CreateIoCompletionPort(reinterpret_cast<HANDLE>(iocp_server_.accept_socket_), iocp_server_.iocp_handle_, SESSION_IO_COMPLETION, 0);
-			new_session->RecvPacket(iocp_server_.iocp_handle_);
-			iocp_server_.accept_socket_ = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-			std::cout << "Session[" << new_index << "] connect" << std::endl;
-		}
-		else {
-			closesocket(iocp_server_.accept_socket_);
-			iocp_server_.accept_socket_ = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-		}
+	auto* new_session = iocp_server_.AcquireSession(iocp_server_.accept_socket_);
+	if (new_session) {
+		CreateIoCompletionPort(reinterpret_cast<HANDLE>(iocp_server_.accept_socket_), iocp_server_.iocp_handle_, SESSION_IO_COMPLETION, 0);
+		new_session->RecvPacket(iocp_server_.iocp_handle_);
+		std::cout << "Session[" << new_session->GetSessionKey().session_index << "] connect" << std::endl;
 	}
 	else {
 		closesocket(iocp_server_.accept_socket_);
-		iocp_server_.accept_socket_ = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	}
+	iocp_server_.accept_socket_ = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 
 	if (iocp_server_.accept_socket_ != INVALID_SOCKET) {
 		ZeroMemory(&iocp_server_.accept_over_.ex_over.over, sizeof(iocp_server_.accept_over_.ex_over.over));
@@ -87,7 +73,7 @@ void IOThread::ProcessSessionCompletion(BOOL result, DWORD transferred_bytes, Ex
 	const bool is_send = ex_over->op_type == OPType::SEND || ex_over->op_type == OPType::POOLED_SEND;
 	IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 	SendBuffer* send_buffer = is_send ? static_cast<SendBuffer*>(io_over) : nullptr;
-	auto session = iocp_server_.FindSessionByIndex(ex_over->session_key.session_index);
+	auto* session = iocp_server_.FindSession(ex_over->session_key);
 	if (!session) {
 		if (ex_over->op_type == OPType::POOLED_SEND) send_buffer->Clear();
 		else if (ex_over->op_type == OPType::SEND) delete send_buffer;
@@ -96,12 +82,12 @@ void IOThread::ProcessSessionCompletion(BOOL result, DWORD transferred_bytes, Ex
 
 	switch (ex_over->op_type) {
 	case OPType::RECV:
-		ProcessReceiveCompletion(result, transferred_bytes, session);
+		ProcessReceiveCompletion(result, transferred_bytes, session, ex_over->session_key);
 		break;
 
 	case OPType::SEND:
 	case OPType::POOLED_SEND:
-		ProcessSendCompletion(result, transferred_bytes, send_buffer, session);
+		ProcessSendCompletion(result, transferred_bytes, send_buffer, session, ex_over->session_key);
 		break;
 
 	default:
@@ -109,64 +95,41 @@ void IOThread::ProcessSessionCompletion(BOOL result, DWORD transferred_bytes, Ex
 	}
 }
 
-void IOThread::ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, const SP<Session>& session)
+void IOThread::ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, Session* session, SessionKey session_key)
 {
 	if (!result || transferred_bytes == 0) {
-		if (session->BeginDeactivate()) {
-			iocp_server_.BeginDisconnect(session); // 팬딩이 0으로 노출되면 다른 곳에서 disconnect 관련 작업이 일어날 수 있다.
-		}
-		session->ReducePending();
-		if (session->TryDeactivate()) iocp_server_.TryDisconnect(session);
+		iocp_server_.RequestDisconnect(session_key);
+		iocp_server_.CompleteSessionIO(session_key);
 		return;
 	}
 
-	iocp_server_.ProcessRecvBuffer(session, transferred_bytes); // recv 토큰은 정상 수신 중 유지하고 disconnect 경로에서만 줄인다.
-	session->ReducePending();
-	if (session->TryDeactivate()) iocp_server_.TryDisconnect(session);
-	session->RecvPacket(iocp_server_.iocp_handle_);
+	const bool should_receive = iocp_server_.ProcessRecvBuffer(session, transferred_bytes);
+	if (should_receive) session->RecvPacket(iocp_server_.iocp_handle_);
+	iocp_server_.CompleteSessionIO(session_key);
 }
 
-void IOThread::ProcessSendCompletion(BOOL result, DWORD transferred_bytes, SendBuffer* send_buffer, const SP<Session>& session)
+void IOThread::ProcessSendCompletion(BOOL result, DWORD transferred_bytes, SendBuffer* send_buffer, Session* session, SessionKey session_key)
 {
-	if (!result || transferred_bytes == 0) {
-		if (session->BeginDeactivate()) {
-			iocp_server_.BeginDisconnect(session);
-		}
-	}
-	session->ReducePending();
-	if (session->TryDeactivate()) iocp_server_.TryDisconnect(session);
+	if (!result || transferred_bytes == 0) iocp_server_.RequestDisconnect(session_key);
 
 	if (send_buffer->ex_over.op_type == OPType::POOLED_SEND) send_buffer->Clear();
 	else delete send_buffer;
-}
-
-void IOThread::ProcessRoomCompletion(ExOverlapped* ex_over)
-{
-	if (ex_over->op_type == OPType::DELETE_ROOM) iocp_server_.DeleteRoom(ex_over->room_index);
-	delete ex_over;
+	iocp_server_.CompleteSessionIO(session_key);
 }
 
 void IOThread::ProcessSessionDBCompletion(BOOL result, ExOverlapped* ex_over)
 {
-	// 팬딩은 모든 작업을 마치고 줄야야 함
-	DBOverlapped* db_over = reinterpret_cast<DBOverlapped*>(ex_over);
-	int index = db_over->ex_over.session_key.session_index;
-	auto session = iocp_server_.FindSessionByIndex(index);
-	if (!session) {
-		delete db_over;
-		return;
-	}
+	std::unique_ptr<DBOverlapped> db_over(reinterpret_cast<DBOverlapped*>(ex_over));
+	const SessionKey session_key = db_over->ex_over.session_key;
+	auto* session = iocp_server_.FindSession(session_key);
+	if (!session) return;
 	if (!result) {
-		if (session->BeginDeactivate()) {
-			iocp_server_.BeginDisconnect(session);
-		}
+		iocp_server_.RequestDisconnect(session_key);
 	}
 	else {
-		iocp_server_.db_result_handler_.HandleSessionDBResult(db_over, session);
+		iocp_server_.EnqueueSessionTask(session_key, std::make_unique<SessionDBResultTask>(std::move(db_over)));
+		return;
 	}
-	session->ReducePending();
-	if (session->TryDeactivate()) iocp_server_.TryDisconnect(session);
-	delete db_over;
 }
 
 void IOThread::ProcessServerDBCompletion(BOOL result, ExOverlapped* ex_over)

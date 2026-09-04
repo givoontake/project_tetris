@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+	<ClCompile Include="Lobby\LobbySession.cpp" />
     <ClCompile Include="Managers\ActiveRoomManager.cpp" />
     <ClCompile Include="Managers\ActivePlayerManager.cpp" />
     <ClCompile Include="Database\DBThread.cpp" />
@@ -29,6 +30,7 @@
     <ClCompile Include="Core\IOCPServer.cpp" />
     <ClCompile Include="Threads\Threads\IOThread.cpp" />
     <ClCompile Include="Threads\Managers\IOThreadManager.cpp" />
+    <ClCompile Include="Threads\Managers\LobbyThreadManager.cpp" />
     <ClCompile Include="Core\main.cpp" />
     <ClCompile Include="Rooms\MultiRoom.cpp" />
     <ClCompile Include="Network\PacketHandler.cpp" />
@@ -39,9 +41,11 @@
     <ClCompile Include="Threads\Managers\ServerThreadManager.cpp" />
     <ClCompile Include="Threads\Threads\ServerThread.cpp" />
     <ClCompile Include="Threads\Managers\DBThreadManager.cpp" />
-    <ClCompile Include="Threads\TickPhaseContext.cpp" />
-    <ClCompile Include="Threads\Threads\TickThread.cpp" />
-    <ClCompile Include="Threads\Managers\TickThreadManager.cpp" />
+    <ClCompile Include="Threads\GamePhaseContext.cpp" />
+    <ClCompile Include="Threads\LobbyPhaseContext.cpp" />
+    <ClCompile Include="Threads\Threads\LobbyThread.cpp" />
+    <ClCompile Include="Threads\Threads\GameThread.cpp" />
+    <ClCompile Include="Threads\Managers\GameThreadManager.cpp" />
     <ClCompile Include="Threads\Threads\TimerThread.cpp" />
     <ClCompile Include="Threads\Managers\TimerThreadManager.cpp" />
     <ClCompile Include="Rooms\SingleRoom.cpp" />
@@ -51,6 +55,7 @@
     <ClCompile Include="Rooms\TwoPlayerRoom.cpp" />
   </ItemGroup>
   <ItemGroup>
+	<ClInclude Include="Lobby\LobbySession.h" />
     <ClInclude Include="Managers\ActiveRoomManager.h" />
     <ClInclude Include="Managers\ActivePlayerManager.h" />
     <ClInclude Include="Common\ConcurrentTaskQueue.h" />
@@ -74,23 +79,30 @@
     <ClInclude Include="Core\IOCPServer.h" />
     <ClInclude Include="Threads\Threads\IOThread.h" />
     <ClInclude Include="Threads\Managers\IOThreadManager.h" />
+    <ClInclude Include="Threads\Managers\LobbyThreadManager.h" />
     <ClInclude Include="Network\PacketHandler.h" />
     <ClInclude Include="Network\SendBuffer.h" />
     <ClInclude Include="Packets\packet_types.h" />
     <ClInclude Include="Managers\RankingManager.h" />
     <ClInclude Include="Game\Player.h" />
     <ClInclude Include="Network\Session.h" />
+    <ClInclude Include="Network\session_tasks.h" />
     <ClInclude Include="Threads\Managers\ServerThreadManager.h" />
     <ClInclude Include="Threads\Threads\ServerThread.h" />
     <ClInclude Include="Threads\Managers\DBThreadManager.h" />
-    <ClInclude Include="Threads\TickPhaseContext.h" />
-    <ClInclude Include="Threads\tick_state.h" />
-    <ClInclude Include="Threads\Threads\TickThread.h" />
-    <ClInclude Include="Threads\Managers\TickThreadManager.h" />
+    <ClInclude Include="Threads\GamePhaseContext.h" />
+    <ClInclude Include="Threads\LobbyPhaseContext.h" />
+    <ClInclude Include="Threads\lobby_state.h" />
+    <ClInclude Include="Threads\lobby_tasks.h" />
+    <ClInclude Include="Threads\Threads\LobbyThread.h" />
+    <ClInclude Include="Threads\game_state.h" />
+    <ClInclude Include="Threads\Threads\GameThread.h" />
+    <ClInclude Include="Threads\Managers\GameThreadManager.h" />
     <ClInclude Include="Threads\Threads\TimerThread.h" />
     <ClInclude Include="Threads\Managers\TimerThreadManager.h" />
     <ClInclude Include="Game\Tetris.h" />
     <ClInclude Include="Rooms\TetrisRoom.h" />
+    <ClInclude Include="Rooms\room_lifecycle_tasks.h" />
     <ClInclude Include="Game\TetrisTimers.h" />
     <ClInclude Include="Common\types.h" />
     <ClInclude Include="Rooms\TwoPlayerRoom.h" />

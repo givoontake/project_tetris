@@ -1,17 +1,20 @@
 #pragma once
+#include <atomic>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
-#include "TickThread.h"
-#include "tick_state.h"
+#include "ConcurrentTaskQueue.h"
+#include "GameThread.h"
+#include "room_lifecycle_tasks.h"
+#include "game_state.h"
 
 class IOCPServer;
-struct TickPhaseContext;
+struct GamePhaseContext;
 class TimerThread;
 
-class TickThreadManager
+class GameThreadManager
 {
 public:
     static constexpr int THREAD_COUNT = 12;
@@ -24,21 +27,24 @@ private:
     // 혼합 대기의 사전 기상에 쓰던 공유 시각이며, 현재는 타이머 내부에서만 다음 틱 시각을 관리한다.
     // std::atomic<std::chrono::steady_clock::duration::rep> next_tick_time_count_{ 0 };
     TickWaitPolicy tick_wait_policy_;
+	ConcurrentTaskQueue<std::unique_ptr<RoomLifecycleTask>> lifecycle_tasks_;
+	std::atomic<bool> is_lifecycle_processing_{ false };
     //bool tick_enable = false;
-    std::vector<std::unique_ptr<TickThread>> thread_objects_;
+    std::vector<std::unique_ptr<GameThread>> thread_objects_;
     std::vector<std::thread> threads_;
 
-    friend class TickThread;
+    friend class GameThread;
     friend class TimerThread;
 
     int GetAvailableThreadCount() const;
-    std::vector<TickThread*> SelectThreads();
+    std::vector<GameThread*> SelectThreads();
 
 public:
-    TickThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy);
+    GameThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy);
 
     void Start();
-    bool StartTickPhase(long long tick_time_ms);
+    bool StartGamePhase(long long tick_time_ms);
+	void Enqueue(std::unique_ptr<RoomLifecycleTask> task);
     void Close();
     void Join();
 };

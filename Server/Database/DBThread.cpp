@@ -96,16 +96,13 @@ bool DBThread::Enqueue(std::unique_ptr<ServerDBTask> db_task)
     return false;
 }
 
-bool DBThread::Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session)
+bool DBThread::Enqueue(std::unique_ptr<SessionDBTask> db_task)
 {
-    if (!session->TryAddPending()) return false;
-
     std::unique_ptr<DBTask> task = std::move(db_task);
     while (is_running_.load()) {
         if (TryEnqueue(task)) return true;
         std::this_thread::yield();
     }
-    session->ReducePending();
     return false;
 }
 
@@ -181,7 +178,6 @@ void DBThread::PostDBFailure(const DBTask& task)
         const auto& multi_session_task = static_cast<const MultiSessionDBTask&>(task);
         for (int i = 0; i < multi_session_task.player_count; ++i)
         {
-            if ((multi_session_task.completion_mask & (1u << i)) == 0) continue;
             auto* db_over = new DBOverlapped{ task.operation_type };
             db_over->ex_over.op_type = OPType::DB;
             db_over->ex_over.session_key = multi_session_task.player_keys[i];

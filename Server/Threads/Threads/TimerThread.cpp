@@ -22,7 +22,7 @@ void TimerThread::Run()
     constexpr DWORD HIGH_RESOLUTION_WAITABLE_TIMER_FLAG = 0x00000002;
     HANDLE high_resolution_timer = CreateWaitableTimerExW(nullptr, nullptr, HIGH_RESOLUTION_WAITABLE_TIMER_FLAG, TIMER_MODIFY_STATE | SYNCHRONIZE);
     if (!high_resolution_timer) {
-        manager_.RequestClose();
+        manager_.CloseThreads();
         return;
     }
 
@@ -48,7 +48,7 @@ void TimerThread::Run()
         }
         if (!is_timer_wait_succeeded) {
             // 단순한 기상 지연이 아니라 타이머 설정 또는 대기 함수가 실패한 경우에만 종료한다.
-            manager_.RequestClose();
+            manager_.CloseThreads();
             break;
         }
         if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) break;
@@ -56,7 +56,7 @@ void TimerThread::Run()
         // 틱 시각이 되어도 사용 가능한 작업 스레드가 최소 개수 이상 있어야 새 틱을 시작한다.
         // 여기서는 잠들지 않고 완료 여부를 반복 확인한다.
         while (is_running_.load() && manager_.iocp_server_.IsRunning()) {
-            if (manager_.tick_thread_manager_.GetAvailableThreadCount() >= TickThreadManager::MIN_AVAILABLE_THREAD_COUNT) break;
+            if (manager_.game_thread_manager_.GetAvailableThreadCount() >= GameThreadManager::MIN_AVAILABLE_THREAD_COUNT) break;
             _mm_pause();
         }
         if (!is_running_.load() || !manager_.iocp_server_.IsRunning()) break;
@@ -71,9 +71,10 @@ void TimerThread::Run()
         // 혼합 대기에서 틱 직전에 미리 깨어나기 위한 정보이며, 일반 수면 대기와 반복 검사에는 필요 없다.
         // manager_.next_tick_time_count_.store(next_tick.time_since_epoch().count());
 
-        // 새 틱이 생겼으니 TickThread 들을 깨운다.
+        // 새 틱이 생겼으니 GameThread들을 깨운다.
         // 사용 가능한 스레드를 확보하고 같은 틱의 처리 정보를 전달한다. 이전 틱의 전체 완료는 기다리지 않는다.
-        manager_.tick_thread_manager_.StartTickPhase(tick_time_ms); // 새 틱 발생
+		manager_.lobby_thread_manager_.StartLobbyPhase();
+        manager_.game_thread_manager_.StartGamePhase(tick_time_ms); // 새 틱 발생
         // 데이터베이스는 작업 등록 시 즉시 깨우며, 여기서는 큐에 남은 작업을 다시 확인하도록 보조 알림을 보낸다.
         manager_.db_thread_manager_.Wake();
     }

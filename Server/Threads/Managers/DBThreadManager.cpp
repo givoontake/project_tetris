@@ -50,33 +50,23 @@ bool DBThreadManager::Enqueue(std::unique_ptr<ServerDBTask> db_task)
     return game_threads_[thread_index].Enqueue(std::move(db_task));
 }
 
-bool DBThreadManager::Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session)
+bool DBThreadManager::Enqueue(std::unique_ptr<SessionDBTask> db_task)
 {
-    bool is_enqueued = false;
     if (db_task->operation_type == DBOperationType::LOGIN) {
-        is_enqueued = login_thread_.Enqueue(std::move(db_task), session);
-    }
-    else {
-        std::size_t thread_index = 0;
-        if (db_task->session_key.player_id >= 0)
-            thread_index = static_cast<std::size_t>(db_task->session_key.player_id) % game_threads_.size();
-        else
-            thread_index = next_game_thread_.fetch_add(1) % game_threads_.size();
-
-        is_enqueued = game_threads_[thread_index].Enqueue(std::move(db_task), session);
+        return login_thread_.Enqueue(std::move(db_task));
     }
 
-    if (!is_enqueued && session->TryDeactivate()) iocp_server_.TryDisconnect(session);
-    return is_enqueued;
+    std::size_t thread_index = 0;
+    if (db_task->session_key.player_id >= 0)
+        thread_index = static_cast<std::size_t>(db_task->session_key.player_id) % game_threads_.size();
+    else
+        thread_index = next_game_thread_.fetch_add(1) % game_threads_.size();
+
+    return game_threads_[thread_index].Enqueue(std::move(db_task));
 }
 
-void DBThreadManager::Enqueue(std::unique_ptr<MultiSessionDBTask> db_task, const SP<Session> (&sessions)[MAX_MATCH_RESULT_PLAYERS])
+void DBThreadManager::Enqueue(std::unique_ptr<MultiSessionDBTask> db_task)
 {
-    for (int i = 0; i < db_task->player_count; ++i) {
-        if (sessions[i]->TryAddPending()) db_task->completion_mask |= static_cast<uint8_t>(1u << i);
-        else if (sessions[i]->TryDeactivate()) iocp_server_.TryDisconnect(sessions[i]);
-    }
-
     const std::size_t thread_index = static_cast<std::size_t>(db_task->player_keys[0].player_id) % game_threads_.size();
     game_threads_[thread_index].Enqueue(std::move(db_task));
 }

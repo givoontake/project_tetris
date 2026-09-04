@@ -1,4 +1,5 @@
 #include "Player.h"
+#include "Session.h"
 
 Player::Player()
 {
@@ -11,16 +12,25 @@ Player::~Player()
 
 }
 
-bool Player::InitPlayer(const SP<Session>& session, int room_index)
+bool Player::InitPlayer(Session* session, SessionKey session_key, int room_index)
 {
 	if (!session) return false;
 	if (session->GetLifeState() != LifeState::ACTIVE) return false;
+	if (!session->MatchesSessionKey(session_key)) return false;
+	ActiveEntryState expected_state = ActiveEntryState::EMPTY;
+	if (!active_state_.compare_exchange_strong(expected_state, ActiveEntryState::PENDING)) return false;
+	session_key_ = session_key;
 	const RoomSnapshot room_snapshot = session->GetRoomSnapshot();
 	if (room_snapshot.mode_state == ModeState::LOBBY) {
-		if (!session->TrySetRoomMode(room_index)) return false;
+		if (!session->TrySetRoomMode(session_key, room_index)) {
+			ClearPlayer();
+			return false;
+		}
 	}
-	else if (room_snapshot.mode_state != ModeState::ROOM || room_snapshot.room_index != room_index) return false;
-	session_ = session;
+	else if (room_snapshot.mode_state != ModeState::ROOM || room_snapshot.room_index != room_index) {
+		ClearPlayer();
+		return false;
+	}
 	tetris_.Clear();
 	room_player_state_.store(RoomPlayerState::WAIT);
 	prev_room_player_state_.store(RoomPlayerState::WAIT);
@@ -31,10 +41,31 @@ bool Player::InitPlayer(const SP<Session>& session, int room_index)
 	return true;
 }
 
+bool Player::Activate(SessionKey session_key)
+{
+	if (!MatchesSessionKey(session_key)) return false;
+	ActiveEntryState expected_state = ActiveEntryState::PENDING;
+	return active_state_.compare_exchange_strong(expected_state, ActiveEntryState::ACTIVE);
+}
+
+bool Player::TrySetPending(SessionKey session_key)
+{
+	if (!MatchesSessionKey(session_key)) return false;
+	ActiveEntryState expected_state = ActiveEntryState::ACTIVE;
+	return active_state_.compare_exchange_strong(expected_state, ActiveEntryState::PENDING);
+}
+
+bool Player::MatchesSessionKey(SessionKey session_key) const
+{
+	return HasSession() &&
+		session_key_.session_index == session_key.session_index &&
+		session_key_.player_id == session_key.player_id &&
+		session_key_.session_id == session_key.session_id;
+}
+
 void Player::ClearPlayer()
 {
-	if (auto session_ptr = session_.lock()) session_ptr->SetRoomSnapshot(ModeState::LOBBY, -1);
-	session_.reset();
+	session_key_ = {};
 	tetris_.Clear();
 	room_player_state_.store(RoomPlayerState::WAIT);
 	prev_room_player_state_.store(RoomPlayerState::WAIT);
@@ -42,6 +73,7 @@ void Player::ClearPlayer()
 
 	score_ = 0;
 	ClearSendBuffer();
+	active_state_.store(ActiveEntryState::EMPTY);
 }
 
 void Player::ResetGameData()

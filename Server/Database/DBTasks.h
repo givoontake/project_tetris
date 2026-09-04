@@ -8,7 +8,6 @@
 #include "enum_class.h"
 
 constexpr int MAX_MATCH_RESULT_PLAYERS = 5;
-static_assert(MAX_MATCH_RESULT_PLAYERS <= 8);
 
 enum class DBTaskTarget : uint8_t
 {
@@ -45,7 +44,6 @@ struct MultiSessionDBTask : DBTask
 {
     SessionKey player_keys[MAX_MATCH_RESULT_PLAYERS]{};
     uint8_t player_count{ 0 };
-    uint8_t completion_mask{ 0 };
 
     MultiSessionDBTask(DBOperationType task_type, const SessionKey (&match_player_keys)[MAX_MATCH_RESULT_PLAYERS], uint8_t player_count)
         : DBTask(task_type, DBTaskTarget::MULTI_SESSION), player_count(player_count)

@@ -36,6 +36,6 @@ public:
     void Join();
     void Wake();
     bool Enqueue(std::unique_ptr<ServerDBTask> db_task);
-    bool Enqueue(std::unique_ptr<SessionDBTask> db_task, const SP<Session>& session);
-    void Enqueue(std::unique_ptr<MultiSessionDBTask> db_task, const SP<Session> (&sessions)[MAX_MATCH_RESULT_PLAYERS]);
+    bool Enqueue(std::unique_ptr<SessionDBTask> db_task);
+    void Enqueue(std::unique_ptr<MultiSessionDBTask> db_task);
 };

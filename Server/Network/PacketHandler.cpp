@@ -26,12 +26,13 @@
 #include "define_packets.h"
 #include "packet_types.h"
 #include "IOCPServer.h"
+#include "room_lifecycle_tasks.h"
 
 PacketHandler::PacketHandler(IOCPServer& server) : server_(server)
 {
 }
 
-void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleLoginPacket(char* packet, Session* session)
 {
 	C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
 	if (!session) return;
@@ -40,10 +41,10 @@ void PacketHandler::HandleLoginPacket(char* packet, const SP<Session>& session)
 	std::string login_id = server_.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
 	std::string password = server_.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
 	SessionKey session_key = session->GetSessionKey();
-	server_.EnqueueDBTask(std::make_unique<DBLoginTask>(session_key, login_id, password), session);
+	server_.EnqueueDBTask(std::make_unique<DBLoginTask>(session_key, login_id, password));
 }
 
-void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleMessagePacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
@@ -69,7 +70,7 @@ void PacketHandler::HandleMessagePacket(char* packet, const SP<Session>& session
 	delete[] send_p;
 }
 
-void PacketHandler::HandleTestPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleTestPacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_TEST_PACKET* recv_p = reinterpret_cast<C2S_TEST_PACKET*>(packet);
@@ -88,14 +89,13 @@ void PacketHandler::HandleTestPacket(char* packet, const SP<Session>& session)
 	delete[] send_p;
 }
 
-void PacketHandler::HandleDisconnectPacket(const SP<Session>& session)
+void PacketHandler::HandleDisconnectPacket(Session* session)
 {
 	if (!session) return;
-	if (session->BeginDeactivate()) server_.BeginDisconnect(session);
-	if (session->TryDeactivate()) server_.TryDisconnect(session);
+	server_.RequestDisconnect(session->GetSessionKey());
 }
 
-void PacketHandler::HandleJoinPublicRoomPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleJoinPublicRoomPacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_JOIN_PUBLIC_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_PUBLIC_ROOM_PACKET*>(packet);
@@ -103,7 +103,7 @@ void PacketHandler::HandleJoinPublicRoomPacket(char* packet, const SP<Session>& 
 	if (result != SUCCESS) server_.SendError(session, result);
 }
 
-void PacketHandler::HandleJoinPrivateRoomPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleJoinPrivateRoomPacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_JOIN_PRIVATE_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_PRIVATE_ROOM_PACKET*>(packet);
@@ -111,14 +111,14 @@ void PacketHandler::HandleJoinPrivateRoomPacket(char* packet, const SP<Session>&
 	if (result != SUCCESS) server_.SendError(session, result);
 }
 
-void PacketHandler::HandleFastMatchingPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleFastMatchingPacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_FAST_MATCHING_PACKET* matching_p = reinterpret_cast<C2S_FAST_MATCHING_PACKET*>(packet);
 	server_.FindMatch(session, matching_p->max_player_count);
 }
 
-void PacketHandler::HandleAddFriendRequestPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleAddFriendRequestPacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_ADD_FRIEND_REQUEST_PACKET* friend_p = reinterpret_cast<C2S_ADD_FRIEND_REQUEST_PACKET*>(packet);
@@ -129,10 +129,10 @@ void PacketHandler::HandleAddFriendRequestPacket(char* packet, const SP<Session>
 	SessionKey session_key = session->GetSessionKey();
 	DBResultLogin db_info = session->GetDBInfo();
 	FriendInfo requester_info{ db_info.player_id, db_info.nickname };
-	server_.EnqueueDBTask(std::make_unique<DBAddFriendRequestTask>(session_key, requester_info, receiver_id), session);
+	server_.EnqueueDBTask(std::make_unique<DBAddFriendRequestTask>(session_key, requester_info, receiver_id));
 }
 
-void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleAcceptFriendPacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_ACCEPT_FRIEND_PACKET* accept_p = reinterpret_cast<C2S_ACCEPT_FRIEND_PACKET*>(packet);
@@ -142,20 +142,20 @@ void PacketHandler::HandleAcceptFriendPacket(char* packet, const SP<Session>& se
 	SessionKey session_key = session->GetSessionKey();
 	DBResultLogin db_info = session->GetDBInfo();
 	FriendInfo acceptor_info{ db_info.player_id, db_info.nickname };
-	server_.EnqueueDBTask(std::make_unique<DBAddFriendTask>(session_key, acceptor_info, requester_id), session);
+	server_.EnqueueDBTask(std::make_unique<DBAddFriendTask>(session_key, acceptor_info, requester_id));
 }
 
-void PacketHandler::HandleDeleteFriendPacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandleDeleteFriendPacket(char* packet, Session* session)
 {
 	if (!session) return;
 	C2S_DELETE_FRIEND_PACKET* delete_p = reinterpret_cast<C2S_DELETE_FRIEND_PACKET*>(packet);
 	int target_id = delete_p->target_id;
 	if (session->GetModeState() != ModeState::LOBBY) return;
 	SessionKey session_key = session->GetSessionKey();
-	server_.EnqueueDBTask(std::make_unique<DBDeleteFriendTask>(session_key, target_id), session);
+	server_.EnqueueDBTask(std::make_unique<DBDeleteFriendTask>(session_key, target_id));
 }
 
-void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)
+void PacketHandler::HandlePacket(char* packet, Session* session)
 {
 	if (!session) return;
 	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
@@ -181,12 +181,22 @@ void PacketHandler::HandlePacket(char* packet, const SP<Session>& session)
 	}
 
 	case C2S_ADD_PUBLIC_ROOM: {
-		server_.CreatePublicRoom(packet, session);
+		const SessionKey session_key = session->GetSessionKey();
+		if (!server_.BeginRoomTransition(session_key)) break;
+		const int packet_size = reinterpret_cast<PACKET_HEADER*>(packet)->size;
+		auto task = std::make_unique<RoomLifecycleTask>(RoomLifecycleTaskType::CREATE_PUBLIC, session_key);
+		task->packet.assign(packet, packet + packet_size);
+		server_.EnqueueRoomLifecycleTask(std::move(task));
 		break;
 	}
 
 	case C2S_ADD_PRIVATE_ROOM: {
-		server_.CreatePrivateRoom(packet, session);
+		const SessionKey session_key = session->GetSessionKey();
+		if (!server_.BeginRoomTransition(session_key)) break;
+		const int packet_size = reinterpret_cast<PACKET_HEADER*>(packet)->size;
+		auto task = std::make_unique<RoomLifecycleTask>(RoomLifecycleTaskType::CREATE_PRIVATE, session_key);
+		task->packet.assign(packet, packet + packet_size);
+		server_.EnqueueRoomLifecycleTask(std::move(task));
 		break;
 	}
 

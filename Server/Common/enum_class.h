@@ -2,7 +2,7 @@
 #include "error_code.h"
 #include "info_code.h"
 
-enum class OPType { SEND, POOLED_SEND, RECV, ACCEPT, DB, DELETE_ROOM};
+enum class OPType { SEND, POOLED_SEND, RECV, ACCEPT, DB };
 
 enum class DBOperationType { LOGIN, LOAD_SESSION_INFO, LOAD_RANKINGS, UPDATE_SCORE, UPDATE_MATCH_RESULT,
 							ADD_FRIEND, DELETE_FRIEND, ADD_FRIEND_REQUEST, DELETE_FRIEND_REQUEST, GET_FRIEND_INFO, LOAD_FRIEND_LIST, LOAD_MATCH_RECORD, DB_ERROR };
@@ -13,9 +13,13 @@ enum class RoomState { EMPTY, WAIT, PLAY, WAITING_DELETE, DELETE_POST };
 
 enum class RoomProcessState { COMPLETE, PROCESSING };
 
-enum class RoomTaskType { NONE, JOIN, REMOVE_PLAYER, READY, KICK, START, GIVE_UP };
+enum class ActiveEntryState { EMPTY, ACTIVE, PENDING };
 
-enum class LifeState { NONE, ACTIVE, DISCONNECT_PENDING, DISCONNECTING };
+enum class RoomExitType { LEAVE, KICK };
+
+enum class RoomTaskType { NONE, REMOVE_PLAYER, READY, KICK, START, GIVE_UP };
+
+enum class LifeState { NONE, INITIALIZING, ACTIVE, DISCONNECT_PENDING, DISCONNECTING };
 
 enum class ModeState { NONE, LOGIN, LOBBY, ROOM };
 

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <memory>
 #include <WinSock2.h>
 #include <MSWSock.h>
@@ -9,11 +10,11 @@
 struct SessionKey {
 	int session_index = -1;
 	int player_id = -1;
+	std::uint64_t session_id = 0;
 };
 
 constexpr ULONG_PTR LISTEN_IO_COMPLETION = 1;
 constexpr ULONG_PTR SESSION_IO_COMPLETION = 2;
-constexpr ULONG_PTR ROOM_IO_COMPLETION = 3;
 constexpr ULONG_PTR DB_SESSION_COMPLETION = 4;
 constexpr ULONG_PTR DB_SERVER_COMPLETION = 5;
 
@@ -21,7 +22,6 @@ struct ExOverlapped {
 	WSAOVERLAPPED over;
 	OPType op_type;
 	SessionKey session_key;
-	int room_index = -1;
 
 	ExOverlapped() {
 		ZeroMemory(&over, sizeof(over));

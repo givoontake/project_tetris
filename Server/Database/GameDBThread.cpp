@@ -8,7 +8,6 @@ namespace
     {
         for (int i = 0; i < task.player_count; ++i)
         {
-            if ((task.completion_mask & (1u << i)) == 0) continue;
             auto* db_over = new DBOverlapped{ DBOperationType::UPDATE_MATCH_RESULT };
             db_over->ex_over.op_type = OPType::DB;
             db_over->ex_over.session_key = task.player_keys[i];

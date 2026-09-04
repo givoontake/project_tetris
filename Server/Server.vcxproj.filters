@@ -25,6 +25,9 @@
     <Filter Include="Managers">
       <UniqueIdentifier>{896E48DF-62AF-4F92-AE0C-023AD3952356}</UniqueIdentifier>
     </Filter>
+	<Filter Include="Lobby">
+	  <UniqueIdentifier>{4F68B01F-12AC-4A35-A0E4-4935E7B3E28D}</UniqueIdentifier>
+	</Filter>
     <Filter Include="Threads">
       <UniqueIdentifier>{7740505E-CB44-40D8-A7A5-3CF1B661EF85}</UniqueIdentifier>
     </Filter>
@@ -36,6 +39,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+	<ClCompile Include="Lobby\LobbySession.cpp">
+	  <Filter>Lobby</Filter>
+	</ClCompile>
     <ClCompile Include="Core\IOCPServer.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -102,6 +108,9 @@
     <ClCompile Include="Threads\Managers\IOThreadManager.cpp">
       <Filter>Threads\Managers</Filter>
     </ClCompile>
+    <ClCompile Include="Threads\Managers\LobbyThreadManager.cpp">
+      <Filter>Threads\Managers</Filter>
+    </ClCompile>
     <ClCompile Include="Threads\Threads\ServerThread.cpp">
       <Filter>Threads\Threads</Filter>
     </ClCompile>
@@ -111,13 +120,19 @@
     <ClCompile Include="Threads\Managers\DBThreadManager.cpp">
       <Filter>Threads\Managers</Filter>
     </ClCompile>
-    <ClCompile Include="Threads\TickPhaseContext.cpp">
+    <ClCompile Include="Threads\GamePhaseContext.cpp">
       <Filter>Threads</Filter>
     </ClCompile>
-    <ClCompile Include="Threads\Threads\TickThread.cpp">
+    <ClCompile Include="Threads\LobbyPhaseContext.cpp">
+      <Filter>Threads</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\Threads\LobbyThread.cpp">
       <Filter>Threads\Threads</Filter>
     </ClCompile>
-    <ClCompile Include="Threads\Managers\TickThreadManager.cpp">
+    <ClCompile Include="Threads\Threads\GameThread.cpp">
+      <Filter>Threads\Threads</Filter>
+    </ClCompile>
+    <ClCompile Include="Threads\Managers\GameThreadManager.cpp">
       <Filter>Threads\Managers</Filter>
     </ClCompile>
     <ClCompile Include="Threads\Threads\TimerThread.cpp">
@@ -128,6 +143,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+	<ClInclude Include="Lobby\LobbySession.h">
+	  <Filter>Lobby</Filter>
+	</ClInclude>
     <ClInclude Include="Core\IOCPServer.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -165,6 +183,9 @@
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="Network\Session.h">
+      <Filter>Network</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\session_tasks.h">
       <Filter>Network</Filter>
     </ClInclude>
     <ClInclude Include="Database\DBThread.h">
@@ -212,6 +233,9 @@
     <ClInclude Include="Rooms\TetrisRoom.h">
       <Filter>Rooms</Filter>
     </ClInclude>
+    <ClInclude Include="Rooms\room_lifecycle_tasks.h">
+      <Filter>Rooms</Filter>
+    </ClInclude>
     <ClInclude Include="Rooms\TwoPlayerRoom.h">
       <Filter>Rooms</Filter>
     </ClInclude>
@@ -230,6 +254,9 @@
     <ClInclude Include="Threads\Managers\IOThreadManager.h">
       <Filter>Threads\Managers</Filter>
     </ClInclude>
+    <ClInclude Include="Threads\Managers\LobbyThreadManager.h">
+      <Filter>Threads\Managers</Filter>
+    </ClInclude>
     <ClInclude Include="Threads\Threads\ServerThread.h">
       <Filter>Threads\Threads</Filter>
     </ClInclude>
@@ -239,16 +266,28 @@
     <ClInclude Include="Threads\Managers\DBThreadManager.h">
       <Filter>Threads\Managers</Filter>
     </ClInclude>
-    <ClInclude Include="Threads\tick_state.h">
+    <ClInclude Include="Threads\game_state.h">
       <Filter>Threads</Filter>
     </ClInclude>
-    <ClInclude Include="Threads\TickPhaseContext.h">
+    <ClInclude Include="Threads\GamePhaseContext.h">
       <Filter>Threads</Filter>
     </ClInclude>
-    <ClInclude Include="Threads\Threads\TickThread.h">
+    <ClInclude Include="Threads\LobbyPhaseContext.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\lobby_state.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\lobby_tasks.h">
+      <Filter>Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\Threads\LobbyThread.h">
       <Filter>Threads\Threads</Filter>
     </ClInclude>
-    <ClInclude Include="Threads\Managers\TickThreadManager.h">
+    <ClInclude Include="Threads\Threads\GameThread.h">
+      <Filter>Threads\Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="Threads\Managers\GameThreadManager.h">
       <Filter>Threads\Managers</Filter>
     </ClInclude>
     <ClInclude Include="Threads\Threads\TimerThread.h">

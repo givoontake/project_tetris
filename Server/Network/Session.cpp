@@ -7,22 +7,35 @@ Session::Session()
 	recv_over_.SetOperationType(OPType::RECV);
 }
 
-void Session::InitSession(SOCKET new_socket)
+bool Session::InitSession(int session_index, std::uint64_t session_id, SOCKET new_socket)
 {
-	std::lock_guard<std::mutex> lock(session_mutex_);
+	if (session_index < 0 || session_id == 0 || new_socket == INVALID_SOCKET) return false;
+	LifeState expected_state = LifeState::NONE;
+	if (!life_state_.compare_exchange_strong(expected_state, LifeState::INITIALIZING)) return false;
+
+	std::unique_lock<std::shared_mutex> socket_lock(socket_mutex_);
+	std::lock_guard<std::mutex> session_lock(session_mutex_);
 	socket_ = new_socket;
 	io_pending_count_ = 0;
 	db_info_.Clear();
+	friend_list_.clear();
 	friend_list_.reserve(MAX_FRIEND_COUNT);
 	room_index_ = -1;
 	remaining_data_size_ = 0;
+	session_key_.session_index = session_index;
 	session_key_.player_id = -1;
+	session_key_.session_id = session_id;
+	ZeroMemory(&recv_over_.ex_over.over, sizeof(recv_over_.ex_over.over));
+	ZeroMemory(recv_over_.packet_buffer, sizeof(recv_over_.packet_buffer));
+	recv_over_.wsabuf.len = BUF_SIZE;
+	recv_over_.wsabuf.buf = recv_over_.packet_buffer;
 	recv_over_.ex_over.session_key = session_key_;
 	life_state_.store(LifeState::ACTIVE);
 	mode_state_.store(ModeState::LOGIN);
 
 	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
 	//state = LOGIN;
+	return true;
 }
 
 bool Session::ApplyLoginResult(DBResultLogin* login_result)
@@ -46,14 +59,22 @@ bool Session::SendPacket(const char* packet, int packet_size, const HANDLE iocp_
 	const int buffer_index = send_buffer_pool_.FindAvailableBuffer();
 	const bool is_pooled = buffer_index >= 0;
 	SendBuffer* send_buffer = is_pooled ? &send_buffer_pool_.send_buffers[buffer_index] : new SendBuffer;
-	if (!send_buffer->Append(packet, packet_size) || !TryAddPending()) {
+	if (!send_buffer->Append(packet, packet_size)) {
 		if (is_pooled) send_buffer->Clear();
 		else delete send_buffer;
 		return false;
 	}
 
-	send_buffer->ex_over.session_key = session_key_;
-	int result = WSASend(socket_, &send_buffer->wsabuf, 1, 0, 0, &send_buffer->ex_over.over, 0);
+	std::shared_lock<std::shared_mutex> socket_lock(socket_mutex_);
+	if (life_state_.load() != LifeState::ACTIVE || socket_ == INVALID_SOCKET) {
+		if (is_pooled) send_buffer->Clear();
+		else delete send_buffer;
+		return false;
+	}
+
+	send_buffer->ex_over.session_key = GetSessionKey();
+	++io_pending_count_;
+	const int result = WSASend(socket_, &send_buffer->wsabuf, 1, 0, 0, &send_buffer->ex_over.over, 0);
 	if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, &send_buffer->ex_over.over);
 		std::cerr << db_info_.nickname << "Session::SendPacket() WSASend error\n";
@@ -63,19 +84,25 @@ bool Session::SendPacket(const char* packet, int packet_size, const HANDLE iocp_
 }
 
 
-void Session::RecvPacket(const HANDLE iocp_handle)
+bool Session::RecvPacket(const HANDLE iocp_handle)
 {
-	if (!TryAddPending()) return;
+	std::shared_lock<std::shared_mutex> socket_lock(socket_mutex_);
+	if (life_state_.load() != LifeState::ACTIVE || socket_ == INVALID_SOCKET) return false;
+
 	DWORD recv_flag = 0;
 	ZeroMemory(&recv_over_.ex_over.over, sizeof(recv_over_.ex_over.over)); // io 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
-	recv_over_.ex_over.session_key = session_key_;
-	recv_over_.wsabuf.len = BUF_SIZE - remaining_data_size_;
-	recv_over_.wsabuf.buf = recv_over_.packet_buffer + remaining_data_size_;
-	int result = WSARecv(socket_, &recv_over_.wsabuf, 1, 0, &recv_flag, &recv_over_.ex_over.over, 0);
+	recv_over_.ex_over.session_key = GetSessionKey();
+	const int remaining_data_size = GetRemainingDataSize();
+	recv_over_.wsabuf.len = BUF_SIZE - remaining_data_size;
+	recv_over_.wsabuf.buf = recv_over_.packet_buffer + remaining_data_size;
+	++io_pending_count_;
+	const int result = WSARecv(socket_, &recv_over_.wsabuf, 1, 0, &recv_flag, &recv_over_.ex_over.over, 0);
 	if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
 		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(&recv_over_));
 		std::cerr << db_info_.nickname << "Session::RecvPacket() WSARecv error\n";
+		return false;
 	}
+	return true;
 }
 
 void Session::AddFriend(FriendInfo& new_friend)
@@ -116,10 +143,12 @@ DBResultLogin Session::UpdateMatchRecord(bool is_winner)
 	return db_info_;
 }
 
-void Session::SetSessionIndex(int new_session_index)
+bool Session::MatchesSessionKey(SessionKey session_key) const
 {
+	const LifeState life_state = life_state_.load();
+	if (life_state == LifeState::NONE || life_state == LifeState::INITIALIZING) return false;
 	std::lock_guard<std::mutex> lock(session_mutex_);
-	session_key_.session_index = new_session_index;
+	return session_key_.session_index == session_key.session_index && session_key_.session_id == session_key.session_id;
 }
 
 void Session::AdjustRemainingDataSize(int data_size_delta)
@@ -128,44 +157,107 @@ void Session::AdjustRemainingDataSize(int data_size_delta)
 	remaining_data_size_ += data_size_delta;
 }
 
-// 현재 디스커넥팅 예외 케이스는 disconnect->방에서 removeplayer할 때 본인에게도 전송하는 로직이 있어서 그 부분이 방지. 세션 정리 단계이므로 넣는게 정배
-bool Session::TryAddPending()
+bool Session::BeginDisconnect(SessionKey session_key)
 {
-	std::lock_guard<std::mutex> lock(session_mutex_);
+	std::unique_lock<std::shared_mutex> socket_lock(socket_mutex_);
+	std::lock_guard<std::mutex> session_lock(session_mutex_);
 	if (life_state_.load() != LifeState::ACTIVE) return false;
-	io_pending_count_++;
-	return true;	
+	if (session_key_.session_index != session_key.session_index || session_key_.session_id != session_key.session_id) return false;
+	life_state_.store(LifeState::DISCONNECT_PENDING);
+	const SOCKET socket = socket_;
+	socket_ = INVALID_SOCKET;
+	if (socket != INVALID_SOCKET) closesocket(socket);
+	if (io_pending_count_.load() != 0) return false;
+	LifeState expected_state = LifeState::DISCONNECT_PENDING;
+	return life_state_.compare_exchange_strong(expected_state, LifeState::DISCONNECTING);
 }
 
-void Session::ReducePending()
+bool Session::CompleteIO(SessionKey session_key)
 {
-	std::lock_guard<std::mutex> lock(session_mutex_);
-	--io_pending_count_;
+	if (!MatchesSessionKey(session_key) || io_pending_count_.load() <= 0) return false;
+	const int pending_count = --io_pending_count_;
+	if (pending_count != 0) return false;
+	LifeState expected_state = LifeState::DISCONNECT_PENDING;
+	return life_state_.compare_exchange_strong(expected_state, LifeState::DISCONNECTING);
 }
 
-bool Session::BeginDeactivate()
+bool Session::CompleteRoomRemoval(SessionKey session_key)
 {
-	std::lock_guard<std::mutex> lock(session_mutex_);
-	if (life_state_.load() == LifeState::ACTIVE) {
-		life_state_.store(LifeState::DISCONNECT_PENDING);
-		return true;
-	}
-	return false;
+	std::lock_guard<std::mutex> session_lock(session_mutex_);
+	const LifeState life_state = life_state_.load();
+	if ((life_state != LifeState::DISCONNECT_PENDING && life_state != LifeState::DISCONNECTING) || mode_state_.load() != ModeState::ROOM) return false;
+	if (session_key_.session_index != session_key.session_index || session_key_.session_id != session_key.session_id) return false;
+	room_index_ = -1;
+	mode_state_.store(ModeState::NONE);
+	return life_state == LifeState::DISCONNECTING;
 }
 
-bool Session::TryDeactivate()
+void Session::FinalizeDisconnect(SessionKey session_key)
 {
-	std::lock_guard<std::mutex> lock(session_mutex_);
-	if (life_state_.load() == LifeState::DISCONNECT_PENDING && io_pending_count_ == 0) {
-		life_state_.store(LifeState::DISCONNECTING);
-		return true;
-	}
-	return false;
+	std::unique_lock<std::shared_mutex> socket_lock(socket_mutex_);
+	if (life_state_.load() != LifeState::DISCONNECTING) return;
+	std::lock_guard<std::mutex> session_lock(session_mutex_);
+	if (session_key_.session_index != session_key.session_index || session_key_.session_id != session_key.session_id) return;
+	db_info_.Clear();
+	friend_list_.clear();
+	room_index_ = -1;
+	remaining_data_size_ = 0;
+	session_key_.player_id = -1;
+	session_key_.session_id = 0;
+	ZeroMemory(&recv_over_.ex_over.over, sizeof(recv_over_.ex_over.over));
+	ZeroMemory(recv_over_.packet_buffer, sizeof(recv_over_.packet_buffer));
+	recv_over_.wsabuf.len = BUF_SIZE;
+	recv_over_.wsabuf.buf = recv_over_.packet_buffer;
+	recv_over_.ex_over.session_key = {};
+	mode_state_.store(ModeState::NONE);
+	life_state_.store(LifeState::NONE);
+}
+
+bool Session::TryEnqueueTask(SessionKey session_key, std::unique_ptr<SessionTask> task)
+{
+	if (!task) return false;
+	std::lock_guard<std::mutex> session_lock(session_mutex_);
+	if (life_state_.load() != LifeState::ACTIVE) return false;
+	if (session_key_.session_index != session_key.session_index || session_key_.session_id != session_key.session_id) return false;
+	session_tasks_.Enqueue(std::move(task));
+	return true;
+}
+
+void Session::DiscardTasks()
+{
+	const std::size_t task_count = session_tasks_.ClaimTaskCount();
+	for (std::size_t i = 0; i < task_count; ++i) session_tasks_.Dequeue();
+}
+
+std::size_t Session::ClaimTaskCount()
+{
+	return session_tasks_.ClaimTaskCount();
+}
+
+void Session::RestoreClaimedTaskCount(std::size_t task_count)
+{
+	session_tasks_.RestoreClaimedTaskCount(task_count);
+}
+
+std::unique_ptr<SessionTask> Session::DequeueTask()
+{
+	return session_tasks_.Dequeue();
+}
+
+bool Session::TryStartTaskProcessing()
+{
+	bool expected = false;
+	return is_processing_tasks_.compare_exchange_strong(expected, true);
+}
+
+void Session::CompleteTaskProcessing()
+{
+	is_processing_tasks_.store(false);
 }
 
 SOCKET Session::GetSocket() const
 {
-	std::lock_guard<std::mutex> lock(session_mutex_);
+	std::shared_lock<std::shared_mutex> lock(socket_mutex_);
 	return socket_;
 }
 
@@ -205,20 +297,23 @@ DBResultLogin Session::GetDBInfo() const
 	return db_info_;
 }
 
-void Session::SetRoomSnapshot(ModeState new_state, int new_room_index)
+bool Session::TrySetLobbyMode(SessionKey session_key)
 {
 	std::lock_guard<std::mutex> lock(session_mutex_);
-	if (life_state_.load() == LifeState::DISCONNECT_PENDING || life_state_.load() == LifeState::DISCONNECTING) return;
-	room_index_ = new_room_index;
-	mode_state_.store(new_state);
+	if (life_state_.load() != LifeState::ACTIVE || mode_state_.load() != ModeState::ROOM) return false;
+	if (session_key_.session_index != session_key.session_index || session_key_.session_id != session_key.session_id) return false;
+	room_index_ = -1;
+	mode_state_.store(ModeState::LOBBY);
+	return true;
 }
 
-bool Session::TrySetRoomMode(int new_room_index)
+bool Session::TrySetRoomMode(SessionKey session_key, int new_room_index)
 {
 	std::lock_guard<std::mutex> lock(session_mutex_);
 	if (new_room_index < 0) return false;
 	if (life_state_.load() != LifeState::ACTIVE) return false;
 	if (mode_state_.load() != ModeState::LOBBY) return false;
+	if (session_key_.session_index != session_key.session_index || session_key_.session_id != session_key.session_id) return false;
 	room_index_ = new_room_index;
 	mode_state_.store(ModeState::ROOM);
 	return true;
