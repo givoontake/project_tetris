@@ -7,8 +7,8 @@ class FivePlayerRoom : public MultiRoom
 	std::array<Player, 5> room_players_;
 
 public:
-	FivePlayerRoom(IOCPServer* server, PublicRoomInitData data);
-	FivePlayerRoom(IOCPServer* server, PrivateRoomInitData data);
+	FivePlayerRoom(TetrisServer* server, PublicRoomInitData data);
+	FivePlayerRoom(TetrisServer* server, PrivateRoomInitData data);
 
 private:
 	virtual std::span<Player> GetRoomPlayers() override;

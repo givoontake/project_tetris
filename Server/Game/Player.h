@@ -3,7 +3,7 @@
 #include <string>
 #include "Tetris.h"
 #include "types.h"
-#include "define_packets.h"
+#include "settings.h"
 #include "ExOverlapped.h"
 
 class Session;
@@ -15,8 +15,6 @@ class Player
 	Tetris tetris_;
 	char send_buffer_[BUF_SIZE];
 	int send_data_size_ = 0;
-	// std::string player_name; // 방 생성할 때 만들도록 일단 하고, 나중에 회원가입 - DB 연동으로 session 클래스에 포함해보자.
-	// char player_name[MAX_PLAYER_NAME_SIZE];
 	std::atomic<RoomPlayerState> room_player_state_;
 	std::atomic<RoomPlayerState> prev_room_player_state_; // 게임 오버시 무승부 체크용
 
@@ -56,6 +54,5 @@ public:
 	void ClearPlayer();
 	void ResetGameData();
 	bool AddToSendBuffer(const char* data, int data_size);
-	//void SendTickData(HANDLE iocp_handle);
 	void ClearSendBuffer();
 };

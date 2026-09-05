@@ -1,12 +1,12 @@
 #include "FivePlayerRoom.h"
 
-FivePlayerRoom::FivePlayerRoom(IOCPServer* server, PublicRoomInitData data)
+FivePlayerRoom::FivePlayerRoom(TetrisServer* server, PublicRoomInitData data)
 	: MultiRoom(server, data)
 {
 	max_player_count_ = 5;
 }
 
-FivePlayerRoom::FivePlayerRoom(IOCPServer* server, PrivateRoomInitData data)
+FivePlayerRoom::FivePlayerRoom(TetrisServer* server, PrivateRoomInitData data)
 	: MultiRoom(server, data)
 {
 	max_player_count_ = 5;

@@ -1,6 +1,5 @@
 #include <memory>
-#include "IOCPServer.h"
-#include "Threads/Managers/ServerThreadManager.h"
+#include "TetrisServer.h"
 
 HANDLE console_close_event = nullptr;
 
@@ -32,19 +31,18 @@ int main()
         return 1;
     }
 
-    auto iocp_server = std::make_unique<IOCPServer>();
-    iocp_server->StartServer();
+    auto tetris_server = std::make_unique<TetrisServer>();
+    tetris_server->StartServer();
 
-    ServerThreadManager server_thread_manager(*iocp_server);
-    server_thread_manager.StartThreads();
+    tetris_server->StartThreads();
 
-    while (iocp_server->IsRunning()) {
+    while (tetris_server->IsRunning()) {
         const DWORD wait_result = WaitForSingleObject(console_close_event, 100);
         if (wait_result == WAIT_OBJECT_0 || wait_result == WAIT_FAILED) break;
     }
 
-    server_thread_manager.CloseThreads();
-    server_thread_manager.JoinThreads();
+    tetris_server->CloseThreads();
+    tetris_server->JoinThreads();
 
     SetConsoleCtrlHandler(HandleConsoleClose, FALSE);
     CloseHandle(console_close_event);

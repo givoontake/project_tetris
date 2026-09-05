@@ -1,11 +1,15 @@
 #include "MultiRoom.h"
+#include "common_packets.h"
+#include "game_packets.h"
+#include "packet_types.h"
+#include "room_packets.h"
 
-MultiRoom::MultiRoom(IOCPServer* server, PublicRoomInitData data)
+MultiRoom::MultiRoom(TetrisServer* server, PublicRoomInitData data)
 	: TetrisRoom(server, data)
 {
 }
 
-MultiRoom::MultiRoom(IOCPServer* server, PrivateRoomInitData data)
+MultiRoom::MultiRoom(TetrisServer* server, PrivateRoomInitData data)
 	: TetrisRoom(server, data)
 {
 }
@@ -55,7 +59,6 @@ int MultiRoom::AddPlayer(Session& new_session, SessionKey session_key, const std
 	if (room_state != RoomState::WAIT) return ErrorCode::ROOM_NOT_FOUND;
 	auto room_players = GetRoomPlayers();
 	if (FindPlayer(session_key)) return ErrorCode::INVALID_REQUEST;
-	//C2S_ADD_PLAYER_PACKET* recv_p = reinterpret_cast<C2S_ADD_PLAYER_PACKET*>(packet);
 	int result = ErrorCode::ROOM_FULL;
 	int added_slot = -1;
 	for (int i = 0; i < room_players.size(); ++i) {
@@ -197,7 +200,6 @@ void MultiRoom::SendCreateRoom(Session& session)
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
 		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 	}
-	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
 }
 
 void MultiRoom::TogglePlayerReady(int player_id)
@@ -390,10 +392,8 @@ bool MultiRoom::ResolveWinner()
 		auto session = FindSession(room_player);
 		if (!session) continue;
 		++player_count;
-		//if (room_player.GetRoomPlayerState() == RoomPlayerState::GAME_OVER) ++over_count;
 	}
 
-	// int winner_id = -1;
 	int new_winner_id = -1;
 	if (player_count == 1) {
 		for (auto& room_player : room_players) {
@@ -449,13 +449,6 @@ void MultiRoom::DistributeGarbageLines()
 			}
 		}
 	}
-
-	// 로직은 맞지만 함수 이름상 여기서 이 동작을 추가하는건 안어울리는 것 같기도, 이름과 동작은 명확히 일치해야 할 듯
-	//for (auto& room_player : room_players) {
-	//	if (room_player.GetRoomPlayerState() == RoomPlayerState::PLAY) {
-	//		room_player.GetTetris().AddGarbageLines();
-	//	}
-	//}
 }
 
 int MultiRoom::CalculateGarbageLineCount(int cleared_line_count)
@@ -555,4 +548,3 @@ int MultiRoom::FindHostIndex(int host_id)
 	}
 	return -1;
 }
-

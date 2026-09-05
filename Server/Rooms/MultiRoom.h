@@ -4,9 +4,7 @@
 #include <array>
 #include "Player.h"
 #include "Session.h"
-#include "define_packets.h"
-#include "packet_types.h"
-#include "IOCPServer.h"
+#include "TetrisServer.h"
 #include "TetrisRoom.h"
 
 class MultiRoom : public TetrisRoom
@@ -14,8 +12,8 @@ class MultiRoom : public TetrisRoom
 	int host_id_ = -1;
 	int winner_id_ = -1;
 public:
-	MultiRoom(IOCPServer* server, PublicRoomInitData data);
-	MultiRoom(IOCPServer* server, PrivateRoomInitData data);
+	MultiRoom(TetrisServer* server, PublicRoomInitData data);
+	MultiRoom(TetrisServer* server, PrivateRoomInitData data);
 	~MultiRoom();
 
 	// 공통(오버라이드)
@@ -44,4 +42,3 @@ private:
 	virtual bool ProcessSpecificRoomTask(const RoomTask& task) override;
 	virtual void ProcessGameTick(long long tick_time_ms) override;
 };
-

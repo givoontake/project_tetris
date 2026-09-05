@@ -11,7 +11,7 @@
 #include "LoginDBThread.h"
 #include "Session.h"
 
-class IOCPServer;
+class TetrisServer;
 
 class DBThreadManager
 {
@@ -21,7 +21,7 @@ public:
     static constexpr int THREAD_COUNT = GAME_THREAD_COUNT + LOGIN_THREAD_COUNT;
 
 private:
-    IOCPServer& iocp_server_;
+    TetrisServer& tetris_server_;
     sql::mysql::MySQL_Driver* driver_ = nullptr;
     LoginDBThread login_thread_;
     std::array<GameDBThread, GAME_THREAD_COUNT> game_threads_;
@@ -29,7 +29,7 @@ private:
     std::vector<std::thread> threads_;
 
 public:
-    DBThreadManager(IOCPServer& iocp_server);
+    DBThreadManager(TetrisServer& tetris_server);
 
     void Start();
     void Close();

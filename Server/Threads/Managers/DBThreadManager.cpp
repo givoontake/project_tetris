@@ -1,19 +1,19 @@
 #include "DBThreadManager.h"
-#include "IOCPServer.h"
+#include "TetrisServer.h"
 
 static_assert(DBThreadManager::GAME_THREAD_COUNT > 0);
 static_assert(DBThreadManager::LOGIN_THREAD_COUNT == 1);
 
-DBThreadManager::DBThreadManager(IOCPServer& iocp_server)
-    : iocp_server_(iocp_server), driver_(sql::mysql::get_mysql_driver_instance())
+DBThreadManager::DBThreadManager(TetrisServer& tetris_server)
+    : tetris_server_(tetris_server), driver_(sql::mysql::get_mysql_driver_instance())
 {
 }
 
 void DBThreadManager::Start()
 {
-    login_thread_.Init(iocp_server_.GetIOCPHandle(), driver_);
+    login_thread_.Init(tetris_server_.GetIOCPHandle(), driver_);
     for (auto& db_thread : game_threads_)
-        db_thread.Init(iocp_server_.GetIOCPHandle(), driver_);
+        db_thread.Init(tetris_server_.GetIOCPHandle(), driver_);
 
     threads_.reserve(THREAD_COUNT);
     login_thread_.Start();

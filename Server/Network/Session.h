@@ -8,13 +8,12 @@
 #include <shared_mutex>
 #include "SendBuffer.h"
 #include "ConcurrentTaskQueue.h"
-#include "define_packets.h"
 #include "DBResult.h"
 #include "enum_class.h"
 #include "session_tasks.h"
 
-// 이 값은 send 및 recv 전에 최종 검증에 사용된다. GQCS에 이 값을 등록하고 값을 send, recv 까지 계속 전달하면, 만약 재사용됐을 경우 등록 직전에 세션 값과 이 값을 비교하면 된다.
-// 다르다면 재사용된 것이므로 작업만 취소하면 된다. 같다면 같은 세션이므로 이전의 모든 작업을 신뢰할 수 있다. 당연히 비교 및 작업 등록은 세션 뮤텍스가 필요하다.
+// 비동기 송수신 완료가 세션 슬롯 재사용 이후 도착할 수 있으므로 등록 시 세션 식별자를 오버랩 구조체에 저장하고, 완료 시 현재 식별자와 비교한다.
+// 송수신 등록과 소켓 종료의 경쟁은 소켓 공유 잠금으로 방지한다.
 
 struct RoomSnapshot {
 	ModeState mode_state;
@@ -26,7 +25,6 @@ class Session
 	SOCKET socket_ = INVALID_SOCKET;
 	IOOverlapped recv_over_;
 	SendBufferPool send_buffer_pool_;
-	//IServer* server_interface;
 	SessionKey session_key_;
 	int room_index_ = -1;
 	int remaining_data_size_ = 0;
@@ -71,10 +69,8 @@ public:
 
 	// 데이터 레이스를 방지하기 위해 세션은 언제든지 수정될 수 있는 데이터에 대해 참조 반환을 하지 않는다
 	//getters
-	SOCKET GetSocket() const;
 	IOOverlapped& GetRecvOver() { return recv_over_; }
 	std::vector<FriendInfo> GetFriendList() const;
-	//IOKey GetIOKey() const { return key; }
 	SessionKey GetSessionKey() const;
 	int GetRoomIndex() const;
 	RoomSnapshot GetRoomSnapshot() const;
@@ -82,12 +78,10 @@ public:
 	LifeState GetLifeState() const { return life_state_.load(); }
 	ModeState GetModeState() const { return mode_state_.load(); }
 	DBResultLogin GetDBInfo() const;
-	//std::string GetPrimaryKey() const { return login_id; }
 
 	//setters
 	bool MatchesSessionKey(SessionKey session_key) const;
 	void AdjustRemainingDataSize(int data_size_delta);
 	bool TrySetLobbyMode(SessionKey session_key);
 	bool TrySetRoomMode(SessionKey session_key, int new_room_index);
-	//void SetPrimaryKey(std::string val) { login_id = val; }
 };

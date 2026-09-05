@@ -3,8 +3,7 @@
 #include <array>
 #include "Player.h"
 #include "Session.h"
-#include "define_packets.h"
-#include "IOCPServer.h"
+#include "TetrisServer.h"
 #include "TetrisRoom.h"
 
 class SingleRoom : public TetrisRoom
@@ -12,8 +11,8 @@ class SingleRoom : public TetrisRoom
 	std::array<Player, 1> room_players_;
 
 public:
-	SingleRoom(IOCPServer* server, PublicRoomInitData data);
-	SingleRoom(IOCPServer* server, PrivateRoomInitData data);
+	SingleRoom(TetrisServer* server, PublicRoomInitData data);
+	SingleRoom(TetrisServer* server, PrivateRoomInitData data);
 
 	// 공통(오버라이드)
 	virtual void HandlePacket(char* packet, Session& request_session) override;
@@ -32,4 +31,3 @@ private:
 	virtual void ProcessGameTick(long long tick_time_ms) override;
 	void GiveUp(Session& request_session);
 };
-

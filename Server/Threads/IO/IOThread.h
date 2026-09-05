@@ -3,7 +3,7 @@
 #include "ServerThread.h"
 #include "types.h"
 
-class IOCPServer;
+class TetrisServer;
 class Session;
 struct ExOverlapped;
 struct SessionKey;
@@ -11,7 +11,7 @@ struct SendBuffer;
 
 class IOThread final : public ServerThread
 {
-	IOCPServer& iocp_server_;
+	TetrisServer& tetris_server_;
 
 	void ProcessAcceptCompletion(BOOL result, ExOverlapped* ex_over);
 	void ProcessSessionCompletion(BOOL result, DWORD transferred_bytes, ExOverlapped* ex_over);
@@ -21,7 +21,7 @@ class IOThread final : public ServerThread
 	void ProcessServerDBCompletion(BOOL result, ExOverlapped* ex_over);
 
 public:
-	IOThread(IOCPServer& iocp_server);
+	IOThread(TetrisServer& tetris_server);
 	void Run() override;
 	void Close() override;
 };

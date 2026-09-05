@@ -1,12 +1,13 @@
 #include <random>
 #include <utility>
 #include "TetrisRoom.h"
-#include "IOCPServer.h"
+#include "TetrisServer.h"
+#include "game_packets.h"
 #include "packet_types.h"
 #include "lobby_tasks.h"
 #include "room_lifecycle_tasks.h"
 
-TetrisRoom::TetrisRoom(IOCPServer* server, PublicRoomInitData data)
+TetrisRoom::TetrisRoom(TetrisServer* server, PublicRoomInitData data)
 {
 	// 생성과 소멸은 스레드 세이프하지는 않지만, 어차피 make_shared하고 CAS해서 룸 리스트에 할당하기 전에는 접근되지 않는다.
 	server_ = server;
@@ -17,11 +18,10 @@ TetrisRoom::TetrisRoom(IOCPServer* server, PublicRoomInitData data)
 	room_gen_ = data.room_gen;
 	room_state_.store(RoomState::EMPTY);
 
-	//SendAddRoom(session);
 	current_player_count_.store(0);
 }
 
-TetrisRoom::TetrisRoom(IOCPServer* server, PrivateRoomInitData data)
+TetrisRoom::TetrisRoom(TetrisServer* server, PrivateRoomInitData data)
 {
 	server_ = server;
 	max_player_count_ = data.max_player_count;
@@ -30,7 +30,6 @@ TetrisRoom::TetrisRoom(IOCPServer* server, PrivateRoomInitData data)
 	room_index_ = data.room_index;
 	room_gen_ = data.room_gen;
 	room_state_.store(RoomState::EMPTY);
-	//SendAddRoom(session);
 	current_player_count_.store(0);
 }
 
@@ -394,120 +393,6 @@ void TetrisRoom::ClearRoom()
 		server_->CompleteRoomDisconnect(disconnected_session_keys[i]);
 }
 
-// 얘는 순차적으로 쌓인 작업을 처리해 보내야할 패킷들을 버퍼에 쌓음
-SessionKey TetrisRoom::AppendTickPackets()
-{
-	auto room_players = GetRoomPlayers();
-	for (auto& room_player : room_players) {
-		if (room_player.GetRoomPlayerState() != RoomPlayerState::PLAY) continue; // 게임오버 되어도 상태 변경은 여기서 이루어지므로 진입 시에는 게임오버 상태는 아님
-		auto session = FindSession(room_player);
-		if (!session) continue;
-		const SessionKey session_key = session->GetSessionKey();
-		int player_id = session->GetDBInfo().player_id;
-
-		for (auto& task : room_player.GetTetris().GetSendTasks()) {
-			switch (task.event_type) {
-			case EventType::MOVE: {
-				// 각 이동의 다음 입력 허용 시각은 Tetris::ProcessMoveInput에서 갱신한다.
-				auto& move_task = std::get<TaskMove>(task.task);
-				if (!AppendMovePacket(room_player, static_cast<int>(move_task.move_type))) return session_key;
-				break;
-			}
-
-			case EventType::FIX: {
-				auto& fix_task = std::get<TaskFix>(task.task);
-				S2C_FIX_PACKET fix_p;
-				fix_p.header.size = static_cast<std::uint16_t>(sizeof(fix_p));
-				fix_p.header.type = S2C_FIX;
-				fix_p.player_id = player_id;
-				fix_p.fixed_x = fix_task.fixed_x; // 실시간 반영된 값을 읽는게 아니라 작업 목록을 가져와서 패킷을 구성하므로, 작업 당시의 값을 가져와야 함. addline과 동시 틱에 처리되면 클라는 공중에 떠 있는 것으로 보이는 버그 발생
-				fix_p.fixed_y = fix_task.fixed_y;
-				if (!room_player.AddToSendBuffer(reinterpret_cast<char*>(&fix_p), fix_p.header.size)) return session_key;
-				break;
-			}
-
-			case EventType::CLEAR_LINE: {
-				auto& clear_line_task = std::get<TaskClearLine>(task.task);
-				S2C_CLEAR_LINE_PACKET clear_line_p;
-				clear_line_p.header.size = static_cast<std::uint16_t>(sizeof(clear_line_p));
-				clear_line_p.header.type = S2C_CLEAR_LINE;
-				clear_line_p.player_id = player_id;
-				clear_line_p.score = room_player.GetScore();
-				clear_line_p.line_index = clear_line_task.line_index;
-				clear_line_p.combo = room_player.GetCombo();
-				if (!room_player.AddToSendBuffer(reinterpret_cast<char*>(&clear_line_p), clear_line_p.header.size)) return session_key;
-
-				break;
-			}
-			case EventType::SPAWN: {
-				if (room_player.GetTetrominoIndex() == (tetromino_spawn_list_.size() - 2)) AppendTetromino7Bag();
-				room_player.IncrementTetrominoIndex();
-
-				if (SpawnTetromino(player_id)) {
-					S2C_SPAWN_PACKET spawn_p;
-					spawn_p.header.size = static_cast<std::uint16_t>(sizeof(spawn_p));
-					spawn_p.header.type = S2C_SPAWN;
-					spawn_p.player_id = player_id;
-					spawn_p.tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex()];
-					spawn_p.next_tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex() + 1];
-					spawn_p.spawn_x = static_cast<char>(spawn_pos_.x);
-					spawn_p.spawn_y = static_cast<char>(spawn_pos_.y);
-					if (!room_player.AddToSendBuffer(reinterpret_cast<char*>(&spawn_p), spawn_p.header.size)) return session_key;
-				}
-				break;
-			}
-
-			case EventType::ADD_LINE: {
-				S2C_ADD_LINE_PACKET add_line_p;
-				add_line_p.header.size = static_cast<std::uint16_t>(sizeof(add_line_p));
-				add_line_p.header.type = S2C_ADD_LINE;
-				add_line_p.player_id = player_id;
-				auto& add_line_task = std::get<TaskAddLine>(task.task);
-				add_line_p.hole_x = static_cast<char>(add_line_task.hole_x);
-				if (!room_player.AddToSendBuffer(reinterpret_cast<char*>(&add_line_p), add_line_p.header.size)) return session_key;
-				break;
-			}
-
-			case EventType::GAME_OVER: {
-				// 일단 종료 패킷을 보냄
-				room_player.SetRoomPlayerState(RoomPlayerState::GAME_OVER);
-				S2C_GAME_OVER_PACKET game_over_p;
-				game_over_p.header.size = static_cast<std::uint16_t>(sizeof(game_over_p));
-				game_over_p.header.type = S2C_GAME_OVER;
-				game_over_p.player_id = player_id;
-				if (!room_player.AddToSendBuffer(reinterpret_cast<char*>(&game_over_p), game_over_p.header.size)) return session_key;
-
-				break;
-			}
-
-			case EventType::GAME_END: { // 이건 사실상 멀티만 쓰므로.. 근데 이거 하나때문에 또 분리하기 좀 그렇긴 하다 분리하는게 좋긴 할 것 같지만..
-				auto& game_end_task = std::get<TaskGameEnd>(task.task);
-
-				S2C_GAME_END_PACKET game_end_p;
-				game_end_p.header.size = static_cast<std::uint16_t>(sizeof(game_end_p));
-				game_end_p.header.type = S2C_GAME_END;
-				game_end_p.winner_id = game_end_task.winner_id;
-				if (!room_player.AddToSendBuffer(reinterpret_cast<char*>(&game_end_p), game_end_p.header.size)) return session_key;
-				break;
-			}
-			}
-		}
-	}
-	return {};
-}
-
-bool TetrisRoom::AppendMovePacket(Player& player, int move_type)
-{
-	auto session = FindSession(player);
-	if (!session) return true;
-	S2C_MOVE_PACKET move_p;
-	move_p.header.size = static_cast<std::uint16_t>(sizeof(move_p));
-	move_p.header.type = S2C_MOVE;
-	move_p.player_id = session->GetDBInfo().player_id;
-	move_p.move_type = static_cast<char>(move_type);
-	return player.AddToSendBuffer(reinterpret_cast<char*>(&move_p), move_p.header.size);
-}
-
 void TetrisRoom::AddGarbageLines()
 {
 	auto room_players = GetRoomPlayers();
@@ -549,63 +434,6 @@ void TetrisRoom::ResetPlayerTickState()
 		auto session = FindSession(room_player);
 		if (!session) continue;
 		room_player.GetTetris().ResetTickData();
-	}
-}
-
-void TetrisRoom::BroadcastPackets()
-{
-	auto room_players = GetRoomPlayers();
-	char send_buffer[BUF_SIZE];
-	int send_data_size = 0;
-
-	for (int i = 0; i < room_players.size(); ++i) {
-		Player& source = room_players[i];
-		auto source_session = FindSession(source);
-		if (!source_session) continue;
-		const int source_data_size = source.GetSendDataSize();
-		if (source_data_size <= 0) continue;
-
-		if (send_data_size + source_data_size > BUF_SIZE) {
-			for (auto& target : room_players) {
-				auto target_session = FindSession(target);
-				if (!target_session) continue;
-				target_session->SendPacket(send_buffer, send_data_size, server_->GetIOCPHandle());
-			}
-			send_data_size = 0;
-		}
-
-		memcpy(send_buffer + send_data_size, source.GetSendBuffer(), source_data_size);
-		send_data_size += source_data_size;
-	}
-
-	if (send_data_size > 0) {
-		for (auto& target : room_players) {
-			auto target_session = FindSession(target);
-			if (!target_session) continue;
-			target_session->SendPacket(send_buffer, send_data_size, server_->GetIOCPHandle());
-		}
-	}
-
-	for (auto& room_player : room_players) {
-		auto session = FindSession(room_player);
-		if (!session) continue;
-		room_player.ClearSendBuffer();
-	}
-}
-
-void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
-{
-	// 범위기반을 있다고 생각하고 만들었는데, 그 순회하는 사이에 접근하기 전에 삭제되면 세션 포인터 nullptr 오류가 생긴다.
-	// 결국 락을 걸 수밖에..
-	// 틱 루프에서 호출할 경우 이중락 걸리므로 주의
-	// 우선 외부에서 잠그는걸로 다시 변경. 범위기반 탐색과 삭제 사이의 관계 때문에 락이 필요한데, 멀티와 같은 경우 범위기반 탐색 내에 다시 범위기반 탐색을 하는 경우도 꽤 있으므로 외부에서 하는게 효율적인 것 같다.
-	std::vector<int> target_index;
-	const int packet_size = static_cast<int>(reinterpret_cast<const PACKET_HEADER*>(packet)->size);
-	auto room_players = GetRoomPlayers();
-	for (auto& room_player : room_players) {
-		auto session = FindSession(room_player);
-		if (!session) continue;
-		session->SendPacket(packet, packet_size, iocp_handle);
 	}
 }
 

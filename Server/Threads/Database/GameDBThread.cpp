@@ -91,28 +91,19 @@ void GameDBThread::ExecuteUpdateScore(SessionKey session_key, int new_score)
             stmt = connection_context_.GetStatement(DBOperationType::UPDATE_SCORE);
             if (!stmt)
             {
-                PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release())); // 전송 바이트는 0만 아니면 됨. 어차피 DB 처리는 전송 바이트 처리 필요 없음
+                // DB 완료 경로는 전송 바이트 값을 사용하지 않는다.
+                PostQueuedCompletionStatus(iocp_handle_, static_cast<int>(OPType::DB), DB_SESSION_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(db_over.release()));
                 return;
             }
         }
 
-        // 바인딩
         stmt->setInt(1, new_score);
         stmt->setInt(2, player_id);
-        //std::cout << "ExecuteUpdateScore() player_id: " << player_id << std::endl;
-
-        // 실행
         const int affected = stmt->executeUpdate();
         if (affected > 0) {
-            // 1이면 업데이트 성공
-            //std::cout << "score update success!, new score: " << new_score << std::endl;
             db_over->result_data = std::make_unique<DBResultUpdateScore>();
 			DBResultUpdateScore* result = static_cast<DBResultUpdateScore*>(db_over->result_data.get());
 			result->max_score = new_score;
-        }
-        
-        else {
-            //std::cout << "score update fail!, new score: " << new_score << std::endl;
         }
     }
     catch (const sql::SQLException& e)
@@ -165,7 +156,6 @@ void GameDBThread::ExecuteAddFriend(SessionKey session_key, FriendInfo acceptor_
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::ADD_FRIEND);
     db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.session_key = session_key;
-    //db_over->ex_over.request_gen; // 사실 여기서는 의미가 없음. 적용된 두 클라에게 모두 보내야해서 두 클라의 키값이 모두 필요
 
     try
     {
@@ -187,7 +177,7 @@ void GameDBThread::ExecuteAddFriend(SessionKey session_key, FriendInfo acceptor_
         af_stmt->setInt(3, requester_id);
 		af_stmt->setInt(4, acceptor_info.player_id);
 
-        const int af_affected = af_stmt->executeUpdate(); // INSERT, UPDATE, DELETE -> 영향을 받은 행의 수를 반환
+        const int af_affected = af_stmt->executeUpdate();
 
 		if (af_affected >= 2) // 친구 추가 성공 -> 친구 요청 레코드 삭제 (추가는 양방향이므로 2행이 영향을 받아야 성공)
         {
@@ -254,7 +244,6 @@ void GameDBThread::ExecuteDeleteFriend(SessionKey session_key, int target_id)
     auto db_over = std::make_unique<DBOverlapped>(DBOperationType::DELETE_FRIEND);
     db_over->ex_over.op_type = OPType::DB;
     db_over->ex_over.session_key = session_key;
-    //db_over->ex_over.request_gen = key.gen;
 	int requester_id = session_key.player_id;
 
     try
@@ -281,7 +270,7 @@ void GameDBThread::ExecuteDeleteFriend(SessionKey session_key, int target_id)
         df_stmt->setInt(3, target_id);
         df_stmt->setInt(4, requester_id);
 
-        const int affected = df_stmt->executeUpdate(); // INSERT, UPDATE, DELETE -> 영향을 받은 행의 수를 반환
+        const int affected = df_stmt->executeUpdate();
 
         if (affected >= 2)
         {
@@ -312,11 +301,8 @@ void GameDBThread::ExecuteLoadFriendList(SessionKey session_key)
         auto* stmt = connection_context_.GetStatement(DBOperationType::LOAD_FRIEND_LIST);
         if (!stmt)
         {
-            // SELECT: 컬럼들 선택(열)
-            // FROM: 테이블 선택(단일 뿐만 아니라 조인된 테이블도 당연히 가능)
-            // WHERE: 테이블에서 조건에 맞는 행 선택
             const char* SQL_GET_FRIEND_LIST = // 쿼리 안에서 몇 개를 요청하던 1번의 요청 결과는 원자적
-                "SELECT player_id, nickname " // 헷갈리지만, 직접 해보면 맞다. 친구 목록 뒤에 친구에 대한 부가 정보를 붙이고(친구 닉네임 알려고), 그 중 내 친구들만 골라서 그 중 player_id, nickname을 받는다.
+				"SELECT player_id, nickname "
 				"FROM friends JOIN players " 
                 "ON friends.friend_id = players.player_id "
 			    "WHERE my_id = ?";
@@ -338,7 +324,7 @@ void GameDBThread::ExecuteLoadFriendList(SessionKey session_key)
         if (rs) {
             auto result_data = std::make_unique<DBResultLoadFriendList>();
             DBResultLoadFriendList* result = result_data.get();
-            while (rs->next()) { // rs->next()는 다음 결과로 이동하며, 결과가 있는지 여부를 반환한다.
+            while (rs->next()) {
                 FriendInfo info;
 				info.player_id = rs->getInt(1);
                 info.nickname = rs->getString(2);

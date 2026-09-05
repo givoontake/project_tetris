@@ -11,7 +11,7 @@
 #include "room_lifecycle_tasks.h"
 #include "game_state.h"
 
-class IOCPServer;
+class TetrisServer;
 class Session;
 class TetrisRoom;
 struct GamePhaseContext;
@@ -24,15 +24,12 @@ public:
     static constexpr int MIN_AVAILABLE_THREAD_COUNT = THREAD_COUNT / 2;
 
 private:
-    IOCPServer& iocp_server_;
+    TetrisServer& tetris_server_;
     std::mutex tick_mutex_;
     std::condition_variable tick_cv_;
-    // 혼합 대기의 사전 기상에 쓰던 공유 시각이며, 현재는 타이머 내부에서만 다음 틱 시각을 관리한다.
-    // std::atomic<std::chrono::steady_clock::duration::rep> next_tick_time_count_{ 0 };
     TickWaitPolicy tick_wait_policy_;
 	ConcurrentTaskQueue<std::unique_ptr<RoomLifecycleTask>> lifecycle_tasks_;
 	std::atomic<bool> is_lifecycle_processing_{ false };
-    //bool tick_enable = false;
     std::vector<std::unique_ptr<GameThread>> thread_objects_;
     std::vector<std::thread> threads_;
 
@@ -45,11 +42,10 @@ private:
 	int CreatePublicRoom(char* packet, Session& session, SessionKey session_key);
 	int CreatePrivateRoom(char* packet, Session& session, SessionKey session_key);
 	void DeleteRoom(int room_index);
-	int GenerateRoomGen();
 	std::shared_ptr<TetrisRoom> FindRoomByGen(int room_gen);
 
 public:
-    GameThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy);
+    GameThreadManager(TetrisServer& tetris_server, TickWaitPolicy tick_policy);
 
     void Start();
 	bool StartGamePhase(long long tick_time_ms);

@@ -22,13 +22,13 @@
 	<ClCompile Include="Lobby\LobbySession.cpp" />
     <ClCompile Include="Managers\ActiveRoomManager.cpp" />
     <ClCompile Include="Managers\ActivePlayerManager.cpp" />
-    <ClCompile Include="Database\DBThread.cpp" />
-    <ClCompile Include="Database\GameDBThread.cpp" />
-    <ClCompile Include="Database\LoginDBThread.cpp" />
+    <ClCompile Include="Threads\Database\DBThread.cpp" />
+    <ClCompile Include="Threads\Database\GameDBThread.cpp" />
+    <ClCompile Include="Threads\Database\LoginDBThread.cpp" />
     <ClCompile Include="Database\DBResultHandler.cpp" />
     <ClCompile Include="Rooms\FivePlayerRoom.cpp" />
-    <ClCompile Include="Core\IOCPServer.cpp" />
-    <ClCompile Include="Threads\Threads\IOThread.cpp" />
+    <ClCompile Include="Core\TetrisServer.cpp" />
+    <ClCompile Include="Threads\IO\IOThread.cpp" />
     <ClCompile Include="Threads\Managers\IOThreadManager.cpp" />
     <ClCompile Include="Threads\Managers\LobbyThreadManager.cpp" />
     <ClCompile Include="Core\main.cpp" />
@@ -38,18 +38,19 @@
     <ClCompile Include="Game\Player.cpp" />
     <ClCompile Include="Network\Session.cpp" />
     <ClCompile Include="Threads\Managers\ServerThreadManager.cpp" />
-    <ClCompile Include="Threads\Threads\ServerThread.cpp" />
+    <ClCompile Include="Threads\ServerThread.cpp" />
     <ClCompile Include="Threads\Managers\DBThreadManager.cpp" />
-    <ClCompile Include="Threads\GamePhaseContext.cpp" />
-    <ClCompile Include="Threads\LobbyPhaseContext.cpp" />
-    <ClCompile Include="Threads\Threads\LobbyThread.cpp" />
-    <ClCompile Include="Threads\Threads\GameThread.cpp" />
+    <ClCompile Include="Threads\Game\GamePhaseContext.cpp" />
+    <ClCompile Include="Threads\Lobby\LobbyPhaseContext.cpp" />
+    <ClCompile Include="Threads\Lobby\LobbyThread.cpp" />
+    <ClCompile Include="Threads\Game\GameThread.cpp" />
     <ClCompile Include="Threads\Managers\GameThreadManager.cpp" />
-    <ClCompile Include="Threads\Threads\TimerThread.cpp" />
+    <ClCompile Include="Threads\Timer\TimerThread.cpp" />
     <ClCompile Include="Threads\Managers\TimerThreadManager.cpp" />
     <ClCompile Include="Rooms\SingleRoom.cpp" />
     <ClCompile Include="Game\Tetris.cpp" />
     <ClCompile Include="Rooms\TetrisRoom.cpp" />
+    <ClCompile Include="Rooms\TetrisRoomPackets.cpp" />
     <ClCompile Include="Game\TetrisTimers.cpp" />
     <ClCompile Include="Rooms\TwoPlayerRoom.cpp" />
   </ItemGroup>
@@ -58,13 +59,18 @@
     <ClInclude Include="Managers\ActiveRoomManager.h" />
     <ClInclude Include="Managers\ActivePlayerManager.h" />
     <ClInclude Include="Common\ConcurrentTaskQueue.h" />
-    <ClInclude Include="Database\DBThread.h" />
-    <ClInclude Include="Database\GameDBThread.h" />
-    <ClInclude Include="Database\LoginDBThread.h" />
+    <ClInclude Include="Threads\Database\DBThread.h" />
+    <ClInclude Include="Threads\Database\GameDBThread.h" />
+    <ClInclude Include="Threads\Database\LoginDBThread.h" />
     <ClInclude Include="Database\DBTasks.h" />
     <ClInclude Include="Database\DBResultHandler.h" />
     <ClInclude Include="Database\DBResult.h" />
-    <ClInclude Include="Packets\define_packets.h" />
+    <ClInclude Include="Packets\common_packets.h" />
+    <ClInclude Include="Packets\database_packets.h" />
+    <ClInclude Include="Packets\game_packets.h" />
+    <ClInclude Include="Packets\lobby_packets.h" />
+    <ClInclude Include="Packets\room_packets.h" />
+    <ClInclude Include="Packets\test_packets.h" />
     <ClInclude Include="Common\enum_class.h" />
     <ClInclude Include="Common\error_code.h" />
     <ClInclude Include="Rooms\FivePlayerRoom.h" />
@@ -75,8 +81,8 @@
     <ClInclude Include="Game\task_type.h" />
     <ClInclude Include="Game\Tetromino.h" />
     <ClInclude Include="Network\ExOverlapped.h" />
-    <ClInclude Include="Core\IOCPServer.h" />
-    <ClInclude Include="Threads\Threads\IOThread.h" />
+    <ClInclude Include="Core\TetrisServer.h" />
+    <ClInclude Include="Threads\IO\IOThread.h" />
     <ClInclude Include="Threads\Managers\IOThreadManager.h" />
     <ClInclude Include="Threads\Managers\LobbyThreadManager.h" />
     <ClInclude Include="Network\SendBuffer.h" />
@@ -86,17 +92,17 @@
     <ClInclude Include="Network\Session.h" />
     <ClInclude Include="Network\session_tasks.h" />
     <ClInclude Include="Threads\Managers\ServerThreadManager.h" />
-    <ClInclude Include="Threads\Threads\ServerThread.h" />
+    <ClInclude Include="Threads\ServerThread.h" />
     <ClInclude Include="Threads\Managers\DBThreadManager.h" />
-    <ClInclude Include="Threads\GamePhaseContext.h" />
-    <ClInclude Include="Threads\LobbyPhaseContext.h" />
-    <ClInclude Include="Threads\lobby_state.h" />
-    <ClInclude Include="Threads\lobby_tasks.h" />
-    <ClInclude Include="Threads\Threads\LobbyThread.h" />
-    <ClInclude Include="Threads\game_state.h" />
-    <ClInclude Include="Threads\Threads\GameThread.h" />
+    <ClInclude Include="Threads\Game\GamePhaseContext.h" />
+    <ClInclude Include="Threads\Lobby\LobbyPhaseContext.h" />
+    <ClInclude Include="Threads\Lobby\lobby_state.h" />
+    <ClInclude Include="Lobby\lobby_tasks.h" />
+    <ClInclude Include="Threads\Lobby\LobbyThread.h" />
+    <ClInclude Include="Threads\Game\game_state.h" />
+    <ClInclude Include="Threads\Game\GameThread.h" />
     <ClInclude Include="Threads\Managers\GameThreadManager.h" />
-    <ClInclude Include="Threads\Threads\TimerThread.h" />
+    <ClInclude Include="Threads\Timer\TimerThread.h" />
     <ClInclude Include="Threads\Managers\TimerThreadManager.h" />
     <ClInclude Include="Game\Tetris.h" />
     <ClInclude Include="Rooms\TetrisRoom.h" />
@@ -167,7 +173,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Lobby;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Database;$(ProjectDir)Threads\Game;$(ProjectDir)Threads\IO;$(ProjectDir)Threads\Lobby;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -181,7 +187,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Lobby;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Database;$(ProjectDir)Threads\Game;$(ProjectDir)Threads\IO;$(ProjectDir)Threads\Lobby;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -199,7 +205,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Lobby;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Database;$(ProjectDir)Threads\Game;$(ProjectDir)Threads\IO;$(ProjectDir)Threads\Lobby;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -215,7 +221,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Threads;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Core;$(ProjectDir)Common;$(ProjectDir)Packets;$(ProjectDir)Network;$(ProjectDir)Database;$(ProjectDir)Game;$(ProjectDir)Lobby;$(ProjectDir)Rooms;$(ProjectDir)Managers;$(ProjectDir)Threads;$(ProjectDir)Threads\Database;$(ProjectDir)Threads\Game;$(ProjectDir)Threads\IO;$(ProjectDir)Threads\Lobby;$(ProjectDir)Threads\Managers;$(ProjectDir)Threads\Timer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>

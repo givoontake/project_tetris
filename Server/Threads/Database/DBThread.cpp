@@ -8,7 +8,6 @@
 #include <thread>
 #include <jdbc/cppconn/connection.h>
 #include <jdbc/cppconn/driver.h>
-#include <jdbc/cppconn/metadata.h>
 #include "DBThread.h"
 #include "DBResult.h"
 
@@ -21,24 +20,6 @@ static inline void Trim(std::string& s)
 
     s.erase(s.begin(), std::find_if(s.begin(), s.end(), not_space));
     s.erase(std::find_if(s.rbegin(), s.rend(), not_space).base(), s.end());
-}
-
-static inline void PrintDBConnectionInfo(sql::Connection* conn)
-{
-    if (!conn)
-    {
-        std::cout << "[DB] Connection is null\n";
-        return;
-    }
-
-    std::cout << "===== DB Connection Info =====\n";
-    std::cout << "Connected        : " << (conn->isValid() ? "YES" : "NO") << '\n';
-    std::cout << "Server Version   : " << conn->getMetaData()->getDatabaseProductVersion() << '\n';
-    std::cout << "Server Name      : " << conn->getMetaData()->getDatabaseProductName() << '\n';
-    std::cout << "User Name        : " << conn->getMetaData()->getUserName() << '\n';
-    std::cout << "Current Schema   : " << conn->getSchema() << '\n';
-    std::cout << "Auto Commit      : " << (conn->getAutoCommit() ? "ON" : "OFF") << '\n';
-    std::cout << "===============================\n";
 }
 
 // -------------------- DBThread --------------------
@@ -148,8 +129,7 @@ bool DBThread::LoadDBConfigFromFile(const std::string& file_path)
         {
             try
             {
-                int p = std::stoi(val); // 문자열을 그대로 정수 변환, 예외를 던질 수 있음
-                // 포트 범위 예외 처리
+                int p = std::stoi(val);
                 if (p < 0) p = 0;
                 if (p > 65535) p = 65535;
                 connection_info_.port = static_cast<uint16_t>(p);
@@ -218,8 +198,8 @@ void DBThread::Run()
         if (!task_queue_.try_pop(queued_task))
         {
             std::unique_lock<std::mutex> lock(wait_mutex_);
-            // 잠자고 있는 상태에서는 깨우는 신호가 오면 다시 조건을 검사한다.
-            cv_.wait(lock, [this]() { return !task_queue_.empty() || !is_running_.load(); }); // 조건이 참이 되어야 깨어나므로 is_running_ = false이면 깨어나도록 해야함
+            // 종료 알림에도 대기에서 빠져나오도록 실행 상태를 조건에 포함한다.
+            cv_.wait(lock, [this]() { return !task_queue_.empty() || !is_running_.load(); });
 
             if (!is_running_.load()) break;
 
@@ -259,8 +239,6 @@ bool DBThread::Connect()
 
 		connection_context_.connection.reset(driver_->connect(url, connection_info_.id, connection_info_.password));
 		connection_context_.connection->setSchema(connection_info_.schema);
-
-		PrintDBConnectionInfo(connection_context_.connection.get());
 
         return true;
     }

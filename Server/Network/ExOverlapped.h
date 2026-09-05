@@ -3,7 +3,7 @@
 #include <memory>
 #include <WinSock2.h>
 #include <MSWSock.h>
-#include "define_packets.h"
+#include "settings.h"
 #include "enum_class.h"
 #include "DBResult.h"
 
@@ -43,10 +43,6 @@ struct IOOverlapped {
 		ex_over.op_type = op_type;
 	}
 
-	//void SetExOverlapped(OPType type, char* packet) {
-	//	memcpy(socket_buf, packet, packet[0]);
-	//	op_type = type;
-	//}
 };
 
 struct DBOverlapped

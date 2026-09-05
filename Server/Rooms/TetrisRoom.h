@@ -11,9 +11,8 @@
 #include "ConcurrentTaskQueue.h"
 #include "Player.h"
 #include "Session.h"
-#include "define_packets.h"
 
-class IOCPServer;
+class TetrisServer;
 class GameThread;
 class GameThreadManager;
 
@@ -60,10 +59,10 @@ class TetrisRoom
 {
 	friend class GameThread;
 	friend class GameThreadManager;
-	friend class IOCPServer;
+	friend class TetrisServer;
 
 protected:
-	IOCPServer* server_;
+	TetrisServer* server_;
 	std::atomic<RoomState> room_state_;
 	std::atomic<RoomProcessState> processing_state_{ RoomProcessState::PROCESSING };
 	ConcurrentTaskQueue<RoomTask> room_tasks_;
@@ -98,10 +97,19 @@ protected:
 	bool TryProcessRoomTask(const RoomTask& task);
 	virtual bool ProcessSpecificRoomTask(const RoomTask& task) = 0;
 	virtual void ProcessGameTick(long long tick_time_ms) = 0;
+	bool ApplySendTaskState(Player& player, int player_id, const TaskType& task);
+	bool AppendTickPacket(Player& player, int player_id, const TaskType& task);
+	bool AppendMovePacket(Player& player, const TaskMove& task);
+	bool AppendFixPacket(Player& player, int player_id, const TaskFix& task);
+	bool AppendClearLinePacket(Player& player, int player_id, const TaskClearLine& task);
+	bool AppendSpawnPacket(Player& player, int player_id);
+	bool AppendAddLinePacket(Player& player, int player_id, const TaskAddLine& task);
+	bool AppendGameOverPacket(Player& player, int player_id);
+	bool AppendGameEndPacket(Player& player, const TaskGameEnd& task);
 
 public:
-	TetrisRoom(IOCPServer* server, PublicRoomInitData data);
-	TetrisRoom(IOCPServer* server, PrivateRoomInitData data);
+	TetrisRoom(TetrisServer* server, PublicRoomInitData data);
+	TetrisRoom(TetrisServer* server, PrivateRoomInitData data);
 	virtual ~TetrisRoom();
 
 	int GetRoomGen() const { return room_gen_; }
@@ -132,10 +140,8 @@ public:
 	
 	void AppendTetromino7Bag();
 	bool SpawnTetromino(int player_id);
-	void ClearRoom(); // 이제 재사용이 아니라 아예 없앨거라서 굳이 방이 비워진 상태를 관리할 필요는 없다. 나중에 없애면 될 듯
+	void ClearRoom();
 	SessionKey AppendTickPackets();
-	//void SendAddRoom(Session* session);
-	bool AppendMovePacket(Player& player, int move_type);
 	void AddGarbageLines();
 	void AddSpawnTasks();
 	void ResetPlayerTickState();

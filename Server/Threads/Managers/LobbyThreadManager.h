@@ -10,7 +10,7 @@
 #include "LobbyThread.h"
 #include "lobby_tasks.h"
 
-class IOCPServer;
+class TetrisServer;
 class Session;
 
 class LobbyThreadManager
@@ -19,7 +19,7 @@ public:
 	static constexpr int THREAD_COUNT = 2;
 
 private:
-	IOCPServer& iocp_server_;
+	TetrisServer& tetris_server_;
 	std::mutex lobby_mutex_;
 	std::condition_variable lobby_cv_;
 	ConcurrentTaskQueue<std::unique_ptr<LobbyTask>> lifecycle_tasks_;
@@ -38,7 +38,7 @@ private:
 	void SendRankings(Session& session);
 
 public:
-	explicit LobbyThreadManager(IOCPServer& iocp_server);
+	explicit LobbyThreadManager(TetrisServer& tetris_server);
 
 	void Start();
 	void StartLobbyPhase();

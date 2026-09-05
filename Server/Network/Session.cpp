@@ -32,9 +32,6 @@ bool Session::InitSession(int session_index, std::uint64_t session_id, SOCKET ne
 	recv_over_.ex_over.session_key = session_key_;
 	life_state_.store(LifeState::ACTIVE);
 	mode_state_.store(ModeState::LOGIN);
-
-	// ZeroMemory(&info, sizeof(info)); string은 제로메모리 하면 안됨,  string = 연산은 내부 필드 전체를 복사하는 연산이 아님
-	//state = LOGIN;
 	return true;
 }
 
@@ -253,12 +250,6 @@ bool Session::TryStartTaskProcessing()
 void Session::CompleteTaskProcessing()
 {
 	is_processing_tasks_.store(false);
-}
-
-SOCKET Session::GetSocket() const
-{
-	std::shared_lock<std::shared_mutex> lock(socket_mutex_);
-	return socket_;
 }
 
 std::vector<FriendInfo> Session::GetFriendList() const

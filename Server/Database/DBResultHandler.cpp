@@ -1,10 +1,11 @@
 #include "DBResultHandler.h"
+#include "common_packets.h"
+#include "database_packets.h"
 #include "packet_types.h"
-#include "IOCPServer.h"
+#include "TetrisServer.h"
 #include "session_tasks.h"
-#include <iostream>
 
-DBResultHandler::DBResultHandler(IOCPServer& server) : server_(server)
+DBResultHandler::DBResultHandler(TetrisServer& server) : server_(server)
 {
 }
 
@@ -12,7 +13,7 @@ void DBResultHandler::HandleAddFriendRequestDBResult(DBOverlapped* db_over)
 {
 	if (db_over->result_data->is_success) {
 		DBResultAddFriendRequest* result = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
-		const SessionKey receiver_key = server_.active_players_.FindSessionKeyByID(result->receiver_info.player_id);
+		const SessionKey receiver_key = server_.GetActivePlayerManager().FindSessionKeyByID(result->receiver_info.player_id);
 		server_.EnqueueSessionTask(receiver_key, std::make_unique<SessionFriendRequestTask>(result->requester_info));
 	}
 }
@@ -21,9 +22,9 @@ void DBResultHandler::HandleAddFriendDBResult(DBOverlapped* db_over)
 {
 	if (db_over->result_data->is_success) {
 		DBResultAddFriend* result = static_cast<DBResultAddFriend*>(db_over->result_data.get());
-		const SessionKey requester_key = server_.active_players_.FindSessionKeyByID(result->requester_info.player_id);
+		const SessionKey requester_key = server_.GetActivePlayerManager().FindSessionKeyByID(result->requester_info.player_id);
 		server_.EnqueueSessionTask(requester_key, std::make_unique<SessionAddFriendTask>(result->acceptor_info));
-		const SessionKey acceptor_key = server_.active_players_.FindSessionKeyByID(result->acceptor_info.player_id);
+		const SessionKey acceptor_key = server_.GetActivePlayerManager().FindSessionKeyByID(result->acceptor_info.player_id);
 		server_.EnqueueSessionTask(acceptor_key, std::make_unique<SessionAddFriendTask>(result->requester_info));
 	}
 }
@@ -32,9 +33,9 @@ void DBResultHandler::HandleDeleteFriendDBResult(DBOverlapped* db_over)
 {
 	if (db_over->result_data->is_success) {
 		DBResultDeleteFriend* result = static_cast<DBResultDeleteFriend*>(db_over->result_data.get());
-		const SessionKey requester_key = server_.active_players_.FindSessionKeyByID(result->requester_id);
+		const SessionKey requester_key = server_.GetActivePlayerManager().FindSessionKeyByID(result->requester_id);
 		server_.EnqueueSessionTask(requester_key, std::make_unique<SessionDeleteFriendTask>(result->target_id));
-		const SessionKey target_key = server_.active_players_.FindSessionKeyByID(result->target_id);
+		const SessionKey target_key = server_.GetActivePlayerManager().FindSessionKeyByID(result->target_id);
 		server_.EnqueueSessionTask(target_key, std::make_unique<SessionDeleteFriendTask>(result->requester_id));
 	}
 }
@@ -56,7 +57,7 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, Session& sessio
 	login_p.player_id = -1;
 	if (db_over->result_data->is_success) {
 		DBResultLogin* login_result = static_cast<DBResultLogin*>(db_over->result_data.get());
-		if (!server_.active_players_.AddPlayer(session, login_result)) {
+		if (!server_.GetActivePlayerManager().AddPlayer(session, login_result)) {
 			login_p.player_id = -2;
 		}
 		else {
@@ -84,7 +85,6 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, Session& sessio
 	}
 
 	else {
-		std::cout << "로그인 - 플레이어: " << session.GetDBInfo().nickname << std::endl;
 		session.SendPacket(reinterpret_cast<char*>(&login_p), login_p.header.size, server_.GetIOCPHandle());
 
 		SessionKey session_key = session.GetSessionKey();

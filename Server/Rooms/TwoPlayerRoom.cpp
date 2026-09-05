@@ -1,12 +1,12 @@
 #include "TwoPlayerRoom.h"
 
-TwoPlayerRoom::TwoPlayerRoom(IOCPServer* server, PublicRoomInitData data)
+TwoPlayerRoom::TwoPlayerRoom(TetrisServer* server, PublicRoomInitData data)
 	: MultiRoom(server, data)
 {
 	max_player_count_ = 2;
 }
 
-TwoPlayerRoom::TwoPlayerRoom(IOCPServer* server, PrivateRoomInitData data)
+TwoPlayerRoom::TwoPlayerRoom(TetrisServer* server, PrivateRoomInitData data)
 	: MultiRoom(server, data)
 {
 	max_player_count_ = 2;

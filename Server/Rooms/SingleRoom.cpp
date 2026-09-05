@@ -1,15 +1,17 @@
 #include <random>
 #include <algorithm>
 #include "SingleRoom.h"
+#include "game_packets.h"
 #include "packet_types.h"
+#include "room_packets.h"
 
-SingleRoom::SingleRoom(IOCPServer* server, PublicRoomInitData data)
+SingleRoom::SingleRoom(TetrisServer* server, PublicRoomInitData data)
 	: TetrisRoom(server, data)
 {
 	max_player_count_ = 1;
 }
 
-SingleRoom::SingleRoom(IOCPServer* server, PrivateRoomInitData data)
+SingleRoom::SingleRoom(TetrisServer* server, PrivateRoomInitData data)
 	: TetrisRoom(server, data)
 {
 	max_player_count_ = 1;
@@ -159,13 +161,10 @@ void SingleRoom::RemovePlayer(SessionKey session_key)
 
 void SingleRoom::CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_type)
 {
-	//std::cout << "delete player id: " << session_key.player_id << std::endl;
-
 	{
 		for (auto& room_player : room_players_) {
 			if (room_player.MatchesSessionKey(session_key)) { // 삭제할 세션 검색
 				const int player_id = room_player.GetSessionKey().player_id;
-				//std::cout << "delete player id: " << player_id << std::endl;
 				S2C_REMOVE_PLAYER_PACKET p;
 				p.header.size = static_cast<std::uint16_t>(sizeof(p));
 				p.header.type = S2C_REMOVE_PLAYER;
@@ -181,7 +180,7 @@ void SingleRoom::CompletePlayerRemoval(SessionKey session_key, RoomExitType exit
 	}
 }
 
-void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸고 들어온다
+void SingleRoom::SendCreateRoom(Session& session)
 {
 	if (room_password_.empty()) {
 		S2C_ADD_PUBLIC_ROOM_PACKET public_p;
@@ -202,7 +201,6 @@ void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸�
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
 		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 	}
-	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
 }
 
 void SingleRoom::CalculateScore(int clear_line_count)

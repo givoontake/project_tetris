@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "define_packets.h"
 #include "enum_class.h"
 
 struct DBResultBase {
@@ -54,7 +53,6 @@ struct DBResultUpdateMatchResult : public DBResultBase {
 
 struct FriendInfo {
 	int player_id;
-	//int sess_gen; // db 요청 - 응답 사이에 재사용 판별을 위해 사용 -> 어차피 재사용 보장이 안돼서 탐색해서 찾아야겠다
 	std::string nickname;
 };
 

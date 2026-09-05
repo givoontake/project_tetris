@@ -6,11 +6,11 @@
 #include "TimerThreadManager.h"
 #include "game_state.h"
 
-class IOCPServer;
+class TetrisServer;
 
 class ServerThreadManager
 {
-    IOCPServer& iocp_server_;
+    TetrisServer& tetris_server_;
 	IOThreadManager io_thread_manager_;
 	LobbyThreadManager lobby_thread_manager_;
     GameThreadManager game_thread_manager_;
@@ -20,10 +20,12 @@ class ServerThreadManager
     friend class TimerThread;
 
 public:
-    ServerThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy = TickWaitPolicy::FULL_SPIN);
-    ~ServerThreadManager();
+    ServerThreadManager(TetrisServer& tetris_server, TickWaitPolicy tick_policy = TickWaitPolicy::FULL_SPIN);
 
     void StartThreads();
     void CloseThreads();
     void JoinThreads();
+	DBThreadManager& GetDBThreadManager() { return db_thread_manager_; }
+	LobbyThreadManager& GetLobbyThreadManager() { return lobby_thread_manager_; }
+	GameThreadManager& GetGameThreadManager() { return game_thread_manager_; }
 };

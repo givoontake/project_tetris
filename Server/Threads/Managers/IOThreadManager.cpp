@@ -1,8 +1,8 @@
 #include "IOThreadManager.h"
-#include "IOCPServer.h"
+#include "TetrisServer.h"
 
-IOThreadManager::IOThreadManager(IOCPServer& iocp_server)
-    : iocp_server_(iocp_server)
+IOThreadManager::IOThreadManager(TetrisServer& tetris_server)
+    : tetris_server_(tetris_server)
 {
 }
 
@@ -12,7 +12,7 @@ void IOThreadManager::Start(int thread_count)
     thread_objects_.reserve(thread_count);
     threads_.reserve(thread_count);
     for (int i = 0; i < thread_count; ++i) {
-        thread_objects_.emplace_back(std::make_unique<IOThread>(iocp_server_));
+        thread_objects_.emplace_back(std::make_unique<IOThread>(tetris_server_));
         thread_objects_.back()->Start();
         threads_.emplace_back(&ServerThread::Run, thread_objects_.back().get());
     }

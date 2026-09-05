@@ -1,12 +1,13 @@
 #include <vector>
 #include <algorithm>
+#include <iostream>
 #include <random>
 #include <variant>
 #include "Tetris.h"
 
 Tetris::Tetris()
 {
-    Clear(); // init처럼 쓰는중
+    Clear();
 }
 
 void Tetris::InitNewTetromino(char type, Position spawn_pos)
@@ -22,7 +23,6 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 // 그러면 회전된 테트로미노 관리가 수월해진다.
 EventType Tetris::ProcessMoveInput(EventType move_type, long long tick_time_ms) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
 {
-    PrintMoveType(move_type);
     Tetromino if_move_tetromino = current_tetromino_;
 	if(!timers_.IsInputAllowed(move_type, tick_time_ms)) return EventType::NONE;
     switch (move_type) {
@@ -140,7 +140,6 @@ void Tetris::ClearLine()
 			task.task = TaskClearLine{ y };
 			send_tasks_.emplace_back(task);
 			++cleared_line_count_;
-			//std::cout << "Cleared line index y = " << y << "\n";
         }
     }
 }
@@ -174,14 +173,11 @@ void Tetris::AddGarbageLines() // 팬딩에 add되어야 할 라인 로직 계�
 
 int Tetris::GenerateRandomGarbageHole()
 {
-    // OS/하드웨어 엔트로피에서 시드 생성
     static int prev_x = 0;
     static std::random_device rd;
 
-    // 넣어준 시드값에 의해 생성될 난수가 준비된다.
     static std::mt19937 gen(rd());
 
-    // 0~BOARD_WIDTH - 1 범위에서 균등 분포로 값 출력
     static std::uniform_int_distribution<int> dist(0, BOARD_WIDTH - 1);
 	int random_x;
     do {
@@ -200,7 +196,7 @@ void Tetris::Clear()
         for (int j = 0; j < BOARD_WIDTH; ++j) {
             board_[i][j] = false;
         }
-    } // 가로 = WIDTH = x / 세로 = HEIGHT = y
+    }
 
 	pending_moves_.fill(false);
 	timers_.Reset();

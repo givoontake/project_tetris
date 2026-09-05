@@ -1,14 +1,14 @@
 #pragma once
-class IOCPServer;
+class TetrisServer;
 class Session;
 struct DBOverlapped;
 
 class DBResultHandler
 {
-	IOCPServer& server_;
+	TetrisServer& server_;
 
 public:
-	DBResultHandler(IOCPServer& server);
+	DBResultHandler(TetrisServer& server);
 	void HandleSessionDBResult(DBOverlapped* db_over, Session& session);
 	void HandleServerDBResult(DBOverlapped* db_over);
 

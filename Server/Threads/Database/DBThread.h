@@ -23,11 +23,10 @@
 #include "ExOverlapped.h"
 #include "types.h"
 #include "enum_class.h"
-#include "define_packets.h"
 #include "DBResult.h"
 #include "Session.h"
 #include "DBTasks.h"
-#include "Threads/Threads/ServerThread.h"
+#include "ServerThread.h"
 
 struct DBConnectionInfo
 {

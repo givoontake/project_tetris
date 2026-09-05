@@ -1,5 +1,4 @@
 #pragma once
-#include <iostream>
 #include "Tetromino.h"
 #include "TetrisTimers.h"
 #include "task_type.h"
@@ -7,29 +6,6 @@ constexpr int HIDDEN_HEIGHT = 5;
 constexpr int BOARD_WIDTH = 10;
 constexpr int BOARD_HEIGHT = 20;
 constexpr int TOTAL_HEIGHT = BOARD_HEIGHT + HIDDEN_HEIGHT;
-
-inline void PrintMoveType(EventType type)
-{
-	switch (type)
-	{
-	case EventType::RIGHT:
-		std::cout << "RIGHT\n";
-		break;
-	case EventType::LEFT:
-		std::cout << "LEFT\n";
-		break;
-	case EventType::DOWN:
-		std::cout << "DOWN\n";
-		break;
-	case EventType::ROTATE:
-		std::cout << "ROTATE\n";
-		break;
-	case EventType::DROP:
-		std::cout << "DROP\n";
-		break;
-	}
-}
-
 
 class Tetris
 {
@@ -45,8 +21,6 @@ class Tetris
 public:
 	Tetris();
 
-	//bool GetNewSpawn() const { return new_spawn; }
-	//void SetNewSpawn(bool val) { new_spawn = val; }
 	std::vector<EventType>& GetInputTasks() { return input_tasks_; }
 	std::vector<TaskType>& GetSendTasks() { return send_tasks_; }
 	int GetClearedLineCount() const { return cleared_line_count_; }

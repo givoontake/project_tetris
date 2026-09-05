@@ -16,24 +16,18 @@
 #pragma comment(lib, "MSWSock.lib")
 #pragma comment(lib, "Ws2_32.lib")
 
-class DBThreadManager;
-class LobbyThreadManager;
-class GameThreadManager;
 class ServerThreadManager;
 struct LobbyTask;
 struct RoomLifecycleTask;
 struct SessionTask;
 
-class IOCPServer
+class TetrisServer
 {
 	HANDLE iocp_handle_;
 	SOCKET listen_socket_, accept_socket_;
 	WSADATA wsa_data_;
 	SOCKADDR_IN server_addr_;
 	IOOverlapped accept_over_;
-	DBThreadManager* db_thread_manager_ = nullptr;
-	LobbyThreadManager* lobby_thread_manager_ = nullptr;
-	GameThreadManager* game_thread_manager_ = nullptr;
 	RankingManager ranking_manager_;
 	ActiveRoomManager active_rooms_;
 	ActivePlayerManager active_players_;
@@ -43,24 +37,27 @@ class IOCPServer
 	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM_COUNT> rooms_;
 
 	std::atomic<bool> is_running_ = true;
-
-	friend class DBResultHandler;
-	friend class LobbyThreadManager;
-	friend class GameThreadManager;
-	friend class IOThread;
-	friend class ServerThreadManager;
+	std::unique_ptr<ServerThreadManager> thread_manager_;
 
 public:
-	IOCPServer();
-	~IOCPServer();
+	TetrisServer();
+	~TetrisServer();
 
 	Session* AcquireSession(SOCKET new_socket);
 	std::uint64_t GenerateSessionID();
 	bool IsRunning() const { return is_running_.load(); }
+	void RequestStop() { is_running_.store(false); }
 	HANDLE GetIOCPHandle() const { return iocp_handle_; }
+	ServerThreadManager& GetThreadManager() { return *thread_manager_; }
 
 	SP<TetrisRoom> GetRoomByIndex(int room_index) const;
+	bool TryAddRoom(int room_index, const SP<TetrisRoom>& room);
+	bool TryRemoveRoom(int room_index, const SP<TetrisRoom>& room);
+	int GenerateRoomGen();
+	ActiveRoomManager& GetActiveRoomManager() { return active_rooms_; }
+	ActivePlayerManager& GetActivePlayerManager() { return active_players_; }
 	RankingManager& GetRankingManager() { return ranking_manager_; }
+	DBResultHandler& GetDBResultHandler() { return db_result_handler_; }
 
 	Session* FindSessionByIndex(int session_index);
 	Session* FindSession(SessionKey session_key);
@@ -70,6 +67,10 @@ public:
 	void CompleteRoomDisconnect(SessionKey session_key);
 	bool FinalizeDisconnect(SessionKey session_key);
 	void StartServer();
+	void CompleteAccept();
+	void StartThreads();
+	void CloseThreads();
+	void JoinThreads();
 	bool EnqueueDBTask(std::unique_ptr<ServerDBTask> db_task);
 	bool EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task);
 	void EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task);
@@ -83,6 +84,4 @@ public:
 	void StringToCharBuf(const std::string& str, char* buf, int buf_size);
 	std::string CharBufToString(const char* buf, int buf_size);
 	void SendError(Session& session, int error_code);
-	void SendAddFriendResult(FriendInfo& requester_info, FriendInfo& acceptor_info);
-	void SendDeleteFriendResult(int requester_id, int target_id);
 };

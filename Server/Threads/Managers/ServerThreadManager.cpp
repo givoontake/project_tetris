@@ -1,20 +1,10 @@
 #include <thread>
 #include "ServerThreadManager.h"
-#include "IOCPServer.h"
+#include "TetrisServer.h"
 
-ServerThreadManager::ServerThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy)
-	: iocp_server_(iocp_server), io_thread_manager_(iocp_server), lobby_thread_manager_(iocp_server), game_thread_manager_(iocp_server, tick_policy), db_thread_manager_(iocp_server), timer_thread_manager_(*this)
+ServerThreadManager::ServerThreadManager(TetrisServer& tetris_server, TickWaitPolicy tick_policy)
+	: tetris_server_(tetris_server), io_thread_manager_(tetris_server), lobby_thread_manager_(tetris_server), game_thread_manager_(tetris_server, tick_policy), db_thread_manager_(tetris_server), timer_thread_manager_(*this)
 {
-    iocp_server_.db_thread_manager_ = &db_thread_manager_;
-	iocp_server_.lobby_thread_manager_ = &lobby_thread_manager_;
-	iocp_server_.game_thread_manager_ = &game_thread_manager_;
-}
-
-ServerThreadManager::~ServerThreadManager()
-{
-    iocp_server_.db_thread_manager_ = nullptr;
-	iocp_server_.lobby_thread_manager_ = nullptr;
-	iocp_server_.game_thread_manager_ = nullptr;
 }
 
 void ServerThreadManager::StartThreads()
@@ -26,7 +16,7 @@ void ServerThreadManager::StartThreads()
     game_thread_manager_.Start();
     timer_thread_manager_.Start();
     db_thread_manager_.Start();
-    iocp_server_.RequestLoadRankings();
+    tetris_server_.RequestLoadRankings();
     io_thread_manager_.Start(io_thread_count);
 } 
 
