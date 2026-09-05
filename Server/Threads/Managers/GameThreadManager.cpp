@@ -1,6 +1,14 @@
+#include <iostream>
+#include <immintrin.h>
 #include "GameThreadManager.h"
+#include "FivePlayerRoom.h"
 #include "IOCPServer.h"
 #include "GamePhaseContext.h"
+#include "LobbyThreadManager.h"
+#include "MultiRoom.h"
+#include "SingleRoom.h"
+#include "TwoPlayerRoom.h"
+#include "lobby_tasks.h"
 
 GameThreadManager::GameThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy)
     : iocp_server_(iocp_server), tick_wait_policy_(tick_policy)
@@ -68,6 +76,255 @@ bool GameThreadManager::StartGamePhase(long long tick_time_ms)
 void GameThreadManager::Enqueue(std::unique_ptr<RoomLifecycleTask> task)
 {
 	lifecycle_tasks_.Enqueue(std::move(task));
+}
+
+int GameThreadManager::TryJoinRoom(SessionKey session_key, int room_gen, const std::string& room_password, int matching_max_player_count)
+{
+	auto* session = iocp_server_.FindSession(session_key);
+	if (!session || session->GetModeState() != ModeState::LOBBY) return ErrorCode::INVALID_REQUEST;
+	auto room = FindRoomByGen(room_gen);
+	if (!room) return ErrorCode::ROOM_NOT_FOUND;
+	if (room->GetMaxPlayerCount() == 1) return ErrorCode::INVALID_REQUEST;
+	if (!iocp_server_.lobby_thread_manager_->BeginRoomTransition(session_key)) return ErrorCode::INVALID_REQUEST;
+	auto task = std::make_unique<RoomLifecycleTask>(RoomLifecycleTaskType::JOIN_ROOM, session_key);
+	task->room_gen = room_gen;
+	task->room_password = room_password;
+	task->matching_max_player_count = matching_max_player_count;
+	Enqueue(std::move(task));
+	return SUCCESS;
+}
+
+void GameThreadManager::ProcessTask(std::unique_ptr<RoomLifecycleTask> task)
+{
+	if (!task) return;
+	if (task->task_type == RoomLifecycleTaskType::DELETE_ROOM) {
+		DeleteRoom(task->room_index);
+		return;
+	}
+	if (task->task_type == RoomLifecycleTaskType::LOBBY_TRANSITION_RESULT) {
+		auto room = iocp_server_.GetRoomByIndex(task->room_index);
+		if (!room || room->GetRoomGen() != task->room_gen) return;
+		RoomProcessState expected_state = RoomProcessState::COMPLETE;
+		while (!room->processing_state_.compare_exchange_weak(expected_state, RoomProcessState::PROCESSING)) {
+			if (!iocp_server_.IsRunning()) return;
+			expected_state = RoomProcessState::COMPLETE;
+			_mm_pause();
+		}
+		room->CompleteLobbyTransition(task->session_key, task->result, task->exit_type);
+		room->processing_state_.store(RoomProcessState::COMPLETE);
+		return;
+	}
+	if (task->task_type == RoomLifecycleTaskType::JOIN_ROOM) {
+		int result = ErrorCode::ROOM_NOT_FOUND;
+		auto room = FindRoomByGen(task->room_gen);
+		if (room) {
+			RoomProcessState expected_state = RoomProcessState::COMPLETE;
+			while (!room->processing_state_.compare_exchange_weak(expected_state, RoomProcessState::PROCESSING)) {
+				if (!iocp_server_.IsRunning()) return;
+				expected_state = RoomProcessState::COMPLETE;
+				_mm_pause();
+			}
+
+			auto* session = iocp_server_.FindSession(task->session_key);
+			if (session && session->GetLifeState() == LifeState::ACTIVE) {
+				while (!session->TryStartTaskProcessing()) {
+					if (!iocp_server_.IsRunning()) {
+						room->processing_state_.store(RoomProcessState::COMPLETE);
+						return;
+					}
+					_mm_pause();
+				}
+				auto multi_room = std::dynamic_pointer_cast<MultiRoom>(room);
+				if (multi_room && session->MatchesSessionKey(task->session_key) && session->GetModeState() == ModeState::LOBBY)
+					result = multi_room->AddPlayer(*session, task->session_key, task->room_password);
+
+				auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
+				lobby_task->result = result;
+				lobby_task->matching_max_player_count = task->matching_max_player_count;
+				iocp_server_.EnqueueLobbyTask(std::move(lobby_task));
+				if (result == SUCCESS) room->ActivatePlayer(task->session_key);
+				session->CompleteTaskProcessing();
+				room->processing_state_.store(RoomProcessState::COMPLETE);
+				return;
+			}
+			room->processing_state_.store(RoomProcessState::COMPLETE);
+		}
+
+		auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
+		lobby_task->result = result;
+		lobby_task->matching_max_player_count = task->matching_max_player_count;
+		iocp_server_.EnqueueLobbyTask(std::move(lobby_task));
+		return;
+	}
+
+	auto* session = iocp_server_.FindSession(task->session_key);
+	if (!session || session->GetLifeState() != LifeState::ACTIVE) {
+		auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
+		lobby_task->result = ErrorCode::INVALID_REQUEST;
+		iocp_server_.EnqueueLobbyTask(std::move(lobby_task));
+		return;
+	}
+	while (!session->TryStartTaskProcessing()) {
+		if (!iocp_server_.IsRunning()) return;
+		_mm_pause();
+	}
+	if (!session->MatchesSessionKey(task->session_key) || session->GetLifeState() != LifeState::ACTIVE || session->GetModeState() != ModeState::LOBBY) {
+		session->CompleteTaskProcessing();
+		auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
+		lobby_task->result = ErrorCode::INVALID_REQUEST;
+		iocp_server_.EnqueueLobbyTask(std::move(lobby_task));
+		return;
+	}
+
+	int result = ErrorCode::INVALID_REQUEST;
+	switch (task->task_type) {
+	case RoomLifecycleTaskType::CREATE_PUBLIC:
+		result = CreatePublicRoom(task->packet.data(), *session, task->session_key);
+		break;
+	case RoomLifecycleTaskType::CREATE_PRIVATE:
+		result = CreatePrivateRoom(task->packet.data(), *session, task->session_key);
+		break;
+	default:
+		break;
+	}
+	auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
+	lobby_task->result = result;
+	iocp_server_.EnqueueLobbyTask(std::move(lobby_task));
+	if (result == SUCCESS) {
+		const RoomSnapshot room_snapshot = session->GetRoomSnapshot();
+		auto room = iocp_server_.GetRoomByIndex(room_snapshot.room_index);
+		if (room) room->CompleteRoomInitialization();
+	}
+	session->CompleteTaskProcessing();
+}
+
+int GameThreadManager::CreatePublicRoom(char* packet, Session& session, SessionKey session_key)
+{
+	if (!packet) return ErrorCode::INVALID_REQUEST;
+	C2S_ADD_PUBLIC_ROOM_PACKET* public_p = reinterpret_cast<C2S_ADD_PUBLIC_ROOM_PACKET*>(packet);
+	PublicRoomInitData data;
+	constexpr size_t MIN_ROOM_NAME_LENGTH = 4;
+	//std::shared_ptr<TetrisRoom> new_room;
+	if (public_p->max_player_count == 1) {
+		data.max_player_count = public_p->max_player_count;
+	}
+
+	else if (public_p->max_player_count == 2 || public_p->max_player_count == 5) {
+		data.max_player_count = public_p->max_player_count;
+	}
+
+	else return ErrorCode::INVALID_REQUEST;
+	data.room_name = iocp_server_.CharBufToString(public_p->room_name, sizeof(public_p->room_name));
+	if (data.room_name.size() < MIN_ROOM_NAME_LENGTH) return ErrorCode::INVALID_REQUEST;
+	data.room_gen = GenerateRoomGen();
+
+	SP<TetrisRoom> new_room;
+
+	for (int i = 0; i < MAX_ROOM_COUNT; ++i) {
+		if (iocp_server_.rooms_[i].load() == nullptr) {
+			data.room_index = i;
+			{
+				if (data.max_player_count == 1) new_room = std::make_shared<SingleRoom>(&iocp_server_, data);
+				else if (data.max_player_count == 2) new_room = std::make_shared<TwoPlayerRoom>(&iocp_server_, data);
+				else new_room = std::make_shared<FivePlayerRoom>(&iocp_server_, data);
+				SP<TetrisRoom> expected = nullptr;
+				if (std::atomic_compare_exchange_strong(&iocp_server_.rooms_[i], &expected, new_room)) {
+					if (!new_room->AddHostSession(session, session_key)) {
+						SP<TetrisRoom> expected_room = new_room;
+						SP<TetrisRoom> empty_room = nullptr;
+						std::atomic_compare_exchange_strong(&iocp_server_.rooms_[i], &expected_room, empty_room);
+						return ErrorCode::INVALID_REQUEST;
+					}
+					iocp_server_.active_rooms_.AddRoom(data.room_gen, new_room);
+					new_room->SendCreateRoom(session);
+					return SUCCESS;
+				}
+			}
+		}
+	}
+
+	// 나중에 방 못찾으면 추후 처리 필요
+	return ErrorCode::SERVER_ERROR;
+}
+
+int GameThreadManager::CreatePrivateRoom(char* packet, Session& session, SessionKey session_key)
+{
+	if (!packet) return ErrorCode::INVALID_REQUEST;
+	C2S_ADD_PRIVATE_ROOM_PACKET* private_p = reinterpret_cast<C2S_ADD_PRIVATE_ROOM_PACKET*>(packet);
+	PrivateRoomInitData data;
+	constexpr size_t MIN_ROOM_NAME_LENGTH = 4;
+	constexpr size_t MIN_ROOM_PASSWORD_LENGTH = 4;
+	//std::shared_ptr<TetrisRoom> new_room;
+	if (private_p->max_player_count == 1) {
+		data.max_player_count = private_p->max_player_count;
+	}
+
+	else if (private_p->max_player_count == 2 || private_p->max_player_count == 5) {
+		data.max_player_count = private_p->max_player_count;
+	}
+
+	else return ErrorCode::INVALID_REQUEST;
+	data.room_name = iocp_server_.CharBufToString(private_p->room_name, sizeof(private_p->room_name));
+	data.room_password = iocp_server_.CharBufToString(private_p->room_password, sizeof(private_p->room_password));
+	if (data.room_name.size() < MIN_ROOM_NAME_LENGTH || data.room_password.size() < MIN_ROOM_PASSWORD_LENGTH) return ErrorCode::INVALID_REQUEST;
+	data.room_gen = GenerateRoomGen();
+
+	SP<TetrisRoom> new_room;
+
+	for (int i = 0; i < MAX_ROOM_COUNT; ++i) {
+		if (iocp_server_.rooms_[i].load() == nullptr) {
+			data.room_index = i;
+			{
+				if (data.max_player_count == 1) new_room = std::make_shared<SingleRoom>(&iocp_server_, data);
+				else if (data.max_player_count == 2) new_room = std::make_shared<TwoPlayerRoom>(&iocp_server_, data);
+				else new_room = std::make_shared<FivePlayerRoom>(&iocp_server_, data);
+				SP<TetrisRoom> expected = nullptr;
+				if (std::atomic_compare_exchange_strong(&iocp_server_.rooms_[i], &expected, new_room)) {
+					if (!new_room->AddHostSession(session, session_key)) {
+						SP<TetrisRoom> expected_room = new_room;
+						SP<TetrisRoom> empty_room = nullptr;
+						std::atomic_compare_exchange_strong(&iocp_server_.rooms_[i], &expected_room, empty_room);
+						return ErrorCode::INVALID_REQUEST;
+					}
+					iocp_server_.active_rooms_.AddRoom(data.room_gen, new_room);
+					new_room->SendCreateRoom(session);
+					return SUCCESS;
+				}
+			}
+		}
+	}
+	return ErrorCode::SERVER_ERROR;
+}
+
+void GameThreadManager::ProcessPacket(char* packet, Session& session)
+{
+	if (!packet) return;
+	const RoomSnapshot room_snapshot = session.GetRoomSnapshot();
+	auto room = iocp_server_.GetRoomByIndex(room_snapshot.room_index);
+	if (!room) {
+		iocp_server_.SendError(session, ErrorCode::INVALID_REQUEST);
+		return;
+	}
+	room->HandlePacket(packet, session);
+}
+
+void GameThreadManager::DeleteRoom(int room_index)
+{
+	auto room = iocp_server_.GetRoomByIndex(room_index);
+	if (!room) return;
+	iocp_server_.active_rooms_.RemoveRoom(room->GetRoomGen(), room);
+	iocp_server_.rooms_[room_index].store(nullptr);
+	std::cout << "방 삭제 - 방 이름: " << room->GetRoomName() << std::endl;
+}
+
+int GameThreadManager::GenerateRoomGen()
+{
+	return iocp_server_.room_gen_generator_.fetch_add(1) + 1;
+}
+
+std::shared_ptr<TetrisRoom> GameThreadManager::FindRoomByGen(int room_gen)
+{
+	return iocp_server_.active_rooms_.FindRoomByGen(room_gen);
 }
 
 void GameThreadManager::Close()

@@ -73,21 +73,18 @@ void IOThread::ProcessSessionCompletion(BOOL result, DWORD transferred_bytes, Ex
 	const bool is_send = ex_over->op_type == OPType::SEND || ex_over->op_type == OPType::POOLED_SEND;
 	IOOverlapped* io_over = reinterpret_cast<IOOverlapped*>(ex_over);
 	SendBuffer* send_buffer = is_send ? static_cast<SendBuffer*>(io_over) : nullptr;
-	auto* session = iocp_server_.FindSession(ex_over->session_key);
-	if (!session) {
-		if (ex_over->op_type == OPType::POOLED_SEND) send_buffer->Clear();
-		else if (ex_over->op_type == OPType::SEND) delete send_buffer;
-		return;
-	}
 
 	switch (ex_over->op_type) {
-	case OPType::RECV:
-		ProcessReceiveCompletion(result, transferred_bytes, session, ex_over->session_key);
+	case OPType::RECV: {
+		auto* session = iocp_server_.FindSession(ex_over->session_key);
+		if (!session) return;
+		ProcessReceiveCompletion(result, transferred_bytes, *session, ex_over->session_key);
 		break;
+	}
 
 	case OPType::SEND:
 	case OPType::POOLED_SEND:
-		ProcessSendCompletion(result, transferred_bytes, send_buffer, session, ex_over->session_key);
+		ProcessSendCompletion(result, transferred_bytes, send_buffer, ex_over->session_key);
 		break;
 
 	default:
@@ -95,7 +92,7 @@ void IOThread::ProcessSessionCompletion(BOOL result, DWORD transferred_bytes, Ex
 	}
 }
 
-void IOThread::ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, Session* session, SessionKey session_key)
+void IOThread::ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, Session& session, SessionKey session_key)
 {
 	if (!result || transferred_bytes == 0) {
 		iocp_server_.RequestDisconnect(session_key);
@@ -103,12 +100,12 @@ void IOThread::ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, Se
 		return;
 	}
 
-	const bool should_receive = iocp_server_.ProcessRecvBuffer(session, transferred_bytes);
-	if (should_receive) session->RecvPacket(iocp_server_.iocp_handle_);
+	const bool should_receive = iocp_server_.ProcessRecvBuffer(session, session_key, transferred_bytes);
+	if (should_receive) session.RecvPacket(iocp_server_.iocp_handle_);
 	iocp_server_.CompleteSessionIO(session_key);
 }
 
-void IOThread::ProcessSendCompletion(BOOL result, DWORD transferred_bytes, SendBuffer* send_buffer, Session* session, SessionKey session_key)
+void IOThread::ProcessSendCompletion(BOOL result, DWORD transferred_bytes, SendBuffer* send_buffer, SessionKey session_key)
 {
 	if (!result || transferred_bytes == 0) iocp_server_.RequestDisconnect(session_key);
 
@@ -121,8 +118,6 @@ void IOThread::ProcessSessionDBCompletion(BOOL result, ExOverlapped* ex_over)
 {
 	std::unique_ptr<DBOverlapped> db_over(reinterpret_cast<DBOverlapped*>(ex_over));
 	const SessionKey session_key = db_over->ex_over.session_key;
-	auto* session = iocp_server_.FindSession(session_key);
-	if (!session) return;
 	if (!result) {
 		iocp_server_.RequestDisconnect(session_key);
 	}

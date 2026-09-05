@@ -33,7 +33,6 @@
     <ClCompile Include="Threads\Managers\LobbyThreadManager.cpp" />
     <ClCompile Include="Core\main.cpp" />
     <ClCompile Include="Rooms\MultiRoom.cpp" />
-    <ClCompile Include="Network\PacketHandler.cpp" />
     <ClCompile Include="Network\SendBuffer.cpp" />
     <ClCompile Include="Managers\RankingManager.cpp" />
     <ClCompile Include="Game\Player.cpp" />
@@ -80,7 +79,6 @@
     <ClInclude Include="Threads\Threads\IOThread.h" />
     <ClInclude Include="Threads\Managers\IOThreadManager.h" />
     <ClInclude Include="Threads\Managers\LobbyThreadManager.h" />
-    <ClInclude Include="Network\PacketHandler.h" />
     <ClInclude Include="Network\SendBuffer.h" />
     <ClInclude Include="Packets\packet_types.h" />
     <ClInclude Include="Managers\RankingManager.h" />

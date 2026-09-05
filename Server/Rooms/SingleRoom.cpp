@@ -20,14 +20,13 @@ std::span<Player> SingleRoom::GetRoomPlayers()
 	return room_players_;
 }
 
-void SingleRoom::HandlePacket(char* packet, Session* request_session)
+void SingleRoom::HandlePacket(char* packet, Session& request_session)
 {
-	if (!request_session) return;
 	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
 	case C2S_GIVE_UP: {
 		RoomTask task;
 		task.task_type = RoomTaskType::GIVE_UP;
-		task.session_key = request_session->GetSessionKey();
+		task.session_key = request_session.GetSessionKey();
 		AddRoomTask(std::move(task));
 		break;
 	}
@@ -37,12 +36,12 @@ void SingleRoom::HandlePacket(char* packet, Session* request_session)
 	}
 }
 
-void SingleRoom::GiveUp(Session* request_session)
+void SingleRoom::GiveUp(Session& request_session)
 {
 	if (!IsPlayerInRoom(request_session)) return;
 	if (room_state_ == RoomState::PLAY) {
 		auto session = FindSession(room_players_[0]);
-		if (!session || session != request_session) return;
+		if (!session || session != &request_session) return;
 		S2C_GAME_OVER_PACKET game_over_p;
 		game_over_p.header.size = static_cast<std::uint16_t>(sizeof(game_over_p));
 		game_over_p.header.type = S2C_GAME_OVER;
@@ -59,10 +58,10 @@ bool SingleRoom::ProcessSpecificRoomTask(const RoomTask& task)
 	if (!session) return true;
 	switch (task.task_type) {
 	case RoomTaskType::START:
-		if (IsPlayerInRoom(session)) StartGame();
+		if (IsPlayerInRoom(*session)) StartGame();
 		break;
 	case RoomTaskType::GIVE_UP:
-		GiveUp(session);
+		GiveUp(*session);
 		break;
 	default:
 		break;
@@ -182,9 +181,8 @@ void SingleRoom::CompletePlayerRemoval(SessionKey session_key, RoomExitType exit
 	}
 }
 
-void SingleRoom::SendCreateRoom(Session* session) // 외부에서 세션락 걸고 들어온다
+void SingleRoom::SendCreateRoom(Session& session) // 외부에서 세션락 걸고 들어온다
 {
-	if (!session) return;
 	if (room_password_.empty()) {
 		S2C_ADD_PUBLIC_ROOM_PACKET public_p;
 		public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
@@ -192,7 +190,7 @@ void SingleRoom::SendCreateRoom(Session* session) // 외부에서 세션락 걸�
 		public_p.room_gen = room_gen_;
 		public_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-		session->SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
 	}
 	else {
 		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
@@ -202,9 +200,9 @@ void SingleRoom::SendCreateRoom(Session* session) // 외부에서 세션락 걸�
 		private_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-		session->SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 	}
-	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
+	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
 }
 
 void SingleRoom::CalculateScore(int clear_line_count)

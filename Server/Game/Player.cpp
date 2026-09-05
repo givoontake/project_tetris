@@ -12,17 +12,16 @@ Player::~Player()
 
 }
 
-bool Player::InitPlayer(Session* session, SessionKey session_key, int room_index)
+bool Player::InitPlayer(Session& session, SessionKey session_key, int room_index)
 {
-	if (!session) return false;
-	if (session->GetLifeState() != LifeState::ACTIVE) return false;
-	if (!session->MatchesSessionKey(session_key)) return false;
+	if (session.GetLifeState() != LifeState::ACTIVE) return false;
+	if (!session.MatchesSessionKey(session_key)) return false;
 	ActiveEntryState expected_state = ActiveEntryState::EMPTY;
 	if (!active_state_.compare_exchange_strong(expected_state, ActiveEntryState::PENDING)) return false;
 	session_key_ = session_key;
-	const RoomSnapshot room_snapshot = session->GetRoomSnapshot();
+	const RoomSnapshot room_snapshot = session.GetRoomSnapshot();
 	if (room_snapshot.mode_state == ModeState::LOBBY) {
-		if (!session->TrySetRoomMode(session_key, room_index)) {
+		if (!session.TrySetRoomMode(session_key, room_index)) {
 			ClearPlayer();
 			return false;
 		}

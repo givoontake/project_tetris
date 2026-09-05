@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 #include "ConcurrentTaskQueue.h"
@@ -11,6 +12,8 @@
 #include "game_state.h"
 
 class IOCPServer;
+class Session;
+class TetrisRoom;
 struct GamePhaseContext;
 class TimerThread;
 
@@ -36,15 +39,23 @@ private:
     friend class GameThread;
     friend class TimerThread;
 
-    int GetAvailableThreadCount() const;
-    std::vector<GameThread*> SelectThreads();
+	int GetAvailableThreadCount() const;
+	std::vector<GameThread*> SelectThreads();
+	void ProcessTask(std::unique_ptr<RoomLifecycleTask> task);
+	int CreatePublicRoom(char* packet, Session& session, SessionKey session_key);
+	int CreatePrivateRoom(char* packet, Session& session, SessionKey session_key);
+	void DeleteRoom(int room_index);
+	int GenerateRoomGen();
+	std::shared_ptr<TetrisRoom> FindRoomByGen(int room_gen);
 
 public:
     GameThreadManager(IOCPServer& iocp_server, TickWaitPolicy tick_policy);
 
     void Start();
-    bool StartGamePhase(long long tick_time_ms);
+	bool StartGamePhase(long long tick_time_ms);
 	void Enqueue(std::unique_ptr<RoomLifecycleTask> task);
+	int TryJoinRoom(SessionKey session_key, int room_gen, const std::string& room_password, int matching_max_player_count = -1);
+	void ProcessPacket(char* packet, Session& session);
     void Close();
     void Join();
 };

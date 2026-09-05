@@ -15,6 +15,7 @@
 
 class IOCPServer;
 class GameThread;
+class GameThreadManager;
 
 struct PlayerInputTask
 {
@@ -58,6 +59,7 @@ struct RoomInfoSnapshot {
 class TetrisRoom
 {
 	friend class GameThread;
+	friend class GameThreadManager;
 	friend class IOCPServer;
 
 protected:
@@ -83,12 +85,12 @@ protected:
 	Session* FindSession(const Player& player) const;
 	Player* FindPlayer(SessionKey session_key);
 	SessionKey ClearPlayer(Player& player);
-	bool InitHostSession(Session* session, SessionKey session_key);
+	bool InitHostSession(Session& session, SessionKey session_key);
 	bool RequestLobbyTransition(SessionKey session_key, RoomExitType exit_type = RoomExitType::LEAVE);
 	virtual void CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_type) = 0;
 	virtual void HandlePlayerReactivated() {}
 	void ClearPlayTasks();
-	bool IsPlayerInRoom(Session* session) const;
+	bool IsPlayerInRoom(const Session& session) const;
 	void BeginRoomDelete();
 	void TryPostRoomDelete();
 	void ProcessSessionTasks();
@@ -112,11 +114,11 @@ public:
 	const std::string& GetRoomPassword() const { return room_password_; }
 
 	// 공통
-	virtual void HandlePacket(char* packet, Session* request_session);
+	virtual void HandlePacket(char* packet, Session& request_session);
 	void ProcessRoomTick(long long tick_time_ms);
 	virtual void RemovePlayer(SessionKey session_key) = 0;
-	virtual void SendCreateRoom(Session* session) = 0;
-	virtual bool AddHostSession(Session* session, SessionKey session_key);
+	virtual void SendCreateRoom(Session& session) = 0;
+	virtual bool AddHostSession(Session& session, SessionKey session_key);
 	bool ActivatePlayer(SessionKey session_key);
 	void CompleteLobbyTransition(SessionKey session_key, int result, RoomExitType exit_type);
 	bool AddRoomTask(RoomTask task);

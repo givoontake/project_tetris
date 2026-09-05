@@ -50,7 +50,7 @@ public:
 	void ResetCombo() { combo_ = 0; }
 	void AddCombo() { ++combo_; }
 
-	bool InitPlayer(Session* session, SessionKey session_key, int room_index);
+	bool InitPlayer(Session& session, SessionKey session_key, int room_index);
 	bool Activate(SessionKey session_key);
 	bool TrySetPending(SessionKey session_key);
 	void ClearPlayer();

@@ -16,9 +16,9 @@ public:
 	SingleRoom(IOCPServer* server, PrivateRoomInitData data);
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session* request_session) override;
+	virtual void HandlePacket(char* packet, Session& request_session) override;
 	virtual void RemovePlayer(SessionKey session_key) override;
-	virtual void SendCreateRoom(Session* session) override;
+	virtual void SendCreateRoom(Session& session) override;
 	void StartGame();
 
 	// 싱글 전용
@@ -30,6 +30,6 @@ private:
 	virtual void CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_type) override;
 	virtual bool ProcessSpecificRoomTask(const RoomTask& task) override;
 	virtual void ProcessGameTick(long long tick_time_ms) override;
-	void GiveUp(Session* request_session);
+	void GiveUp(Session& request_session);
 };
 

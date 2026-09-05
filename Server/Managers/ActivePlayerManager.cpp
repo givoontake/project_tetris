@@ -1,14 +1,14 @@
 #include "ActivePlayerManager.h"
 #include "Session.h"
 
-bool ActivePlayerManager::AddPlayer(Session* session, DBResultLogin* login_result)
+bool ActivePlayerManager::AddPlayer(Session& session, DBResultLogin* login_result)
 {
-	if (!session || !login_result) return false;
+	if (!login_result) return false;
 	std::lock_guard<std::mutex> lock(active_players_mutex_);
 	auto it = active_players_.find(login_result->player_id);
 	if (it != active_players_.end()) return false;
-	if (!session->ApplyLoginResult(login_result)) return false;
-	active_players_[login_result->player_id] = session->GetSessionKey();
+	if (!session.ApplyLoginResult(login_result)) return false;
+	active_players_[login_result->player_id] = session.GetSessionKey();
 	return true;
 }
 

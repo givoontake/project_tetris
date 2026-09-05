@@ -31,7 +31,7 @@ void GameThread::Run()
 			if (is_lifecycle_acquired) {
 				const std::size_t lifecycle_task_count = manager_.lifecycle_tasks_.ClaimTaskCount();
 				for (std::size_t i = 0; i < lifecycle_task_count; ++i)
-					manager_.iocp_server_.ProcessRoomLifecycleTask(manager_.lifecycle_tasks_.Dequeue());
+					manager_.ProcessTask(manager_.lifecycle_tasks_.Dequeue());
 				manager_.is_lifecycle_processing_.store(false);
 			}
 			current_phase_context->is_lifecycle_complete.store(true);

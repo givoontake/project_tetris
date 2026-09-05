@@ -19,11 +19,11 @@ public:
 	~MultiRoom();
 
 	// 공통(오버라이드)
-	virtual void HandlePacket(char* packet, Session* request_session) override;
+	virtual void HandlePacket(char* packet, Session& request_session) override;
 	virtual void RemovePlayer(SessionKey session_key) override;
-	virtual void SendCreateRoom(Session* session) override;
-	virtual bool AddHostSession(Session* session, SessionKey session_key) override;
-	int AddPlayer(Session* new_session, SessionKey session_key, const std::string& room_password);
+	virtual void SendCreateRoom(Session& session) override;
+	virtual bool AddHostSession(Session& session, SessionKey session_key) override;
+	int AddPlayer(Session& new_session, SessionKey session_key, const std::string& room_password);
 
 	void StartGame(int requester_id);
 

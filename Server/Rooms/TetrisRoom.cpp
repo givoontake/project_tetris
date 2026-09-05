@@ -43,9 +43,8 @@ int TetrisRoom::GetCurrentPlayerCount() const
 	return static_cast<int>(current_player_count_.load());
 }
 
-bool TetrisRoom::InitHostSession(Session* session, SessionKey session_key)
+bool TetrisRoom::InitHostSession(Session& session, SessionKey session_key)
 {
-	if (!session) return false;
 	auto room_players = GetRoomPlayers();
 	if (room_players.empty()) return false;
 	if (room_players[0].HasSession()) return false;
@@ -117,7 +116,7 @@ void TetrisRoom::CompleteLobbyTransition(SessionKey session_key, int result, Roo
 	CompletePlayerRemoval(session_key, exit_type);
 }
 
-bool TetrisRoom::AddHostSession(Session* session, SessionKey session_key)
+bool TetrisRoom::AddHostSession(Session& session, SessionKey session_key)
 {
 	return InitHostSession(session, session_key);
 }
@@ -140,25 +139,23 @@ void TetrisRoom::ClearPlayTasks()
 	for (std::size_t i = 0; i < task_count; ++i) play_tasks_.Dequeue();
 }
 
-bool TetrisRoom::IsPlayerInRoom(Session* session) const
+bool TetrisRoom::IsPlayerInRoom(const Session& session) const
 {
-	if (!session) return false;
-	const RoomSnapshot snapshot = session->GetRoomSnapshot();
+	const RoomSnapshot snapshot = session.GetRoomSnapshot();
 	return snapshot.mode_state == ModeState::ROOM && snapshot.room_index == room_index_;
 }
 
-void TetrisRoom::HandlePacket(char* packet, Session* request_session)
+void TetrisRoom::HandlePacket(char* packet, Session& request_session)
 {
-	if (!request_session) return;
 	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
 	case C2S_REMOVE_PLAYER: {
-		RequestLobbyTransition(request_session->GetSessionKey());
+		RequestLobbyTransition(request_session.GetSessionKey());
 		break;
 	}
 	case C2S_START: {
 		RoomTask task;
 		task.task_type = RoomTaskType::START;
-		task.session_key = request_session->GetSessionKey();
+		task.session_key = request_session.GetSessionKey();
 		AddRoomTask(std::move(task));
 		break;
 	}
@@ -168,7 +165,7 @@ void TetrisRoom::HandlePacket(char* packet, Session* request_session)
 		if (room_state_.load() != RoomState::PLAY) return;
 		C2S_MOVE_PACKET* recv_p = reinterpret_cast<C2S_MOVE_PACKET*>(packet);
 		PlayerInputTask task;
-		task.player_id = request_session->GetDBInfo().player_id;
+		task.player_id = request_session.GetDBInfo().player_id;
 		task.event_type = static_cast<EventType>(recv_p->move_type);
 		task.play_generation = current_play_generation;
 		AddPlayTask(std::move(task));
@@ -213,7 +210,7 @@ void TetrisRoom::ProcessSessionTasks()
 
 		const std::size_t task_count = session->ClaimTaskCount();
 		for (std::size_t i = 0; i < task_count; ++i) {
-			const SessionTaskProcessResult result = server_->ProcessSessionTask(session, session->DequeueTask());
+			const SessionTaskProcessResult result = server_->ProcessSessionTask(*session, session->DequeueTask());
 			if (result == SessionTaskProcessResult::DISCARD_REMAINING) {
 				for (++i; i < task_count; ++i) session->DequeueTask();
 				session->DiscardTasks();

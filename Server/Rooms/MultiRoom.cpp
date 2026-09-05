@@ -14,21 +14,20 @@ MultiRoom::~MultiRoom()
 {
 }
 
-bool MultiRoom::AddHostSession(Session* session, SessionKey session_key)
+bool MultiRoom::AddHostSession(Session& session, SessionKey session_key)
 {
 	if (!InitHostSession(session, session_key)) return false;
-	host_id_ = session->GetDBInfo().player_id;
+	host_id_ = session.GetDBInfo().player_id;
 	return true;
 }
 
-void MultiRoom::HandlePacket(char* packet, Session* request_session)
+void MultiRoom::HandlePacket(char* packet, Session& request_session)
 {
-	if (!request_session) return;
 	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
 	case C2S_READY: {
 		RoomTask task;
 		task.task_type = RoomTaskType::READY;
-		task.session_key = request_session->GetSessionKey();
+		task.session_key = request_session.GetSessionKey();
 		AddRoomTask(std::move(task));
 		break;
 	}
@@ -36,7 +35,7 @@ void MultiRoom::HandlePacket(char* packet, Session* request_session)
 		C2S_KICK_PACKET* kick_p = reinterpret_cast<C2S_KICK_PACKET*>(packet);
 		RoomTask task;
 		task.task_type = RoomTaskType::KICK;
-		task.session_key = request_session->GetSessionKey();
+		task.session_key = request_session.GetSessionKey();
 		task.target_player_id = kick_p->kick_player_id;
 		AddRoomTask(std::move(task));
 		break;
@@ -47,10 +46,9 @@ void MultiRoom::HandlePacket(char* packet, Session* request_session)
 	}
 }
 
-int MultiRoom::AddPlayer(Session* new_session, SessionKey session_key, const std::string& room_password)
+int MultiRoom::AddPlayer(Session& new_session, SessionKey session_key, const std::string& room_password)
 {
-	if (!new_session) return ErrorCode::INVALID_REQUEST;
-	if (new_session->GetLifeState() != LifeState::ACTIVE || new_session->GetModeState() != ModeState::LOBBY) return ErrorCode::INVALID_REQUEST;
+	if (new_session.GetLifeState() != LifeState::ACTIVE || new_session.GetModeState() != ModeState::LOBBY) return ErrorCode::INVALID_REQUEST;
 	if (room_password_ != room_password) return ErrorCode::ROOM_INVALID_PASSWORD;
 	const RoomState room_state = room_state_.load();
 	if (room_state == RoomState::PLAY) return ErrorCode::ROOM_IN_GAME;
@@ -78,7 +76,7 @@ int MultiRoom::AddPlayer(Session* new_session, SessionKey session_key, const std
 			public_p.room_gen = room_gen_;
 			public_p.max_player_count = max_player_count_;
 			server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-			new_session->SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
+			new_session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
 		}
 		else {
 			S2C_ADD_PRIVATE_ROOM_PACKET private_p;
@@ -88,7 +86,7 @@ int MultiRoom::AddPlayer(Session* new_session, SessionKey session_key, const std
 			private_p.max_player_count = max_player_count_;
 			server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 			server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-			new_session->SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
+			new_session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 		}
 
 		// 본인의 입장을 본인 제외 나머지에게(방 생성 시 본인은 방에 추가된다)
@@ -100,8 +98,8 @@ int MultiRoom::AddPlayer(Session* new_session, SessionKey session_key, const std
 			S2C_ADD_PLAYER_PACKET add_p;
 			add_p.header.size = static_cast<std::uint16_t>(sizeof(add_p));
 			add_p.header.type = S2C_ADD_PLAYER;
-			add_p.player_id = new_session->GetDBInfo().player_id;
-			server_->StringToCharBuf(new_session->GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
+			add_p.player_id = new_session.GetDBInfo().player_id;
+			server_->StringToCharBuf(new_session.GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
 			session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, server_->GetIOCPHandle());
 		}
 
@@ -116,7 +114,7 @@ int MultiRoom::AddPlayer(Session* new_session, SessionKey session_key, const std
 			add_p.header.type = S2C_ADD_PLAYER;
 			add_p.player_id = session->GetDBInfo().player_id;
 			server_->StringToCharBuf(session->GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
-			new_session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, server_->GetIOCPHandle());
+			new_session.SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, server_->GetIOCPHandle());
 		}
 
 		// 새로 입장한 세션에게 방장이 누구인지
@@ -124,7 +122,7 @@ int MultiRoom::AddPlayer(Session* new_session, SessionKey session_key, const std
 		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
 		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id_;
-		new_session->SendPacket(reinterpret_cast<char*>(&host_p), host_p.header.size, server_->GetIOCPHandle());
+		new_session.SendPacket(reinterpret_cast<char*>(&host_p), host_p.header.size, server_->GetIOCPHandle());
 		return result;
 	}
 
@@ -178,9 +176,8 @@ void MultiRoom::HandlePlayerReactivated()
 	if (host_id_ < 0) FindNewHost();
 }
 
-void MultiRoom::SendCreateRoom(Session* session)
+void MultiRoom::SendCreateRoom(Session& session)
 {
-	if (!session) return;
 	if (room_password_.empty()) {
 		S2C_ADD_PUBLIC_ROOM_PACKET public_p;
 		public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
@@ -188,7 +185,7 @@ void MultiRoom::SendCreateRoom(Session* session)
 		public_p.room_gen = room_gen_;
 		public_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-		session->SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
 	}
 	else {
 		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
@@ -198,9 +195,9 @@ void MultiRoom::SendCreateRoom(Session* session)
 		private_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-		session->SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
 	}
-	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session->GetDBInfo().nickname << std::endl;
+	std::cout << "방 생성 - 방 이름: " << room_name_ << ", 플레이어: " << session.GetDBInfo().nickname << std::endl;
 }
 
 void MultiRoom::TogglePlayerReady(int player_id)
@@ -243,7 +240,7 @@ bool MultiRoom::KickPlayer(int requester_id, int kick_player_id)
 		auto session = FindSession(room_player);
 		if (!session) continue;
 		if (!session->TryStartTaskProcessing()) return false;
-		if (!session->MatchesSessionKey(room_player.GetSessionKey()) || !IsPlayerInRoom(session)) {
+		if (!session->MatchesSessionKey(room_player.GetSessionKey()) || !IsPlayerInRoom(*session)) {
 			session->CompleteTaskProcessing();
 			return true;
 		}
@@ -335,13 +332,13 @@ bool MultiRoom::ProcessSpecificRoomTask(const RoomTask& task)
 	if (!session) return true;
 	switch (task.task_type) {
 	case RoomTaskType::READY:
-		if (IsPlayerInRoom(session)) TogglePlayerReady(session->GetDBInfo().player_id);
+		if (IsPlayerInRoom(*session)) TogglePlayerReady(session->GetDBInfo().player_id);
 		break;
 	case RoomTaskType::KICK:
-		if (IsPlayerInRoom(session)) return KickPlayer(session->GetDBInfo().player_id, task.target_player_id);
+		if (IsPlayerInRoom(*session)) return KickPlayer(session->GetDBInfo().player_id, task.target_player_id);
 		break;
 	case RoomTaskType::START:
-		if (IsPlayerInRoom(session)) StartGame(session->GetDBInfo().player_id);
+		if (IsPlayerInRoom(*session)) StartGame(session->GetDBInfo().player_id);
 		break;
 	default:
 		break;

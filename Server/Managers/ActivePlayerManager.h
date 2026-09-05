@@ -13,7 +13,7 @@ class ActivePlayerManager
 	mutable std::mutex active_players_mutex_;
 
 public:
-	bool AddPlayer(Session* session, DBResultLogin* login_result);
+	bool AddPlayer(Session& session, DBResultLogin* login_result);
 	void RemovePlayer(int player_id, SessionKey session_key);
 	SessionKey FindSessionKeyByID(int player_id) const;
 	std::vector<SessionKey> GetActiveSessionKeys() const;

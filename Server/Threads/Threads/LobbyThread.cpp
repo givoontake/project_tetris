@@ -19,7 +19,7 @@ void LobbyThread::Run()
 		bool expected = false;
 		if (current_phase_context->is_lifecycle_claimed.compare_exchange_strong(expected, true)) {
 			for (std::size_t i = 0; i < current_phase_context->lifecycle_task_count; ++i)
-				manager_.iocp_server_.ProcessLobbyTask(manager_.lifecycle_tasks_.Dequeue());
+				manager_.ProcessTask(manager_.lifecycle_tasks_.Dequeue());
 			current_phase_context->is_lifecycle_complete.store(true);
 		}
 		while (is_running_.load() && manager_.iocp_server_.IsRunning() && !current_phase_context->is_lifecycle_complete.load())
@@ -47,7 +47,7 @@ void LobbyThread::Run()
 
 			const std::size_t task_count = session->ClaimTaskCount();
 			for (std::size_t i = 0; i < task_count; ++i) {
-				const SessionTaskProcessResult result = manager_.iocp_server_.ProcessSessionTask(session, session->DequeueTask());
+				const SessionTaskProcessResult result = manager_.iocp_server_.ProcessSessionTask(*session, session->DequeueTask());
 				if (result == SessionTaskProcessResult::DISCARD_REMAINING) {
 					for (++i; i < task_count; ++i) session->DequeueTask();
 					session->DiscardTasks();
