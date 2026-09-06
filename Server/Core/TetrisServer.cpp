@@ -33,10 +33,6 @@ TetrisServer::TetrisServer()
 
 TetrisServer::~TetrisServer()
 {
-	for(auto& room : rooms_) {
-		std::atomic_store(&room, SP<TetrisRoom>{}); // nullptr과 같은 논리
-	}
-	active_rooms_.Clear();
 	active_players_.Clear();
 	closesocket(listen_socket_);
 	closesocket(accept_socket_);
@@ -66,7 +62,7 @@ void TetrisServer::SendError(Session& session, int error_code)
 	error_p.header.type = S2C_ERROR;
 	error_p.error_code = error_code;
 
-	session.SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, iocp_handle_);
+	session.SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size);
 }
 
 void TetrisServer::StartServer()
@@ -84,7 +80,7 @@ void TetrisServer::CompleteAccept()
 	auto* new_session = AcquireSession(accept_socket_);
 	if (new_session) {
 		CreateIoCompletionPort(reinterpret_cast<HANDLE>(accept_socket_), iocp_handle_, SESSION_IO_COMPLETION, 0);
-		new_session->RecvPacket(iocp_handle_);
+		new_session->RecvPacket();
 	}
 	else {
 		closesocket(accept_socket_);
@@ -207,7 +203,7 @@ SessionTaskProcessResult TetrisServer::ProcessSessionTask(Session& session, std:
 			packet.header.type = S2C_ADD_FRIEND;
 			packet.friend_id = friend_task->friend_info.player_id;
 			StringToCharBuf(friend_task->friend_info.nickname, packet.friend_nickname, MAX_PLAYER_NAME_SIZE);
-			session.SendPacket(reinterpret_cast<char*>(&packet), packet.header.size, iocp_handle_);
+			session.SendPacket(reinterpret_cast<char*>(&packet), packet.header.size);
 		}
 		break;
 	}
@@ -219,7 +215,7 @@ SessionTaskProcessResult TetrisServer::ProcessSessionTask(Session& session, std:
 			packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
 			packet.header.type = S2C_DELETE_FRIEND;
 			packet.target_id = friend_task->target_player_id;
-			session.SendPacket(reinterpret_cast<char*>(&packet), packet.header.size, iocp_handle_);
+			session.SendPacket(reinterpret_cast<char*>(&packet), packet.header.size);
 		}
 		break;
 	}
@@ -231,7 +227,7 @@ SessionTaskProcessResult TetrisServer::ProcessSessionTask(Session& session, std:
 			packet.header.type = S2C_ADD_FRIEND_REQUEST;
 			packet.requester_id = friend_task->requester_info.player_id;
 			StringToCharBuf(friend_task->requester_info.nickname, packet.requester_nickname, MAX_PLAYER_NAME_SIZE);
-			session.SendPacket(reinterpret_cast<char*>(&packet), packet.header.size, iocp_handle_);
+			session.SendPacket(reinterpret_cast<char*>(&packet), packet.header.size);
 		}
 		break;
 	}
@@ -275,7 +271,7 @@ Session* TetrisServer::AcquireSession(SOCKET new_socket)
 	const std::uint64_t session_id = GenerateSessionID();
 	if (session_id == 0) return nullptr;
 	for (int i = 0; i < MAX_PLAYER_COUNT; ++i) {
-		if (sessions_[i].InitSession(i, session_id, new_socket)) {
+		if (sessions_[i].InitSession(i, session_id, new_socket, iocp_handle_)) {
 			const SessionKey session_key = sessions_[i].GetSessionKey();
 			EnqueueLobbyTask(std::make_unique<LobbyTask>(LobbyTaskType::ADD_SESSION, session_key));
 			return &sessions_[i];
@@ -291,6 +287,22 @@ std::uint64_t TetrisServer::GenerateSessionID()
 		if (BCryptGenRandom(nullptr, reinterpret_cast<PUCHAR>(&session_id), sizeof(session_id), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0) return 0;
 	}
 	return session_id;
+}
+
+Session* TetrisServer::FindSessionByIndex(int session_index)
+{
+	if (session_index < 0 || session_index >= MAX_PLAYER_COUNT) return nullptr;
+	auto* session = &sessions_[session_index];
+	const LifeState life_state = session->GetLifeState();
+	if (life_state == LifeState::NONE || life_state == LifeState::INITIALIZING) return nullptr;
+	return session;
+}
+
+Session* TetrisServer::FindSession(SessionKey session_key)
+{
+	auto* session = FindSessionByIndex(session_key.session_index);
+	if (!session || !session->MatchesSessionKey(session_key)) return nullptr;
+	return session;
 }
 
 SP<TetrisRoom> TetrisServer::GetRoomByIndex(int room_index) const
@@ -311,27 +323,6 @@ bool TetrisServer::TryRemoveRoom(int room_index, const SP<TetrisRoom>& room)
 	if (room_index < 0 || room_index >= MAX_ROOM_COUNT || !room) return false;
 	SP<TetrisRoom> expected_room = room;
 	return std::atomic_compare_exchange_strong(&rooms_[room_index], &expected_room, SP<TetrisRoom>{});
-}
-
-int TetrisServer::GenerateRoomGen()
-{
-	return room_gen_generator_.fetch_add(1) + 1;
-}
-
-Session* TetrisServer::FindSessionByIndex(int session_index)
-{
-	if (session_index < 0 || session_index >= MAX_PLAYER_COUNT) return nullptr;
-	auto* session = &sessions_[session_index];
-	const LifeState life_state = session->GetLifeState();
-	if (life_state == LifeState::NONE || life_state == LifeState::INITIALIZING) return nullptr;
-	return session;
-}
-
-Session* TetrisServer::FindSession(SessionKey session_key)
-{
-	auto* session = FindSessionByIndex(session_key.session_index);
-	if (!session || !session->MatchesSessionKey(session_key)) return nullptr;
-	return session;
 }
 
 void TetrisServer::RequestDisconnect(SessionKey session_key)
@@ -382,8 +373,9 @@ bool TetrisServer::FinalizeDisconnect(SessionKey session_key)
 
 	const DBResultLogin db_info = session->GetDBInfo();
 	active_players_.RemovePlayer(db_info.player_id, current_session_key);
-	auto* lobby_session = thread_manager_->GetLobbyThreadManager().GetLobbySession(current_session_key.session_index);
-	if (lobby_session) lobby_session->Clear(current_session_key);
+	auto& lobby_thread_manager = thread_manager_->GetLobbyThreadManager();
+	auto* lobby_session = lobby_thread_manager.GetLobbySession(current_session_key.session_index);
+	if (lobby_session && lobby_session->Clear(current_session_key)) lobby_thread_manager.RemoveActiveSession(current_session_key);
 	session->DiscardTasks();
 	session->CompleteTaskProcessing();
 	session->FinalizeDisconnect(current_session_key);

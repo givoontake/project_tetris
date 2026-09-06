@@ -23,6 +23,7 @@ struct RoomSnapshot {
 class Session
 {
 	SOCKET socket_ = INVALID_SOCKET;
+	HANDLE iocp_handle_ = nullptr; // TetrisServer가 소유하며 Session은 비소유로 사용한다.
 	IOOverlapped recv_over_;
 	SendBufferPool send_buffer_pool_;
 	SessionKey session_key_;
@@ -46,10 +47,10 @@ class Session
 public:
 	Session();
 
-	bool InitSession(int session_index, std::uint64_t session_id, SOCKET new_socket);
+	bool InitSession(int session_index, std::uint64_t session_id, SOCKET new_socket, HANDLE iocp_handle);
 	bool ApplyLoginResult(DBResultLogin* login_result);
-	bool SendPacket(const char* packet, int packet_size, const HANDLE iocp_handle);
-	bool RecvPacket(const HANDLE iocp_handle);
+	bool SendPacket(const char* packet, int packet_size);
+	bool RecvPacket();
 	void AddFriend(FriendInfo& new_friend);
 	void RemoveFriend(const int target_id);
 	void InitFriendList(std::vector<FriendInfo>& db_friend_list);

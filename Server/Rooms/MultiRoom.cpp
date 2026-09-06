@@ -76,20 +76,20 @@ int MultiRoom::AddPlayer(Session& new_session, SessionKey session_key, const std
 			S2C_ADD_PUBLIC_ROOM_PACKET public_p;
 			public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
 			public_p.header.type = S2C_ADD_PUBLIC_ROOM;
-			public_p.room_gen = room_gen_;
+			public_p.room_key = room_key_;
 			public_p.max_player_count = max_player_count_;
 			server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-			new_session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
+			new_session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size);
 		}
 		else {
 			S2C_ADD_PRIVATE_ROOM_PACKET private_p;
 			private_p.header.size = static_cast<std::uint16_t>(sizeof(private_p));
 			private_p.header.type = S2C_ADD_PRIVATE_ROOM;
-			private_p.room_gen = room_gen_;
+			private_p.room_key = room_key_;
 			private_p.max_player_count = max_player_count_;
 			server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 			server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-			new_session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
+			new_session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size);
 		}
 
 		// 본인의 입장을 본인 제외 나머지에게(방 생성 시 본인은 방에 추가된다)
@@ -103,7 +103,7 @@ int MultiRoom::AddPlayer(Session& new_session, SessionKey session_key, const std
 			add_p.header.type = S2C_ADD_PLAYER;
 			add_p.player_id = new_session.GetDBInfo().player_id;
 			server_->StringToCharBuf(new_session.GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
-			session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, server_->GetIOCPHandle());
+			session->SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size);
 		}
 
 		// 본인 제외 나머지 플레이어를 본인에게
@@ -117,7 +117,7 @@ int MultiRoom::AddPlayer(Session& new_session, SessionKey session_key, const std
 			add_p.header.type = S2C_ADD_PLAYER;
 			add_p.player_id = session->GetDBInfo().player_id;
 			server_->StringToCharBuf(session->GetDBInfo().nickname, add_p.nickname, sizeof(add_p.nickname));
-			new_session.SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size, server_->GetIOCPHandle());
+			new_session.SendPacket(reinterpret_cast<char*>(&add_p), add_p.header.size);
 		}
 
 		// 새로 입장한 세션에게 방장이 누구인지
@@ -125,7 +125,7 @@ int MultiRoom::AddPlayer(Session& new_session, SessionKey session_key, const std
 		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
 		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id_;
-		new_session.SendPacket(reinterpret_cast<char*>(&host_p), host_p.header.size, server_->GetIOCPHandle());
+		new_session.SendPacket(reinterpret_cast<char*>(&host_p), host_p.header.size);
 		return result;
 	}
 
@@ -154,7 +154,7 @@ void MultiRoom::CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_
 			p.header.type = S2C_REMOVE_PLAYER;
 			p.player_id = player_id;
 
-			Broadcast(reinterpret_cast<char*>(&p), server_->GetIOCPHandle());
+			Broadcast(reinterpret_cast<char*>(&p));
 			if (exit_type == RoomExitType::KICK) {
 				auto* session = server_->FindSession(session_key);
 				if (session) {
@@ -162,7 +162,7 @@ void MultiRoom::CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_
 					info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 					info_p.header.type = S2C_INFO;
 					info_p.info_code = InfoCode::KICKED;
-					session->SendPacket(reinterpret_cast<char*>(&info_p), info_p.header.size, server_->GetIOCPHandle());
+					session->SendPacket(reinterpret_cast<char*>(&info_p), info_p.header.size);
 				}
 			}
 			const SessionKey disconnected_session_key = ClearPlayer(room_player);
@@ -174,31 +174,26 @@ void MultiRoom::CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_
 	}
 }
 
-void MultiRoom::HandlePlayerReactivated()
-{
-	if (host_id_ < 0) FindNewHost();
-}
-
 void MultiRoom::SendCreateRoom(Session& session)
 {
 	if (room_password_.empty()) {
 		S2C_ADD_PUBLIC_ROOM_PACKET public_p;
 		public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
 		public_p.header.type = S2C_ADD_PUBLIC_ROOM;
-		public_p.room_gen = room_gen_;
+		public_p.room_key = room_key_;
 		public_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-		session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size);
 	}
 	else {
 		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
 		private_p.header.size = static_cast<std::uint16_t>(sizeof(private_p));
 		private_p.header.type = S2C_ADD_PRIVATE_ROOM;
-		private_p.room_gen = room_gen_;
+		private_p.room_key = room_key_;
 		private_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size);
 	}
 }
 
@@ -225,7 +220,7 @@ void MultiRoom::TogglePlayerReady(int player_id)
 			p.player_id = player_id;
 			p.is_ready = is_ready;
 
-			Broadcast(reinterpret_cast<char*>(&p), server_->GetIOCPHandle());
+			Broadcast(reinterpret_cast<char*>(&p));
 			break;
 		}
 	}
@@ -289,7 +284,7 @@ void MultiRoom::StartGame(int requester_id)
 		int host_index = FindHostIndex(host_id_);
 		if (host_index >= 0) {
 			auto host_session = FindSession(room_players[host_index]);
-			if (host_session) host_session->SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, server_->GetIOCPHandle());
+			if (host_session) host_session->SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size);
 		}
 		return;
 	}
@@ -300,7 +295,7 @@ void MultiRoom::StartGame(int requester_id)
 	S2C_MULTI_START_PACKET start_p;
 	start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
 	start_p.header.type = S2C_MULTI_START;
-	Broadcast(reinterpret_cast<char*>(&start_p), server_->GetIOCPHandle());
+	Broadcast(reinterpret_cast<char*>(&start_p));
 	// 모든 조건 통과->게임 시작
 	AppendTetromino7Bag();
 	for (auto& room_player : room_players) {
@@ -324,7 +319,7 @@ void MultiRoom::StartGame(int requester_id)
 		spawn_p.next_tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex() + 1];
 		spawn_p.spawn_x = spawn_pos_.x;
 		spawn_p.spawn_y = spawn_pos_.y;
-		Broadcast(reinterpret_cast<char*>(&spawn_p), server_->GetIOCPHandle());
+		Broadcast(reinterpret_cast<char*>(&spawn_p));
 	}
 }
 
@@ -529,7 +524,7 @@ void MultiRoom::FindNewHost()
 		host_p.header.size = static_cast<std::uint16_t>(sizeof(host_p));
 		host_p.header.type = S2C_UPDATE_HOST;
 		host_p.new_host_id = host_id_;
-		Broadcast(reinterpret_cast<char*>(&host_p), server_->GetIOCPHandle());
+		Broadcast(reinterpret_cast<char*>(&host_p));
 	}
 
 	else if (GetCurrentPlayerCount() == 0) {

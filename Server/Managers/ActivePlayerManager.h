@@ -1,7 +1,6 @@
 #pragma once
 #include <mutex>
 #include <unordered_map>
-#include <vector>
 #include "ExOverlapped.h"
 
 class Session;
@@ -16,6 +15,5 @@ public:
 	bool AddPlayer(Session& session, DBResultLogin* login_result);
 	void RemovePlayer(int player_id, SessionKey session_key);
 	SessionKey FindSessionKeyByID(int player_id) const;
-	std::vector<SessionKey> GetActiveSessionKeys() const;
 	void Clear();
 };

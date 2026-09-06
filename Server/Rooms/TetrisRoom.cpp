@@ -15,7 +15,7 @@ TetrisRoom::TetrisRoom(TetrisServer* server, PublicRoomInitData data)
 	room_name_ = std::move(data.room_name);
 	room_password_.clear();
 	room_index_ = data.room_index;
-	room_gen_ = data.room_gen;
+	room_key_ = data.room_key;
 	room_state_.store(RoomState::EMPTY);
 
 	current_player_count_.store(0);
@@ -28,7 +28,7 @@ TetrisRoom::TetrisRoom(TetrisServer* server, PrivateRoomInitData data)
 	room_name_ = std::move(data.room_name);
 	room_password_ = std::move(data.room_password);
 	room_index_ = data.room_index;
-	room_gen_ = data.room_gen;
+	room_key_ = data.room_key;
 	room_state_.store(RoomState::EMPTY);
 	current_player_count_.store(0);
 }
@@ -81,10 +81,9 @@ bool TetrisRoom::RequestLobbyTransition(SessionKey session_key, RoomExitType exi
 {
 	auto* player = FindPlayer(session_key);
 	if (!player || !player->TrySetPending(session_key)) return false;
+	CompletePlayerRemoval(session_key, exit_type);
 	auto task = std::make_unique<LobbyTask>(LobbyTaskType::ENTER_LOBBY, session_key);
-	task->exit_type = exit_type;
 	task->room_index = room_index_;
-	task->room_gen = room_gen_;
 	server_->EnqueueLobbyTask(std::move(task));
 	return true;
 }
@@ -94,36 +93,20 @@ bool TetrisRoom::ActivatePlayer(SessionKey session_key)
 	auto* player = FindPlayer(session_key);
 	return player && player->Activate(session_key);
 }
-
-void TetrisRoom::CompleteLobbyTransition(SessionKey session_key, int result, RoomExitType exit_type)
-{
-	auto* player = FindPlayer(session_key);
-	if (!player || player->GetActiveState() != ActiveEntryState::PENDING) return;
-	if (result == SUCCESS) {
-		CompletePlayerRemoval(session_key, exit_type);
-		return;
-	}
-
-	auto* session = server_->FindSession(session_key);
-	if (session) {
-		const RoomSnapshot room_snapshot = session->GetRoomSnapshot();
-		if (session->GetLifeState() == LifeState::ACTIVE && room_snapshot.mode_state == ModeState::ROOM && room_snapshot.room_index == room_index_) {
-			if (player->Activate(session_key)) HandlePlayerReactivated();
-			return;
-		}
-	}
-	CompletePlayerRemoval(session_key, exit_type);
-}
-
 bool TetrisRoom::AddHostSession(Session& session, SessionKey session_key)
 {
 	return InitHostSession(session, session_key);
 }
 
+int TetrisRoom::AddPlayer(Session&, SessionKey, const std::string&)
+{
+	return ErrorCode::INVALID_REQUEST;
+}
+
 RoomInfoSnapshot TetrisRoom::GetRoomInfoSnapshot()
 {
 	RoomInfoSnapshot snapshot;
-	snapshot.room_gen = room_gen_;
+	snapshot.room_key = room_key_;
 	snapshot.max_player_count = static_cast<int>(max_player_count_);
 	snapshot.current_player_count = static_cast<int>(current_player_count_.load());
 	snapshot.room_name = room_name_;
@@ -177,11 +160,11 @@ void TetrisRoom::HandlePacket(char* packet, Session& request_session)
 
 bool TetrisRoom::AddRoomTask(RoomTask task)
 {
-	RoomState state = room_state_.load();
+	std::lock_guard<std::mutex> lock(room_mutex_);
+	const RoomState state = room_state_.load();
 	if (state != RoomState::WAIT && state != RoomState::PLAY) return false;
 	room_tasks_.Enqueue(std::move(task));
-	state = room_state_.load();
-	return state != RoomState::DELETE_POST;
+	return true;
 }
 
 void TetrisRoom::AddPlayTask(PlayerInputTask task)
@@ -228,6 +211,8 @@ void TetrisRoom::ProcessSessionTasks()
 
 bool TetrisRoom::TryProcessRoomTask(const RoomTask& task)
 {
+	if (task.task_type == RoomTaskType::JOIN) return TryProcessJoinTask(task);
+
 	auto* session = server_->FindSession(task.session_key);
 	if (!session) {
 		if (task.task_type == RoomTaskType::REMOVE_PLAYER) RemovePlayer(task.session_key);
@@ -256,6 +241,26 @@ bool TetrisRoom::TryProcessRoomTask(const RoomTask& task)
 	const bool is_processed = ProcessSpecificRoomTask(task);
 	session->CompleteTaskProcessing();
 	return is_processed;
+}
+
+bool TetrisRoom::TryProcessJoinTask(const RoomTask& task)
+{
+	int result = ErrorCode::INVALID_REQUEST;
+	auto* session = server_->FindSession(task.session_key);
+	if (session) {
+		if (!session->TryStartTaskProcessing()) return false;
+		if (session->MatchesSessionKey(task.session_key) && session->GetLifeState() == LifeState::ACTIVE && session->GetModeState() == ModeState::LOBBY) {
+			result = AddPlayer(*session, task.session_key, task.room_password);
+			if (result == SUCCESS) ActivatePlayer(task.session_key);
+		}
+		session->CompleteTaskProcessing();
+	}
+
+	auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task.session_key);
+	lobby_task->result = result;
+	lobby_task->matching_max_player_count = task.matching_max_player_count;
+	server_->EnqueueLobbyTask(std::move(lobby_task));
+	return true;
 }
 
 void TetrisRoom::ProcessRoomTasks()
@@ -316,13 +321,17 @@ void TetrisRoom::CompleteRoomInitialization()
 
 void TetrisRoom::BeginRoomDelete()
 {
+	std::lock_guard<std::mutex> lock(room_mutex_);
 	StoreRoomState(RoomState::WAITING_DELETE);
 }
 
 void TetrisRoom::TryPostRoomDelete()
 {
-	if (room_state_.load() != RoomState::WAITING_DELETE || room_tasks_.GetTaskCount() != 0) return;
-	StoreRoomState(RoomState::DELETE_POST);
+	{
+		std::lock_guard<std::mutex> lock(room_mutex_);
+		if (room_state_.load() != RoomState::WAITING_DELETE || room_tasks_.GetTaskCount() != 0) return;
+		StoreRoomState(RoomState::DELETE_POST);
+	}
 	server_->EnqueueRoomLifecycleTask(std::make_unique<RoomLifecycleTask>(room_index_));
 }
 

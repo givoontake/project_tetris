@@ -6,7 +6,6 @@
 #include <memory>
 #include "types.h"
 #include "ExOverlapped.h"
-#include "ActiveRoomManager.h"
 #include "ActivePlayerManager.h"
 #include "Session.h"
 #include "DBResultHandler.h"
@@ -29,10 +28,8 @@ class TetrisServer
 	SOCKADDR_IN server_addr_;
 	IOOverlapped accept_over_;
 	RankingManager ranking_manager_;
-	ActiveRoomManager active_rooms_;
 	ActivePlayerManager active_players_;
 	DBResultHandler db_result_handler_;
-	std::atomic<int> room_gen_generator_ = -1;
 	std::array<Session, MAX_PLAYER_COUNT> sessions_;
 	std::array<std::atomic<SP<TetrisRoom>>, MAX_ROOM_COUNT> rooms_;
 
@@ -50,17 +47,15 @@ public:
 	HANDLE GetIOCPHandle() const { return iocp_handle_; }
 	ServerThreadManager& GetThreadManager() { return *thread_manager_; }
 
-	SP<TetrisRoom> GetRoomByIndex(int room_index) const;
-	bool TryAddRoom(int room_index, const SP<TetrisRoom>& room);
-	bool TryRemoveRoom(int room_index, const SP<TetrisRoom>& room);
-	int GenerateRoomGen();
-	ActiveRoomManager& GetActiveRoomManager() { return active_rooms_; }
 	ActivePlayerManager& GetActivePlayerManager() { return active_players_; }
 	RankingManager& GetRankingManager() { return ranking_manager_; }
 	DBResultHandler& GetDBResultHandler() { return db_result_handler_; }
 
 	Session* FindSessionByIndex(int session_index);
 	Session* FindSession(SessionKey session_key);
+	SP<TetrisRoom> GetRoomByIndex(int room_index) const;
+	bool TryAddRoom(int room_index, const SP<TetrisRoom>& room);
+	bool TryRemoveRoom(int room_index, const SP<TetrisRoom>& room);
 
 	void RequestDisconnect(SessionKey session_key);
 	void CompleteSessionIO(SessionKey session_key);

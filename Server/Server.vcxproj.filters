@@ -60,9 +60,6 @@
     <ClCompile Include="Core\main.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="Managers\ActiveRoomManager.cpp">
-      <Filter>Managers</Filter>
-    </ClCompile>
     <ClCompile Include="Managers\ActivePlayerManager.cpp">
       <Filter>Managers</Filter>
     </ClCompile>
@@ -164,6 +161,12 @@
     <ClInclude Include="Common\ConcurrentTaskQueue.h">
       <Filter>Common</Filter>
     </ClInclude>
+    <ClInclude Include="Common\ActiveList.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="Common\IndexRegistry.h">
+      <Filter>Common</Filter>
+    </ClInclude>
     <ClInclude Include="Common\enum_class.h">
       <Filter>Common</Filter>
     </ClInclude>
@@ -262,9 +265,6 @@
     </ClInclude>
     <ClInclude Include="Rooms\TwoPlayerRoom.h">
       <Filter>Rooms</Filter>
-    </ClInclude>
-    <ClInclude Include="Managers\ActiveRoomManager.h">
-      <Filter>Managers</Filter>
     </ClInclude>
     <ClInclude Include="Managers\ActivePlayerManager.h">
       <Filter>Managers</Filter>

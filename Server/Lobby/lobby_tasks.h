@@ -7,9 +7,7 @@ struct LobbyTask
 {
 	LobbyTaskType task_type;
 	SessionKey session_key;
-	RoomExitType exit_type = RoomExitType::LEAVE;
 	int room_index = -1;
-	int room_gen = -1;
 	int result = SUCCESS;
 	int matching_max_player_count = -1;
 

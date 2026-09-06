@@ -48,7 +48,7 @@ void SingleRoom::GiveUp(Session& request_session)
 		game_over_p.header.size = static_cast<std::uint16_t>(sizeof(game_over_p));
 		game_over_p.header.type = S2C_GAME_OVER;
 		game_over_p.player_id = session->GetDBInfo().player_id;
-		session->SendPacket(reinterpret_cast<char*>(&game_over_p), game_over_p.header.size, server_->GetIOCPHandle());
+		session->SendPacket(reinterpret_cast<char*>(&game_over_p), game_over_p.header.size);
 		RequestUpdateScore();
 		ClearGame();
 	}
@@ -131,7 +131,7 @@ void SingleRoom::StartGame()
 		start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
 		start_p.header.type = S2C_SINGLE_START;
 		start_p.score = 0;
-		Broadcast(reinterpret_cast<char*>(&start_p), server_->GetIOCPHandle());
+		Broadcast(reinterpret_cast<char*>(&start_p));
 
 		for (auto& room_player : room_players_) {
 			auto session = FindSession(room_player);
@@ -144,7 +144,7 @@ void SingleRoom::StartGame()
 			spawn_p.next_tetromino_type = tetromino_spawn_list_[room_player.GetTetrominoIndex() + 1];
 			spawn_p.spawn_x = spawn_pos_.x;
 			spawn_p.spawn_y = spawn_pos_.y;
-			Broadcast(reinterpret_cast<char*>(&spawn_p), server_->GetIOCPHandle());
+			Broadcast(reinterpret_cast<char*>(&spawn_p));
 		}
 	}
 }
@@ -170,7 +170,7 @@ void SingleRoom::CompletePlayerRemoval(SessionKey session_key, RoomExitType exit
 				p.header.type = S2C_REMOVE_PLAYER;
 				p.player_id = player_id;
 
-				Broadcast(reinterpret_cast<char*>(&p), server_->GetIOCPHandle());
+				Broadcast(reinterpret_cast<char*>(&p));
 
 				ClearRoom(); // 안하면 방 삭제 포스트 이후 세션이 재사용되면 문제가 될 수 있음.
 				BeginRoomDelete();
@@ -186,20 +186,20 @@ void SingleRoom::SendCreateRoom(Session& session)
 		S2C_ADD_PUBLIC_ROOM_PACKET public_p;
 		public_p.header.size = static_cast<std::uint16_t>(sizeof(public_p));
 		public_p.header.type = S2C_ADD_PUBLIC_ROOM;
-		public_p.room_gen = room_gen_;
+		public_p.room_key = room_key_;
 		public_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, public_p.room_name, sizeof(public_p.room_name));
-		session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&public_p), public_p.header.size);
 	}
 	else {
 		S2C_ADD_PRIVATE_ROOM_PACKET private_p;
 		private_p.header.size = static_cast<std::uint16_t>(sizeof(private_p));
 		private_p.header.type = S2C_ADD_PRIVATE_ROOM;
-		private_p.room_gen = room_gen_;
+		private_p.room_key = room_key_;
 		private_p.max_player_count = max_player_count_;
 		server_->StringToCharBuf(room_name_, private_p.room_name, sizeof(private_p.room_name));
 		server_->StringToCharBuf(room_password_, private_p.room_password, sizeof(private_p.room_password));
-		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size, server_->GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&private_p), private_p.header.size);
 	}
 }
 

@@ -116,7 +116,7 @@ class RoomInfo:
             )
 
     def update_info(self, data: S2C_ROOM_INFO_PACKET):
-        self.room_gen = data.room_gen
+        self.room_key = data.room_key
         self.title = data.room_name
         self.is_private = data.is_private
         self.cur_user = data.cur_user

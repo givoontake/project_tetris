@@ -1,11 +1,14 @@
 #pragma once
 #include <array>
+#include <cstdint>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
+#include "ActiveList.h"
 #include "ConcurrentTaskQueue.h"
+#include "IndexRegistry.h"
 #include "Lobby/LobbySession.h"
 #include "LobbyThread.h"
 #include "lobby_tasks.h"
@@ -24,6 +27,8 @@ private:
 	std::condition_variable lobby_cv_;
 	ConcurrentTaskQueue<std::unique_ptr<LobbyTask>> lifecycle_tasks_;
 	std::array<LobbySession, MAX_PLAYER_COUNT> lobby_sessions_;
+	ActiveList<std::uint64_t> active_session_keys_; // 활성 로비 세션만 순회하여 로비 처리 비용을 줄인다.
+	IndexRegistry<std::uint64_t> session_index_registry_; // session_key의 session_id로 고정 세션 배열의 session_index를 빠르게 찾는다.
 	std::vector<std::unique_ptr<LobbyThread>> thread_objects_;
 	std::vector<std::thread> threads_;
 
@@ -36,6 +41,8 @@ private:
 	void SendLobbyPlayerList(Session& session);
 	void SendFriendList(Session& session);
 	void SendRankings(Session& session);
+	bool AddActiveSession(SessionKey session_key);
+	Session* GetActiveSession(std::size_t active_session_index);
 
 public:
 	explicit LobbyThreadManager(TetrisServer& tetris_server);
@@ -44,6 +51,7 @@ public:
 	void StartLobbyPhase();
 	void Enqueue(std::unique_ptr<LobbyTask> task);
 	LobbySession* GetLobbySession(int session_index);
+	void RemoveActiveSession(SessionKey session_key);
 	bool BeginRoomTransition(SessionKey session_key);
 	void ProcessPacket(char* packet, Session& session);
 	void Close();

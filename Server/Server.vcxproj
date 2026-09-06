@@ -20,7 +20,6 @@
   </ItemGroup>
   <ItemGroup>
 	<ClCompile Include="Lobby\LobbySession.cpp" />
-    <ClCompile Include="Managers\ActiveRoomManager.cpp" />
     <ClCompile Include="Managers\ActivePlayerManager.cpp" />
     <ClCompile Include="Threads\Database\DBThread.cpp" />
     <ClCompile Include="Threads\Database\GameDBThread.cpp" />
@@ -56,9 +55,10 @@
   </ItemGroup>
   <ItemGroup>
 	<ClInclude Include="Lobby\LobbySession.h" />
-    <ClInclude Include="Managers\ActiveRoomManager.h" />
     <ClInclude Include="Managers\ActivePlayerManager.h" />
     <ClInclude Include="Common\ConcurrentTaskQueue.h" />
+    <ClInclude Include="Common\ActiveList.h" />
+    <ClInclude Include="Common\IndexRegistry.h" />
     <ClInclude Include="Threads\Database\DBThread.h" />
     <ClInclude Include="Threads\Database\GameDBThread.h" />
     <ClInclude Include="Threads\Database\LoginDBThread.h" />

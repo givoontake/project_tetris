@@ -31,15 +31,6 @@ SessionKey ActivePlayerManager::FindSessionKeyByID(int player_id) const
 	return it->second;
 }
 
-std::vector<SessionKey> ActivePlayerManager::GetActiveSessionKeys() const
-{
-	std::vector<SessionKey> session_keys;
-	std::lock_guard<std::mutex> lock(active_players_mutex_);
-	session_keys.reserve(active_players_.size());
-	for (const auto& active_player : active_players_) session_keys.emplace_back(active_player.second);
-	return session_keys;
-}
-
 void ActivePlayerManager::Clear()
 {
 	std::lock_guard<std::mutex> lock(active_players_mutex_);

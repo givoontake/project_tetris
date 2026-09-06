@@ -21,7 +21,7 @@ public:
 	virtual void RemovePlayer(SessionKey session_key) override;
 	virtual void SendCreateRoom(Session& session) override;
 	virtual bool AddHostSession(Session& session, SessionKey session_key) override;
-	int AddPlayer(Session& new_session, SessionKey session_key, const std::string& room_password);
+	virtual int AddPlayer(Session& new_session, SessionKey session_key, const std::string& room_password) override;
 
 	void StartGame(int requester_id);
 
@@ -38,7 +38,6 @@ public:
 
 private:
 	virtual void CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_type) override;
-	virtual void HandlePlayerReactivated() override;
 	virtual bool ProcessSpecificRoomTask(const RoomTask& task) override;
 	virtual void ProcessGameTick(long long tick_time_ms) override;
 };

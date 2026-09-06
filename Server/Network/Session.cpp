@@ -7,15 +7,16 @@ Session::Session()
 	recv_over_.SetOperationType(OPType::RECV);
 }
 
-bool Session::InitSession(int session_index, std::uint64_t session_id, SOCKET new_socket)
+bool Session::InitSession(int session_index, std::uint64_t session_id, SOCKET new_socket, HANDLE iocp_handle)
 {
-	if (session_index < 0 || session_id == 0 || new_socket == INVALID_SOCKET) return false;
+	if (session_index < 0 || session_id == 0 || new_socket == INVALID_SOCKET || !iocp_handle) return false;
 	LifeState expected_state = LifeState::NONE;
 	if (!life_state_.compare_exchange_strong(expected_state, LifeState::INITIALIZING)) return false;
 
 	std::unique_lock<std::shared_mutex> socket_lock(socket_mutex_);
 	std::lock_guard<std::mutex> session_lock(session_mutex_);
 	socket_ = new_socket;
+	iocp_handle_ = iocp_handle;
 	io_pending_count_ = 0;
 	db_info_.Clear();
 	friend_list_.clear();
@@ -50,7 +51,7 @@ bool Session::ApplyLoginResult(DBResultLogin* login_result)
 	return true;
 }
 
-bool Session::SendPacket(const char* packet, int packet_size, const HANDLE iocp_handle)
+bool Session::SendPacket(const char* packet, int packet_size)
 {
 	if (!packet || packet_size <= 0 || packet_size > BUF_SIZE) return false;
 	const int buffer_index = send_buffer_pool_.FindAvailableBuffer();
@@ -73,7 +74,7 @@ bool Session::SendPacket(const char* packet, int packet_size, const HANDLE iocp_
 	++io_pending_count_;
 	const int result = WSASend(socket_, &send_buffer->wsabuf, 1, 0, 0, &send_buffer->ex_over.over, 0);
 	if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, &send_buffer->ex_over.over);
+		PostQueuedCompletionStatus(iocp_handle_, 0, SESSION_IO_COMPLETION, &send_buffer->ex_over.over);
 		std::cerr << db_info_.nickname << "Session::SendPacket() WSASend error\n";
 		return false;
 	}
@@ -81,7 +82,7 @@ bool Session::SendPacket(const char* packet, int packet_size, const HANDLE iocp_
 }
 
 
-bool Session::RecvPacket(const HANDLE iocp_handle)
+bool Session::RecvPacket()
 {
 	std::shared_lock<std::shared_mutex> socket_lock(socket_mutex_);
 	if (life_state_.load() != LifeState::ACTIVE || socket_ == INVALID_SOCKET) return false;
@@ -95,7 +96,7 @@ bool Session::RecvPacket(const HANDLE iocp_handle)
 	++io_pending_count_;
 	const int result = WSARecv(socket_, &recv_over_.wsabuf, 1, 0, &recv_flag, &recv_over_.ex_over.over, 0);
 	if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(&recv_over_));
+		PostQueuedCompletionStatus(iocp_handle_, 0, SESSION_IO_COMPLETION, reinterpret_cast<WSAOVERLAPPED*>(&recv_over_));
 		std::cerr << db_info_.nickname << "Session::RecvPacket() WSARecv error\n";
 		return false;
 	}

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <utility>
 #include <optional>
+#include <mutex>
 #include "ConcurrentTaskQueue.h"
 #include "Player.h"
 #include "Session.h"
@@ -27,18 +28,20 @@ struct RoomTask
 {
 	RoomTaskType task_type = RoomTaskType::NONE;
 	SessionKey session_key; // 세션이 먼저 정리돼도 지연된 방 작업이 같은 세대의 플레이어만 처리하도록 보관한다.
+	std::string room_password;
 	int target_player_id = -1;
+	int matching_max_player_count = -1;
 };
 
 struct PublicRoomInitData {
-	int room_gen = -1;
+	RoomKey room_key = 0;
 	int room_index = -1;
 	char max_player_count = -1;
 	std::string room_name;
 };
 
 struct PrivateRoomInitData {
-	int room_gen = -1;
+	RoomKey room_key = 0;
 	int room_index = -1;
 	char max_player_count = -1;
 	std::string room_name;
@@ -47,7 +50,7 @@ struct PrivateRoomInitData {
 
 struct RoomInfoSnapshot {
 	RoomState room_state = RoomState::EMPTY;
-	int room_gen = -1;
+	RoomKey room_key = 0;
 	int max_player_count = 0;
 	int current_player_count = 0;
 	std::string room_name;
@@ -65,6 +68,8 @@ protected:
 	TetrisServer* server_;
 	std::atomic<RoomState> room_state_;
 	std::atomic<RoomProcessState> processing_state_{ RoomProcessState::PROCESSING };
+	// 방 삭제와 남은 작업 정리를 동기화한다.
+	std::mutex room_mutex_;
 	ConcurrentTaskQueue<RoomTask> room_tasks_;
 	ConcurrentTaskQueue<PlayerInputTask> play_tasks_;
 	std::optional<RoomTask> pending_room_task_;
@@ -73,7 +78,7 @@ protected:
 	Position spawn_pos_{ 3, 0 };
 
 	int room_index_;
-	int room_gen_;
+	RoomKey room_key_;
 	std::string room_name_;
 	std::string room_password_;
 	char max_player_count_;
@@ -87,14 +92,15 @@ protected:
 	bool InitHostSession(Session& session, SessionKey session_key);
 	bool RequestLobbyTransition(SessionKey session_key, RoomExitType exit_type = RoomExitType::LEAVE);
 	virtual void CompletePlayerRemoval(SessionKey session_key, RoomExitType exit_type) = 0;
-	virtual void HandlePlayerReactivated() {}
 	void ClearPlayTasks();
 	bool IsPlayerInRoom(const Session& session) const;
 	void BeginRoomDelete();
 	void TryPostRoomDelete();
 	void ProcessSessionTasks();
 	void ProcessRoomTasks();
+	bool TryProcessJoinTask(const RoomTask& task);
 	bool TryProcessRoomTask(const RoomTask& task);
+	virtual int AddPlayer(Session& new_session, SessionKey session_key, const std::string& room_password);
 	virtual bool ProcessSpecificRoomTask(const RoomTask& task) = 0;
 	virtual void ProcessGameTick(long long tick_time_ms) = 0;
 	bool ApplySendTaskState(Player& player, int player_id, const TaskType& task);
@@ -112,7 +118,7 @@ public:
 	TetrisRoom(TetrisServer* server, PrivateRoomInitData data);
 	virtual ~TetrisRoom();
 
-	int GetRoomGen() const { return room_gen_; }
+	RoomKey GetRoomKey() const { return room_key_; }
 	int GetRoomIndex() const { return room_index_; }
 	bool IsPrivate() const { return !room_password_.empty(); }
 	int GetMaxPlayerCount() const { return static_cast<int>(max_player_count_); }
@@ -128,7 +134,6 @@ public:
 	virtual void SendCreateRoom(Session& session) = 0;
 	virtual bool AddHostSession(Session& session, SessionKey session_key);
 	bool ActivatePlayer(SessionKey session_key);
-	void CompleteLobbyTransition(SessionKey session_key, int result, RoomExitType exit_type);
 	bool AddRoomTask(RoomTask task);
 	void AddPlayTask(PlayerInputTask task);
 	void CompleteRoomInitialization();
@@ -146,5 +151,5 @@ public:
 	void AddSpawnTasks();
 	void ResetPlayerTickState();
 	void BroadcastPackets();
-	void Broadcast(char* packet, const HANDLE iocp_handle);
+	void Broadcast(char* packet);
 };

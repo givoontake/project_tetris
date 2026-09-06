@@ -17,7 +17,7 @@ enum class ActiveEntryState { EMPTY, ACTIVE, PENDING };
 
 enum class RoomExitType { LEAVE, KICK };
 
-enum class RoomTaskType { NONE, REMOVE_PLAYER, READY, KICK, START, GIVE_UP };
+enum class RoomTaskType { NONE, JOIN, REMOVE_PLAYER, READY, KICK, START, GIVE_UP };
 
 enum class LifeState { NONE, INITIALIZING, ACTIVE, DISCONNECT_PENDING, DISCONNECTING };
 

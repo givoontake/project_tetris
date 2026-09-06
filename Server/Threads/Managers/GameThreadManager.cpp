@@ -1,3 +1,5 @@
+#include <WinSock2.h>
+#include <bcrypt.h>
 #include <immintrin.h>
 #include "GameThreadManager.h"
 #include "FivePlayerRoom.h"
@@ -5,14 +7,13 @@
 #include "ServerThreadManager.h"
 #include "GamePhaseContext.h"
 #include "LobbyThreadManager.h"
-#include "MultiRoom.h"
 #include "SingleRoom.h"
 #include "TwoPlayerRoom.h"
 #include "lobby_tasks.h"
 #include "room_packets.h"
 
 GameThreadManager::GameThreadManager(TetrisServer& tetris_server, TickWaitPolicy tick_policy)
-    : tetris_server_(tetris_server), tick_wait_policy_(tick_policy)
+    : tetris_server_(tetris_server), tick_wait_policy_(tick_policy), active_room_keys_(MAX_ROOM_COUNT), room_index_registry_(MAX_ROOM_COUNT)
 {
 }
 
@@ -59,7 +60,7 @@ bool GameThreadManager::StartGamePhase(long long tick_time_ms)
     }
 
     // 일부 게임 스레드 작업이 완료되지 않아도 다음 틱으로 넘어갈 수 있으므로 게임 처리 시작에 항상 새 GamePhaseContext를 생성한다.
-	const auto phase_context = std::make_shared<GamePhaseContext>(tick_time_ms);
+	const auto phase_context = std::make_shared<GamePhaseContext>(tick_time_ms, static_cast<int>(selected_game_threads.size()));
     {
         std::lock_guard<std::mutex> lock(tick_mutex_);
         for (GameThread* game_thread : selected_game_threads) {
@@ -76,19 +77,25 @@ void GameThreadManager::Enqueue(std::unique_ptr<RoomLifecycleTask> task)
 	lifecycle_tasks_.Enqueue(std::move(task));
 }
 
-int GameThreadManager::TryJoinRoom(SessionKey session_key, int room_gen, const std::string& room_password, int matching_max_player_count)
+int GameThreadManager::TryJoinRoom(SessionKey session_key, RoomKey room_key, const std::string& room_password, int matching_max_player_count)
 {
 	auto* session = tetris_server_.FindSession(session_key);
 	if (!session || session->GetModeState() != ModeState::LOBBY) return ErrorCode::INVALID_REQUEST;
-	auto room = FindRoomByGen(room_gen);
+	auto room = FindRoomByKey(room_key);
 	if (!room) return ErrorCode::ROOM_NOT_FOUND;
 	if (room->GetMaxPlayerCount() == 1) return ErrorCode::INVALID_REQUEST;
 	if (!tetris_server_.GetThreadManager().GetLobbyThreadManager().BeginRoomTransition(session_key)) return ErrorCode::INVALID_REQUEST;
-	auto task = std::make_unique<RoomLifecycleTask>(RoomLifecycleTaskType::JOIN_ROOM, session_key);
-	task->room_gen = room_gen;
-	task->room_password = room_password;
-	task->matching_max_player_count = matching_max_player_count;
-	Enqueue(std::move(task));
+	RoomTask task;
+	task.task_type = RoomTaskType::JOIN;
+	task.session_key = session_key;
+	task.room_password = room_password;
+	task.matching_max_player_count = matching_max_player_count;
+	if (!room->AddRoomTask(std::move(task))) {
+		auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, session_key);
+		lobby_task->result = ErrorCode::ROOM_NOT_FOUND;
+		lobby_task->matching_max_player_count = matching_max_player_count;
+		tetris_server_.EnqueueLobbyTask(std::move(lobby_task));
+	}
 	return SUCCESS;
 }
 
@@ -99,62 +106,6 @@ void GameThreadManager::ProcessTask(std::unique_ptr<RoomLifecycleTask> task)
 		DeleteRoom(task->room_index);
 		return;
 	}
-	if (task->task_type == RoomLifecycleTaskType::LOBBY_TRANSITION_RESULT) {
-		auto room = tetris_server_.GetRoomByIndex(task->room_index);
-		if (!room || room->GetRoomGen() != task->room_gen) return;
-		RoomProcessState expected_state = RoomProcessState::COMPLETE;
-		while (!room->processing_state_.compare_exchange_weak(expected_state, RoomProcessState::PROCESSING)) {
-			if (!tetris_server_.IsRunning()) return;
-			expected_state = RoomProcessState::COMPLETE;
-			_mm_pause();
-		}
-		room->CompleteLobbyTransition(task->session_key, task->result, task->exit_type);
-		room->processing_state_.store(RoomProcessState::COMPLETE);
-		return;
-	}
-	if (task->task_type == RoomLifecycleTaskType::JOIN_ROOM) {
-		int result = ErrorCode::ROOM_NOT_FOUND;
-		auto room = FindRoomByGen(task->room_gen);
-		if (room) {
-			RoomProcessState expected_state = RoomProcessState::COMPLETE;
-			while (!room->processing_state_.compare_exchange_weak(expected_state, RoomProcessState::PROCESSING)) {
-				if (!tetris_server_.IsRunning()) return;
-				expected_state = RoomProcessState::COMPLETE;
-				_mm_pause();
-			}
-
-			auto* session = tetris_server_.FindSession(task->session_key);
-			if (session && session->GetLifeState() == LifeState::ACTIVE) {
-				while (!session->TryStartTaskProcessing()) {
-					if (!tetris_server_.IsRunning()) {
-						room->processing_state_.store(RoomProcessState::COMPLETE);
-						return;
-					}
-					_mm_pause();
-				}
-				auto multi_room = std::dynamic_pointer_cast<MultiRoom>(room);
-				if (multi_room && session->MatchesSessionKey(task->session_key) && session->GetModeState() == ModeState::LOBBY)
-					result = multi_room->AddPlayer(*session, task->session_key, task->room_password);
-
-				auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
-				lobby_task->result = result;
-				lobby_task->matching_max_player_count = task->matching_max_player_count;
-				tetris_server_.EnqueueLobbyTask(std::move(lobby_task));
-				if (result == SUCCESS) room->ActivatePlayer(task->session_key);
-				session->CompleteTaskProcessing();
-				room->processing_state_.store(RoomProcessState::COMPLETE);
-				return;
-			}
-			room->processing_state_.store(RoomProcessState::COMPLETE);
-		}
-
-		auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
-		lobby_task->result = result;
-		lobby_task->matching_max_player_count = task->matching_max_player_count;
-		tetris_server_.EnqueueLobbyTask(std::move(lobby_task));
-		return;
-	}
-
 	auto* session = tetris_server_.FindSession(task->session_key);
 	if (!session || session->GetLifeState() != LifeState::ACTIVE) {
 		auto lobby_task = std::make_unique<LobbyTask>(LobbyTaskType::ROOM_TRANSITION_RESULT, task->session_key);
@@ -213,7 +164,8 @@ int GameThreadManager::CreatePublicRoom(char* packet, Session& session, SessionK
 	else return ErrorCode::INVALID_REQUEST;
 	data.room_name = tetris_server_.CharBufToString(public_p->room_name, sizeof(public_p->room_name));
 	if (data.room_name.size() < MIN_ROOM_NAME_LENGTH) return ErrorCode::INVALID_REQUEST;
-	data.room_gen = tetris_server_.GenerateRoomGen();
+	data.room_key = GenerateRoomKey();
+	if (data.room_key == 0) return ErrorCode::SERVER_ERROR;
 
 	SP<TetrisRoom> new_room;
 
@@ -225,11 +177,17 @@ int GameThreadManager::CreatePublicRoom(char* packet, Session& session, SessionK
 				else if (data.max_player_count == 2) new_room = std::make_shared<TwoPlayerRoom>(&tetris_server_, data);
 				else new_room = std::make_shared<FivePlayerRoom>(&tetris_server_, data);
 				if (tetris_server_.TryAddRoom(i, new_room)) {
+					if (!room_index_registry_.Register(data.room_key, i) || !active_room_keys_.Add(data.room_key)) {
+						room_index_registry_.Unregister(data.room_key, i);
+						tetris_server_.TryRemoveRoom(i, new_room);
+						return ErrorCode::SERVER_ERROR;
+					}
 					if (!new_room->AddHostSession(session, session_key)) {
+						active_room_keys_.Remove(data.room_key);
+						room_index_registry_.Unregister(data.room_key, i);
 						tetris_server_.TryRemoveRoom(i, new_room);
 						return ErrorCode::INVALID_REQUEST;
 					}
-					tetris_server_.GetActiveRoomManager().AddRoom(data.room_gen, new_room);
 					new_room->SendCreateRoom(session);
 					return SUCCESS;
 				}
@@ -260,7 +218,8 @@ int GameThreadManager::CreatePrivateRoom(char* packet, Session& session, Session
 	data.room_name = tetris_server_.CharBufToString(private_p->room_name, sizeof(private_p->room_name));
 	data.room_password = tetris_server_.CharBufToString(private_p->room_password, sizeof(private_p->room_password));
 	if (data.room_name.size() < MIN_ROOM_NAME_LENGTH || data.room_password.size() < MIN_ROOM_PASSWORD_LENGTH) return ErrorCode::INVALID_REQUEST;
-	data.room_gen = tetris_server_.GenerateRoomGen();
+	data.room_key = GenerateRoomKey();
+	if (data.room_key == 0) return ErrorCode::SERVER_ERROR;
 
 	SP<TetrisRoom> new_room;
 
@@ -272,11 +231,17 @@ int GameThreadManager::CreatePrivateRoom(char* packet, Session& session, Session
 				else if (data.max_player_count == 2) new_room = std::make_shared<TwoPlayerRoom>(&tetris_server_, data);
 				else new_room = std::make_shared<FivePlayerRoom>(&tetris_server_, data);
 				if (tetris_server_.TryAddRoom(i, new_room)) {
+					if (!room_index_registry_.Register(data.room_key, i) || !active_room_keys_.Add(data.room_key)) {
+						room_index_registry_.Unregister(data.room_key, i);
+						tetris_server_.TryRemoveRoom(i, new_room);
+						return ErrorCode::SERVER_ERROR;
+					}
 					if (!new_room->AddHostSession(session, session_key)) {
+						active_room_keys_.Remove(data.room_key);
+						room_index_registry_.Unregister(data.room_key, i);
 						tetris_server_.TryRemoveRoom(i, new_room);
 						return ErrorCode::INVALID_REQUEST;
 					}
-					tetris_server_.GetActiveRoomManager().AddRoom(data.room_gen, new_room);
 					new_room->SendCreateRoom(session);
 					return SUCCESS;
 				}
@@ -302,13 +267,35 @@ void GameThreadManager::DeleteRoom(int room_index)
 {
 	auto room = tetris_server_.GetRoomByIndex(room_index);
 	if (!room) return;
-	tetris_server_.GetActiveRoomManager().RemoveRoom(room->GetRoomGen(), room);
+	const RoomKey room_key = room->GetRoomKey();
+	active_room_keys_.Remove(room_key);
+	room_index_registry_.Unregister(room_key, room_index);
 	tetris_server_.TryRemoveRoom(room_index, room);
 }
 
-std::shared_ptr<TetrisRoom> GameThreadManager::FindRoomByGen(int room_gen)
+std::shared_ptr<TetrisRoom> GameThreadManager::FindRoomByKey(RoomKey room_key) const
 {
-	return tetris_server_.GetActiveRoomManager().FindRoomByGen(room_gen);
+	const auto room_index = room_index_registry_.Find(room_key);
+	if (!room_index) return nullptr;
+	auto room = tetris_server_.GetRoomByIndex(*room_index);
+	if (!room || room->GetRoomKey() != room_key) return nullptr;
+	return room;
+}
+
+SP<TetrisRoom> GameThreadManager::GetActiveRoom(std::size_t active_room_index) const
+{
+	const auto room_key = active_room_keys_.Get(active_room_index);
+	if (!room_key) return nullptr;
+	return FindRoomByKey(*room_key);
+}
+
+RoomKey GameThreadManager::GenerateRoomKey()
+{
+	RoomKey room_key = 0;
+	do {
+		if (BCryptGenRandom(nullptr, reinterpret_cast<PUCHAR>(&room_key), sizeof(room_key), BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0) return 0;
+	} while (room_key == 0 || room_index_registry_.Contains(room_key));
+	return room_key;
 }
 
 void GameThreadManager::Close()

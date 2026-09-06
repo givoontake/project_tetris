@@ -11,7 +11,8 @@
 #include "room_lifecycle_tasks.h"
 #include "test_packets.h"
 
-LobbyThreadManager::LobbyThreadManager(TetrisServer& tetris_server) : tetris_server_(tetris_server)
+LobbyThreadManager::LobbyThreadManager(TetrisServer& tetris_server)
+	: tetris_server_(tetris_server), active_session_keys_(MAX_PLAYER_COUNT), session_index_registry_(MAX_PLAYER_COUNT)
 {
 }
 
@@ -33,7 +34,7 @@ void LobbyThreadManager::StartLobbyPhase()
 		if (lobby_thread->state_.load() != LobbyThreadState::AVAILABLE) return;
 	}
 
-	const auto phase_context = std::make_shared<LobbyPhaseContext>(lifecycle_tasks_.ClaimTaskCount());
+	const auto phase_context = std::make_shared<LobbyPhaseContext>(lifecycle_tasks_.ClaimTaskCount(), THREAD_COUNT);
 	{
 		std::lock_guard<std::mutex> lock(lobby_mutex_);
 		for (const auto& lobby_thread : thread_objects_) {
@@ -56,6 +57,31 @@ LobbySession* LobbyThreadManager::GetLobbySession(int session_index)
 	return &lobby_sessions_[session_index];
 }
 
+bool LobbyThreadManager::AddActiveSession(SessionKey session_key)
+{
+	if (!session_index_registry_.Register(session_key.session_id, session_key.session_index)) return false;
+	if (active_session_keys_.Add(session_key.session_id)) return true;
+	session_index_registry_.Unregister(session_key.session_id, session_key.session_index);
+	return false;
+}
+
+void LobbyThreadManager::RemoveActiveSession(SessionKey session_key)
+{
+	active_session_keys_.Remove(session_key.session_id);
+	session_index_registry_.Unregister(session_key.session_id, session_key.session_index);
+}
+
+Session* LobbyThreadManager::GetActiveSession(std::size_t active_session_index)
+{
+	const auto session_id = active_session_keys_.Get(active_session_index);
+	if (!session_id) return nullptr;
+	const auto session_index = session_index_registry_.Find(*session_id);
+	if (!session_index) return nullptr;
+	auto* session = tetris_server_.FindSessionByIndex(*session_index);
+	if (!session || session->GetSessionKey().session_id != *session_id) return nullptr;
+	return session;
+}
+
 bool LobbyThreadManager::BeginRoomTransition(SessionKey session_key)
 {
 	auto* session = tetris_server_.FindSession(session_key);
@@ -68,17 +94,19 @@ void LobbyThreadManager::FindMatch(SessionKey session_key, int max_player_count)
 {
 	auto* session = tetris_server_.FindSession(session_key);
 	if (!session) return;
+	auto& game_thread_manager = tetris_server_.GetThreadManager().GetGameThreadManager();
 	if (max_player_count == 0) {
-		for (int room_index = 0; room_index < MAX_ROOM_COUNT; ++room_index) {
+		for (std::size_t active_room_index = 0; ; ++active_room_index) {
 			// 방에 접근할 때는 무조건 Shared_ptr을 로드해서 참조 카운트를 늘려야 한다. 방이 삭제되더라도 안전하게 동작하기 위해서이다.
 			// 단순히 널을 체크하고 들어가도 그 다음 내부 객체 접근 시 그 객체가 삭제되었을 수 있다.
-			auto room_sp = tetris_server_.GetRoomByIndex(room_index);
+			auto room_sp = game_thread_manager.GetActiveRoom(active_room_index);
+			if (!room_sp) break;
 			if (room_sp) {
 				if (room_sp->IsPrivate()) continue;
 				if (room_sp->GetMaxPlayerCount() == 2 or room_sp->GetMaxPlayerCount() == 5) { // 공개 멀티 방 중 아무 방이나 찾기
 					const RoomInfoSnapshot snapshot = room_sp->GetRoomInfoSnapshot();
 					if (snapshot.room_state != RoomState::WAIT || snapshot.current_player_count >= snapshot.max_player_count) continue;
-					int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session_key, room_sp->GetRoomGen(), "", max_player_count);
+					int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session_key, room_sp->GetRoomKey(), "", max_player_count);
 					if (result == SUCCESS) return;
 					if (result == ErrorCode::INVALID_REQUEST || result == ErrorCode::SERVER_ERROR) {
 						tetris_server_.SendError(*session, result);
@@ -90,14 +118,15 @@ void LobbyThreadManager::FindMatch(SessionKey session_key, int max_player_count)
 	}
 
 	else if (max_player_count == 2) {
-		for (int room_index = 0; room_index < MAX_ROOM_COUNT; ++room_index) {
-			auto room_sp = tetris_server_.GetRoomByIndex(room_index);
+		for (std::size_t active_room_index = 0; ; ++active_room_index) {
+			auto room_sp = game_thread_manager.GetActiveRoom(active_room_index);
+			if (!room_sp) break;
 			if (room_sp) {
 				if (room_sp->IsPrivate()) continue;
 				if (room_sp->GetMaxPlayerCount() == max_player_count) {
 					const RoomInfoSnapshot snapshot = room_sp->GetRoomInfoSnapshot();
 					if (snapshot.room_state != RoomState::WAIT || snapshot.current_player_count >= snapshot.max_player_count) continue;
-					int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session_key, room_sp->GetRoomGen(), "", max_player_count);
+					int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session_key, room_sp->GetRoomKey(), "", max_player_count);
 					if (result == SUCCESS) return;
 					if (result == ErrorCode::INVALID_REQUEST || result == ErrorCode::SERVER_ERROR) {
 						tetris_server_.SendError(*session, result);
@@ -109,14 +138,15 @@ void LobbyThreadManager::FindMatch(SessionKey session_key, int max_player_count)
 	}
 
 	else if (max_player_count == 5) {
-		for (int room_index = 0; room_index < MAX_ROOM_COUNT; ++room_index) {
-			auto room_sp = tetris_server_.GetRoomByIndex(room_index);
+		for (std::size_t active_room_index = 0; ; ++active_room_index) {
+			auto room_sp = game_thread_manager.GetActiveRoom(active_room_index);
+			if (!room_sp) break;
 			if (room_sp) {
 				if (room_sp->IsPrivate()) continue;
 				if (room_sp->GetMaxPlayerCount() == max_player_count) {
 					const RoomInfoSnapshot snapshot = room_sp->GetRoomInfoSnapshot();
 					if (snapshot.room_state != RoomState::WAIT || snapshot.current_player_count >= snapshot.max_player_count) continue;
-					int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session_key, room_sp->GetRoomGen(), "", max_player_count);
+					int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session_key, room_sp->GetRoomKey(), "", max_player_count);
 					if (result == SUCCESS) return;
 					if (result == ErrorCode::INVALID_REQUEST || result == ErrorCode::SERVER_ERROR) {
 						tetris_server_.SendError(*session, result);
@@ -138,10 +168,11 @@ void LobbyThreadManager::FindMatch(SessionKey session_key, int max_player_count)
 void LobbyThreadManager::BroadcastToLobby(char* packet)
 {
 	const int packet_size = static_cast<int>(reinterpret_cast<const PACKET_HEADER*>(packet)->size);
-	for (const SessionKey session_key : tetris_server_.GetActivePlayerManager().GetActiveSessionKeys()) {
-		auto* player = tetris_server_.FindSession(session_key);
+	for (std::size_t active_session_index = 0; ; ++active_session_index) {
+		auto* player = GetActiveSession(active_session_index);
+		if (!player) break;
 		if (player && player->GetModeState() == ModeState::LOBBY) {
-			player->SendPacket(packet, packet_size, tetris_server_.GetIOCPHandle());
+			player->SendPacket(packet, packet_size);
 		}
 	}
 }
@@ -150,14 +181,16 @@ void LobbyThreadManager::SendRoomList(Session& session)
 {
 	char packet_buffer[BUF_SIZE];
 	int packet_size = 0;
-	for (auto& room_sp : tetris_server_.GetActiveRoomManager().GetActiveRoomsSnapshot()) {
-		if (!room_sp) continue;
+	auto& game_thread_manager = tetris_server_.GetThreadManager().GetGameThreadManager();
+	for (std::size_t active_room_index = 0; ; ++active_room_index) {
+		auto room_sp = game_thread_manager.GetActiveRoom(active_room_index);
+		if (!room_sp) break;
 		S2C_ROOM_INFO_PACKET info_p;
 		RoomInfoSnapshot room_snapshot = room_sp->GetRoomInfoSnapshot();
 		if (room_snapshot.room_state != RoomState::WAIT && room_snapshot.room_state != RoomState::PLAY) continue;
 		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 		info_p.header.type = S2C_ROOM_INFO;
-		info_p.room_gen = room_snapshot.room_gen;
+		info_p.room_key = room_snapshot.room_key;
 		info_p.max_player_count = room_snapshot.max_player_count;
 		info_p.current_player_count = room_snapshot.current_player_count;
 		tetris_server_.StringToCharBuf(room_snapshot.room_name, info_p.room_name, sizeof(info_p.room_name));
@@ -165,14 +198,14 @@ void LobbyThreadManager::SendRoomList(Session& session)
 		info_p.is_play = room_snapshot.room_state == RoomState::PLAY;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
-			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 			packet_size = 0;
 		}
 
 		memcpy(packet_buffer + packet_size, &info_p, sizeof(info_p));
 		packet_size += sizeof(info_p);
 	}
-	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 }
 
 void LobbyThreadManager::SendLobbyPlayerList(Session& session)
@@ -184,9 +217,9 @@ void LobbyThreadManager::SendLobbyPlayerList(Session& session)
 
 	int packet_size = 0;
 	char packet_buffer[BUF_SIZE];
-	for (const SessionKey session_key : tetris_server_.GetActivePlayerManager().GetActiveSessionKeys()) {
-		auto* player = tetris_server_.FindSession(session_key);
-		if (!player) continue;
+	for (std::size_t active_session_index = 0; ; ++active_session_index) {
+		auto* player = GetActiveSession(active_session_index);
+		if (!player) break;
 		S2C_LOBBY_PLAYER_INFO_PACKET info_p;
 		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 		info_p.header.type = S2C_LOBBY_PLAYER_INFO;
@@ -201,14 +234,14 @@ void LobbyThreadManager::SendLobbyPlayerList(Session& session)
 		}
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
-			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 			packet_size = 0;
 		}
 
 		memcpy(packet_buffer + packet_size, &info_p, sizeof(info_p));
 		packet_size += sizeof(info_p);
 	}
-	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 }
 
 void LobbyThreadManager::SendFriendList(Session& session)
@@ -237,14 +270,14 @@ void LobbyThreadManager::SendFriendList(Session& session)
 		}
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
-			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 			packet_size = 0;
 		}
 
 		memcpy(packet_buffer + packet_size, &info_p, sizeof(info_p));
 		packet_size += sizeof(info_p);
 	}
-	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 }
 
 void LobbyThreadManager::SendRankings(Session& session)
@@ -266,7 +299,7 @@ void LobbyThreadManager::SendRankings(Session& session)
 		info_p.score = ranking.score;
 
 		if (packet_size + sizeof(info_p) > BUF_SIZE) {
-			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+			session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 			packet_size = 0;
 		}
 
@@ -274,7 +307,7 @@ void LobbyThreadManager::SendRankings(Session& session)
 		packet_size += sizeof(info_p);
 	}
 
-	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size, tetris_server_.GetIOCPHandle());
+	session.SendPacket(reinterpret_cast<char*>(packet_buffer), packet_size);
 }
 
 void LobbyThreadManager::ProcessPacket(char* packet, Session& session)
@@ -337,13 +370,13 @@ void LobbyThreadManager::ProcessPacket(char* packet, Session& session)
 	}
 	case C2S_JOIN_PUBLIC_ROOM: {
 		C2S_JOIN_PUBLIC_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_PUBLIC_ROOM_PACKET*>(packet);
-		const int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session.GetSessionKey(), join_p->room_gen, "");
+		const int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session.GetSessionKey(), join_p->room_key, "");
 		if (result != SUCCESS) tetris_server_.SendError(session, result);
 		break;
 	}
 	case C2S_JOIN_PRIVATE_ROOM: {
 		C2S_JOIN_PRIVATE_ROOM_PACKET* join_p = reinterpret_cast<C2S_JOIN_PRIVATE_ROOM_PACKET*>(packet);
-		const int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session.GetSessionKey(), join_p->room_gen, tetris_server_.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
+		const int result = tetris_server_.GetThreadManager().GetGameThreadManager().TryJoinRoom(session.GetSessionKey(), join_p->room_key, tetris_server_.CharBufToString(join_p->room_password, sizeof(join_p->room_password)));
 		if (result != SUCCESS) tetris_server_.SendError(session, result);
 		break;
 	}
@@ -401,18 +434,19 @@ void LobbyThreadManager::ProcessTask(std::unique_ptr<LobbyTask> task)
 		if (!lobby_session || !session || session->GetLifeState() != LifeState::ACTIVE) return;
 		const ModeState mode_state = session->GetModeState();
 		if (mode_state != ModeState::LOGIN && mode_state != ModeState::LOBBY) return;
-		if (lobby_session->TryPrepare(task->session_key)) lobby_session->Activate(task->session_key);
+		if (lobby_session->TryPrepare(task->session_key) && lobby_session->Activate(task->session_key) && !AddActiveSession(task->session_key))
+			lobby_session->Clear(task->session_key);
 		break;
 	}
 	case LobbyTaskType::ROOM_TRANSITION_RESULT: {
 		if (!lobby_session) return;
 		if (task->result == SUCCESS) {
-			lobby_session->Clear(task->session_key);
+			if (lobby_session->Clear(task->session_key)) RemoveActiveSession(task->session_key);
 			return;
 		}
 		auto* session = tetris_server_.FindSession(task->session_key);
 		if (!session) {
-			lobby_session->Clear(task->session_key);
+			if (lobby_session->Clear(task->session_key)) RemoveActiveSession(task->session_key);
 			return;
 		}
 		if (!lobby_session->Activate(task->session_key)) return;
@@ -437,13 +471,17 @@ void LobbyThreadManager::ProcessTask(std::unique_ptr<LobbyTask> task)
 			}
 		}
 
-		auto room_task = std::make_unique<RoomLifecycleTask>(RoomLifecycleTaskType::LOBBY_TRANSITION_RESULT, task->session_key);
-		room_task->exit_type = task->exit_type;
-		room_task->room_index = task->room_index;
-		room_task->room_gen = task->room_gen;
-		room_task->result = result;
-		tetris_server_.EnqueueRoomLifecycleTask(std::move(room_task));
-		if (result == SUCCESS) lobby_session->Activate(task->session_key);
+		if (result == SUCCESS && lobby_session->Activate(task->session_key)) {
+			if (AddActiveSession(task->session_key)) {
+				S2C_REMOVE_PLAYER_PACKET remove_p;
+				remove_p.header.size = static_cast<std::uint16_t>(sizeof(remove_p));
+				remove_p.header.type = S2C_REMOVE_PLAYER;
+				remove_p.player_id = task->session_key.player_id;
+				session->SendPacket(reinterpret_cast<char*>(&remove_p), remove_p.header.size);
+			}
+			else lobby_session->Clear(task->session_key);
+		}
+
 		if (is_processing) session->CompleteTaskProcessing();
 		break;
 	}

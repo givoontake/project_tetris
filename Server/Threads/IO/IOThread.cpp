@@ -85,7 +85,7 @@ void IOThread::ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, Se
 	}
 
 	const bool should_receive = tetris_server_.ProcessRecvBuffer(session, session_key, transferred_bytes);
-	if (should_receive) session.RecvPacket(tetris_server_.GetIOCPHandle());
+	if (should_receive) session.RecvPacket();
 	tetris_server_.CompleteSessionIO(session_key);
 }
 

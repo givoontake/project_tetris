@@ -18,38 +18,39 @@ void GameThread::Run()
 
         auto current_phase_context = phase_context_; // 틱이 밀려 있어도 새로운 처리를 전달받은 시점에 한 번에 처리
 		bool expected = false;
-		if (current_phase_context->is_lifecycle_claimed.compare_exchange_strong(expected, true)) {
-			bool is_lifecycle_acquired = false;
+		if (current_phase_context->is_lifecycle_preparing.compare_exchange_strong(expected, true)) {
 			while (is_running_.load() && manager_.tetris_server_.IsRunning()) {
 				expected = false;
-				if (manager_.is_lifecycle_processing_.compare_exchange_weak(expected, true)) {
-					is_lifecycle_acquired = true;
-					break;
+				if (!manager_.is_lifecycle_processing_.compare_exchange_weak(expected, true)) {
+					_mm_pause();
+					continue;
 				}
-				_mm_pause();
+				current_phase_context->lifecycle_task_count = manager_.lifecycle_tasks_.ClaimTaskCount();
+				current_phase_context->is_lifecycle_ready.store(true);
+				break;
 			}
-			if (is_lifecycle_acquired) {
-				const std::size_t lifecycle_task_count = manager_.lifecycle_tasks_.ClaimTaskCount();
-				for (std::size_t i = 0; i < lifecycle_task_count; ++i)
-					manager_.ProcessTask(manager_.lifecycle_tasks_.Dequeue());
-				manager_.is_lifecycle_processing_.store(false);
-			}
+		}
+		while (is_running_.load() && manager_.tetris_server_.IsRunning() && !current_phase_context->is_lifecycle_ready.load())
+			_mm_pause();
+		if (!is_running_.load() || !manager_.tetris_server_.IsRunning()) break;
+		while (current_phase_context->next_lifecycle_task_index.fetch_add(1) < current_phase_context->lifecycle_task_count)
+			manager_.ProcessTask(manager_.lifecycle_tasks_.Dequeue());
+		const int completed_lifecycle_thread_count = current_phase_context->completed_lifecycle_thread_count.fetch_add(1) + 1;
+		if (completed_lifecycle_thread_count == current_phase_context->thread_count) {
 			current_phase_context->is_lifecycle_complete.store(true);
+			manager_.is_lifecycle_processing_.store(false);
 		}
 		while (is_running_.load() && manager_.tetris_server_.IsRunning() && !current_phase_context->is_lifecycle_complete.load())
 			_mm_pause();
 
         while (true) {
-            int i = current_phase_context->next_room_index.fetch_add(1);
-            if (i >= MAX_ROOM_COUNT) break;
-
-            auto room = manager_.tetris_server_.GetRoomByIndex(i);
-            if (room) {
-                RoomProcessState expected_state = RoomProcessState::COMPLETE;
-                if (!room->processing_state_.compare_exchange_strong(expected_state, RoomProcessState::PROCESSING)) continue;
-				room->ProcessRoomTick(current_phase_context->tick_time_ms);
-				room->processing_state_.store(RoomProcessState::COMPLETE);
-            }
+			const std::size_t active_room_index = current_phase_context->next_active_room_index.fetch_add(1);
+			auto room = manager_.GetActiveRoom(active_room_index);
+			if (!room) break;
+			RoomProcessState expected_state = RoomProcessState::COMPLETE;
+			if (!room->processing_state_.compare_exchange_strong(expected_state, RoomProcessState::PROCESSING)) continue;
+			room->ProcessRoomTick(current_phase_context->tick_time_ms);
+			room->processing_state_.store(RoomProcessState::COMPLETE);
         }
 
         phase_context_.reset();

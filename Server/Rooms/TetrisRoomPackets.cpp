@@ -156,7 +156,7 @@ void TetrisRoom::BroadcastPackets()
 			for (auto& target : room_players) {
 				auto target_session = FindSession(target);
 				if (!target_session) continue;
-				target_session->SendPacket(send_buffer, send_data_size, server_->GetIOCPHandle());
+				target_session->SendPacket(send_buffer, send_data_size);
 			}
 			send_data_size = 0;
 		}
@@ -169,7 +169,7 @@ void TetrisRoom::BroadcastPackets()
 		for (auto& target : room_players) {
 			auto target_session = FindSession(target);
 			if (!target_session) continue;
-			target_session->SendPacket(send_buffer, send_data_size, server_->GetIOCPHandle());
+			target_session->SendPacket(send_buffer, send_data_size);
 		}
 	}
 
@@ -180,7 +180,7 @@ void TetrisRoom::BroadcastPackets()
 	}
 }
 
-void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
+void TetrisRoom::Broadcast(char* packet)
 {
 	std::vector<int> target_index;
 	const int packet_size = static_cast<int>(reinterpret_cast<const PACKET_HEADER*>(packet)->size);
@@ -188,6 +188,6 @@ void TetrisRoom::Broadcast(char* packet, const HANDLE iocp_handle)
 	for (auto& room_player : room_players) {
 		auto session = FindSession(room_player);
 		if (!session) continue;
-		session->SendPacket(packet, packet_size, iocp_handle);
+		session->SendPacket(packet, packet_size);
 	}
 }

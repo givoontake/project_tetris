@@ -156,22 +156,22 @@ class S2C_DISCONNECT_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_ADD_OPEN_ROOM_PACKET(RecvPacketStruct):
-    room_gen: int = -1
+    room_key: int = 0
     max_user: int = -1
     room_name: str = ""
 
-    BODY_FMT: ClassVar[str] = f"ib{MAX_ROOM_NAME}s"
+    BODY_FMT: ClassVar[str] = f"Qb{MAX_ROOM_NAME}s"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class S2C_ADD_LOCK_ROOM_PACKET(RecvPacketStruct):
-    room_gen: int = -1
+    room_key: int = 0
     max_user: int = -1
     room_name: str = ""
     room_password: str = ""
 
-    BODY_FMT: ClassVar[str] = f"ib{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
+    BODY_FMT: ClassVar[str] = f"Qb{MAX_ROOM_NAME}s{MAX_ROOM_PASSWORD}s"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
@@ -310,14 +310,14 @@ class S2C_UPDATE_HOST_PACKET(RecvPacketStruct):
 
 @dataclass
 class S2C_ROOM_INFO_PACKET(RecvPacketStruct):
-    room_gen: int = -1
+    room_key: int = 0
     room_name: str = ""
     max_user: int = -1
     cur_user: int = -1
     is_private: bool = False
     is_play: bool = False
 
-    BODY_FMT: ClassVar[str] = f"i{MAX_ROOM_NAME}sbb??"
+    BODY_FMT: ClassVar[str] = f"Q{MAX_ROOM_NAME}sbb??"
     FMT: ClassVar[str] = RecvPacketStruct.HEADER_FMT + BODY_FMT
 
 
@@ -425,18 +425,18 @@ class C2S_ADD_LOCK_ROOM_PACKET(SendPacketStruct):
 
 @dataclass
 class C2S_JOIN_OPEN_ROOM_PACKET(SendPacketStruct):
-    room_gen: int = -1
+    room_key: int = 0
 
-    BODY_FMT: ClassVar[str] = "i"
+    BODY_FMT: ClassVar[str] = "Q"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 
 @dataclass
 class C2S_JOIN_LOCK_ROOM_PACKET(SendPacketStruct):
-    room_gen: int = -1
+    room_key: int = 0
     room_password: bytes = b""
 
-    BODY_FMT: ClassVar[str] = f"i{MAX_ROOM_PASSWORD}s"
+    BODY_FMT: ClassVar[str] = f"Q{MAX_ROOM_PASSWORD}s"
     FMT: ClassVar[str] = SendPacketStruct.HEADER_FMT + BODY_FMT
 
 

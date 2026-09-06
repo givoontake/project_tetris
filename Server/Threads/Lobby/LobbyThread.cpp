@@ -16,23 +16,21 @@ void LobbyThread::Run()
 		if (!is_running_.load() || !manager_.tetris_server_.IsRunning()) break;
 
 		auto current_phase_context = phase_context_;
-		bool expected = false;
-		if (current_phase_context->is_lifecycle_claimed.compare_exchange_strong(expected, true)) {
-			for (std::size_t i = 0; i < current_phase_context->lifecycle_task_count; ++i)
-				manager_.ProcessTask(manager_.lifecycle_tasks_.Dequeue());
-			current_phase_context->is_lifecycle_complete.store(true);
-		}
-		while (is_running_.load() && manager_.tetris_server_.IsRunning() && !current_phase_context->is_lifecycle_complete.load())
+		while (current_phase_context->next_lifecycle_task_index.fetch_add(1) < current_phase_context->lifecycle_task_count)
+			manager_.ProcessTask(manager_.lifecycle_tasks_.Dequeue());
+		current_phase_context->completed_lifecycle_thread_count.fetch_add(1);
+		while (is_running_.load() && manager_.tetris_server_.IsRunning() && current_phase_context->completed_lifecycle_thread_count.load() < current_phase_context->thread_count)
 			_mm_pause();
 
 		while (is_running_.load() && manager_.tetris_server_.IsRunning()) {
-			const int session_index = current_phase_context->next_session_index.fetch_add(1);
-			if (session_index >= MAX_PLAYER_COUNT) break;
+			const std::size_t active_session_index = current_phase_context->next_active_session_index.fetch_add(1);
+			auto* session = manager_.GetActiveSession(active_session_index);
+			if (!session) break;
 
+			const int session_index = session->GetSessionKey().session_index;
 			auto& lobby_session = manager_.lobby_sessions_[session_index];
 			if (lobby_session.GetState() != ActiveEntryState::ACTIVE) continue;
-			auto* session = manager_.tetris_server_.FindSessionByIndex(session_index);
-			if (!session || session->GetLifeState() != LifeState::ACTIVE) continue;
+			if (session->GetLifeState() != LifeState::ACTIVE) continue;
 			const SessionKey session_key = session->GetSessionKey();
 			if (!lobby_session.MatchesSessionKey(session_key)) continue;
 			ModeState mode_state = session->GetModeState();

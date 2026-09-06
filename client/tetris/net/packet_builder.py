@@ -36,16 +36,16 @@ class PacketBuilder:
         header = self.pack_struct(data)
         return header + struct.pack(f"<{message_bytes}s", encoded)
 
-    def build_join_room_pkt(self, room_gen: int, room_pw: Optional[str]) -> bytes:
+    def build_join_room_pkt(self, room_key: int, room_pw: Optional[str]) -> bytes:
         if room_pw:
             data = C2S_JOIN_LOCK_ROOM_PACKET()
             data.set_header(C2S_JOIN_LOCK_ROOM)
-            data.room_gen = room_gen
+            data.room_key = room_key
             data.room_password = self.str_to_bytes(room_pw, MAX_ROOM_PASSWORD)
         else:
             data = C2S_JOIN_OPEN_ROOM_PACKET()
             data.set_header(C2S_JOIN_OPEN_ROOM)
-            data.room_gen = room_gen
+            data.room_key = room_key
 
         return self.pack_struct(data)
 

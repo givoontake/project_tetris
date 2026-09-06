@@ -74,18 +74,18 @@ void DBResultHandler::HandleLoginDBResult(DBOverlapped* db_over, Session& sessio
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ErrorCode::LOGIN_FAILED;
-		session.SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, server_.GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size);
 	}
 
 	else if (login_p.player_id == -2) {
 		error_p.header.size = static_cast<std::uint16_t>(sizeof(error_p));
 		error_p.header.type = S2C_ERROR;
 		error_p.error_code = ErrorCode::DUPLICATE_LOGIN_ID;
-		session.SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size, server_.GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&error_p), error_p.header.size);
 	}
 
 	else {
-		session.SendPacket(reinterpret_cast<char*>(&login_p), login_p.header.size, server_.GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&login_p), login_p.header.size);
 
 		SessionKey session_key = session.GetSessionKey();
 		server_.EnqueueDBTask(std::make_unique<DBLoadFriendListTask>(session_key));
@@ -102,7 +102,7 @@ void DBResultHandler::HandleUpdateScoreDBResult(DBOverlapped* db_over, Session& 
 		us_p.header.size = static_cast<std::uint16_t>(sizeof(us_p));
 		us_p.header.type = S2C_UPDATE_SCORE;
 		us_p.max_score = result->max_score;
-		session.SendPacket(reinterpret_cast<char*>(&us_p), us_p.header.size, server_.GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&us_p), us_p.header.size);
 	}
 }
 
@@ -118,7 +118,7 @@ void DBResultHandler::HandleUpdateMatchResultDBResult(DBOverlapped* db_over, Ses
 		record_p.win_count = db_info.win_count;
 		record_p.lose_count = db_info.lose_count;
 
-		session.SendPacket(reinterpret_cast<char*>(&record_p), record_p.header.size, server_.GetIOCPHandle());
+		session.SendPacket(reinterpret_cast<char*>(&record_p), record_p.header.size);
 	}
 }
 

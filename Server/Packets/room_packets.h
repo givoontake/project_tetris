@@ -1,6 +1,7 @@
 #pragma once
 #include "common_packets.h"
 #include "settings.h"
+#include "types.h"
 
 #pragma pack(push, 1)
 
@@ -12,7 +13,7 @@ struct C2S_ADD_PUBLIC_ROOM_PACKET {
 
 struct S2C_ADD_PUBLIC_ROOM_PACKET {
 	PACKET_HEADER header;
-	int room_gen;
+	RoomKey room_key;
 	char max_player_count;
 	char room_name[MAX_ROOM_NAME_SIZE];
 };
@@ -26,7 +27,7 @@ struct C2S_ADD_PRIVATE_ROOM_PACKET {
 
 struct S2C_ADD_PRIVATE_ROOM_PACKET {
 	PACKET_HEADER header;
-	int room_gen;
+	RoomKey room_key;
 	char max_player_count;
 	char room_name[MAX_ROOM_NAME_SIZE];
 	char room_password[MAX_ROOM_PASSWORD_SIZE];
@@ -34,12 +35,12 @@ struct S2C_ADD_PRIVATE_ROOM_PACKET {
 
 struct C2S_JOIN_PUBLIC_ROOM_PACKET {
 	PACKET_HEADER header;
-	int room_gen;
+	RoomKey room_key;
 };
 
 struct C2S_JOIN_PRIVATE_ROOM_PACKET {
 	PACKET_HEADER header;
-	int room_gen;
+	RoomKey room_key;
 	char room_password[MAX_ROOM_PASSWORD_SIZE];
 };
 
@@ -102,7 +103,7 @@ struct C2S_REQUEST_ROOM_LIST_PACKET {
 
 struct S2C_ROOM_INFO_PACKET {
 	PACKET_HEADER header;
-	int room_gen;
+	RoomKey room_key;
 	char room_name[MAX_ROOM_NAME_SIZE];
 	char max_player_count;
 	char current_player_count;

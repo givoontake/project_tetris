@@ -66,7 +66,7 @@ class LobbyState(BaseState):
         self.friend_ev_btn = None
         self.friend_ev_target_id = None
 
-        self.join_room_gen = None
+        self.join_room_key = None
     
         self.set_layout()
 
@@ -253,15 +253,15 @@ class LobbyState(BaseState):
             elif room_event != None:
                 index = room_event
                 room = self.room_list.show_rooms[index]
-                self.join_room_gen = room.data.room_gen
+                self.join_room_key = room.data.room_key
                 buttons_text = ["참가", "취소"]
                 if room.data.is_private: 
                     self.input_pw_window = InputWindow(self.screen, self.rm, buttons_text) 
                     self.reactable = False
                 else:
-                    packet = self.net_worker.builder.build_join_room_pkt(self.join_room_gen, None)
+                    packet = self.net_worker.builder.build_join_room_pkt(self.join_room_key, None)
                     self.net_worker.send_packet(packet)
-                    self.join_room_gen = None
+                    self.join_room_key = None
             
             message = self.chat_window.handle_event(ev)
             if message != None:
@@ -366,13 +366,13 @@ class LobbyState(BaseState):
                 ipw_event = self.input_pw_window.handle_event(ev)
                 if ipw_event != None:
                     if ipw_event == "참가": # 내부 즉시 전송은 패스워드를 입력할 경우 복잡해진다
-                        packet = self.net_worker.builder.build_join_room_pkt(self.join_room_gen, self.input_pw_window.input.extract_text())
+                        packet = self.net_worker.builder.build_join_room_pkt(self.join_room_key, self.input_pw_window.input.extract_text())
                         self.net_worker.send_packet(packet)
 
                     # 참가/취소는 send 유무의 차이
                     self.reactable = True
                     self.input_pw_window = None
-                    self.join_room_gen = None
+                    self.join_room_key = None
 
             elif self.info_popup:
                 if self.info_popup.handle_event(ev) == "확인":

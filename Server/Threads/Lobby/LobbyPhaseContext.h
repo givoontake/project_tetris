@@ -4,10 +4,11 @@
 
 struct LobbyPhaseContext
 {
-	std::atomic<bool> is_lifecycle_claimed{ false };
-	std::atomic<bool> is_lifecycle_complete{ false };
-	std::atomic<int> next_session_index{ 0 };
+	std::atomic<std::size_t> next_lifecycle_task_index{ 0 };
+	std::atomic<int> completed_lifecycle_thread_count{ 0 };
+	std::atomic<std::size_t> next_active_session_index{ 0 };
 	const std::size_t lifecycle_task_count;
+	const int thread_count;
 
-	explicit LobbyPhaseContext(std::size_t lifecycle_task_count);
+	LobbyPhaseContext(std::size_t lifecycle_task_count, int thread_count);
 };
