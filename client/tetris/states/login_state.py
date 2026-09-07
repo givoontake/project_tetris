@@ -79,7 +79,6 @@ class LoginState(BaseState):
 
     def handle_packet(self, data: Optional[RecvPacketStruct]):
         if data:
-            # print(", ".join(f"{k}: {v}" for k, v in data.items()))
             if data.type == S2C_ERROR:
                 error_data = cast(S2C_ERROR_PACKET, data)
                 error_message = ERROR_MESSAGES[error_data.error_code]
@@ -87,7 +86,7 @@ class LoginState(BaseState):
                 self.reactable = False
 
             elif data.type == S2C_LOGIN:
-                login_data = cast(S2C_LOGIN_PACKET, data) # 코드 작성시 불편함을 줄이기 위한 힌트용, 논리적으로는 맞으므로 굳이 할 필요는 없음
+                login_data = cast(S2C_LOGIN_PACKET, data)
                 id = login_data.id
                 self.session.id = id
                 self.session.nickname = login_data.user_name

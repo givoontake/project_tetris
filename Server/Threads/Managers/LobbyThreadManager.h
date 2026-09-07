@@ -35,6 +35,8 @@ private:
 	friend class LobbyThread;
 
 	void ProcessTask(std::unique_ptr<LobbyTask> task);
+	void ProcessLogin(char* packet, Session& session);
+	void ProcessTestLogin(char* packet, Session& session);
 	void FindMatch(SessionKey session_key, int max_player_count);
 	void BroadcastToLobby(char* packet);
 	void SendRoomList(Session& session);

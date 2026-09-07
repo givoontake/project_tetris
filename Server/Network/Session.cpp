@@ -88,7 +88,7 @@ bool Session::RecvPacket()
 	if (life_state_.load() != LifeState::ACTIVE || socket_ == INVALID_SOCKET) return false;
 
 	DWORD recv_flag = 0;
-	ZeroMemory(&recv_over_.ex_over.over, sizeof(recv_over_.ex_over.over)); // io 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
+	ZeroMemory(&recv_over_.ex_over.over, sizeof(recv_over_.ex_over.over));
 	recv_over_.ex_over.session_key = GetSessionKey();
 	const int remaining_data_size = GetRemainingDataSize();
 	recv_over_.wsabuf.len = BUF_SIZE - remaining_data_size;

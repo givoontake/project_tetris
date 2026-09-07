@@ -37,6 +37,8 @@ class TetrisServer
 	std::unique_ptr<ServerThreadManager> thread_manager_;
 
 public:
+	bool is_test_mode_ = false;
+
 	TetrisServer();
 	~TetrisServer();
 
@@ -69,7 +71,6 @@ public:
 	bool EnqueueDBTask(std::unique_ptr<ServerDBTask> db_task);
 	bool EnqueueDBTask(std::unique_ptr<SessionDBTask> db_task);
 	void EnqueueDBTask(std::unique_ptr<MultiSessionDBTask> db_task);
-	bool ProcessRecvBuffer(Session& session, SessionKey session_key, int recv_bytes);
 	void RoutePacket(char* packet, Session& session);
 	SessionTaskProcessResult ProcessSessionTask(Session& session, std::unique_ptr<SessionTask> task);
 	bool EnqueueSessionTask(SessionKey session_key, std::unique_ptr<SessionTask> task);

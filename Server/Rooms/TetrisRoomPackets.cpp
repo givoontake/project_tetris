@@ -35,7 +35,7 @@ bool TetrisRoom::AppendTickPacket(Player& player, int player_id, const TaskType&
 		return AppendAddLinePacket(player, player_id, std::get<TaskAddLine>(task.task));
 	case EventType::GAME_OVER:
 		return AppendGameOverPacket(player, player_id);
-	case EventType::GAME_END: // 이건 사실상 멀티만 쓰므로.. 근데 이거 하나때문에 또 분리하기 좀 그렇긴 하다 분리하는게 좋긴 할 것 같지만..
+	case EventType::GAME_END:
 		return AppendGameEndPacket(player, std::get<TaskGameEnd>(task.task));
 	default:
 		return true;
@@ -103,7 +103,6 @@ bool TetrisRoom::AppendAddLinePacket(Player& player, int player_id, const TaskAd
 
 bool TetrisRoom::AppendGameOverPacket(Player& player, int player_id)
 {
-	// 일단 종료 패킷을 보냄
 	S2C_GAME_OVER_PACKET game_over_p;
 	game_over_p.header.size = static_cast<std::uint16_t>(sizeof(game_over_p));
 	game_over_p.header.type = S2C_GAME_OVER;
@@ -179,6 +178,29 @@ void TetrisRoom::BroadcastPackets()
 		room_player.ClearSendBuffer();
 	}
 }
+
+//void TetrisRoom::BroadcastPackets()
+//{
+//	auto room_players = GetRoomPlayers();
+//	for (auto& source : room_players) {
+//		auto source_session = FindSession(source);
+//		if (!source_session) continue;
+//		const int source_data_size = source.GetSendDataSize();
+//		if (source_data_size <= 0) continue;
+//
+//		for (auto& target : room_players) {
+//			auto target_session = FindSession(target);
+//			if (!target_session) continue;
+//			target_session->SendPacket(source.GetSendBuffer(), source_data_size);
+//		}
+//	}
+//
+//	for (auto& room_player : room_players) {
+//		auto session = FindSession(room_player);
+//		if (!session) continue;
+//		room_player.ClearSendBuffer();
+//	}
+//}
 
 void TetrisRoom::Broadcast(char* packet)
 {

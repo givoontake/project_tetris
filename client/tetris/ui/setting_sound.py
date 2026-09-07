@@ -54,15 +54,6 @@ class SettingSound(SettingBase):
             self.sound_settings.append(setting)
             setting_y += setting_h
 
-        # self.buttons: list[Button] = []
-        # button_x = self.rect.x
-        # button_y = self.rect.y + self.rect.h - setting_h
-        # button_w = self.rect.w // len(self.button_texts)
-        # button_h = setting_h
-        # for button_text in self.button_texts:
-        #     button_rect = pygame.Rect(button_x, button_y, button_w, button_h)
-        #     button = Button(self.screen, button_rect, self.rm, None, button_text)
-        #     self.buttons.append(button)
 
     def modify_settings(self):
         for setting in self.sound_settings:

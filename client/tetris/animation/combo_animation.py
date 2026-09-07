@@ -26,9 +26,6 @@ class ComboAnimation:
 
         self.font_surface = self.font.render(self.text, False, color)
 
-    # def set_text_size(self, new_size: int):
-    #     self.font = self.fm.get_font(new_size)
-    #     self.font_surface = self.font.render(self.text, False, self.text_color)
 
     def _get_alpha(self) -> int:
         alpha = int(255*((self.animation_time - self.elapsed_time) / self.animation_time))
@@ -50,6 +47,3 @@ class ComboAnimation:
             
             self.font_surface.set_alpha(self._get_alpha())
             self.screen.blit(self.font_surface, font_rect)    
-
-
-    

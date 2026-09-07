@@ -23,7 +23,7 @@ def create_app():
     # 유틸: 비밀번호 규칙 체크
     # ---------------------------
     def validate_password(pw: str) -> bool:
-        # 8~20, 영문/숫자/특수문자 중 2종 이상 (너가 원하는 규칙으로 쉽게 변경 가능)
+        # 8~20자이며 영문, 숫자, 특수문자 중 두 종류 이상을 포함한다.
         if not (8 <= len(pw) <= 20):
             return False
 
@@ -85,7 +85,6 @@ def create_app():
     def api_check_nickname():
         nickname = (request.json or {}).get("nickname", "").strip()
 
-        # 예시 규칙: 2~20자, 한글/영문/숫자/언더바 허용
         if not (2 <= len(nickname) <= 20) or not re.match(r"^[A-Za-z0-9가-힣_]+$", nickname):
             return jsonify(ok=False, msg="닉네임은 2~20자, 한글/영문/숫자/언더바(_)만 가능합니다."), 400
 
@@ -103,7 +102,6 @@ def create_app():
         data = request.json or {}
         email = data.get("email", "").strip()
 
-        # 매우 간단한 이메일 형식 체크
         if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
             return jsonify(ok=False, msg="이메일 형식이 올바르지 않습니다."), 400
         
@@ -199,7 +197,7 @@ def create_app():
         # 5) 비밀번호 해시 저장 (bcrypt)
         pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
-        # 닉네임은 일단 login_id로 자동 세팅(필요하면 폼에 추가해서 받으면 됨)
+        # 초기 닉네임은 로그인 아이디로 설정한다.
         user = User(
             login_id=login_id,
             nickname=nickname,
@@ -219,5 +217,4 @@ def create_app():
 app = create_app()
 
 if __name__ == "__main__":
-    # 개발용 실행
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=True)

@@ -289,14 +289,14 @@ void MultiRoom::StartGame(int requester_id)
 		return;
 	}
 
-	if(!TryChangeRoomState(RoomState::WAIT, RoomState::PLAY)) return; // 잘못된 요청(동시 요청 등)에 대한 방어 코드 -> CAS에 성공해야만 시작
+	if(!TryChangeRoomState(RoomState::WAIT, RoomState::PLAY)) return; // 상태 전환에 성공한 요청만 게임을 시작한다.
 	play_generation_.fetch_add(1);
 	
 	S2C_MULTI_START_PACKET start_p;
 	start_p.header.size = static_cast<std::uint16_t>(sizeof(start_p));
 	start_p.header.type = S2C_MULTI_START;
 	Broadcast(reinterpret_cast<char*>(&start_p));
-	// 모든 조건 통과->게임 시작
+	// 시작 조건을 충족한 플레이어를 게임 상태로 전환한다.
 	AppendTetromino7Bag();
 	for (auto& room_player : room_players) {
 		auto session = FindSession(room_player);
@@ -305,7 +305,6 @@ void MultiRoom::StartGame(int requester_id)
 		room_player.GetTetris().InitNewTetromino(tetromino_spawn_list_[room_player.GetTetrominoIndex()], spawn_pos_);
 	}
 
-	// 테트리스 게임 중에 들어오는 패킷은 또 따로 분리하고 싶기는 한데..
 	InitGame();
 
 	for (auto& room_player : room_players) {
@@ -356,7 +355,7 @@ void MultiRoom::ProcessGameTick(long long tick_time_ms)
 
 	DistributeGarbageLines();
 	AddGarbageLines();
-	// 승자 나왔으면 종료 아니면 계속 진행해야되니 스폰 체크
+	// 승자가 없으면 다음 테트로미노를 생성한다.
 	bool is_game_end = false;
 	is_game_end = ResolveWinner();
 	if (!is_game_end) AddSpawnTasks();
@@ -372,7 +371,7 @@ void MultiRoom::ProcessGameTick(long long tick_time_ms)
 	ResetPlayerTickState();
 	BroadcastPackets();
 	if (is_game_end) {
-		RequestUpdateMatchResult();
+		if (!server_->is_test_mode_) RequestUpdateMatchResult();
 		ClearGame();
 	}
 }
@@ -401,7 +400,7 @@ bool MultiRoom::ResolveWinner()
 		}
 	}
 
-	else if (player_count == 0) { // 동시에 게임오버된 상태 -> 결국 승자는 정해줘야함.
+	else if (player_count == 0) { // 동시에 게임 오버되면 남아 있던 플레이어 중 승자를 결정한다.
 		for (auto& room_player : room_players) {
 			if ((room_player.GetRoomPlayerState() == RoomPlayerState::GAME_OVER) || (room_player.GetPrevRoomPlayerState() == RoomPlayerState::PLAY)) {
 				auto session = FindSession(room_player);

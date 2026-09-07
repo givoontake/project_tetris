@@ -9,7 +9,7 @@
 
 TetrisRoom::TetrisRoom(TetrisServer* server, PublicRoomInitData data)
 {
-	// 생성과 소멸은 스레드 세이프하지는 않지만, 어차피 make_shared하고 CAS해서 룸 리스트에 할당하기 전에는 접근되지 않는다.
+	// 생성이 끝난 방만 방 배열에 게시된다.
 	server_ = server;
 	max_player_count_ = data.max_player_count;
 	room_name_ = std::move(data.room_name);
@@ -370,7 +370,7 @@ void TetrisRoom::AppendTetromino7Bag()
 	tetromino_spawn_list_.insert(tetromino_spawn_list_.end(), tetromino_bag.begin(), tetromino_bag.end());
 }
 
-bool TetrisRoom::SpawnTetromino(int player_id) // 내가 이걸 왜 반환형을 bool이라고 했을까
+bool TetrisRoom::SpawnTetromino(int player_id)
 {
 	auto room_players = GetRoomPlayers();
 	for (auto& room_player : room_players) {
@@ -442,6 +442,7 @@ void TetrisRoom::ResetPlayerTickState()
 	for(auto& room_player : room_players){
 		auto session = FindSession(room_player);
 		if (!session) continue;
+		if (server_->is_test_mode_) room_player.GetTetris().ResetTetrominoPosition(spawn_pos_);
 		room_player.GetTetris().ResetTickData();
 	}
 }

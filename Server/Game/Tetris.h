@@ -28,7 +28,7 @@ public:
 
 	void InitNewTetromino(char type, Position spawn_pos);
 	EventType ProcessMoveInput(EventType move_type, long long tick_time_ms);
-	bool IsValidPosition(const Tetromino& tetromino); // 이건 움직였다고 가정한 값을 넘김
+	bool IsValidPosition(const Tetromino& tetromino); // 이동을 적용한 좌표의 유효성을 검사한다.
 	void FixTetromino();
 	void ClearLine();
 	void AddGarbageLines();
@@ -37,5 +37,6 @@ public:
 	void Clear();
 	bool CheckGameOver();
 	void ProcessTick(long long tick_time_ms);
+	void ResetTetrominoPosition(Position spawn_pos);
 	void ResetTickData();
 };

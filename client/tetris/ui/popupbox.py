@@ -20,7 +20,6 @@ class PopupBox:
                  button_width: int = None, button_height: int = None):
         self.screen = screen
         self.message = message
-        #self.visible = False
         self.buttons_text = buttons_text
         self.buttons: list[Button] = []
         self.message_window: Rectangle = None
@@ -33,10 +32,6 @@ class PopupBox:
         self.button_height = button_height if button_height is not None else self.BUTTON_HEIGHT
 
         # 색 / 스타일
-        # self.bg_overlay_color = (0, 0, 0, 128)  # 전체 화면 어둡게 (반투명)
-        # self.window_color = (0, 0, 0)           # 팝업 본체
-        # self.border_color = (255, 255, 255)
-        # self.border_thickness = 2
 
         # 폰트 (기존 폰트와 동일 계열)
         self.font_msg = self.rm.fonts.load_font(POPUPBOX_FONT_SIZE)
@@ -85,8 +80,6 @@ class PopupBox:
             button_rect = pygame.Rect(draw_x + i * (btn_w + btn_padding), btn_y, btn_w, btn_h)
             self.buttons.append(Button(self.screen, button_rect, self.rm, self.buttons_text[i], 0))
 
-    # def set_visible(self, value: bool):
-    #     self.visible = value
 
     def handle_event(self, ev: pygame.event.Event)-> Optional[str]: # 어떤 버튼이 눌렸는가
 
@@ -98,9 +91,6 @@ class PopupBox:
         return None
 
     def draw(self):
-        # if not self.visible:
-        #     return
-
         sw, sh = self.screen.get_size()
 
         # 1) 전체 화면 어둡게(반투명 오버레이)

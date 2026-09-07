@@ -7,7 +7,7 @@ from tetris.ui.button import ButtonStyle
 
 
 class ToggleButton(Rectangle):
-    """?쒖꽦/鍮꾪솢???곹깭瑜?媛吏???묒? ?좉? 踰꾪듉."""
+    """활성 상태를 전환하는 버튼."""
     def __init__(self,
         screen: pygame.Surface,
         rect: pygame.Rect,

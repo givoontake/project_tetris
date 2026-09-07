@@ -211,7 +211,7 @@ void LobbyThreadManager::SendRoomList(Session& session)
 void LobbyThreadManager::SendLobbyPlayerList(Session& session)
 {
 	{
-		// 비용을 줄이기 위한 선체크
+		// 로비 세션만 친구 목록을 조회한다.
 		if (session.GetModeState() != ModeState::LOBBY) return;
 	}
 
@@ -223,7 +223,6 @@ void LobbyThreadManager::SendLobbyPlayerList(Session& session)
 		S2C_LOBBY_PLAYER_INFO_PACKET info_p;
 		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 		info_p.header.type = S2C_LOBBY_PLAYER_INFO;
-		//info_p.player_id = -1;
 		{
 			if (player->GetDBInfo().player_id == session.GetDBInfo().player_id) continue;
 			if (player->GetModeState() == ModeState::LOBBY) {
@@ -255,7 +254,7 @@ void LobbyThreadManager::SendFriendList(Session& session)
 	int packet_size = 0;
 	char packet_buffer[BUF_SIZE];
 	for (auto& friend_info : friend_list) {
-		S2C_FRIEND_INFO_PACKET info_p; // 얘는 그냥 지 세션에 있는 친구 목록이라 미리 다 작성하고 현재 친구 상태만 검사해서 보내주면 됨
+		S2C_FRIEND_INFO_PACKET info_p;
 		info_p.header.size = static_cast<std::uint16_t>(sizeof(info_p));
 		info_p.header.type = S2C_FRIEND_INFO;
 		info_p.player_id = friend_info.player_id;
@@ -314,14 +313,12 @@ void LobbyThreadManager::ProcessPacket(char* packet, Session& session)
 {
 	if (!packet) return;
 	switch (reinterpret_cast<PACKET_HEADER*>(packet)->type) {
-	case C2S_LOGIN: {
-		if (session.GetModeState() != ModeState::LOGIN) return;
-		C2S_LOGIN_PACKET* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
-		std::string login_id = tetris_server_.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
-		std::string password = tetris_server_.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
-		tetris_server_.EnqueueDBTask(std::make_unique<DBLoginTask>(session.GetSessionKey(), login_id, password));
+	case C2S_LOGIN:
+		if (!tetris_server_.is_test_mode_) ProcessLogin(packet, session);
 		break;
-	}
+	case C2S_TEST_LOGIN:
+		if (tetris_server_.is_test_mode_) ProcessTestLogin(packet, session);
+		break;
 	case C2S_MESSAGE: {
 		if (session.GetModeState() != ModeState::LOBBY) return;
 		C2S_MESSAGE_PACKET* recv_p = reinterpret_cast<C2S_MESSAGE_PACKET*>(packet);
@@ -422,6 +419,38 @@ void LobbyThreadManager::ProcessPacket(char* packet, Session& session)
 	default:
 		break;
 	}
+}
+
+void LobbyThreadManager::ProcessLogin(char* packet, Session& session)
+{
+	if (session.GetModeState() != ModeState::LOGIN) return;
+	auto* recv_p = reinterpret_cast<C2S_LOGIN_PACKET*>(packet);
+	const std::string login_id = tetris_server_.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
+	const std::string password = tetris_server_.CharBufToString(recv_p->login_password, sizeof(recv_p->login_password));
+	tetris_server_.EnqueueDBTask(std::make_unique<DBLoginTask>(session.GetSessionKey(), login_id, password));
+}
+
+void LobbyThreadManager::ProcessTestLogin(char* packet, Session& session)
+{
+	if (session.GetModeState() != ModeState::LOGIN) return;
+	auto* recv_p = reinterpret_cast<C2S_TEST_LOGIN_PACKET*>(packet);
+	if (recv_p->player_id <= 0 || recv_p->player_id > MAX_PLAYER_COUNT) {
+		tetris_server_.SendError(session, ErrorCode::INVALID_REQUEST);
+		return;
+	}
+
+	DBResultLogin login_result;
+	login_result.Clear();
+	login_result.player_id = recv_p->player_id;
+	login_result.login_id = tetris_server_.CharBufToString(recv_p->login_id, sizeof(recv_p->login_id));
+	login_result.nickname = login_result.login_id;
+
+	S2C_TEST_LOGIN_PACKET login_p;
+	login_p.header.size = static_cast<std::uint16_t>(sizeof(login_p));
+	login_p.header.type = S2C_TEST_LOGIN;
+	login_p.player_id = -1;
+	if (tetris_server_.GetActivePlayerManager().AddPlayer(session, &login_result)) login_p.player_id = login_result.player_id;
+	session.SendPacket(reinterpret_cast<char*>(&login_p), login_p.header.size);
 }
 
 void LobbyThreadManager::ProcessTask(std::unique_ptr<LobbyTask> task)

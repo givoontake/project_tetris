@@ -27,8 +27,6 @@ class SinglePlayState(BaseState):
         self.password = room_password
 
         # UI 요소들
-        # self.room_session.board: Optional[TetrisBoard] = None
-        # self.btn_start: Optional[Button] = None
 
         self.title_box: Optional[Rectangle] = None
         self.password_box: Optional[Rectangle] = None
@@ -46,9 +44,7 @@ class SinglePlayState(BaseState):
         tetris_rect = pygame.Rect(tetris_x, tetris_y, tetris_w, tetris_h)
         self.tetris_session = TetrisSession(self.screen, tetris_rect, self.rm, self.net_worker, True)
         self.tetris_session.init_session(self.session)
-        # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
 
-        # self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
 
         # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
         draw_x, draw_y = 0, 0

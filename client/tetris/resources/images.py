@@ -14,8 +14,8 @@ class Images:
 
         # ---- UI Images ----
         # 즉 key: value for 변수 in iterable 구조이고 조건을 통과한 것들만 딕셔너리에 저장되며, 조건문에 사용된 변수는 위에서도 사용 가능하다.
-        # 어차피 절차적으로 보면 아래 반복, 조건문이 먼저 실행되기 때문
-        self.ui_images = { # 딕셔너리 컴프리헨션 -> 오른쪽부터 실행된다. 
+        # 이미지 경로를 순회하며 조건에 맞는 리소스를 등록한다.
+        self.ui_images = {
             key: self.load_image(path, 300, 100)
             for key, path in UI_IMAGE_PATHS.items()
             if key in (UI_BUTTON_LOGIN_IDLE, UI_BUTTON_LOGIN_HOVER, UI_BUTTON_LOGIN_PRESS)

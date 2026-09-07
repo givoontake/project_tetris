@@ -15,6 +15,7 @@ class IOThread final : public ServerThread
 
 	void ProcessAcceptCompletion(BOOL result, ExOverlapped* ex_over);
 	void ProcessSessionCompletion(BOOL result, DWORD transferred_bytes, ExOverlapped* ex_over);
+	bool ProcessRecvBuffer(Session& session, int recv_bytes);
 	void ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, Session& session, SessionKey session_key);
 	void ProcessSendCompletion(BOOL result, DWORD transferred_bytes, SendBuffer* send_buffer, SessionKey session_key);
 	void ProcessSessionDBCompletion(BOOL result, ExOverlapped* ex_over);

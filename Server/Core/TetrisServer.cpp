@@ -111,54 +111,6 @@ void TetrisServer::JoinThreads()
 	if (thread_manager_) thread_manager_->JoinThreads();
 }
 
-bool TetrisServer::ProcessRecvBuffer(Session& session, SessionKey session_key, int recv_bytes)
-{   
-	std::uint16_t packet_size = 0;
-	int offset = 0;
-	char packet_buffer[BUF_SIZE];
-	int remaining_data_size = 0;
-	bool should_receive = true;
-
-	if (recv_bytes + session.GetRemainingDataSize() > BUF_SIZE) return true; // 버퍼가 더 이상 없다면 종료
-	else session.AdjustRemainingDataSize(recv_bytes);
-
-	if (session.GetRemainingDataSize() < PACKET_HEADER_SIZE) return true; // 처리할 최소 데이터(헤더 크기 이상)가 없다면 종료
-
-	// 우선 사이즈 - 타입 관계는 신뢰를 전제로 간다. 보안 처리는 나중에 고민할 예정
-	remaining_data_size = session.GetRemainingDataSize();
-	packet_size = reinterpret_cast<PACKET_HEADER*>(session.GetRecvOver().packet_buffer)->size;
-	memcpy(packet_buffer, session.GetRecvOver().packet_buffer, remaining_data_size);
-
-	//if (packet_size < PACKET_HEADER_SIZE || packet_size > BUF_SIZE) { // 이거 반쪽짜리 방어인데?? 있으나~ 없으나~ 어차피 범위를 벗어나지 않아도 이상하면 똑같음.
-	//	return;
-	//}
-
-	while (remaining_data_size - offset >= packet_size)
-	{
-		char* packet = packet_buffer + offset;
-		const bool is_disconnect_packet = reinterpret_cast<PACKET_HEADER*>(packet)->type == C2S_DISCONNECT;
-		std::unique_ptr<SessionTask> task;
-		if (is_disconnect_packet) task = std::make_unique<SessionDisconnectTask>();
-		else task = std::make_unique<SessionPacketTask>(packet, packet_size);
-		if (!EnqueueSessionTask(session_key, std::move(task))) {
-			should_receive = false;
-			break;
-		}
-
-		offset += packet_size;
-		if (is_disconnect_packet) {
-			should_receive = false;
-			break;
-		}
-		if (remaining_data_size - offset < PACKET_HEADER_SIZE) break;
-		packet_size = reinterpret_cast<PACKET_HEADER*>(packet_buffer + offset)->size;
-	}
-
-	session.AdjustRemainingDataSize(-offset);
-	memmove(session.GetRecvOver().packet_buffer, session.GetRecvOver().packet_buffer + offset, session.GetRemainingDataSize());
-	return should_receive;
-}
-
 bool TetrisServer::EnqueueSessionTask(SessionKey session_key, std::unique_ptr<SessionTask> task)
 {
 	if (!task) return false;
@@ -185,6 +137,11 @@ SessionTaskProcessResult TetrisServer::ProcessSessionTask(Session& session, std:
 	case SessionTaskType::PACKET: {
 		auto* packet_task = static_cast<SessionPacketTask*>(task.get());
 		const std::uint8_t packet_type = reinterpret_cast<PACKET_HEADER*>(packet_task->packet.data())->type;
+		if (packet_type == C2S_DISCONNECT) {
+			if (session.BeginDisconnect(task->session_key))
+				EnqueueLobbyTask(std::make_unique<LobbyTask>(LobbyTaskType::DISCONNECT, task->session_key));
+			return SessionTaskProcessResult::DISCARD_REMAINING;
+		}
 		RoutePacket(packet_task->packet.data(), session);
 		if (packet_type == C2S_REMOVE_PLAYER) return SessionTaskProcessResult::RESTORE_REMAINING;
 		break;
@@ -241,10 +198,6 @@ SessionTaskProcessResult TetrisServer::ProcessSessionTask(Session& session, std:
 
 void TetrisServer::RoutePacket(char* packet, Session& session)
 {
-	if (reinterpret_cast<PACKET_HEADER*>(packet)->type == C2S_DISCONNECT) {
-		RequestDisconnect(session.GetSessionKey());
-		return;
-	}
 	auto room_snapshot = session.GetRoomSnapshot();
 	switch (room_snapshot.mode_state) {
 	case ModeState::NONE:

@@ -21,7 +21,7 @@ void Tetris::InitNewTetromino(char type, Position spawn_pos)
 
 // 좌표 관리는 정의된 테트로미노 절대 좌표 + 키보드로 이동한 상대 좌표를 더해 현재 테트로미노 좌표를 구한다.
 // 그러면 회전된 테트로미노 관리가 수월해진다.
-EventType Tetris::ProcessMoveInput(EventType move_type, long long tick_time_ms) //bool 반환은 충돌 성공 시 다음 블록 스폰이 되어야 하는 것을 생각함
+EventType Tetris::ProcessMoveInput(EventType move_type, long long tick_time_ms)
 {
     Tetromino if_move_tetromino = current_tetromino_;
 	if(!timers_.IsInputAllowed(move_type, tick_time_ms)) return EventType::NONE;
@@ -125,15 +125,13 @@ void Tetris::FixTetromino()
 
 void Tetris::ClearLine()
 {
-    // ✅ 줄 삭제는 "보이는 영역"만: RESERVE_HEIGHT ~ TOTAL_HEIGHT-1
+    // 줄 삭제는 보이는 영역에만 적용한다.
     for (int y = HIDDEN_HEIGHT; y < TOTAL_HEIGHT; ++y) {
         if (std::all_of(board_[y].begin(), board_[y].end(), // 한 줄이 모두 true(채워짐)이면
             [](bool is_cell_filled) { return is_cell_filled; })) {
             std::fill(board_[y].begin(), board_[y].end(), false); // 현재 줄을 모두 false로 바꾸고
 
             // false 줄을 맨 위로 옮기고, 맨 위에서 1줄씩 아래로 당김
-            // (숨겨진 0~RESERVE_HEIGHT-1 줄도 같이 아래로 내려오지만,
-            //  줄 삭제 시의 "중력"은 전체 스택을 대상으로 적용)
             std::rotate(board_.begin(), board_.begin() + y, board_.begin() + y + 1);
             TaskType task;
 			task.event_type = EventType::CLEAR_LINE;
@@ -191,7 +189,7 @@ int Tetris::GenerateRandomGarbageHole()
 
 void Tetris::Clear()
 {
-    // ✅ 전체 보드(TOTAL_HEIGHT) 초기화
+    // 숨겨진 영역을 포함한 전체 보드를 초기화한다.
     for (int i = 0; i < TOTAL_HEIGHT; ++i) {
         for (int j = 0; j < BOARD_WIDTH; ++j) {
             board_[i][j] = false;
@@ -258,18 +256,23 @@ void Tetris::ProcessTick(long long tick_time_ms)
             if (result == EventType::NONE) {
                 continue;
             }
-            else if (result == EventType::FIX){ // 바로 여기서 처리해도 될 것 같은데
+            else if (result == EventType::FIX){
                 FixTetromino();
                 timers_.RecordInput(EventType::DOWN, tick_time_ms);
                 timers_.RestartAutoDown(tick_time_ms);
                 timers_.RecordInput(EventType::DROP, tick_time_ms);
 
                 ClearLine();
-                // 게임오버는 룸에서 상태를 변경시키는 이벤트인데, 여기서 수행하면 상태를 변경할 수가 없다..
+                // 게임 오버에 따른 방 상태 변경은 방 처리 단계에서 수행한다.
 				CheckGameOver();
             }
         }
     }
+}
+
+void Tetris::ResetTetrominoPosition(Position spawn_pos)
+{
+	current_tetromino_.moved_pos = spawn_pos;
 }
 
 void Tetris::ResetTickData()

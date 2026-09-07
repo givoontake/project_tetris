@@ -3,27 +3,28 @@
 #include <MSWSock.h>
 #include "define.h"
 
-enum OP_TYPE { SEND, RECV, ACCEPT };
+enum class OperationType
+{
+	SEND,
+	RECV,
+	CONNECT
+};
 
-struct ExOverlapped {
-	WSAOVERLAPPED over;
-	WSABUF wsabuf;
-	char packet_buf[BUF_SIZE];
-	OP_TYPE op_type;
+struct ExOverlapped
+{
+	WSAOVERLAPPED over{};
+	WSABUF wsabuf{};
+	char packet_buffer[BUF_SIZE]{};
+	OperationType operation_type = OperationType::RECV;
 
 	ExOverlapped()
 	{
-		ZeroMemory(&over, sizeof(over));
 		wsabuf.len = BUF_SIZE;
-		wsabuf.buf = packet_buf;
+		wsabuf.buf = packet_buffer;
 	}
 
-	void SetExOverlapped(OP_TYPE type) {
-		op_type = type;
+	void SetOperationType(OperationType new_operation_type)
+	{
+		operation_type = new_operation_type;
 	}
-
-	//void SetExOverlapped(OP_TYPE type, char* packet) {
-	//	memcpy(socket_buf, packet, packet[0]);
-	//	op_type = type;
-	//}
 };

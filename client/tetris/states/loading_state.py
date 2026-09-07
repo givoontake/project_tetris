@@ -21,8 +21,6 @@ class LoadingState(BaseState):
             self.anim.set_next_images()
             self.draw_flag = True
         pass
-        # if hasattr(self.state, "init"):
-        #     self.state.init()
 
     def draw(self):
         self.background.fill(0,0,0,128)

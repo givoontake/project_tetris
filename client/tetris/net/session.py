@@ -27,7 +27,7 @@ class Session:
         if set(self.block_textures.keys()) != new_textures: # 키가 전부 일치하는지
             return 
         
-        self.block_textures = new_textures # 텍스쳐 가져올 때 실제로 있는건지 검증하는 코드가 필요할 것 같기는 한데.. 일단 패스
+        self.block_textures = new_textures
 
     def load_default_textures(self):
        self.block_textures = {
@@ -40,6 +40,3 @@ class Session:
         'T': self.rm.images.block_images[DEFAULT_PURPLE],
         'G': self.rm.images.block_images[DEFAULT_GRAY],
     }
-
-    # def set_id(self, new_id: int):
-    #     self.id = int(new_id)

@@ -195,7 +195,6 @@ int GameThreadManager::CreatePublicRoom(char* packet, Session& session, SessionK
 		}
 	}
 
-	// 나중에 방 못찾으면 추후 처리 필요
 	return ErrorCode::SERVER_ERROR;
 }
 

@@ -49,7 +49,7 @@ void SingleRoom::GiveUp(Session& request_session)
 		game_over_p.header.type = S2C_GAME_OVER;
 		game_over_p.player_id = session->GetDBInfo().player_id;
 		session->SendPacket(reinterpret_cast<char*>(&game_over_p), game_over_p.header.size);
-		RequestUpdateScore();
+		if (!server_->is_test_mode_) RequestUpdateScore();
 		ClearGame();
 	}
 }
@@ -105,7 +105,7 @@ void SingleRoom::ProcessGameTick(long long tick_time_ms)
 	ResetPlayerTickState();
 	BroadcastPackets();
 	if (is_game_over) {
-		RequestUpdateScore();
+		if (!server_->is_test_mode_) RequestUpdateScore();
 		ClearGame();
 	}
 }
@@ -117,7 +117,7 @@ void SingleRoom::StartGame()
 		if (!TryChangeRoomState(RoomState::WAIT, RoomState::PLAY)) return;
 		play_generation_.fetch_add(1);
 
-		// 모든 조건 통과->게임 시작
+		// 시작 조건을 충족한 플레이어를 게임 상태로 전환한다.
 		InitGame();
 		AppendTetromino7Bag();
 		for (auto& room_player : room_players_) {

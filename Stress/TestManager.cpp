@@ -1,287 +1,421 @@
-#include <iostream>
+#include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <iostream>
+#include <stdexcept>
+#include <thread>
+#include <utility>
 #include <WS2tcpip.h>
-#include <fstream>
 #include "TestManager.h"
 
-TestManager::TestManager()
+TestManager::TestManager(const std::string& server_ip, std::string output_directory)
+	: latency_recorder_(std::move(output_directory))
 {
-	for (int i = 0; i < MAX_USER; i++){
-		sessions[i] = new Session();
-	}
-	WSAStartup(MAKEWORD(2, 2), &wsadata);
+	for (auto& session : sessions_) session = std::make_unique<Session>();
+	for (auto& room_key : room_keys_) room_key.store(0);
+	for (auto& room_join_ready_time : room_join_ready_times_) room_join_ready_time.store(-1);
 
-	//client_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(PORT_NUM);
-	inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
-
-	iocp_handle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
+	WSAStartup(MAKEWORD(2, 2), &wsa_data_);
+	server_address_.sin_family = AF_INET;
+	server_address_.sin_port = htons(PORT_NUM);
+	if (inet_pton(AF_INET, server_ip.c_str(), &server_address_.sin_addr) != 1) throw std::invalid_argument("invalid server IPv4 address: " + server_ip);
+	iocp_handle_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
 }
 
 TestManager::~TestManager()
 {
-	//closesocket(client_socket);
+	for (auto& session : sessions_) {
+		if (session->GetSocket() != INVALID_SOCKET) closesocket(session->GetSocket());
+	}
+	if (iocp_handle_) CloseHandle(iocp_handle_);
 	WSACleanup();
 }
 
-long long TestManager::GetCurrentTimeMS()
+void TestManager::Start(int client_count)
 {
-	return std::chrono::duration_cast<std::chrono::milliseconds>(
-		std::chrono::system_clock::now().time_since_epoch()
-	).count();
+	target_client_count_.store((std::min)(client_count, MAX_USER));
+	started_connect_count_.store(0);
+	ready_room_count_.store(0);
+	is_reconnect_enabled_.store(true);
+	connect_signal_count_.store((std::min)(CONNECT_INFLIGHT_COUNT, target_client_count_.load()));
+	connect_cv_.notify_all();
 }
 
-void TestManager::AdjustSessionNumber(long long now_time, S2C_TEST_PACKET* p)
+long long TestManager::GetCurrentTimeMS() const
 {
-	//std::cout << "TestManager::AdjustSessionNumber(): client index[" << p->id << "] Adjust Session Number\n";
-	static long long delay_time1 = 50;
-	static long long delay_time2 = 100;
-	static int delay_multiplier = 1;
-	static long long last_adjust_time = 0;
-	static long long adjust_interval = 20;
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
-	long long adjust_time = adjust_interval * delay_multiplier;
-	if (now_time - last_adjust_time < adjust_time) return;
-	else last_adjust_time = now_time;
+bool TestManager::LoadConnectEx(SOCKET socket)
+{
+	std::lock_guard<std::mutex> lock(connect_ex_mutex_);
+	if (connect_ex_) return true;
+	GUID guid = WSAID_CONNECTEX;
+	DWORD bytes = 0;
+	return WSAIoctl(socket, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &connect_ex_, sizeof(connect_ex_), &bytes, nullptr, nullptr) == 0;
+}
 
-	long long new_delay = now_time - p->last_time;
-	if (delay < new_delay) {
-		delay += ((new_delay - delay) / 10);
-	} 
-	else if (delay > new_delay) {
-		delay -= ((delay - new_delay) / 10);
+int TestManager::FindAvailableSessionIndex()
+{
+	const int target_count = target_client_count_.load();
+	for (int i = 0; i < target_count; ++i) {
+		if (sessions_[i]->TrySetState(SessionState::NONE, SessionState::CONNECTING)) return i;
 	}
-
-	if (delay <= delay_time2) {
-		delay_multiplier = 10;
-		if (delay <= delay_time1) delay_multiplier = 1;
-		if(connected_client.load() < MAX_USER) ConnectToServer();
-	}
-
-	if (delay > delay_time2 && connected_client.load() > 20) Disconnect(p->id);
-
-	std::cout << "접속자 수: " << connected_client << " 지연 시간: " << delay << "ms \n";
+	return -1;
 }
 
 bool TestManager::ConnectToServer()
 {
-	SOCKET client_socket; // 각 스레드에서 따로 연결을 시도하므로 소켓이 겹치면 안된다.
-	client_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	int res = connect(client_socket, (SOCKADDR*)&server_addr, sizeof(server_addr));
-	if (res == SOCKET_ERROR) {
-		std::cout << "서버 연결 실패: " << WSAGetLastError() << "\n";
-		closesocket(client_socket);
+	const int session_index = FindAvailableSessionIndex();
+	if (session_index < 0) return false;
+	Session& session = *sessions_[session_index];
+
+	SOCKET socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, WSA_FLAG_OVERLAPPED);
+	if (socket == INVALID_SOCKET || !LoadConnectEx(socket)) {
+		if (socket != INVALID_SOCKET) closesocket(socket);
+		session.SetState(SessionState::NONE);
 		return false;
 	}
 
-	int new_index = GetClientIndex();
-	if (new_index == -1) return false;
-	sessions[new_index]->InitSession();
-	sessions[new_index]->SetId(new_index); // 이미 배열 인덱스를 id처럼 쓰고 있어서..나중에라도 의미가 있을까?
-	sessions[new_index]->SetIndex(new_index);
-	sessions[new_index]->SetSocket(client_socket);
-	sessions[new_index]->last_send_time = GetCurrentTimeMS();
-	sessions[new_index]->remain_data_size = 0;
+	SOCKADDR_IN local_address{};
+	local_address.sin_family = AF_INET;
+	local_address.sin_addr.s_addr = htonl(INADDR_ANY);
+	if (bind(socket, reinterpret_cast<SOCKADDR*>(&local_address), sizeof(local_address)) == SOCKET_ERROR) {
+		closesocket(socket);
+		session.SetState(SessionState::NONE);
+		return false;
+	}
 
-	//C2S_TEST_LOGIN_PACKET p;
-	//p.size = sizeof(C2S_TEST_LOGIN_PACKET);
-	//p.type = C2S_TEST_LOGIN;
-	//p.temp_id = sessions[new_index]->GetTempId();
-	sessions[new_index]->RecvPacket(iocp_handle);
+	session.InitSession();
+	session.SetIndex(session_index);
+	session.SetSocket(socket);
+	CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), iocp_handle_, session_index, 0);
 
-	std::cout << "client[" << new_index << "]" << " connect\n";
-	++connected_client;
-
-	CreateIoCompletionPort(reinterpret_cast<HANDLE>(client_socket), iocp_handle, new_index, 0);
-
+	ExOverlapped* connect_over = new ExOverlapped;
+	connect_over->SetOperationType(OperationType::CONNECT);
+	const BOOL result = connect_ex_(socket, reinterpret_cast<SOCKADDR*>(&server_address_), sizeof(server_address_), nullptr, 0, nullptr, &connect_over->over);
+	if (!result && WSAGetLastError() != WSA_IO_PENDING) {
+		delete connect_over;
+		closesocket(socket);
+		session.SetSocket(INVALID_SOCKET);
+		session.SetState(SessionState::NONE);
+		return false;
+	}
 	return true;
 }
 
-void TestManager::ProcessGQCS()
+void TestManager::ProcessConnect()
+{
+	while (true) {
+		{
+			std::unique_lock<std::mutex> lock(connect_mutex_);
+			connect_cv_.wait(lock, [this] { return connect_signal_count_.load() > 0 || !is_reconnect_enabled_.load(); });
+		}
+		if (!is_reconnect_enabled_.load()) return;
+
+		if (started_connect_count_.load() >= target_client_count_.load()) {
+			std::this_thread::yield();
+			continue;
+		}
+		if (connect_signal_count_.fetch_sub(1) <= 0) {
+			connect_signal_count_.fetch_add(1);
+			continue;
+		}
+
+		if (!is_reconnect_enabled_.load()) return;
+		if (ConnectToServer()) {
+			started_connect_count_.fetch_add(1);
+		}
+		else {
+			if (is_reconnect_enabled_.load()) connect_signal_count_.fetch_add(1);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+	}
+}
+
+void TestManager::CompleteConnect(int session_index, ExOverlapped* connect_over)
+{
+	Session& session = *sessions_[session_index];
+	setsockopt(session.GetSocket(), SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nullptr, 0);
+	session.SetState(SessionState::LOGIN);
+	session.RecvPacket(iocp_handle_);
+	const int connected_count = connected_client_count_.fetch_add(1) + 1;
+	if (connected_count <= 5 || connected_count % 1000 == 0) {
+		std::lock_guard<std::mutex> lock(log_mutex_);
+		std::cout << "connected=" << connected_count << std::endl;
+	}
+	SendTestLogin(session_index);
+	delete connect_over;
+}
+
+void TestManager::ProcessIO()
 {
 	DWORD transferred_bytes = 0;
 	ULONG_PTR key = 0;
 	WSAOVERLAPPED* over = nullptr;
-	BOOL result = GetQueuedCompletionStatus( // 인자로 넘긴 주소 변수의 값을 채워준다.
-		iocp_handle,
-		&transferred_bytes,
-		&key,
-		&over,
-		INFINITE);
+	const BOOL result = GetQueuedCompletionStatus(iocp_handle_, &transferred_bytes, &key, &over, INFINITE);
+	if (!over) return;
 
+	const int session_index = static_cast<int>(key);
+	if (session_index < 0 || session_index >= target_client_count_.load()) return;
 	ExOverlapped* ex_over = reinterpret_cast<ExOverlapped*>(over);
-
-	if (!result) {
-		//std::cout << "client[" << key << "] IOCP 작업 실패! 에러: " << WSAGetLastError() << std::endl;
-		Disconnect(static_cast<int>(key));
-		if (ex_over->op_type == SEND) delete ex_over;
+	if (!result || (ex_over->operation_type != OperationType::CONNECT && transferred_bytes == 0)) {
+		if (ex_over->operation_type == OperationType::SEND || ex_over->operation_type == OperationType::CONNECT) delete ex_over;
+		Disconnect(session_index);
 		return;
 	}
 
-	if (transferred_bytes == 0) {
-		Disconnect(static_cast<int>(key));
-		if (ex_over->op_type == SEND) delete ex_over;
-		return;
-	}
-
-	switch (ex_over->op_type) {
-
-	case RECV:
-		ProcessPacket(transferred_bytes, key);
-		sessions[key]->RecvPacket(iocp_handle);
+	switch (ex_over->operation_type) {
+	case OperationType::CONNECT:
+		CompleteConnect(session_index, ex_over);
 		break;
-
-	case SEND:
-		sessions[key]->last_time = GetCurrentTimeMS();
+	case OperationType::RECV:
+		ProcessRecvBuffer(static_cast<int>(transferred_bytes), session_index);
+		if (sessions_[session_index]->GetState() != SessionState::NONE && sessions_[session_index]->GetState() != SessionState::DISCONNECTING) {
+			sessions_[session_index]->RecvPacket(iocp_handle_);
+		}
+		break;
+	case OperationType::SEND:
 		delete ex_over;
-		// 송신 완료 후 추가 처리
 		break;
 	}
 }
 
-void TestManager::ProcessSend()
+void TestManager::ProcessRecvBuffer(int recv_bytes, int session_index)
 {
-	for (auto& client : sessions) {
-		if (client->GetState() != LOBBY) continue;
-		long long expected = client->last_send_time;
-		long long desired = GetCurrentTimeMS();
-		long long ms = desired - expected;
-		if (ms > 1000) {
-			if (client->last_send_time.compare_exchange_strong(expected, desired)) {
-				C2S_TEST_PACKET p;
-				int total_packet_size = sizeof(C2S_TEST_PACKET) + sizeof(test_message);
-				p.size = static_cast<short>(total_packet_size);
-				p.type = C2S_TEST;
-				p.id = client->GetId();
-				p.last_time = GetCurrentTimeMS();
-				char* p_buffer = new char[total_packet_size];
-				memcpy(p_buffer, &p, sizeof(C2S_TEST_PACKET)); // 구조체 우선 복사
-				memcpy(p_buffer + sizeof(C2S_TEST_PACKET), test_message, sizeof(test_message)); // 구조체 뒤에 붙여서 메세지 복사
-				client->SendPacket(p_buffer, iocp_handle);
-				//std::cout << "TestManager::ProcessSend(): client index[" << client->GetIndex() << "] Send Test Packet\n";
-				delete[] p_buffer;
-			}
-		}
-		else continue;
-	}
-}
-
-int TestManager::GetClientIndex()
-{
-	for (int i = 0; i < MAX_USER; ++i) {
-		if (sessions[i]->GetState() == NONE) {
-			if (sessions[i]->SetState(NONE, LOGIN)) {
-				return i;
-			}
-		}
-	}
-
-	return -1;
-}
-
-void TestManager::SetTestMessege(int message_size)
-{
-	std::ifstream in("message.txt", std::ios::binary);
-	if (!in.is_open()) {
-		std::cout << "파일 열기 실패, 프로그램을 종료합니다.\n" << std::endl;
-		exit(0);
-	}
-	in.read(test_message, message_size);
-
-	in.close();
-}
-
-void TestManager::ProcessPacket(int recv_bytes, int user_index)
-{
-	if (sessions[user_index]->GetState() == NONE) {
-		//std::cout << "handler_interface->GetManagerInterface()->Disconnect(id);\n";
+	Session& session = *sessions_[session_index];
+	if (recv_bytes + session.GetRemainingDataSize() > BUF_SIZE) {
+		Disconnect(session_index);
 		return;
 	}
 
-	if (recv_bytes + sessions[user_index]->GetRemainDataSize() > BUF_SIZE) {
-		Disconnect(user_index);
-		return;
+	session.AdjustRemainingDataSize(recv_bytes);
+	int remaining_data_size = session.GetRemainingDataSize();
+	int offset = 0;
+	char packet_buffer[BUF_SIZE];
+	memcpy(packet_buffer, session.GetRecvOverlapped().packet_buffer, remaining_data_size);
+
+	while (remaining_data_size - offset >= static_cast<int>(sizeof(PacketHeader))) {
+		PacketHeader* header = reinterpret_cast<PacketHeader*>(packet_buffer + offset);
+		if (header->size < sizeof(PacketHeader) || header->size > BUF_SIZE) {
+			Disconnect(session_index);
+			return;
+		}
+		if (remaining_data_size - offset < header->size) break;
+		HandlePacket(packet_buffer + offset, session_index);
+		offset += header->size;
+		if (session.GetState() == SessionState::NONE || session.GetState() == SessionState::DISCONNECTING) return;
 	}
 
-	else sessions[user_index]->SetRemainDataSize(recv_bytes);
-
-	if (sessions[user_index]->GetRemainDataSize() < sizeof(short)) return;
-
-	short packet_size = sessions[user_index]->GetPacketSize(sessions[user_index]->GetExOver().packet_buf); // 처리해야할 데이터 크기
-
-	while (sessions[user_index]->GetRemainDataSize() >= packet_size) // 남아있는 데이터 크기가 실제 처리가능한 데이터 크기이상 존재한다면
-	{
-		char p_buffer[BUF_SIZE];
-		// 패킷 분리: packet_buffer에 복사 후 처리
-		memcpy(p_buffer, sessions[user_index]->GetExOver().packet_buf, packet_size);
-		HandlePacket(p_buffer);
-
-		if(sessions[user_index]->GetState() == NONE) return; // 만약 handlepacket에서 disconnect 된 이후에, 이 코드 전에 로그인이 되어 버리면.. 문제가 생길 수 있다. 이 부분을 해결하고 싶은데..
-		// 처리한 패킷은 남은 데이터에서 제거
-		sessions[user_index]->SetRemainDataSize(-packet_size);
-		int debug_remain_data_size = sessions[user_index]->GetRemainDataSize();
-		memmove(sessions[user_index]->GetExOver().packet_buf, sessions[user_index]->GetExOver().packet_buf + packet_size, sessions[user_index]->GetRemainDataSize());
-		packet_size = sessions[user_index]->GetPacketSize(sessions[user_index]->GetExOver().packet_buf);
-	}
+	session.AdjustRemainingDataSize(-offset);
+	memmove(session.GetRecvOverlapped().packet_buffer, session.GetRecvOverlapped().packet_buffer + offset, session.GetRemainingDataSize());
 }
 
-void TestManager::Disconnect(int session_id)
+void TestManager::SendTestLogin(int session_index)
 {
-	int dis_index = -1;
-	for (int i = 0; i < MAX_USER; ++i) {
-		if (sessions[i]->GetState() == NONE) continue;
-		if (sessions[i]->GetId() == session_id) dis_index = i;
-	}
-	if (dis_index == -1) return;
-	C2S_DISCONNECT_PACKET p;
-	p.size = sizeof(C2S_DISCONNECT_PACKET);
-	p.type = C2S_DISCONNECT;
-	p.id = sessions[dis_index]->GetId();
-	sessions[dis_index]->SendPacket(reinterpret_cast<char*>(&p), iocp_handle); // disconnect 패킷 전송
-	closesocket(sessions[dis_index]->GetSocket());
-	//sessions[dis_index]->ClearSession(); -> 여기서 remain_data_size = 0하고 이후 processpacket에서 패킷 크기를 빼버려 엑세스 오류가 생길 수 밖에 없어 보인다.
-	sessions[dis_index]->SetState(NONE);
-	std::cout << "client[" << dis_index << "]" << " Disconnect\n";
-	--connected_client;
+	C2S_TEST_LOGIN_PACKET packet{};
+	packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
+	packet.header.type = C2S_TEST_LOGIN;
+	packet.player_id = session_index + 1;
+	std::snprintf(packet.login_id, sizeof(packet.login_id), "test%d", packet.player_id);
+	std::snprintf(packet.login_password, sizeof(packet.login_password), "1234");
+	sessions_[session_index]->SendPacket(reinterpret_cast<char*>(&packet), iocp_handle_);
 }
 
-void TestManager::HandlePacket(char* packet)
+void TestManager::SendCreateRoom(int host_index)
 {
-	//std::cout << "TestManager::HandlePacket(): packet type " << static_cast<int>(packet[2]) << "\n";
-	S2C_TEST_LOGIN_PACKET* p = reinterpret_cast<S2C_TEST_LOGIN_PACKET*>(packet);
+	Session& session = *sessions_[host_index];
+	if (!session.TrySetState(SessionState::LOBBY, SessionState::ENTER_ROOM)) return;
+	C2S_ADD_PUBLIC_ROOM_PACKET packet{};
+	packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
+	packet.header.type = C2S_ADD_PUBLIC_ROOM;
+	packet.max_player_count = ROOM_PLAYER_COUNT;
+	std::snprintf(packet.room_name, sizeof(packet.room_name), "stress_%d", host_index / ROOM_PLAYER_COUNT);
+	session.SendPacket(reinterpret_cast<char*>(&packet), iocp_handle_);
+}
 
-	switch (packet[2]) {
+void TestManager::TryJoinRoom(int session_index)
+{
+	if (session_index % ROOM_PLAYER_COUNT == 0) return;
+	Session& session = *sessions_[session_index];
+	const int group_index = session_index / ROOM_PLAYER_COUNT;
+	const RoomKey room_key = room_keys_[group_index].load();
+	if (room_key == 0 || GetCurrentTimeMS() < room_join_ready_times_[group_index].load()) return;
+	if (!session.TrySetState(SessionState::LOBBY, SessionState::ENTER_ROOM)) return;
+
+	C2S_JOIN_PUBLIC_ROOM_PACKET packet{};
+	packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
+	packet.header.type = C2S_JOIN_PUBLIC_ROOM;
+	packet.room_key = room_key;
+	session.SendPacket(reinterpret_cast<char*>(&packet), iocp_handle_);
+}
+
+void TestManager::SendReady(int session_index)
+{
+	C2S_READY_PACKET packet{};
+	packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
+	packet.header.type = C2S_READY;
+	sessions_[session_index]->SendPacket(reinterpret_cast<char*>(&packet), iocp_handle_);
+}
+
+void TestManager::SendStart(int host_index)
+{
+	C2S_START_PACKET packet{};
+	packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
+	packet.header.type = C2S_START;
+	sessions_[host_index]->SendPacket(reinterpret_cast<char*>(&packet), iocp_handle_);
+}
+
+void TestManager::SendMove(int session_index, long long send_time)
+{
+	Session& session = *sessions_[session_index];
+	if (!session.PushMoveSendTime(send_time)) return;
+	C2S_MOVE_PACKET packet{};
+	packet.header.size = static_cast<std::uint16_t>(sizeof(packet));
+	packet.header.type = C2S_MOVE;
+	packet.move_type = static_cast<char>(session.GetNextMoveType());
+	session.SendPacket(reinterpret_cast<char*>(&packet), iocp_handle_);
+}
+
+void TestManager::NotifyLoginComplete()
+{
+	if (is_reconnect_enabled_.load() && started_connect_count_.load() < target_client_count_.load()) connect_signal_count_.fetch_add(1);
+	connect_cv_.notify_one();
+}
+
+void TestManager::HandlePacket(char* packet, int session_index)
+{
+	PacketHeader* header = reinterpret_cast<PacketHeader*>(packet);
+	Session& session = *sessions_[session_index];
+
+	switch (header->type) {
 	case S2C_TEST_LOGIN: {
-		S2C_TEST_LOGIN_PACKET* p = reinterpret_cast<S2C_TEST_LOGIN_PACKET*>(packet);
-		for (int i = 0; i < MAX_USER; ++i){ 
-			if (sessions[i]->GetState() == LOGIN) { // 다중 클라를 관리해야 하고, 인덱스 != id 상태이므로 그냥 상태를 통해 순서 관계없이 아이디 할당
-				if (sessions[i]->SetState(LOGIN, LOBBY)) { // 나중에 조건문을 합쳐도 될 것 같다.
-					sessions[i]->SetId(p->id);
-					std::cout << "client[" << sessions[i]->GetIndex() << "]" << " Login Success\n";
-					break;
-				}
-			}
+		S2C_TEST_LOGIN_PACKET* login_packet = reinterpret_cast<S2C_TEST_LOGIN_PACKET*>(packet);
+		NotifyLoginComplete();
+		if (login_packet->player_id < 0 || !session.TrySetState(SessionState::LOGIN, SessionState::LOBBY)) break;
+		session.SetPlayerID(login_packet->player_id);
+		if (session_index % ROOM_PLAYER_COUNT == 0) SendCreateRoom(session_index);
+		else TryJoinRoom(session_index);
+		break;
+	}
+	case S2C_ADD_PUBLIC_ROOM: {
+		S2C_ADD_PUBLIC_ROOM_PACKET* room_packet = reinterpret_cast<S2C_ADD_PUBLIC_ROOM_PACKET*>(packet);
+		session.SetState(SessionState::ROOM);
+		const int group_index = session_index / ROOM_PLAYER_COUNT;
+		if (session_index % ROOM_PLAYER_COUNT == 0) {
+			room_keys_[group_index].store(room_packet->room_key);
+			room_join_ready_times_[group_index].store(GetCurrentTimeMS() + 100);
+		}
+		else {
+			SendReady(session_index);
 		}
 		break;
 	}
-
-	case S2C_TEST: {
-		long long now_time = GetCurrentTimeMS();
-		// 받아서 따로 서버에서 변경되는 패킷 내용이 없다.
-		S2C_TEST_PACKET* p = reinterpret_cast<S2C_TEST_PACKET*>(packet);
-		AdjustSessionNumber(now_time, p);
+	case S2C_READY: {
+		if (session_index % ROOM_PLAYER_COUNT != 0) break;
+		S2C_READY_PACKET* ready_packet = reinterpret_cast<S2C_READY_PACKET*>(packet);
+		if (!ready_packet->is_ready || session.IncrementReadyPlayerCount() != ROOM_PLAYER_COUNT - 1) break;
+		session.ResetReadyPlayerCount();
+		const int target_room_count = target_client_count_.load() / ROOM_PLAYER_COUNT;
+		if (ready_room_count_.load() == target_room_count) SendStart(session_index);
+		else if (ready_room_count_.fetch_add(1) + 1 == target_room_count) {
+			for (int host_index = 0; host_index < target_client_count_.load(); host_index += ROOM_PLAYER_COUNT) SendStart(host_index);
+		}
+		break;
+	}
+	case S2C_MULTI_START: {
+		if (session.GetState() == SessionState::PLAYING) break;
+		session.SetLastSendTime(GetCurrentTimeMS());
+		session.SetState(SessionState::PLAYING);
+		const int playing_count = playing_client_count_.fetch_add(1) + 1;
+		if (playing_count <= 5 || playing_count % 1000 == 0) {
+			std::lock_guard<std::mutex> lock(log_mutex_);
+			std::cout << "playing=" << playing_count << std::endl;
+		}
+		UpdateMeasurement();
+		break;
+	}
+	case S2C_GAME_END:
+		if (session.GetState() != SessionState::PLAYING) break;
+		session.SetState(SessionState::ROOM);
+		playing_client_count_.fetch_sub(1);
+		if (session_index % ROOM_PLAYER_COUNT != 0) SendReady(session_index);
+		break;
+	case S2C_MOVE: {
+		S2C_MOVE_PACKET* move_packet = reinterpret_cast<S2C_MOVE_PACKET*>(packet);
+		if (move_packet->player_id != session.GetPlayerID()) break;
+		const std::optional<long long> send_time = session.PopMoveSendTime();
+		if (send_time) latency_recorder_.Record(GetCurrentTimeMS() - *send_time);
+		break;
+	}
+	case S2C_ERROR: {
+		S2C_ERROR_PACKET* error_packet = reinterpret_cast<S2C_ERROR_PACKET*>(packet);
+		if (session.GetState() == SessionState::ENTER_ROOM) session.SetState(SessionState::LOBBY);
+		latency_recorder_.RecordServerError(error_packet->error_code);
+		std::lock_guard<std::mutex> lock(log_mutex_);
+		std::cerr << "server_error session=" << session_index << " code=" << error_packet->error_code << std::endl;
 		break;
 	}
 	case S2C_DISCONNECT:
-		// 어차피 disconnect는 서버에서 계산해서 보내주니까 필요없지 않나..?
+		Disconnect(session_index);
 		break;
-
-	default: {
-		std::cout << "잘못된 패킷, 코드 수정이 필요합니다. \n";
+	default:
 		break;
 	}
+}
 
+void TestManager::ProcessSend(int worker_index)
+{
+	const long long now_time = GetCurrentTimeMS();
+	const int target_count = target_client_count_.load();
+	for (int session_index = worker_index; session_index < target_count; session_index += SEND_THREAD_COUNT) {
+		Session& session = *sessions_[session_index];
+		if (session.GetState() == SessionState::LOBBY) {
+			TryJoinRoom(session_index);
+			continue;
+		}
+		if (session.GetState() != SessionState::PLAYING) continue;
+		long long expected = session.GetLastSendTime();
+		if (now_time - expected < MOVE_INTERVAL_MS) continue;
+		if (session.TrySetLastSendTime(expected, now_time)) SendMove(session_index, now_time);
 	}
+	if (worker_index == 0) UpdateMeasurement();
+}
+
+void TestManager::UpdateMeasurement()
+{
+	if (playing_client_count_.load() == target_client_count_.load() && latency_recorder_.TryStart()) {
+		is_reconnect_enabled_.store(false);
+		connect_cv_.notify_all();
+		std::lock_guard<std::mutex> lock(log_mutex_);
+		std::cout << "measurement_started duration_seconds=" << MEASUREMENT_SECONDS << std::endl;
+	}
+	if (latency_recorder_.TryFinish()) {
+		std::lock_guard<std::mutex> lock(log_mutex_);
+		std::cout << "measurement_finished" << std::endl;
+	}
+}
+
+void TestManager::Disconnect(int session_index)
+{
+	if (session_index < 0 || session_index >= target_client_count_.load()) return;
+	Session& session = *sessions_[session_index];
+	SessionState previous_state = session.GetState();
+	while (previous_state != SessionState::NONE && previous_state != SessionState::DISCONNECTING) {
+		if (session.TrySetState(previous_state, SessionState::DISCONNECTING)) break;
+		previous_state = session.GetState();
+	}
+	if (previous_state == SessionState::NONE || previous_state == SessionState::DISCONNECTING) return;
+
+	if (previous_state != SessionState::CONNECTING) connected_client_count_.fetch_sub(1);
+	if (previous_state == SessionState::PLAYING) playing_client_count_.fetch_sub(1);
+	closesocket(session.GetSocket());
+	session.SetSocket(INVALID_SOCKET);
+	session.ClearSession();
+	session.SetState(SessionState::NONE);
+	started_connect_count_.fetch_sub(1);
+	if (!is_reconnect_enabled_.load()) return;
+	connect_signal_count_.fetch_add(1);
+	connect_cv_.notify_one();
 }

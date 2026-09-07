@@ -12,17 +12,17 @@ class LabelFrame:
         label_rect: pygame.Rect,
         rm: ResourceManager,
         placeholder: str = "",
-        max_input_len: int | None = None,  # optional과 같음
+        max_input_len: int | None = None,
         is_password: bool = False,
-        allow_korean: bool = True,   # ✅ 한글 허용 여부
+        allow_korean: bool = True,
     ):
         self.screen = screen
         self.frame_image = image
         self.frame_rect = label_rect
         self.input_box = InputBox(screen, input_rect, rm, placeholder, max_input_len, is_password, allow_korean, False)
         
-    def _set_rect_scale(self, rect: pygame.Rect, scale_x: float, scale_y: float) -> pygame.Rect: # x = 가로, y = 세로 스케일
-        if scale_x < 0.1 or scale_x > 2.0: # 최소 범위는 너무 작은 스케일을 방지하기 위함. 최대는 큰 스케일 방지를 위한 적당한 값임
+    def _set_rect_scale(self, rect: pygame.Rect, scale_x: float, scale_y: float) -> pygame.Rect:
+        if scale_x < 0.1 or scale_x > 2.0:
             raise ValueError("scale_x must be between 0.1 and 2.0")
         if scale_y < 0.1 or scale_y > 2.0:
             raise ValueError("scale_y must be between 0.1 and 2.0")
@@ -36,13 +36,6 @@ class LabelFrame:
         return temp_rect
     
     def move_pos(self, dx: int, dy: int):
-        # sw, sh = self.screen.get_size()
-        # if self.frame_rect.x + dx < 0 or self.frame_rect.x + dx + self.frame_rect.w > sw:
-        #     raise ValueError("객체는 화면 좌우 외부로 잘릴 수 없습니다.")
-
-        # if self.frame_rect.y + dy < 0 or self.frame_rect.y + dy + self.frame_rect.h > sh:
-        #     raise ValueError("객체는 화면 세로 외부로 잘릴 수 없습니다.")
-        
         self.frame_rect.x += dx
         self.input_box.rect.x += dx
 

@@ -43,7 +43,7 @@ class TetrisSession:
         self.board.init()
         self.nickname.set_text(self.session.nickname)
         if self.is_single: self.set_score(0)
-        self.board.set_textures(self.session.block_textures) # 텍스쳐를 TSession에 두는 것이 지금보다 더 좋아 보인다
+        self.board.set_textures(self.session.block_textures)
         self.state = TSessionState.WAIT
 
     def set_layout(self):
@@ -104,7 +104,7 @@ class TetrisSession:
 
     def set_is_host(self):
         self.is_host = True # 방장 양도는 계획에 없다.
-        if self.session.is_self == False: self.btn_ready.visible = False # 방장인데 자기 세션이 아니면 준비버튼 없이 왕관만 그려야 함. 당연히 상호작용도 불가
+        if self.session.is_self == False: self.btn_ready.visible = False # 다른 플레이어의 준비 버튼은 표시하지 않는다.
         else: 
             self.btn_ready = None
             self.btn_start = Button(self.screen, self.ready_rect, self.rm, "게임시작", 1)
@@ -176,11 +176,10 @@ class TetrisSession:
             clearline_data = cast(S2C_CLEARLINE_PACKET, data)
             self.board.clear_lines(clearline_data.line_index)
             self.set_score(clearline_data.score)
-            if self.prev_packet_type != S2C_CLEARLINE: # 애니메이션 1번 재생 -> 서버는 clearline을 여러번 연속해서 보내는 점을 이용
+            if self.prev_packet_type != S2C_CLEARLINE: # 연속된 줄 제거 패킷에는 애니메이션을 한 번만 재생한다.
                 self.prev_packet_type = data.type
                 self.board.animate_combo(clearline_data.line_index, clearline_data.combo)
 
-        # 멀티용 클리어라인 패킷 추가 필요 (스코어 제거 버전)
 
         elif data.type == S2C_ADDLINE:
             addline_data = cast(S2C_ADDLINE_PACKET, data)
@@ -209,7 +208,6 @@ class TetrisSession:
             if self.controller: self.controller.update(dt_ms)
             self.board.update(dt_ms)
         
-        # 상태 관리를 여기서 하다 보니 생기는 구조..
         if self.state == TSessionState.GAMEOVER_ANIMATING:
             if self.board.animate_gameover(dt_ms):
                 if self.is_single: self.reset()
@@ -227,7 +225,7 @@ class TetrisSession:
             self.score_box.draw()
         if self.session.is_self == False and self.is_host: self.crown.draw() #본인이 아닌 방장의 경우 위에 덧그려지는 형태
 
-        # 준비는 호스트가 아니면 일단 그리고, 본인이 아닌 호스트면 상호작용만 끄고 위에 왕
+        # 호스트는 왕관으로 표시하고 다른 플레이어의 준비 버튼 입력은 비활성화한다.
         if self.state == TSessionState.WAIT:
             if self.btn_start: 
                 self.btn_start.draw()

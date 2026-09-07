@@ -33,21 +33,16 @@ class GameLoop:
         self.prev_time = time.perf_counter()
         self.frame_time = 1.0 / FPS  # 초 단위
 
-        # 선택: 바쁜 대기 방지용 아주 짧은 sleep
         self.cpu_idle_time = 0.001 
 
     def handle_events(self):
-        # 공통 이벤트만 우선 거르기
+        # 공통 이벤트를 먼저 처리한다.
         events = pygame.event.get()
 
         for ev in events:
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 raise SystemExit
-            # if ev.type == pygame.VIDEORESIZE:
-            #     self.screen = pygame.display.set_mode((ev.w, ev.h))
-            #     if hasattr(self.state, "on_resize"):
-            #         self.state.on_resize(ev.w, ev.h, self.screen)
 
         return events
     
@@ -73,8 +68,6 @@ class GameLoop:
         if next_state is not None and next_state is not self.state:
             self.state = next_state
             self.state.start_fade_in()
-        # if hasattr(self.state, "init"):
-        #     self.state.init()
 
     def draw(self):
         self.state.draw()
@@ -87,7 +80,7 @@ class GameLoop:
             dt = now - self.prev_time  # 초 단위
             self.drain_packets()
             if dt > self.frame_time:
-                dt_ms = dt * 1000.0      # ✅ ms 단위로 변환
+                dt_ms = dt * 1000.0
                 events = self.handle_events()
                 self.update(dt_ms, events)
                 self.draw()

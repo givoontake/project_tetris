@@ -66,7 +66,7 @@ class AdjustSound:
         adjust_bar_h = valid_box_h
         adjust_bar_w = frame_padding_w*2 # 양 끝 패딩의 2배 길이만큼, 빈 공간 없이 값을 맞췄기 때문에 좌표 계산에 써도 된다.
         
-        self.adjust_bar_rect = pygame.Rect(adjust_bar_x, adjust_bar_y, adjust_bar_w, adjust_bar_h) # 사운드 조절 막대, 우선 왼쪽에 붙여 그림
+        self.adjust_bar_rect = pygame.Rect(adjust_bar_x, adjust_bar_y, adjust_bar_w, adjust_bar_h) # 사운드 조절 막대를 왼쪽에 배치한다.
 
         self.set_volume_bar_layout()
 

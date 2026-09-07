@@ -10,7 +10,9 @@ struct S2C_TEST_LOGIN_PACKET {
 
 struct C2S_TEST_LOGIN_PACKET {
 	PACKET_HEADER header;
-	int temp_id;
+	int player_id;
+	char login_id[MAX_PLAYER_ID_SIZE];
+	char login_password[MAX_PLAYER_PASSWORD_SIZE];
 };
 
 struct S2C_TEST_PACKET {

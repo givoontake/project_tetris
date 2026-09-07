@@ -1,81 +1,92 @@
-#include <iostream>
+#include <cstring>
 #include "Session.h"
 
 Session::Session()
 {
-	recv_over.SetExOverlapped(RECV);
+	recv_over_.SetOperationType(OperationType::RECV);
 }
 
-void Session::SendPacket(char* packet, HANDLE iocp_handle)
+bool Session::SendPacket(const char* packet, HANDLE iocp_handle)
 {
-	if (s_state == NONE) return;
+	if (!packet || state_.load() == SessionState::NONE || state_.load() == SessionState::DISCONNECTING) return false;
+	const std::uint16_t packet_size = reinterpret_cast<const PacketHeader*>(packet)->size;
+	if (packet_size < sizeof(PacketHeader) || packet_size > BUF_SIZE) return false;
+
 	ExOverlapped* send_over = new ExOverlapped;
-	send_over->SetExOverlapped(SEND);
-	short packet_size = GetPacketSize(packet);
-	memcpy(send_over->packet_buf, packet, packet_size);
+	send_over->SetOperationType(OperationType::SEND);
+	memcpy(send_over->packet_buffer, packet, packet_size);
 	send_over->wsabuf.len = packet_size;
-	int ret = WSASend(socket, &send_over->wsabuf, 1, 0, 0, &send_over->over, 0);
-	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+	const int result = WSASend(socket_, &send_over->wsabuf, 1, nullptr, 0, &send_over->over, nullptr);
+	if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
+		PostQueuedCompletionStatus(iocp_handle, 0, index_, reinterpret_cast<WSAOVERLAPPED*>(send_over));
+		return false;
 	}
+	return true;
 }
 
 void Session::RecvPacket(HANDLE iocp_handle)
 {
-	if (s_state == NONE) return;
-	int sign_count = 0;
+	if (state_.load() == SessionState::NONE || state_.load() == SessionState::DISCONNECTING) return;
 	DWORD recv_flag = 0;
-	ZeroMemory(&recv_over.over, sizeof(recv_over.over)); // iocp 작업을 할 때마다 오버랩 구조체 초기화 필요(안정성)
-	recv_over.wsabuf.len = BUF_SIZE - remain_data_size;
-	recv_over.wsabuf.buf = recv_over.packet_buf + remain_data_size;
-	int ret = WSARecv(socket, &recv_over.wsabuf, 1, 0, &recv_flag,
-		&recv_over.over, 0);
-	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
-		PostQueuedCompletionStatus(iocp_handle, 0, index, reinterpret_cast<WSAOVERLAPPED*>(&recv_over));
+	ZeroMemory(&recv_over_.over, sizeof(recv_over_.over));
+	recv_over_.SetOperationType(OperationType::RECV);
+	recv_over_.wsabuf.len = BUF_SIZE - remaining_data_size_;
+	recv_over_.wsabuf.buf = recv_over_.packet_buffer + remaining_data_size_;
+	const int result = WSARecv(socket_, &recv_over_.wsabuf, 1, nullptr, &recv_flag, &recv_over_.over, nullptr);
+	if (result == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING) {
+		PostQueuedCompletionStatus(iocp_handle, 0, index_, reinterpret_cast<WSAOVERLAPPED*>(&recv_over_));
 	}
-}
-
-short Session::GetPacketSize(char* packet)
-{
-	short packet_size;
-	memcpy(&packet_size, packet, sizeof(packet_size));
-	return packet_size;
 }
 
 void Session::InitSession()
 {
-	index = -1;
-	id = -1;
-	remain_data_size = 0;
-	last_time = -1;
-	last_send_time = -1;
+	player_id_ = -1;
+	remaining_data_size_ = 0;
+	last_send_time_.store(-1);
+	move_time_write_index_.store(0);
+	move_time_read_index_.store(0);
+	next_move_type_.store(0);
+	ready_player_count_.store(0);
 }
 
 void Session::ClearSession()
 {
-	index = -1;
-	id = -1;
-	remain_data_size = 0;
-	//last_time = -1;
-	//last_send_time = -1;
-
-	//s_state = NONE;
+	index_ = -1;
+	player_id_ = -1;
+	remaining_data_size_ = 0;
+	last_send_time_.store(-1);
+	move_time_write_index_.store(0);
+	move_time_read_index_.store(0);
+	next_move_type_.store(0);
+	ready_player_count_.store(0);
 }
 
-bool Session::SetState(SESSION_STATE expected, SESSION_STATE desired)
+bool Session::PushMoveSendTime(long long send_time)
 {
-	if (desired != expected) {
-		if (s_state.compare_exchange_strong(expected, desired)) return true;
-		else return false;
-	}
-
-	// 같으면 원하는 상태이므로 true 반환
+	const std::uint32_t write_index = move_time_write_index_.load();
+	const std::uint32_t read_index = move_time_read_index_.load();
+	if (write_index - read_index >= MOVE_TIME_QUEUE_SIZE) return false;
+	move_send_times_[write_index % MOVE_TIME_QUEUE_SIZE] = send_time;
+	move_time_write_index_.store(write_index + 1);
 	return true;
 }
 
-void Session::SetState(SESSION_STATE desired)
+std::optional<long long> Session::PopMoveSendTime()
 {
-	s_state = desired;
+	const std::uint32_t read_index = move_time_read_index_.load();
+	const std::uint32_t write_index = move_time_write_index_.load();
+	if (read_index == write_index) return std::nullopt;
+	const long long send_time = move_send_times_[read_index % MOVE_TIME_QUEUE_SIZE];
+	move_time_read_index_.store(read_index + 1);
+	return send_time;
 }
 
+bool Session::TrySetState(SessionState expected, SessionState desired)
+{
+	return state_.compare_exchange_strong(expected, desired);
+}
 
+void Session::SetState(SessionState desired)
+{
+	state_.store(desired);
+}

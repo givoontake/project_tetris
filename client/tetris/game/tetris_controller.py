@@ -33,7 +33,6 @@ class TetrisController:
     def handle_event(self, ev: pygame.event.Event):
         if ev.type == pygame.KEYDOWN or ev.type == pygame.KEYUP:
             if ev.key == pygame.K_LEFT:
-                # move_type = LEFT
                 if ev.type == pygame.KEYDOWN: 
                     self.left_pressed = True
                 elif ev.type == pygame.KEYUP: 
@@ -43,7 +42,6 @@ class TetrisController:
                     self.left_elapsed_time = 0
 
             elif ev.key == pygame.K_RIGHT:
-                # move_type = RIGHT
                 if ev.type == pygame.KEYDOWN: 
                     self.right_pressed = True
                 elif ev.type == pygame.KEYUP: 
@@ -54,7 +52,6 @@ class TetrisController:
 
             # 소프트 드랍
             elif ev.key == pygame.K_DOWN:
-                # move_type = DOWN
                 if ev.type == pygame.KEYDOWN:
                     self.down_pressed = True
                 elif ev.type == pygame.KEYUP:
@@ -67,7 +64,6 @@ class TetrisController:
             elif ev.key == pygame.K_SPACE:
                 if ev.type == pygame.KEYDOWN: self.drop_pressed = True
                 elif ev.type == pygame.KEYUP: self.drop_pressed = False
-                # move_type = DROP
 
             # 회전(위)
             elif ev.key == pygame.K_UP:

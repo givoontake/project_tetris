@@ -98,9 +98,6 @@ class LobbyState(BaseState):
         self.request_lobby_user_list()
         self.request_friend_list()
 
-    # def on_resize(self, w, h, screen):
-    #     self.screen = screen
-    #     self.set_layout()
 
     def request_room_list(self):
         self.room_list.clear()
@@ -180,7 +177,7 @@ class LobbyState(BaseState):
         event = None
         if self.reactable:
             for index, menu in enumerate(self.top_menus):
-                if menu.handle_event(ev): # 이벤트 함수의 반환값 형태 통일이 필요할 것 같긴 한데..
+                if menu.handle_event(ev):
                     event = index
                     break
             
@@ -225,7 +222,6 @@ class LobbyState(BaseState):
                     self.room_create_window = CreateRoomWindow(self.screen, self.rm, self.net_worker, self.session)
                     self.reactable = False
                     
-                # 나중에 메뉴별 상태 만들고 동작 추가
                 elif event == "게임종료":
                     popup_texts = ["게임종료", "계속하기"]
                     self.exit_popup = PopupBox(self.screen, self.rm, "종료하시겠습니까?", popup_texts)
@@ -365,7 +361,7 @@ class LobbyState(BaseState):
             elif self.input_pw_window:
                 ipw_event = self.input_pw_window.handle_event(ev)
                 if ipw_event != None:
-                    if ipw_event == "참가": # 내부 즉시 전송은 패스워드를 입력할 경우 복잡해진다
+                    if ipw_event == "참가": # 비밀번호 입력이 끝난 뒤 참가 요청을 전송한다.
                         packet = self.net_worker.builder.build_join_room_pkt(self.join_room_key, self.input_pw_window.input.extract_text())
                         self.net_worker.send_packet(packet)
 

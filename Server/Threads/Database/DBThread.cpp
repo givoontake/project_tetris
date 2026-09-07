@@ -109,7 +109,6 @@ bool DBThread::LoadDBConfigFromFile(const std::string& file_path)
         if (!line.empty() && line.back() == '\r')
             line.pop_back();
 
-        // 주석은 남겨둔다.
         Trim(line);
         if (line.empty() || line[0] == '#')
             continue;

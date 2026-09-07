@@ -39,8 +39,6 @@ class Rectangle:
         self.border_width = border_width
         self.visible = True
 
-    # def get_rect(self) -> pygame.Rect: 
-    #     return self.rect
     
     def set_background_color(self, color = tuple[int, int, int]): # r, g, b
         self.background_color = color

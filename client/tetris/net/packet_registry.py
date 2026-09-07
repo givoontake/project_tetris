@@ -1,5 +1,3 @@
-# packet_registry.py (예시)
-
 from tetris.net.packet_types import *
 from tetris.net.packet_structs import *
 

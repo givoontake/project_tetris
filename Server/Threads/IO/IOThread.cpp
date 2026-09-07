@@ -1,6 +1,8 @@
 #include <iostream>
 #include "IOThread.h"
 #include "TetrisServer.h"
+#include "common_packets.h"
+#include "packet_types.h"
 #include "session_tasks.h"
 
 IOThread::IOThread(TetrisServer& tetris_server)
@@ -84,9 +86,50 @@ void IOThread::ProcessReceiveCompletion(BOOL result, DWORD transferred_bytes, Se
 		return;
 	}
 
-	const bool should_receive = tetris_server_.ProcessRecvBuffer(session, session_key, transferred_bytes);
+	const bool should_receive = ProcessRecvBuffer(session, transferred_bytes);
 	if (should_receive) session.RecvPacket();
 	tetris_server_.CompleteSessionIO(session_key);
+}
+
+bool IOThread::ProcessRecvBuffer(Session& session, int recv_bytes)
+{
+	const SessionKey session_key = session.GetSessionKey();
+	const int current_data_size = session.GetRemainingDataSize();
+	if (recv_bytes < 0 || current_data_size < 0 || current_data_size > BUF_SIZE || recv_bytes > BUF_SIZE - current_data_size) {
+		tetris_server_.RequestDisconnect(session_key);
+		return false;
+	}
+
+	session.AdjustRemainingDataSize(recv_bytes);
+	const int remaining_data_size = session.GetRemainingDataSize();
+	char packet_buffer[BUF_SIZE];
+	memcpy(packet_buffer, session.GetRecvOver().packet_buffer, remaining_data_size);
+
+	int offset = 0;
+	bool should_receive = true;
+	while (remaining_data_size - offset >= PACKET_HEADER_SIZE) {
+		char* packet = packet_buffer + offset;
+		const auto* header = reinterpret_cast<const PACKET_HEADER*>(packet);
+		const int packet_size = header->size;
+		if (packet_size < PACKET_HEADER_SIZE || packet_size > BUF_SIZE) {
+			tetris_server_.RequestDisconnect(session_key);
+			should_receive = false;
+			break;
+		}
+		if (remaining_data_size - offset < packet_size) break;
+
+		auto task = std::make_unique<SessionPacketTask>(packet, packet_size);
+		if (!tetris_server_.EnqueueSessionTask(session_key, std::move(task))) {
+			should_receive = false;
+			break;
+		}
+
+		offset += packet_size;
+	}
+
+	session.AdjustRemainingDataSize(-offset);
+	memmove(session.GetRecvOver().packet_buffer, session.GetRecvOver().packet_buffer + offset, session.GetRemainingDataSize());
+	return should_receive;
 }
 
 void IOThread::ProcessSendCompletion(BOOL result, DWORD transferred_bytes, SendBuffer* send_buffer, SessionKey session_key)

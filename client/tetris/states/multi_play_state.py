@@ -69,9 +69,7 @@ class MultiPlayState(BaseState):
         tetris_rect2.x = (sw // 2) + (padding_w // 2)
         tetris_player2 = TetrisSession(self.screen, tetris_rect2, self.rm, self.net_worker, False)
         self.players.append(tetris_player2)
-        # self.board = TetrisBoard(self.screen, board_rect, self.fm, self.room_session)
 
-        # self.btn_start = Button(self.screen, btn_rect, self.rm, self.fm, None, "게임 시작", True)
 
         # 방 제목 / 비밀번호용 상단 버튼 (단순한 박스 역할)
         draw_x, draw_y = 0, 0
@@ -183,8 +181,6 @@ class MultiPlayState(BaseState):
             self.reactable = False
             
         elif data.type == S2C_MULTI_START:
-            # start_data = cast(S2C_MULTI_START_PACKET, data)
-            # if start_data.is_start:
             self.room_state = RoomState.PLAY
             for player in self.players:
                 if player.session == None: continue
@@ -228,7 +224,7 @@ class MultiPlayState(BaseState):
                 if player.session == None: continue
                 if delete_user.id == player.session.id:
                     if player.session.is_self:     
-                        pygame.mixer.music.stop() # 게임 도중에 그냥 나가면 로비에서는 음악나오면 안되니까
+                        pygame.mixer.music.stop() # 로비로 이동하기 전에 게임 음악을 중지한다.
                         self.queue_state(LobbyState(self.screen, self.rm, self.net_worker, self.session))
                     else:
                         player.clear()

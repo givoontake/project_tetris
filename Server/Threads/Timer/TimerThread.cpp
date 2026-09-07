@@ -26,7 +26,6 @@ void TimerThread::Run()
 
     while (is_running_.load() && manager_.tetris_server_.IsRunning())
     {
-        // 다음 틱 시각 계산 후 그때까지 잠자기 cpu 내의 하드웨어 타이머를 통해 타이머 인터럽트가 발생하면 깨어나므로, 대기 중 CPU를 소모하지 않는다.
         bool is_timer_wait_succeeded = true;
         while (is_running_.load() && manager_.tetris_server_.IsRunning()) {
             const auto current_time = Clock::now();
@@ -67,7 +66,7 @@ void TimerThread::Run()
         // 새 틱이 생겼으니 GameThread들을 깨운다.
         // 사용 가능한 스레드를 확보하고 같은 틱의 처리 정보를 전달한다. 이전 틱의 전체 완료는 기다리지 않는다.
 		manager_.lobby_thread_manager_.StartLobbyPhase();
-        manager_.game_thread_manager_.StartGamePhase(tick_time_ms); // 새 틱 발생
+        manager_.game_thread_manager_.StartGamePhase(tick_time_ms);
         // 데이터베이스는 작업 등록 시 즉시 깨우며, 여기서는 큐에 남은 작업을 다시 확인하도록 보조 알림을 보낸다.
         manager_.db_thread_manager_.Wake();
     }

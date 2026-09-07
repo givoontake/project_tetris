@@ -12,9 +12,7 @@ from tetris.ui.rectangle import Rectangle
 
 # -------------------- 싱글 플레이 보드 --------------------
 class TetrisBoard:
-    # 각 ui들은 전체 rect에 상댓값으로 배치하는게 좋아 보인다.
-    # 쓸데없이 rect를 전부 받을 필요가 없다. rect는 전체 하나만 받고, 나머지는 상댓값으로 배치한다.
-    # 보드는 rect 클래스를 통해 2차원 격자로 생성한다. rect 클래스에 set_image 함수를 추가한다.
+    # 전체 영역을 기준으로 하위 요소를 상대 배치한다.
     def __init__(
         self,
         screen: pygame.Surface,
@@ -25,14 +23,12 @@ class TetrisBoard:
         self.rect = rect
         self.rm = rm
         self.block_textures = None
-        # self.is_single = is_single
         self.score = None # 싱글용
 
         self.cols = BOARD_COLS
         self.rows = BOARD_ROWS
-        # self.cell_rect = pygame.Rect(0, 0, 0, 0)
 
-        # 보드 생성 및 None으로 초기화 (각 칸에는 shape_key('I','J',...) 또는 None)
+        # 각 칸을 테트로미노 종류 또는 빈 값으로 관리한다.
         self.grid: list[list[Optional[str]]] = [
             [None for _ in range(self.cols)] for _ in range(self.rows)
         ]
@@ -41,7 +37,6 @@ class TetrisBoard:
         self.current_tetromino: Optional[Tetromino] = None
         self.next_tetromino_shape: Optional[str] = None
 
-        # self.combo = 0
         self.combo_effects: Optional[list[ComboAnimation]] = []
 
         self.anim_elapsed_ms = 0
@@ -74,8 +69,6 @@ class TetrisBoard:
         self.board_frame = Rectangle(self.screen, self.board_frame_rect, self.rm, False, None, "")
         self.board_frame.border_color = GOLD
 
-        # profile_rect = pygame.Rect(draw_x, draw_y, draw_w, draw_h)
-        # self.profile = Profile(self.screen, profile_rect, self.fm, self.session)
         
         draw_x = self.rect.x + self.cell_length*self.cols
         draw_w = self.cell_length*PREVIEW_COLS
@@ -171,8 +164,6 @@ class TetrisBoard:
         if not self.current_tetromino:
             return
         self.current_tetromino = self.current_tetromino.rotated(delta)
-        # if self.can_place(nxt):
-            # self.current_tetromino
 
     def make_landing_tetromino(self) -> Optional[Tetromino]:
         if not self.current_tetromino:

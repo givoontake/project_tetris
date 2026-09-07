@@ -23,11 +23,7 @@ class NetworkWorker:
         self.builder = PacketBuilder()
 
     # ---- 메인 스레드에서 사용할 접근자 ----
-    # def get_packet_manager(self) -> PacketManager:
-    #     return self._pm
 
-    # def get_packet_queue(self):
-    #     return self._pm.queue
 
     # ---- 연결/해제 ----
     def connect_to_server(self) -> bool:
@@ -46,13 +42,6 @@ class NetworkWorker:
             except Exception:
                 pass
             return False
-
-    # 수신 스레드가 아직 살아 있으면 join 시도 (약간의 유예)
-        if self.recv_thread and self.recv_thread.is_alive():
-            try:
-                self.recv_thread.join(timeout=0.2)
-            except Exception:
-                pass
 
     # ---- 수신 루프 ----
     def recv_loop(self):
@@ -74,7 +63,7 @@ class NetworkWorker:
         if not self.running:
             return False
         try:
-            with self.socket_lock: # with: 자원을 자동으로 열고 닫아줌. 여기서는 락을 자동 관리해줌(lock_guard랑 동일)
+            with self.socket_lock:
                 self.sock.sendall(data)
             return True
         except Exception as e:

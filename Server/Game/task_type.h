@@ -37,7 +37,7 @@ struct TaskGameEnd {
 	int winner_id;	
 };
 
-// 이벤트 타입 말고 따로 필요한 내용이 없다면 굳이 구조체로 안만든다
+// 추가 데이터가 없는 이벤트는 별도 구조체를 사용하지 않는다.
 
 using TaskVar = std::variant<TaskMove, TaskClearLine, TaskAddLine, TaskFix, TaskGameOver, TaskUp, TaskGameEnd, TaskSpawn>;
 

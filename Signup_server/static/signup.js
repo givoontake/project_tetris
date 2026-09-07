@@ -112,26 +112,22 @@ document.getElementById("btn_register").addEventListener("click", async () => {
   } else {
     const msg = (data && data.msg) ? data.msg : "회원가입 실패";
 
-    // 서버가 "이미 사용 중인 이메일입니다." 같은 문구를 준다면 여기로 잡힘
     if (msg.includes("이메일")) {
       setMsg("email_msg", msg, false);
-      setMsg("code_msg", "", false); // 원하면 유지/삭제 선택
+      setMsg("code_msg", "", false);
       return;
     }
 
-    // 아이디 중복/아이디 관련이면 id_msg로
     if (msg.includes("아이디")) {
       setMsg("id_msg", msg, false);
       return;
     }
 
-    // 그 외는 기존처럼 알림
     alert(msg);
   }
 });
 
 document.getElementById("btn_cancel").addEventListener("click", () => {
-  // 원하는 페이지로 바꾸면 됨
   window.location.href = "/signup";
 });
 

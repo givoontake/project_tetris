@@ -179,7 +179,7 @@ void GameDBThread::ExecuteAddFriend(SessionKey session_key, FriendInfo acceptor_
 
         const int af_affected = af_stmt->executeUpdate();
 
-		if (af_affected >= 2) // 친구 추가 성공 -> 친구 요청 레코드 삭제 (추가는 양방향이므로 2행이 영향을 받아야 성공)
+		if (af_affected >= 2) // 양방향 친구 관계가 추가되면 기존 요청 레코드를 삭제한다.
         {
             const char* SQL_DELETE_FRIEND_REQUEST =
                 "DELETE FROM friend_requests "
@@ -389,7 +389,7 @@ void GameDBThread::ExecuteAddFriendRequest(SessionKey session_key, FriendInfo re
                 db_over->result_data = std::make_unique<DBResultAddFriendRequest>();
 				DBResultAddFriendRequest* result = static_cast<DBResultAddFriendRequest*>(db_over->result_data.get());
 				result->requester_info = requester_info;
-				result->receiver_info = receiver_info; // 얘는 있는지 없는지 모르니까 gen은 당연히 못넣음
+				result->receiver_info = receiver_info;
             }
         }
     }
